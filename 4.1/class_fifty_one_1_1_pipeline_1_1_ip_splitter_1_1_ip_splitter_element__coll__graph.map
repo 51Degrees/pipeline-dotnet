@@ -1,0 +1,11 @@
+<map id="FiftyOne.Pipeline.IpSplitter.IpSplitterElement" name="FiftyOne.Pipeline.IpSplitter.IpSplitterElement">
+<area shape="rect" id="node1" title=" " alt="" coords="1307,79,1487,121"/>
+<area shape="rect" id="node2" href="$class_fifty_one_1_1_pipeline_1_1_core_1_1_flow_elements_1_1_flow_element_base.html" title=" " alt="" coords="924,14,1149,55"/>
+<area shape="rect" id="node3" href="$class_fifty_one_1_1_pipeline_1_1_core_1_1_flow_elements_1_1_flow_element_base.html" title="Abstract base class for Flow Elements." alt="" coords="542,7,729,63"/>
+<area shape="rect" id="node4" href="$interface_fifty_one_1_1_pipeline_1_1_core_1_1_flow_elements_1_1_i_flow_element.html" title=" " alt="" coords="316,21,491,48"/>
+<area shape="rect" id="node5" href="$interface_fifty_one_1_1_pipeline_1_1_core_1_1_flow_elements_1_1_i_flow_element.html" title="IFlowElement is the basic building block of a pipeline." alt="" coords="5,14,188,55"/>
+<area shape="rect" id="node6" href="$interface_fifty_one_1_1_pipeline_1_1_core_1_1_data_1_1_i_evidence_key_filter.html" title="Represents an object that filters evidence key names based on some criteria." alt="" coords="943,79,1130,121"/>
+<area shape="rect" id="node7" href="$class_fifty_one_1_1_pipeline_1_1_core_1_1_typed_map_1_1_typed_key.html" title=" " alt="" coords="925,145,1149,201"/>
+<area shape="rect" id="node8" href="$class_fifty_one_1_1_pipeline_1_1_core_1_1_typed_map_1_1_typed_key.html" title="A key to a ITypedKeyMap data store." alt="" coords="540,153,731,194"/>
+<area shape="rect" id="node9" href="$interface_fifty_one_1_1_pipeline_1_1_core_1_1_typed_map_1_1_i_typed_key.html" title="Represents a key to a ITypedKeyMap data store." alt="" coords="346,160,461,187"/>
+</map>

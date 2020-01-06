@@ -1,0 +1,9 @@
+<map id="FiftyOne.Pipeline.Core.FlowElements.PipelineBuilderBase&lt; T &gt;" name="FiftyOne.Pipeline.Core.FlowElements.PipelineBuilderBase&lt; T &gt;">
+<area shape="rect" id="node1" title="Abstract pipeline builder base class" alt="" coords="5,51,233,93"/>
+<area shape="rect" id="node2" href="$class_fifty_one_1_1_pipeline_1_1_core_1_1_flow_elements_1_1_pipeline_builder_base.html" title=" " alt="" coords="396,8,593,64"/>
+<area shape="rect" id="node5" href="$class_fifty_one_1_1_pipeline_1_1_core_1_1_flow_elements_1_1_pipeline_builder_base.html" title=" " alt="" coords="396,88,593,144"/>
+<area shape="rect" id="node3" href="$class_fifty_one_1_1_pipeline_1_1_core_1_1_flow_elements_1_1_pipeline_builder.html" title="Default pipeline builder." alt="" coords="667,14,850,55"/>
+<area shape="rect" id="node4" href="$class_fifty_one_1_1_pipeline_1_1_engines_1_1_fifty_one_1_1_flow_elements_1_1_fifty_one_pipeline_builder.html" title="Pipeline builder class that allows the 51Degrees share usage element to be enabled/disabled." alt="" coords="924,5,1135,61"/>
+<area shape="rect" id="node6" href="$class_fifty_one_1_1_pipeline_1_1_engines_1_1_flow_elements_1_1_pre_packaged_pipeline_builder_base.html" title="Base class for pipeline builders that will produce a pipeline with specific flow elements." alt="" coords="643,89,875,145"/>
+<area shape="rect" id="node7" href="$class_fifty_one_1_1_pipeline_1_1_engines_1_1_flow_elements_1_1_cloud_pipeline_builder_base.html" title="Base class for cloud pipeline builders." alt="" coords="940,86,1119,157"/>
+</map>

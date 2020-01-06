@@ -1,0 +1,7 @@
+<map id="FiftyOne.Pipeline.Core.Data.IElementPropertyMetaData" name="FiftyOne.Pipeline.Core.Data.IElementPropertyMetaData">
+<area shape="rect" id="node1" title=" " alt="" coords="5,39,192,80"/>
+<area shape="rect" id="node2" href="$class_fifty_one_1_1_pipeline_1_1_core_1_1_data_1_1_element_property_meta_data.html" title="Meta&#45;data relating to properties that are populated by Flow Elements." alt="" coords="248,5,435,47"/>
+<area shape="rect" id="node4" href="$interface_fifty_one_1_1_pipeline_1_1_engines_1_1_data_1_1_i_aspect_property_meta_data.html" title=" " alt="" coords="240,71,443,112"/>
+<area shape="rect" id="node3" href="$class_fifty_one_1_1_pipeline_1_1_engines_1_1_data_1_1_aspect_property_meta_data.html" title="Meta&#45;data relating to properties that are populated by Aspect Engines." alt="" coords="515,5,714,47"/>
+<area shape="rect" id="node5" href="$interface_fifty_one_1_1_pipeline_1_1_engines_1_1_fifty_one_1_1_data_1_1_i_fifty_one_aspect_property_meta_data.html" title="51Degrees specific meta data." alt="" coords="491,71,739,127"/>
+</map>

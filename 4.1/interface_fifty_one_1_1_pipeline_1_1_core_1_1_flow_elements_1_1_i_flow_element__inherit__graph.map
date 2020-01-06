@@ -1,0 +1,8 @@
+<map id="FiftyOne.Pipeline.Core.FlowElements.IFlowElement" name="FiftyOne.Pipeline.Core.FlowElements.IFlowElement">
+<area shape="rect" id="node1" title="IFlowElement is the basic building block of a pipeline." alt="" coords="5,62,188,103"/>
+<area shape="rect" id="node2" href="$interface_fifty_one_1_1_pipeline_1_1_core_1_1_flow_elements_1_1_i_flow_element.html" title="Generic interface that extends IFlowElement with the ability to return a ITypedKey&lt;T&gt; that will allow..." alt="" coords="455,5,637,61"/>
+<area shape="rect" id="node3" href="$interface_fifty_one_1_1_pipeline_1_1_engines_1_1_flow_elements_1_1_i_aspect_engine.html" title="Interface representing 51Degrees on&#45;premise aspect engines." alt="" coords="450,85,642,141"/>
+<area shape="rect" id="node4" href="$interface_fifty_one_1_1_pipeline_1_1_core_1_1_flow_elements_1_1_i_flow_element.html" title=" " alt="" coords="409,165,683,221"/>
+<area shape="rect" id="node5" href="$interface_fifty_one_1_1_pipeline_1_1_json_builder_1_1_flow_element_1_1_i_json_builder_element.html" title=" " alt="" coords="732,173,951,214"/>
+<area shape="rect" id="node6" href="$class_fifty_one_1_1_pipeline_1_1_json_builder_1_1_flow_element_1_1_json_builder_element.html" title="The JsonBuilderElement takes accessible properties and adds the property key:values to the Json objec..." alt="" coords="1000,173,1216,214"/>
+</map>

@@ -1,0 +1,8 @@
+<map id="FiftyOne.Pipeline.Engines.FiftyOne.Data.FiftyOneDataFile" name="FiftyOne.Pipeline.Engines.FiftyOne.Data.FiftyOneDataFile">
+<area shape="rect" id="node1" title=" " alt="" coords="77,261,280,303"/>
+<area shape="rect" id="node2" href="$class_fifty_one_1_1_pipeline_1_1_engines_1_1_data_1_1_aspect_engine_data_file.html" title="This class contains all configuration and run&#45;time state information that is associated with a partic..." alt="" coords="169,185,319,212"/>
+<area shape="rect" id="node3" href="$interface_fifty_one_1_1_pipeline_1_1_engines_1_1_data_1_1_i_aspect_engine_data_file.html" title="Interface for the details of a data file used by an Aspect engine." alt="" coords="5,89,160,115"/>
+<area shape="rect" id="node6" href="$interface_fifty_one_1_1_pipeline_1_1_engines_1_1_fifty_one_1_1_data_1_1_i_fifty_one_data_file.html" title=" " alt="" coords="21,185,144,212"/>
+<area shape="rect" id="node4" title=" " alt="" coords="38,5,127,32"/>
+<area shape="rect" id="node5" href="$interface_fifty_one_1_1_pipeline_1_1_engines_1_1_services_1_1_i_data_update_service.html" title="Service that manages updates to data files that are used by IOnPremiseAspectEngine instances." alt="" coords="185,81,373,123"/>
+</map>

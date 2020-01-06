@@ -1,0 +1,4 @@
+<map id="FiftyOne.Pipeline.Core.Data.IFlowData" name="FiftyOne.Pipeline.Core.Data.IFlowData">
+<area shape="rect" id="node1" title="The IFlowData represents the data that is used within a pipeline." alt="" coords="5,5,192,47"/>
+<area shape="rect" id="node2" href="$class_fifty_one_1_1_pipeline_1_1_core_1_1_data_1_1_flow_data.html" title="The FlowData class contains the data that is used within a pipeline." alt="" coords="5,95,192,136"/>
+</map>

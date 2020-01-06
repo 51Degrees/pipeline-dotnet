@@ -1,0 +1,5 @@
+<map id="FiftyOne.Pipeline.JavaScriptBuilder.Data.IJavaScriptBuilderElementData" name="FiftyOne.Pipeline.JavaScriptBuilder.Data.IJavaScriptBuilderElementData">
+<area shape="rect" id="node1" title=" " alt="" coords="5,155,204,211"/>
+<area shape="rect" id="node2" href="$interface_fifty_one_1_1_pipeline_1_1_core_1_1_data_1_1_i_element_data.html" title="Represents property values that have be determined by a specific FlowElement based on the supplied ev..." alt="" coords="55,80,155,107"/>
+<area shape="rect" id="node3" href="$interface_fifty_one_1_1_pipeline_1_1_core_1_1_data_1_1_i_data.html" title="Represents property values" alt="" coords="79,5,131,32"/>
+</map>
