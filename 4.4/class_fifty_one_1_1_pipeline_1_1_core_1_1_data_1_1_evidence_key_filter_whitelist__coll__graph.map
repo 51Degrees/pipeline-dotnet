@@ -1,0 +1,4 @@
+<map id="FiftyOne.Pipeline.Core.Data.EvidenceKeyFilterWhitelist" name="FiftyOne.Pipeline.Core.Data.EvidenceKeyFilterWhitelist">
+<area shape="rect" id="node1" title="This evidence filter will only include keys that are in a list that is specified at construction time..." alt="" coords="5,80,211,121"/>
+<area shape="rect" id="node2" href="$interface_fifty_one_1_1_pipeline_1_1_core_1_1_data_1_1_i_evidence_key_filter.html" title="Represents an object that filters evidence key names based on some criteria." alt="" coords="37,5,179,32"/>
+</map>

@@ -1,0 +1,4 @@
+<map id="FiftyOne.Pipeline.Engines.Configuration.DataFileConfiguration" name="FiftyOne.Pipeline.Engines.Configuration.DataFileConfiguration">
+<area shape="rect" id="node1" title="This class contains the automatic update configuration parameters that can be supplied to an engine f..." alt="" coords="5,80,260,121"/>
+<area shape="rect" id="node2" href="$interface_fifty_one_1_1_pipeline_1_1_engines_1_1_configuration_1_1_i_data_file_configuration.html" title="Interface representing the configuration parameters controlling the automatic update checks for a spe..." alt="" coords="49,5,216,32"/>
+</map>

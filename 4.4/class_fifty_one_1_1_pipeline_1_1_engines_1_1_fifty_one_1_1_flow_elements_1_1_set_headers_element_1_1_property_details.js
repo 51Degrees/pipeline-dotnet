@@ -1,0 +1,5 @@
+var class_fifty_one_1_1_pipeline_1_1_engines_1_1_fifty_one_1_1_flow_elements_1_1_set_headers_element_1_1_property_details =
+[
+    [ "PropertyMetaData", "class_fifty_one_1_1_pipeline_1_1_engines_1_1_fifty_one_1_1_flow_elements_1_1_set_headers_element_1_1_property_details.html#a6287ba94349ca1bddf29c89d81bd3522", null ],
+    [ "ResponseHeaderName", "class_fifty_one_1_1_pipeline_1_1_engines_1_1_fifty_one_1_1_flow_elements_1_1_set_headers_element_1_1_property_details.html#a206bc820944658bfc40a970569081616", null ]
+];

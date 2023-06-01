@@ -1,0 +1,4 @@
+<map id="FiftyOne.Pipeline.Core.Data.DataBase" name="FiftyOne.Pipeline.Core.Data.DataBase">
+<area shape="rect" id="node1" title="This class stores data values as key/value pairs where the key is a string and the value can be any t..." alt="" coords="5,80,211,121"/>
+<area shape="rect" id="node2" href="$interface_fifty_one_1_1_pipeline_1_1_core_1_1_data_1_1_i_data.html" title="Represents property values" alt="" coords="79,5,137,32"/>
+</map>

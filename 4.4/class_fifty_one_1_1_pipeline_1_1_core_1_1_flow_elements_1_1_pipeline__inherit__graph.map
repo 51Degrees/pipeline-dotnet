@@ -1,0 +1,6 @@
+<map id="FiftyOne.Pipeline.Core.FlowElements.Pipeline" name="FiftyOne.Pipeline.Core.FlowElements.Pipeline">
+<area shape="rect" id="node1" title="A pipeline is used to create IFlowData instances which then automatically use the pipeline when their..." alt="" coords="5,229,207,271"/>
+<area shape="rect" id="node2" href="$interface_fifty_one_1_1_pipeline_1_1_core_1_1_flow_elements_1_1_i_pipeline_internal.html" title="Internal interface for a pipeline." alt="" coords="42,155,170,181"/>
+<area shape="rect" id="node3" href="$interface_fifty_one_1_1_pipeline_1_1_core_1_1_flow_elements_1_1_i_pipeline.html" title="The public interface for a Pipeline." alt="" coords="67,80,145,107"/>
+<area shape="rect" id="node4" title=" " alt="" coords="57,5,155,32"/>
+</map>

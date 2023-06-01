@@ -1,0 +1,7 @@
+<map id="FiftyOne.Pipeline.Engines.Trackers.TrackerBase&lt; TValue &gt;" name="FiftyOne.Pipeline.Engines.Trackers.TrackerBase&lt; TValue &gt;">
+<area shape="rect" id="node1" title="The abstract base class for trackers." alt="" coords="66,259,297,300"/>
+<area shape="rect" id="node2" href="$class_fifty_one_1_1_pipeline_1_1_engines_1_1_caching_1_1_data_keyed_cache_base.html" title="Abstract base class for caches that use IFlowData as the key." alt="" coords="28,169,193,211"/>
+<area shape="rect" id="node3" href="$interface_fifty_one_1_1_pipeline_1_1_engines_1_1_caching_1_1_i_data_keyed_cache.html" title="Represents a put cache where the key is a IFlowData instance." alt="" coords="5,95,216,121"/>
+<area shape="rect" id="node4" title=" " alt="" coords="25,5,197,47"/>
+<area shape="rect" id="node5" href="$interface_fifty_one_1_1_pipeline_1_1_engines_1_1_trackers_1_1_i_tracker.html" title=" " alt="" coords="217,177,289,203"/>
+</map>

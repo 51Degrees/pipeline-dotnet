@@ -1,0 +1,6 @@
+<map id="FiftyOne.Pipeline.Core.Exceptions.PipelineException" name="FiftyOne.Pipeline.Core.Exceptions.PipelineException">
+<area shape="rect" id="node1" title="Base class for all exceptions thrown by Pipeline API components" alt="" coords="140,39,385,80"/>
+<area shape="rect" id="node3" href="$class_fifty_one_1_1_pipeline_1_1_core_1_1_exceptions_1_1_pipeline_configuration_exception.html" title="Exception that is thrown when the configuration options provided to PipelineBuilder are invalid See t..." alt="" coords="433,5,679,47"/>
+<area shape="rect" id="node4" href="$class_fifty_one_1_1_pipeline_1_1_core_1_1_exceptions_1_1_pipeline_data_exception.html" title="Exception that can be thrown when the available data does not match that which is expected." alt="" coords="433,71,679,112"/>
+<area shape="rect" id="node2" title=" " alt="" coords="5,46,92,73"/>
+</map>

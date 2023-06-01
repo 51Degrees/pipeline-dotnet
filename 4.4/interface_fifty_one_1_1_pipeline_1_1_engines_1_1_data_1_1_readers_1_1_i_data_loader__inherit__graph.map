@@ -1,0 +1,4 @@
+<map id="FiftyOne.Pipeline.Engines.Data.Readers.IDataLoader&lt; T &gt;" name="FiftyOne.Pipeline.Engines.Data.Readers.IDataLoader&lt; T &gt;">
+<area shape="rect" id="node1" title="Used to load data from either a file or byte array into the format &#39;T&#39;." alt="" coords="5,5,236,47"/>
+<area shape="rect" id="node2" href="$class_fifty_one_1_1_pipeline_1_1_engines_1_1_data_1_1_readers_1_1_json_loader.html" title="JSON implementation of IDataLoader." alt="" coords="30,95,211,151"/>
+</map>

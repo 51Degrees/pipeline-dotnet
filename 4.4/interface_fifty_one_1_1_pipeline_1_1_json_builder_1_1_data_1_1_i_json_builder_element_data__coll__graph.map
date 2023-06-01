@@ -1,0 +1,5 @@
+<map id="FiftyOne.Pipeline.JsonBuilder.Data.IJsonBuilderElementData" name="FiftyOne.Pipeline.JsonBuilder.Data.IJsonBuilderElementData">
+<area shape="rect" id="node1" title="The IElementData interface for JsonBuilderElement." alt="" coords="5,155,224,196"/>
+<area shape="rect" id="node2" href="$interface_fifty_one_1_1_pipeline_1_1_core_1_1_data_1_1_i_element_data.html" title="Represents property values that have been determined by a specific FlowElement based on the supplied ..." alt="" coords="59,80,170,107"/>
+<area shape="rect" id="node3" href="$interface_fifty_one_1_1_pipeline_1_1_core_1_1_data_1_1_i_data.html" title="Represents property values" alt="" coords="86,5,143,32"/>
+</map>

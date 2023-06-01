@@ -1,0 +1,7 @@
+var class_fifty_one_1_1_pipeline_1_1_java_script_1_1_tests_1_1_java_script_builder_element_builder_tests =
+[
+    [ "JavaScriptBuilderElement_Builder_SetDefaultProtocol_InvalidProtocol", "class_fifty_one_1_1_pipeline_1_1_java_script_1_1_tests_1_1_java_script_builder_element_builder_tests.html#a11f4c61d844106fe8d7b6a6a2cedeae9", null ],
+    [ "JavaScriptBuilderElement_Builder_SetDefaultProtocol_ValidProtocol", "class_fifty_one_1_1_pipeline_1_1_java_script_1_1_tests_1_1_java_script_builder_element_builder_tests.html#a75f1132ec1bd0a189892c2f8142b30fb", null ],
+    [ "JavaScriptBuilderElement_Builder_SetObjectName_InvalidName", "class_fifty_one_1_1_pipeline_1_1_java_script_1_1_tests_1_1_java_script_builder_element_builder_tests.html#a50a08f6fb9bd2905c4c706d7ab12fcd3", null ],
+    [ "JavaScriptBuilderElement_Builder_SetObjectName_ValidName", "class_fifty_one_1_1_pipeline_1_1_java_script_1_1_tests_1_1_java_script_builder_element_builder_tests.html#a572f60adba099cb56a7ef87cae2e6afa", null ]
+];

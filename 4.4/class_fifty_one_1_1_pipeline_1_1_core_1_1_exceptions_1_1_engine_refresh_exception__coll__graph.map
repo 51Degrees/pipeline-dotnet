@@ -1,0 +1,4 @@
+<map id="FiftyOne.Pipeline.Core.Exceptions.EngineRefreshException" name="FiftyOne.Pipeline.Core.Exceptions.EngineRefreshException">
+<area shape="rect" id="node1" title="Exception that can be thrown when an IOnPremiseAspectEngine fails to reload from one or more of it&#39;s ..." alt="" coords="5,80,251,121"/>
+<area shape="rect" id="node2" title=" " alt="" coords="85,5,171,32"/>
+</map>

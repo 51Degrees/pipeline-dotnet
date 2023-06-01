@@ -1,0 +1,11 @@
+<map id="FiftyOne.Pipeline.Core.FlowElements.IFlowElement" name="FiftyOne.Pipeline.Core.FlowElements.IFlowElement">
+<area shape="rect" id="node1" title="IFlowElement is the basic building block of a pipeline." alt="" coords="5,93,207,134"/>
+<area shape="rect" id="node2" href="$interface_fifty_one_1_1_pipeline_1_1_core_1_1_flow_elements_1_1_i_flow_element.html" title="Generic interface that extends IFlowElement with the ability to return a ITypedKey&lt;T&gt; that will allow..." alt="" coords="504,5,707,61"/>
+<area shape="rect" id="node3" href="$interface_fifty_one_1_1_pipeline_1_1_engines_1_1_flow_elements_1_1_i_aspect_engine.html" title="Interface representing 51Degrees on&#45;premise aspect engines." alt="" coords="500,85,711,141"/>
+<area shape="rect" id="node4" href="$interface_fifty_one_1_1_pipeline_1_1_core_1_1_flow_elements_1_1_i_flow_element.html" title=" " alt="" coords="452,165,759,221"/>
+<area shape="rect" id="node7" href="$interface_fifty_one_1_1_pipeline_1_1_core_1_1_flow_elements_1_1_i_flow_element.html" title=" " alt="" coords="470,245,741,301"/>
+<area shape="rect" id="node5" href="$interface_fifty_one_1_1_pipeline_1_1_json_builder_1_1_flow_element_1_1_i_json_builder_element.html" title="The Interface for the JsonBuilderElement See the Specification" alt="" coords="814,173,1057,214"/>
+<area shape="rect" id="node6" href="$class_fifty_one_1_1_pipeline_1_1_json_builder_1_1_flow_element_1_1_json_builder_element.html" title="The JsonBuilderElement takes accessible properties and adds the property key:values to the Json objec..." alt="" coords="1118,173,1357,214"/>
+<area shape="rect" id="node8" href="$interface_fifty_one_1_1_pipeline_1_1_engines_1_1_fifty_one_1_1_flow_elements_1_1_i_set_headers_element.html" title="An IFlowElement that collates responses from all engines that want to set headers in the HTTP respons..." alt="" coords="808,245,1063,301"/>
+<area shape="rect" id="node9" href="$class_fifty_one_1_1_pipeline_1_1_engines_1_1_fifty_one_1_1_flow_elements_1_1_set_headers_element.html" title="This element is used to determine the values for HTTP headers that other elements in the pipeline wan..." alt="" coords="1112,245,1363,301"/>
+</map>
