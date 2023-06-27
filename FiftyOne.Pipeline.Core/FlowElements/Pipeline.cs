@@ -133,11 +133,12 @@ namespace FiftyOne.Pipeline.Core.FlowElements
                     {
                         if (_evidenceKeyFilter == null)
                         {
-                            _evidenceKeyFilter = new EvidenceKeyFilterAggregator();
+                            var evidenceKeyFilter = new EvidenceKeyFilterAggregator();
                             foreach (var filter in _flowElements.Select(e => e.EvidenceKeyFilter))
                             {
-                                _evidenceKeyFilter.AddFilter(filter);
+                                evidenceKeyFilter.AddFilter(filter);
                             }
+                            _evidenceKeyFilter = evidenceKeyFilter;
                         }
                     }
                 }
