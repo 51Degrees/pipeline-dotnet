@@ -165,6 +165,26 @@ Public Member Functions</h2>
 <section class="g-docs__section">
 </section>
 <section class="g-docs__section">
+<!-- startMemberHeader -->
+<h2 class="g-docs__section-heading">
+<a name="pub-attribs"></a>
+Public Attributes</h2>
+<!-- endMemberHeader -->
+<!-- startMemberList -->
+<!-- start member list -->
+<div class="g-table g-table--overflow">
+<table class="c-table c-table--members">
+<tbody class="c-table__body">
+<!-- member dec start -->
+<!-- startMemberItem() -->
+<tr class="c-table__row memitem:aaada23b5ecf84ad197712605d1f77d78"><td class="c-table__cell">bool<!-- insertMemberAlign -->
+&#160;</td><td class="c-table__cell"><a class="el" href="class_fifty_one_1_1_pipeline_1_1_core_1_1_flow_elements_1_1_pipeline.html#aaada23b5ecf84ad197712605d1f77d78">SuppressProcessExceptions</a> =&gt; _suppressProcessExceptions
+<!-- startMemberDescription -->
+<div class="c-table__desc memdesc:aaada23b5ecf84ad197712605d1f77d78">Control field that indicates if the <a class="el" href="class_fifty_one_1_1_pipeline_1_1_core_1_1_flow_elements_1_1_pipeline.html" title="A pipeline is used to create IFlowData instances which then automatically use the pipeline when their...">Pipeline</a> will throw an aggregate exception during processing or suppress it and ignore the exceptions added to IFlowData.Errors.  <a href="#aaada23b5ecf84ad197712605d1f77d78">More...</a><!-- endMemberDescription -->
+</div></td></tr>
+<!-- endMemberList -->
+<!-- end member list -->
+</tbody></table></div>
 </section>
 <section class="g-docs__section">
 </section>
@@ -278,6 +298,13 @@ Properties</h2>
 &#160;</td><td class="c-table__cell"><a class="el" href="interface_fifty_one_1_1_pipeline_1_1_core_1_1_flow_elements_1_1_i_pipeline.html#aa8dc02e22e0714cc4db5d0af78754786">IsDisposed</a><code> [get]</code>
 <!-- startMemberDescription -->
 <div class="c-table__desc memdesc:aa8dc02e22e0714cc4db5d0af78754786 inherit properties_interface_fifty_one_1_1_pipeline_1_1_core_1_1_flow_elements_1_1_i_pipeline">True if the pipeline has been disposed  <a href="interface_fifty_one_1_1_pipeline_1_1_core_1_1_flow_elements_1_1_i_pipeline.html#aa8dc02e22e0714cc4db5d0af78754786">More...</a><!-- endMemberDescription -->
+</div></td></tr>
+<!-- member dec start -->
+<!-- startMemberItem() -->
+<tr class="c-table__row memitem:a259ac54f9e8273bb01d4666fdeeb0c06 inherit properties_interface_fifty_one_1_1_pipeline_1_1_core_1_1_flow_elements_1_1_i_pipeline"><td class="c-table__cell">bool<!-- insertMemberAlign -->
+&#160;</td><td class="c-table__cell"><a class="el" href="interface_fifty_one_1_1_pipeline_1_1_core_1_1_flow_elements_1_1_i_pipeline.html#a259ac54f9e8273bb01d4666fdeeb0c06">SuppressProcessExceptions</a><code> [get]</code>
+<!-- startMemberDescription -->
+<div class="c-table__desc memdesc:a259ac54f9e8273bb01d4666fdeeb0c06 inherit properties_interface_fifty_one_1_1_pipeline_1_1_core_1_1_flow_elements_1_1_i_pipeline">Control field that indicates if the <a class="el" href="class_fifty_one_1_1_pipeline_1_1_core_1_1_flow_elements_1_1_pipeline.html" title="A pipeline is used to create IFlowData instances which then automatically use the pipeline when their...">Pipeline</a> will throw an aggregate exception during processing or suppress it and ignore the exceptions added to IFlowData.Errors.  <a href="interface_fifty_one_1_1_pipeline_1_1_core_1_1_flow_elements_1_1_i_pipeline.html#a259ac54f9e8273bb01d4666fdeeb0c06">More...</a><!-- endMemberDescription -->
 </div></td></tr>
 <!-- member dec start -->
 <!-- startMemberItem() -->
@@ -632,8 +659,44 @@ Properties</h2>
     <tr><dd class="c-list-definition__desc"><span class="b-text--red">data</span> - The IFlowData that contains the evidence and will allow the user to access the results. </dd>
   </dd>
 </dl>
+<dl class="c-list-definition"><dt class="c-list-definition__title">Exceptions</dt><dd class="c-list-definition__desc">
+    <tr><dd class="c-list-definition__desc"><span class="b-text--red">ArgumentNullException</span> - Thrown if a required parameter is null. </dd>
+    <tr><dd class="c-list-definition__desc"><span class="b-text--red">AggregateException</span> - Thrown if an error occurred during processing, unless  is true. </dd>
+  </dd>
+</dl>
 
 <p>Implements <a class="el" href="interface_fifty_one_1_1_pipeline_1_1_core_1_1_flow_elements_1_1_i_pipeline_internal.html#a57a2c641f257a95bb428c5ffb8a354be">FiftyOne.Pipeline.Core.FlowElements.IPipelineInternal</a>.</p>
+<!-- endIndent -->
+
+</div>
+</div>
+</article>
+<!-- endMemberDocList -->
+<h2 class="g-docs__section-heading">Member Data Documentation</h2>
+<!-- startMemberDocList -->
+<article class="c-member">
+<a id="aaada23b5ecf84ad197712605d1f77d78"></a><!-- startMemberDoc -->
+
+<h2 class="c-member__title"><span class="c-member__anchor"><a href="#aaada23b5ecf84ad197712605d1f77d78">&#9670;&nbsp;</a></span>SuppressProcessExceptions</h2>
+
+<div class="c-member__main">
+<div class="c-member__head">
+<!-- startMemberDocName -->
+      <div class="c-member__split">
+        <div class="g-table g-table--overflow">
+          <table class="c-table c-table--article">
+            <tr class="c-table__row">
+              <td class="c-table__cell">bool FiftyOne.Pipeline.Core.FlowElements.Pipeline.SuppressProcessExceptions =&gt; _suppressProcessExceptions<!-- endMemberDocName -->
+</td>
+<!-- endMemberDoc -->
+            </tr>
+          </table>
+        </div>
+      </div>
+</div><!-- startIndent -->
+<div class="c-member__body">
+
+<p>Control field that indicates if the <a class="el" href="class_fifty_one_1_1_pipeline_1_1_core_1_1_flow_elements_1_1_pipeline.html" title="A pipeline is used to create IFlowData instances which then automatically use the pipeline when their...">Pipeline</a> will throw an aggregate exception during processing or suppress it and ignore the exceptions added to IFlowData.Errors. </p>
 <!-- endIndent -->
 
 </div>
@@ -817,6 +880,7 @@ Properties</h2>
       <h5 class="c-section-nav__heading">On This Page</h5>
         <ul class="c-section-nav__list">
 <li class="c-section-nav__item"><a class="c-section-nav__link" href="#pub-methods">Public Member Functions</a></li>
+<li class="c-section-nav__item"><a class="c-section-nav__link" href="#pub-attribs">Public Attributes</a></li>
 <li class="c-section-nav__item"><a class="c-section-nav__link" href="#pro-methods">Protected Member Functions</a></li>
 <li class="c-section-nav__item"><a class="c-section-nav__link" href="#properties">Properties</a></li>
 <li class="c-section-nav__item"><a class="c-section-nav__link" href="class_fifty_one_1_1_pipeline_1_1_core_1_1_flow_elements_1_1_pipeline-members.html">List of all members</a></li>    </div>

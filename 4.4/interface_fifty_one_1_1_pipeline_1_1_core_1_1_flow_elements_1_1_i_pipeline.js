@@ -7,5 +7,6 @@ var interface_fifty_one_1_1_pipeline_1_1_core_1_1_flow_elements_1_1_i_pipeline =
     [ "EvidenceKeyFilter", "interface_fifty_one_1_1_pipeline_1_1_core_1_1_flow_elements_1_1_i_pipeline.html#a47e8419cf917ba639c267b821d887431", null ],
     [ "FlowElements", "interface_fifty_one_1_1_pipeline_1_1_core_1_1_flow_elements_1_1_i_pipeline.html#ab505c5f960cba3897d7d99eb250fc297", null ],
     [ "IsConcurrent", "interface_fifty_one_1_1_pipeline_1_1_core_1_1_flow_elements_1_1_i_pipeline.html#adbd1ce96b18b81f6b1017475fca70961", null ],
-    [ "IsDisposed", "interface_fifty_one_1_1_pipeline_1_1_core_1_1_flow_elements_1_1_i_pipeline.html#aa8dc02e22e0714cc4db5d0af78754786", null ]
+    [ "IsDisposed", "interface_fifty_one_1_1_pipeline_1_1_core_1_1_flow_elements_1_1_i_pipeline.html#aa8dc02e22e0714cc4db5d0af78754786", null ],
+    [ "SuppressProcessExceptions", "interface_fifty_one_1_1_pipeline_1_1_core_1_1_flow_elements_1_1_i_pipeline.html#a259ac54f9e8273bb01d4666fdeeb0c06", null ]
 ];

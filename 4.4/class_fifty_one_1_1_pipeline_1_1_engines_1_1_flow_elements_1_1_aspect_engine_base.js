@@ -8,6 +8,7 @@ var class_fifty_one_1_1_pipeline_1_1_engines_1_1_flow_elements_1_1_aspect_engine
     [ "SetCacheHitOrMiss", "class_fifty_one_1_1_pipeline_1_1_engines_1_1_flow_elements_1_1_aspect_engine_base.html#a8c656826c23399be967d26d138acec6f", null ],
     [ "SetLazyLoading", "class_fifty_one_1_1_pipeline_1_1_engines_1_1_flow_elements_1_1_aspect_engine_base.html#ae2e1a0393a106fe68975406c52cab1a1", null ],
     [ "DataSourceTier", "class_fifty_one_1_1_pipeline_1_1_engines_1_1_flow_elements_1_1_aspect_engine_base.html#a76fad31059c56c8bfe6b9f2eb0349499", null ],
+    [ "HasLoadedProperties", "class_fifty_one_1_1_pipeline_1_1_engines_1_1_flow_elements_1_1_aspect_engine_base.html#a5990e12652c20045bd139110218abdd8", null ],
     [ "LazyLoadingConfiguration", "class_fifty_one_1_1_pipeline_1_1_engines_1_1_flow_elements_1_1_aspect_engine_base.html#af274eece2e46ef068dedf96c5d411c3b", null ],
     [ "Properties", "class_fifty_one_1_1_pipeline_1_1_engines_1_1_flow_elements_1_1_aspect_engine_base.html#a1afdb39e045fb264c1543b9cb9de16b8", null ]
 ];
