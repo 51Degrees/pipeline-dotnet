@@ -37,7 +37,7 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="FiftyOne.Caching" Version="4.4.10" />
+    <PackageReference Include="FiftyOne.Caching" Version="4.4.11" />
     <PackageReference Include="FiftyOne.Common" Version="4.4.9" />
     <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
   </ItemGroup>
