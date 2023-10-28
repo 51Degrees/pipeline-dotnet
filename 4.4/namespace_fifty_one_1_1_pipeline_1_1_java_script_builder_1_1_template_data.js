@@ -1,0 +1,4 @@
+var namespace_fifty_one_1_1_pipeline_1_1_java_script_builder_1_1_template_data =
+[
+    [ "JavaScriptResource", "class_fifty_one_1_1_pipeline_1_1_java_script_builder_1_1_template_data_1_1_java_script_resource.html", "class_fifty_one_1_1_pipeline_1_1_java_script_builder_1_1_template_data_1_1_java_script_resource" ]
+];

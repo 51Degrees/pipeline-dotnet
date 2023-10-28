@@ -74,7 +74,7 @@ var NAVTREEINDEX5 =
 "namespace_fifty_one_1_1_pipeline_1_1_java_script_builder.html":[2,4,0,4],
 "namespace_fifty_one_1_1_pipeline_1_1_java_script_builder_1_1_data.html":[2,4,0,4,0],
 "namespace_fifty_one_1_1_pipeline_1_1_java_script_builder_1_1_flow_element.html":[2,4,0,4,1],
-"namespace_fifty_one_1_1_pipeline_1_1_java_script_builder_1_1_templates.html":[2,4,0,4,2],
+"namespace_fifty_one_1_1_pipeline_1_1_java_script_builder_1_1_template_data.html":[2,4,0,4,2],
 "namespace_fifty_one_1_1_pipeline_1_1_json_builder.html":[2,4,0,5],
 "namespace_fifty_one_1_1_pipeline_1_1_json_builder_1_1_converters.html":[2,4,0,5,0],
 "namespace_fifty_one_1_1_pipeline_1_1_json_builder_1_1_data.html":[2,4,0,5,1],
