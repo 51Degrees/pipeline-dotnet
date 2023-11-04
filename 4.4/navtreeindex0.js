@@ -1,7 +1,7 @@
 var NAVTREEINDEX0 =
 {
 "../../documentation/4.4/index.html":[0],
-"_example_framework_web_site_2_controllers_2_home_controller_8cs-example.html":[3,0],
+"_example_framework_website_2_controllers_2_home_controller_8cs-example.html":[3,0],
 "_result_caching_2_program_8cs-example.html":[3,1],
 "_usage_sharing_2_program_8cs-example.html":[3,2],
 "annotated.html":[2],
