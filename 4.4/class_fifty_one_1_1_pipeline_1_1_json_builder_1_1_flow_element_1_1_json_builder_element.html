@@ -143,6 +143,13 @@ Public Member Functions</h2>
 <!-- startMemberDescription -->
 <div class="c-table__desc memdesc:a08c3b07131e29dcefb5c9448ef18d62b">Constructor  <a href="#a08c3b07131e29dcefb5c9448ef18d62b">More...</a><!-- endMemberDescription -->
 </div></td></tr>
+<!-- member dec start -->
+<!-- startMemberItem() -->
+<tr class="c-table__row memitem:ace1893e48e2ae11d133bb268a9d7f263"><td class="c-table__cell"><a class="el" href="interface_fifty_one_1_1_pipeline_1_1_json_builder_1_1_data_1_1_i_json_builder_element_data.html">IJsonBuilderElementData</a><!-- insertMemberAlign -->
+&#160;</td><td class="c-table__cell"><a class="el" href="class_fifty_one_1_1_pipeline_1_1_json_builder_1_1_flow_element_1_1_json_builder_element.html#ace1893e48e2ae11d133bb268a9d7f263">GetFallbackResponse</a> (<a class="el" href="interface_fifty_one_1_1_pipeline_1_1_core_1_1_data_1_1_i_flow_data.html">IFlowData</a> data)
+<!-- startMemberDescription -->
+<div class="c-table__desc memdesc:ace1893e48e2ae11d133bb268a9d7f263">Transform the data in the flow data instance into a JSON object.  <a href="#ace1893e48e2ae11d133bb268a9d7f263">More...</a><!-- endMemberDescription -->
+</div></td></tr>
 <!-- writeInheritedSectionTitle -->
 <tr class="c-table__row pub_methods_class_fifty_one_1_1_pipeline_1_1_core_1_1_flow_elements_1_1_flow_element_base"><td class="c-table__cell c-table__cell--parent" colspan="2" onclick="javascript:toggleInherit('pub_methods_class_fifty_one_1_1_pipeline_1_1_core_1_1_flow_elements_1_1_flow_element_base')"><span class="c-table__arrow c-table__arrow--is-open"></span><h3 class="c-table__heading">Public Member Functions inherited from <a class="el" href="class_fifty_one_1_1_pipeline_1_1_core_1_1_flow_elements_1_1_flow_element_base.html">FiftyOne.Pipeline.Core.FlowElements.FlowElementBase&lt; IJsonBuilderElementData, IElementPropertyMetaData &gt;</a></h3></td></tr>
 <!-- member dec start -->
@@ -262,10 +269,10 @@ Protected Member Functions</h2>
 </div></td></tr>
 <!-- member dec start -->
 <!-- startMemberItem() -->
-<tr class="c-table__row memitem:a41f506767f2bb378df04d57e7d3c294c"><td class="c-table__cell">virtual&#160;string<!-- insertMemberAlign -->
-&#160;</td><td class="c-table__cell"><a class="el" href="class_fifty_one_1_1_pipeline_1_1_json_builder_1_1_flow_element_1_1_json_builder_element.html#a41f506767f2bb378df04d57e7d3c294c">BuildJson</a> (<a class="el" href="interface_fifty_one_1_1_pipeline_1_1_core_1_1_data_1_1_i_flow_data.html">IFlowData</a> data, <a class="el" href="class_fifty_one_1_1_pipeline_1_1_json_builder_1_1_flow_element_1_1_json_builder_element_1_1_pipeline_config.html">PipelineConfig</a> config)
+<tr class="c-table__row memitem:a6865a96f24df8d1b923c0b04b5f27efe"><td class="c-table__cell">virtual&#160;string<!-- insertMemberAlign -->
+&#160;</td><td class="c-table__cell"><a class="el" href="class_fifty_one_1_1_pipeline_1_1_json_builder_1_1_flow_element_1_1_json_builder_element.html#a6865a96f24df8d1b923c0b04b5f27efe">BuildJson</a> (<a class="el" href="interface_fifty_one_1_1_pipeline_1_1_core_1_1_data_1_1_i_flow_data.html">IFlowData</a> data, <a class="el" href="class_fifty_one_1_1_pipeline_1_1_json_builder_1_1_flow_element_1_1_json_builder_element_1_1_pipeline_config.html">PipelineConfig</a> config, bool requireSequenceNumber)
 <!-- startMemberDescription -->
-<div class="c-table__desc memdesc:a41f506767f2bb378df04d57e7d3c294c">Create and populate a JSON string from the specified data.  <a href="#a41f506767f2bb378df04d57e7d3c294c">More...</a><!-- endMemberDescription -->
+<div class="c-table__desc memdesc:a6865a96f24df8d1b923c0b04b5f27efe">Create and populate a JSON string from the specified data.  <a href="#a6865a96f24df8d1b923c0b04b5f27efe">More...</a><!-- endMemberDescription -->
 </div></td></tr>
 <!-- member dec start -->
 <!-- startMemberItem() -->
@@ -665,9 +672,9 @@ Static Protected Member Functions</h2>
 </div>
 </article>
 <article class="c-member">
-<a id="a41f506767f2bb378df04d57e7d3c294c"></a><!-- startMemberDoc -->
+<a id="a6865a96f24df8d1b923c0b04b5f27efe"></a><!-- startMemberDoc -->
 
-<h2 class="c-member__title"><span class="c-member__anchor"><a href="#a41f506767f2bb378df04d57e7d3c294c">&#9670;&nbsp;</a></span>BuildJson() <span class="c-member__count">[1/2]</span></h2>
+<h2 class="c-member__title"><span class="c-member__anchor"><a href="#a6865a96f24df8d1b923c0b04b5f27efe">&#9670;&nbsp;</a></span>BuildJson() <span class="c-member__count">[1/2]</span></h2>
 
 <div class="c-member__main">
 <div class="c-member__head">
@@ -694,7 +701,17 @@ Static Protected Member Functions</h2>
           <td class="c-table__cell"><a class="el" href="class_fifty_one_1_1_pipeline_1_1_json_builder_1_1_flow_element_1_1_json_builder_element_1_1_pipeline_config.html">PipelineConfig</a><!-- endParameterType -->
 &#160;</td>
 <!-- startParameterName -->
-          <td class="c-table__cell"><em>config</em><!-- endParameterName -->
+          <td class="c-table__cell"><em>config</em>, <!-- endParameterName -->
+</td>
+        </tr>
+<!-- startParameterType -->
+        <tr>
+          <td class="c-table__cell"></td>
+          <td></td>
+          <td class="c-table__cell">bool<!-- endParameterType -->
+&#160;</td>
+<!-- startParameterName -->
+          <td class="c-table__cell"><em>requireSequenceNumber</em><!-- endParameterName -->
 &#160;</td>
         </tr>
         <tr>
@@ -720,6 +737,7 @@ Static Protected Member Functions</h2>
 <dl class="c-list-definition"><dt class="c-list-definition__title">Parameters</dt><dd class="c-list-definition__desc">
     <tr><dd class="c-list-definition__desc"><span class="b-text--red">data</span> - </dd>
     <tr><dd class="c-list-definition__desc"><span class="b-text--red">config</span> - The configuration to use</dd>
+    <tr><dd class="c-list-definition__desc"><span class="b-text--red">requireSequenceNumber</span> - The configuration to use</dd>
   </dd>
 </dl>
 <dl class="c-list-definition return"><dt class="c-list-definition__title">Returns</dt><dd class="c-list-definition__desc">A string containing the data in JSON format. </dd></dl>
@@ -836,6 +854,52 @@ Static Protected Member Functions</h2>
   </dd>
 </dl>
 <dl class="c-list-definition return"><dt class="c-list-definition__title">Returns</dt><dd class="c-list-definition__desc"></dd></dl>
+<dl class="c-list-definition"><dt class="c-list-definition__title">Exceptions</dt><dd class="c-list-definition__desc">
+    <tr><dd class="c-list-definition__desc"><span class="b-text--red">ArgumentNullException</span> - Thrown if the supplied flow data is null. </dd>
+  </dd>
+</dl>
+<!-- endIndent -->
+
+</div>
+</div>
+</article>
+<article class="c-member">
+<a id="ace1893e48e2ae11d133bb268a9d7f263"></a><!-- startMemberDoc -->
+
+<h2 class="c-member__title"><span class="c-member__anchor"><a href="#ace1893e48e2ae11d133bb268a9d7f263">&#9670;&nbsp;</a></span>GetFallbackResponse()</h2>
+
+<div class="c-member__main">
+<div class="c-member__head">
+<!-- startMemberDocName -->
+      <div class="c-member__split">
+        <div class="g-table g-table--overflow">
+          <table class="c-table c-table--article">
+            <tr class="c-table__row">
+              <td class="c-table__cell"><a class="el" href="interface_fifty_one_1_1_pipeline_1_1_json_builder_1_1_data_1_1_i_json_builder_element_data.html">IJsonBuilderElementData</a> FiftyOne.Pipeline.JsonBuilder.FlowElement.JsonBuilderElement.GetFallbackResponse <!-- endMemberDocName -->
+</td>
+<!-- startParameterList -->
+          <td>(</td>
+<!-- startFirstParameterType -->
+          <td class="c-table__cell"><a class="el" href="interface_fifty_one_1_1_pipeline_1_1_core_1_1_data_1_1_i_flow_data.html">IFlowData</a><!-- endParameterType -->
+&#160;</td>
+<!-- startParameterName -->
+          <td class="c-table__cell"><em>data</em><!-- endParameterName -->
+</td><td>)</td>
+          <td><!-- endParameterList -->
+</td>
+        </tr>
+<!-- endMemberDoc -->
+          </table>
+        </div>
+      </div>
+</div><!-- startIndent -->
+<div class="c-member__body">
+
+<p>Transform the data in the flow data instance into a JSON object. </p>
+<dl class="c-list-definition"><dt class="c-list-definition__title">Parameters</dt><dd class="c-list-definition__desc">
+    <tr><dd class="c-list-definition__desc"><span class="b-text--red">data</span> - The IFlowData </dd>
+  </dd>
+</dl>
 <dl class="c-list-definition"><dt class="c-list-definition__title">Exceptions</dt><dd class="c-list-definition__desc">
     <tr><dd class="c-list-definition__desc"><span class="b-text--red">ArgumentNullException</span> - Thrown if the supplied flow data is null. </dd>
   </dd>
