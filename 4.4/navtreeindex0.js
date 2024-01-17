@@ -2,8 +2,9 @@ var NAVTREEINDEX0 =
 {
 "../../documentation/4.4/index.html":[0],
 "_example_framework_website_2_controllers_2_home_controller_8cs-example.html":[3,0],
-"_result_caching_2_program_8cs-example.html":[3,1],
-"_usage_sharing_2_program_8cs-example.html":[3,2],
+"_net_core_2_startup_8cs-example.html":[3,1],
+"_result_caching_2_program_8cs-example.html":[3,2],
+"_usage_sharing_2_program_8cs-example.html":[3,3],
 "annotated.html":[2],
 "class_asp_net_core___example_1_1_program.html":[2,0,0],
 "class_asp_net_core___example_1_1_program.html#a542336a29ce4a4d8279152e9a3636874":[2,0,0,0],
@@ -248,6 +249,5 @@ var NAVTREEINDEX0 =
 "class_fifty_one_1_1_pipeline_1_1_core_1_1_data_1_1_product_meta_data.html#a493c5361622bd40e612bd52f140bca9f":[2,4,0,0,2,20,1],
 "class_fifty_one_1_1_pipeline_1_1_core_1_1_data_1_1_property_meta_data.html":[2,4,0,0,2,21],
 "class_fifty_one_1_1_pipeline_1_1_core_1_1_data_1_1_property_meta_data.html#a40cde776778fd865351a46b7ac6c5083":[2,4,0,0,2,21,2],
-"class_fifty_one_1_1_pipeline_1_1_core_1_1_data_1_1_property_meta_data.html#a43b699577f9890030f687149a2dccded":[2,4,0,0,2,21,7],
-"class_fifty_one_1_1_pipeline_1_1_core_1_1_data_1_1_property_meta_data.html#a4fbe67bdb4d5b4d90b2c4ed8a849dfdd":[2,4,0,0,2,21,3]
+"class_fifty_one_1_1_pipeline_1_1_core_1_1_data_1_1_property_meta_data.html#a43b699577f9890030f687149a2dccded":[2,4,0,0,2,21,7]
 };
