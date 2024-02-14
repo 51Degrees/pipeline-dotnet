@@ -20,6 +20,7 @@
  * such notice(s) shall fulfill the requirements of that article.
  * ********************************************************************* */
 
+using System;
 using System.Collections.Generic;
 
 namespace Examples.CustomFlowElement.Data
@@ -31,20 +32,26 @@ namespace Examples.CustomFlowElement.Data
         /// is included twice to handle year end.
         /// </summary>
         public static readonly IReadOnlyList<StarSign> StarSigns = new [] {
-            new StarSign("Aries", "21/03","19/04"),
-            new StarSign("Taurus","20/04","20/05"),
-            new StarSign("Gemini","21/05","20/06"),
-            new StarSign("Cancer","21/06","22/07"),
-            new StarSign("Leo","23/07","22/08"),
-            new StarSign("Virgo","23/08","22/09"),
-            new StarSign("Libra","23/09","22/10"),
-            new StarSign("Scorpio","23/10","21/11"),
-            new StarSign("Sagittarius","22/11","21/12"),
+            StarSign("Aries", "21/03","19/04"),
+            StarSign("Taurus", "20/04", "20/05"),
+            StarSign("Gemini", "21/05", "20/06"),
+            StarSign("Cancer", "21/06", "22/07"),
+            StarSign("Leo", "23/07", "22/08"),
+            StarSign("Virgo", "23/08", "22/09"),
+            StarSign("Libra", "23/09", "22/10"),
+            StarSign("Scorpio", "23/10", "21/11"),
+            StarSign("Sagittarius", "22/11", "21/12"),
             // Capricorn is provided twice to handle year end.
-            new StarSign("Capricorn","22/12","31/12"),
-            new StarSign("Capricorn","01/01","19/01"),
-            new StarSign("Aquarius","20/01","18/02"),
-            new StarSign("Pisces","19/02","20/03")
+            StarSign("Capricorn", "22/12", "31/12"),
+            StarSign("Capricorn", "01/01", "19/01"),
+            StarSign("Aquarius", "20/01", "18/02"),
+            StarSign("Pisces", "19/02", "20/03")
         };
+
+        private static StarSign StarSign(string name, string start, string end)
+            => new StarSign(
+                name,
+                DateTime.ParseExact(start, "dd/MM", null), 
+                DateTime.ParseExact(end, "dd/MM", null));
     }
 }
