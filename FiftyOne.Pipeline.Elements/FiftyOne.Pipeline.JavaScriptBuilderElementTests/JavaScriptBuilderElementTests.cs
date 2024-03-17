@@ -22,25 +22,18 @@
 
 using FiftyOne.Pipeline.Core.Data;
 using FiftyOne.Pipeline.Core.TypedMap;
-using Microsoft.Extensions.Logging;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using Moq;
-using System.Collections.Generic;
 using Newtonsoft.Json.Linq;
 using FiftyOne.Pipeline.JsonBuilder.Data;
 using FiftyOne.Pipeline.JavaScriptBuilder.Data;
-using FiftyOne.Pipeline.JsonBuilder.FlowElement;
 using FiftyOne.Pipeline.JavaScriptBuilder.FlowElement;
-using System;
 using FiftyOne.Pipeline.Core.FlowElements;
 using FiftyOne.Pipeline.Engines.Data;
 using FiftyOne.Pipeline.Engines;
 using FiftyOne.Pipeline.Core.Exceptions;
-using OpenQA.Selenium.Chrome;
 using OpenQA.Selenium;
-using System.Net.Http;
 using FiftyOne.Pipeline.Engines.TestHelpers;
-using System.Threading;
 using System.Net;
 
 namespace FiftyOne.Pipeline.JavaScript.Tests
@@ -50,65 +43,34 @@ namespace FiftyOne.Pipeline.JavaScript.Tests
     /// include using WebDrivers to simulate a browser environment.
     /// </summary>
     [TestClass]
-    public class JavaScriptBuilderElementTests
+    public class JavaScriptBuilderElementTests: JavaScriptBuilderElementTestsBase
     {
-        private Mock<IJsonBuilderElement> _mockjsonBuilderElement;
-        private Mock<IElementData> _elementDataMock;
-        private ILoggerFactory _loggerFactory;
         private JavaScriptBuilderElement _javaScriptBuilderElement;
-        private IList<IElementPropertyMetaData> _elementPropertyMetaDatas;
 
-        private ChromeDriver _driver;
         private HttpClient httpClient;
-        private string ClientServerUrl;
         private CancellationTokenSource clientServerTokenSource;
-        private HttpListener clientServer;
+        private HttpListener _clientServer;
 
         /// <summary>
         /// Initialise the test.
         /// </summary>
         [TestInitialize]
-        public void Init()
+        public override async Task Init()
         {
             httpClient = new HttpClient();
 
+            await base.Init();
+
             // Start the client server
-            ClientServerUrl = $"http://localhost:{TestHttpListener.GetRandomUnusedPort()}/";
             clientServerTokenSource = new CancellationTokenSource();
             var token = clientServerTokenSource.Token;
             // We need the context of a page to be able to test the JavaScript 
             // correctly so create a simple HttpListener which serves some 
             // static HTML.
-            clientServer = TestHttpListener.SimpleListener(ClientServerUrl, token);
-
-            var chromeOptions = new ChromeOptions();
-            chromeOptions.AcceptInsecureCertificates = true;
-            // run in headless mode.
-            chromeOptions.AddArgument("--headless");
-            try
-            {
-                _driver = new ChromeDriver(chromeOptions);
-            }
-            catch (WebDriverException)
-            {
-                Assert.Inconclusive("Could not create a ChromeDriver, check " +
-                    "that the Chromium driver is installed");
-            }
+            _clientServer = TestHttpListener.SimpleListener(ClientServerUrl, token);
 
             // Navigate to the client site.
-            _driver.Navigate().GoToUrl(ClientServerUrl);
-
-            _mockjsonBuilderElement = new Mock<IJsonBuilderElement>();
-
-            _elementPropertyMetaDatas = new List<IElementPropertyMetaData>() {
-                new ElementPropertyMetaData(_mockjsonBuilderElement.Object, "property", typeof(string), true)
-            };
-
-            _mockjsonBuilderElement.Setup(x => x.Properties).Returns(_elementPropertyMetaDatas);
-            _loggerFactory = new LoggerFactory();
-
-            _elementDataMock = new Mock<IElementData>();
-            _elementDataMock.Setup(ed => ed.AsDictionary()).Returns(new Dictionary<string, object>() { { "property", "thisIsAValue" } });
+            Driver.Navigate().GoToUrl(ClientServerUrl);
         }
 
         /// <summary>
@@ -133,7 +95,7 @@ namespace FiftyOne.Pipeline.JavaScript.Tests
         public void JavaScriptBuilderElement_JavaScript(bool minify, string key, string property, object value)
         {
             _javaScriptBuilderElement =
-                new JavaScriptBuilderElementBuilder(_loggerFactory)
+                new JavaScriptBuilderElementBuilder(LoggerFactory)
                 .SetMinify(minify)
                 .Build();
 
@@ -174,7 +136,7 @@ namespace FiftyOne.Pipeline.JavaScript.Tests
         public void JavaScriptBuilder_VerifySession()
         {
             _javaScriptBuilderElement =
-                new JavaScriptBuilderElementBuilder(_loggerFactory).SetMinify(false).Build();
+                new JavaScriptBuilderElementBuilder(LoggerFactory).SetMinify(false).Build();
             var flowData = new Mock<IFlowData>();
             Configure(flowData);
 
@@ -203,7 +165,7 @@ namespace FiftyOne.Pipeline.JavaScript.Tests
         public void JavaScriptBuilder_VerifyFallbackResponse()
         {
             _javaScriptBuilderElement =
-                new JavaScriptBuilderElementBuilder(_loggerFactory)
+                new JavaScriptBuilderElementBuilder(LoggerFactory)
                 .SetEndpoint("/json")
                 .Build();
 
@@ -211,7 +173,7 @@ namespace FiftyOne.Pipeline.JavaScript.Tests
 
             flowData.Setup(d => d.Get<IJsonBuilderElementData>())
                 .Throws<KeyNotFoundException>();
-            var evidence = new Evidence(_loggerFactory.CreateLogger<Evidence>()); 
+            var evidence = new Evidence(LoggerFactory.CreateLogger<Evidence>()); 
             flowData.Setup(d => d.GetEvidence())
                 .Returns(evidence);
 
@@ -233,7 +195,7 @@ namespace FiftyOne.Pipeline.JavaScript.Tests
         public void JavaScriptBuilder_VerifyUrl()
         {
             _javaScriptBuilderElement =
-                new JavaScriptBuilderElementBuilder(_loggerFactory)
+                new JavaScriptBuilderElementBuilder(LoggerFactory)
                 .SetEndpoint("/json")
                 .Build();
             
@@ -268,7 +230,7 @@ namespace FiftyOne.Pipeline.JavaScript.Tests
         public void JavaScriptBuilder_VerifyParameters(string userAgent, string lat, string lon)
         {
             _javaScriptBuilderElement =
-                new JavaScriptBuilderElementBuilder(_loggerFactory)
+                new JavaScriptBuilderElementBuilder(LoggerFactory)
                 .SetEndpoint("/json")
                 .Build();
 
@@ -320,7 +282,7 @@ namespace FiftyOne.Pipeline.JavaScript.Tests
         public void JavaScriptBuilderElement_Promise(ExceptionType exceptionThrownByPromiseProperty, bool exceptionExpected)
         {
             _javaScriptBuilderElement =
-                new JavaScriptBuilderElementBuilder(_loggerFactory).Build();
+                new JavaScriptBuilderElementBuilder(LoggerFactory).Build();
 
             var flowData = new Mock<IFlowData>();
             Configure(flowData);
@@ -402,7 +364,7 @@ namespace FiftyOne.Pipeline.JavaScript.Tests
         public void JavaScriptBuilderElement_DelayExecution(bool minify)
         {
             _javaScriptBuilderElement = 
-                new JavaScriptBuilderElementBuilder(_loggerFactory)
+                new JavaScriptBuilderElementBuilder(LoggerFactory)
                 .SetMinify(minify)
                 .Build();
             
@@ -438,7 +400,7 @@ namespace FiftyOne.Pipeline.JavaScript.Tests
                     "Expected the generated JavaScript to contain the " +
                     "'getEvidencePropertiesFromObject' function but it does not.");
             }
-            IJavaScriptExecutor js = _driver;
+            IJavaScriptExecutor js = Driver;
             // Attempt to evaluate the JavaScript.
             js.ExecuteScript($"{result.JavaScript}; window.fod = fod;");
             var jsObject = js.ExecuteScript("return fod.sessionId;");
@@ -453,7 +415,7 @@ namespace FiftyOne.Pipeline.JavaScript.Tests
         public void JavaScriptBuilder_VerifyObjName()
         {
             _javaScriptBuilderElement =
-                new JavaScriptBuilderElementBuilder(_loggerFactory)
+                new JavaScriptBuilderElementBuilder(LoggerFactory)
                 .SetEndpoint("/json")
                 .Build();
 
@@ -472,7 +434,7 @@ namespace FiftyOne.Pipeline.JavaScript.Tests
 
             _javaScriptBuilderElement.Process(flowData.Object);
 
-            IJavaScriptExecutor js = _driver;
+            IJavaScriptExecutor js = Driver;
 
             // Run the JavaScript content from the cloud service and bind to 
             // window so we can check it later.
@@ -490,7 +452,7 @@ namespace FiftyOne.Pipeline.JavaScript.Tests
         /// <returns></returns>
         private bool IsValidFodObject(string javaScript, string key, string property, object value)
         {
-            IJavaScriptExecutor js = _driver;
+            IJavaScriptExecutor js = Driver;
 
             // Run the JavaScript content from the cloud service and bind to 
             // window so we can check it later.
@@ -504,117 +466,23 @@ namespace FiftyOne.Pipeline.JavaScript.Tests
                 return false;
         }
 
-        delegate void GetValueCallback(string key, out object result);
-
-        /// <summary>
-        /// Configure the flow data to respond in the way we want for 
-        /// this test.
-        /// </summary>
-        /// <param name="flowData">
-        /// The mock flow data instance to configure 
-        /// </param>
-        /// <param name="jsonData">
-        /// The JSON data to embed in the flow data.
-        /// This will be copied into the JavaScript that is produced.
-        /// </param>
-        /// <param name="hostName">
-        /// The host name to add to the evidence.
-        /// The JavaScriptBuilder should use this to generate the 
-        /// callback URL.
-        /// </param>
-        /// <param name="protocol">
-        /// The protocol to add to the evidence.
-        /// The JavaScriptBuilder should use this to generate the 
-        /// callback URL.
-        /// </param>
-        /// <param name="userAgent">
-        /// The User-Agent to add to the evidence.
-        /// </param>
-        /// <param name="latitude">
-        /// The latitude to add to the evidence.
-        /// </param>
-        /// <param name="longitude">
-        /// The longitude to add to the evidence.
-        /// </param>
-        private void Configure(
-            Mock<IFlowData> flowData,
-            JObject jsonData = null,
-            string hostName = "localhost",
-            string protocol = "https",
-            string userAgent = "iPhone",
-            string latitude = "51",
-            string longitude = "-1",
-            string jsObjName = null)
-        {
-            if (jsonData == null)
-            {
-                jsonData = new JObject();
-                jsonData["device"] = new JObject(new JProperty("ismobile", true));
-            }
-
-            flowData.Setup(d => d.Get<IJsonBuilderElementData>()).Returns(() =>
-            {
-                var d = new JsonBuilderElementData(new Mock<ILogger<JsonBuilderElementData>>().Object, flowData.Object.Pipeline);
-                d.Json = jsonData.ToString();
-                return d;
-            });
-
-            string session = "abcdefg-hijklmn-opqrst-uvwxyz";
-            int sequence = 1;
-            // Setup the TryGetEvidence methods that are used to get 
-            // host and protocol for the callback URL
-            flowData.Setup(d => d.TryGetEvidence(JavaScriptBuilder.Constants.EVIDENCE_HOST_KEY, out It.Ref<object>.IsAny))
-                .Callback(new GetValueCallback((string key, out object result) => { result = hostName; })).Returns(true);
-            flowData.Setup(d => d.TryGetEvidence(Core.Constants.EVIDENCE_PROTOCOL, out It.Ref<object>.IsAny))
-                .Callback(new GetValueCallback((string key, out object result) => { result = protocol; })).Returns(true);
-            flowData.Setup(d => d.TryGetEvidence(Engines.FiftyOne.Constants.EVIDENCE_SESSIONID, out It.Ref<object>.IsAny))
-                .Callback(new GetValueCallback((string key, out object result) => { result = session; })).Returns(true);
-            flowData.Setup(d => d.TryGetEvidence(Engines.FiftyOne.Constants.EVIDENCE_SEQUENCE, out It.Ref<object>.IsAny))
-                .Callback(new GetValueCallback((string key, out object result) => { result = sequence; })).Returns(true);
-
-            flowData.Setup(d => d.GetAsString(It.IsAny<string>())).Returns("None");
-            var evidenceDict = new Dictionary<string, object>() {
-                { JavaScriptBuilder.Constants.EVIDENCE_HOST_KEY, hostName },
-                { Core.Constants.EVIDENCE_PROTOCOL, protocol },
-                { Core.Constants.EVIDENCE_QUERY_USERAGENT_KEY, userAgent },
-                { "query.latitude", latitude },
-                { "query.longitude", longitude },
-                { Engines.FiftyOne.Constants.EVIDENCE_SEQUENCE, sequence },
-                { Engines.FiftyOne.Constants.EVIDENCE_SESSIONID, session }
-            };
-            if (jsObjName != null)
-            {
-                flowData.Setup(d => d.TryGetEvidence(JavaScriptBuilder.Constants.EVIDENCE_OBJECT_NAME, out It.Ref<object>.IsAny))
-                    .Callback(new GetValueCallback((string key, out object result) => { result = jsObjName; })).Returns(true);
-                evidenceDict.Add(JavaScriptBuilder.Constants.EVIDENCE_OBJECT_NAME, jsObjName);
-            }
-
-            flowData.Setup(d => d.GetEvidence().AsDictionary()).Returns(evidenceDict);
-            flowData.Setup(d => d.Get(It.IsAny<string>())).Returns(_elementDataMock.Object);
-
-
-        }
-
         /// <summary>
         /// Cleanup the RemoteWebDriver and http listener.
         /// </summary>
         [TestCleanup]
-        public void Cleanup()
+        public override async Task Cleanup()
         {
-            if (_driver != null)
-            {
-                _driver.Quit();
-            }
+            await base.Cleanup();
 
             // Stop the client server.
             clientServerTokenSource.Cancel();
-            while (clientServer.IsListening)
+            while (_clientServer.IsListening)
             {
-                clientServer.Stop();
+                _clientServer.Stop();
                 Thread.Sleep(1000);
             }
             // Close the listener
-            clientServer.Close();
+            _clientServer.Close();
         }
     }
 }

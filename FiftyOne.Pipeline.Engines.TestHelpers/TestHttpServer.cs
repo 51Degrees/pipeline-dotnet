@@ -103,6 +103,7 @@ namespace FiftyOne.Pipeline.Engines.TestHelpers
                 resp.ContentType = "text/html";
                 resp.ContentEncoding = Encoding.UTF8;
                 resp.ContentLength64 = data.LongLength;
+                resp.AddHeader("Access-Control-Allow-Origin", "*");
 
                 // Write out to the response stream (asynchronously), then close it
                 await resp.OutputStream.WriteAsync(data, 0, data.Length);
