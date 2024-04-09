@@ -27,11 +27,6 @@ namespace Examples.CustomFlowElement.Data
     //! [class]
     public class StarSign
     {
-        public StarSign(string name, string start, string end)
-            : this(name, DateTime.Parse(start), DateTime.Parse(end))
-        {
-        }
-
         public StarSign(string name, DateTime start, DateTime end)
         {
             Name = name;
