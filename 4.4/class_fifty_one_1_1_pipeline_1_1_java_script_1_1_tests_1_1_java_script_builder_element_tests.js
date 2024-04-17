@@ -8,8 +8,8 @@ var class_fifty_one_1_1_pipeline_1_1_java_script_1_1_tests_1_1_java_script_build
       [ "Exception", "class_fifty_one_1_1_pipeline_1_1_java_script_1_1_tests_1_1_java_script_builder_element_tests.html#a8985d4d3cfbb9fa173ee94a5d545cc97ab0d4998a26f5b5742ad38c4af8817e32", null ],
       [ "None", "class_fifty_one_1_1_pipeline_1_1_java_script_1_1_tests_1_1_java_script_builder_element_tests.html#a8985d4d3cfbb9fa173ee94a5d545cc97a6adf97f83acf6453d4a6a4b1070f3754", null ]
     ] ],
-    [ "Cleanup", "class_fifty_one_1_1_pipeline_1_1_java_script_1_1_tests_1_1_java_script_builder_element_tests.html#a322fa6783c04c81c183a4f5b93de28ca", null ],
-    [ "Init", "class_fifty_one_1_1_pipeline_1_1_java_script_1_1_tests_1_1_java_script_builder_element_tests.html#a2e683d30acfb66b6b24a10178573de12", null ],
+    [ "Cleanup", "class_fifty_one_1_1_pipeline_1_1_java_script_1_1_tests_1_1_java_script_builder_element_tests.html#a994b1c4a0371f7ca46538a8da8f9ffdd", null ],
+    [ "Init", "class_fifty_one_1_1_pipeline_1_1_java_script_1_1_tests_1_1_java_script_builder_element_tests.html#a042efc9ceeaa6f76f69f5c4d9f9d3abf", null ],
     [ "JavaScriptBuilder_VerifyFallbackResponse", "class_fifty_one_1_1_pipeline_1_1_java_script_1_1_tests_1_1_java_script_builder_element_tests.html#a8dc3ec3fca719c663ad1294439de38f0", null ],
     [ "JavaScriptBuilder_VerifyObjName", "class_fifty_one_1_1_pipeline_1_1_java_script_1_1_tests_1_1_java_script_builder_element_tests.html#aca35eb44bae311c4e2a5af90c0ac2b5e", null ],
     [ "JavaScriptBuilder_VerifyParameters", "class_fifty_one_1_1_pipeline_1_1_java_script_1_1_tests_1_1_java_script_builder_element_tests.html#a7da63f282cd63acde430a19fcfed4e0f", null ],
