@@ -242,7 +242,7 @@ Properties</h2>
 <tr class="c-table__row memitem:a024d97f000aae16ded405a00a5496faf"><td class="c-table__cell">bool<!-- insertMemberAlign -->
 &#160;</td><td class="c-table__cell"><a class="el" href="class_fifty_one_1_1_pipeline_1_1_java_script_builder_1_1_flow_element_1_1_java_script_builder_element_builder.html#a024d97f000aae16ded405a00a5496faf">EnableCookies</a> = <a class="el" href="class_fifty_one_1_1_pipeline_1_1_java_script_builder_1_1_constants.html#acbf7000ca83541d89d70fb44aa1dae77">Constants.BUILDER_DEFAULT_ENABLE_COOKIES</a><code> [get]</code>
 <!-- startMemberDescription -->
-<div class="c-table__desc memdesc:a024d97f000aae16ded405a00a5496faf">If set to false, the <a class="el" href="namespace_fifty_one_1_1_pipeline_1_1_java_script.html">JavaScript</a> will automatically delete any cookies prefixed with 51D_  <a href="#a024d97f000aae16ded405a00a5496faf">More...</a><!-- endMemberDescription -->
+<div class="c-table__desc memdesc:a024d97f000aae16ded405a00a5496faf">If set to false, the <a class="el" href="namespace_fifty_one_1_1_pipeline_1_1_java_script.html">JavaScript</a> will not populateany cookies, and will instead use session storage.  <a href="#a024d97f000aae16ded405a00a5496faf">More...</a><!-- endMemberDescription -->
 </div></td></tr>
 <!-- member dec start -->
 <!-- startMemberItem() -->
@@ -397,6 +397,7 @@ Properties</h2>
 <div class="c-member__body">
 
 <p>Set whether the client <a class="el" href="namespace_fifty_one_1_1_pipeline_1_1_java_script.html">JavaScript</a> stored results of client side processing in cookies. </p>
+<p>This can also be set per request, using the "query.fod-js-enable-cookies" evidence key. For more details on personal data policy, see <a href="http://51degrees.com/terms/client-services-privacy-policy/">http://51degrees.com/terms/client-services-privacy-policy/</a> </p>
 <dl class="c-list-definition"><dt class="c-list-definition__title">Parameters</dt><dd class="c-list-definition__desc">
     <tr><dd class="c-list-definition__desc"><span class="b-text--red">enableCookies</span> - Should enable cookies?</dd>
   </dd>
@@ -657,7 +658,7 @@ Properties</h2>
 </div><!-- startIndent -->
 <div class="c-member__body">
 
-<p>If set to false, the <a class="el" href="namespace_fifty_one_1_1_pipeline_1_1_java_script.html">JavaScript</a> will automatically delete any cookies prefixed with 51D_ </p>
+<p>If set to false, the <a class="el" href="namespace_fifty_one_1_1_pipeline_1_1_java_script.html">JavaScript</a> will not populateany cookies, and will instead use session storage. </p>
 <!-- endIndent -->
 
 </div>
