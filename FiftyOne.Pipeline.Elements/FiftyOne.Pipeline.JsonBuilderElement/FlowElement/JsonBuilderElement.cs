@@ -298,7 +298,7 @@ namespace FiftyOne.Pipeline.JsonBuilder.FlowElement
             {
                 sequenceNumber = GetSequenceNumber(data);
             }
-            catch (PipelineException e)
+            catch (Exception e)
             {
                 if (requireSequenceNumber)
                 {

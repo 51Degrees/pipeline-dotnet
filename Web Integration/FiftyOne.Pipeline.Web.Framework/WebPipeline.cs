@@ -242,7 +242,7 @@ namespace FiftyOne.Pipeline.Web.Framework
                 {
                     filler = new EvidenceFiller(flowData);
                 }
-                catch (PipelineException ex)
+                catch (Exception ex)
                 {
                     flowData.AddError(ex, null);
                     throw;

@@ -220,7 +220,7 @@ namespace FiftyOne.Pipeline.Web.Shared.Services
             {
                 pipelineEvidenceKeyFilter = _pipeline.EvidenceKeyFilter;
             }
-            catch (PipelineException ex)
+            catch (Exception ex)
             {
                 _logger?.LogError(ex, $"Failed to get {nameof(_pipeline.EvidenceKeyFilter)} from {nameof(_pipeline)}");
                 hadFailures = true;
@@ -257,7 +257,7 @@ namespace FiftyOne.Pipeline.Web.Shared.Services
                     {
                         jsonData = flowData.GetFromElement(jsonElement);
                     }
-                    catch (PipelineException ex)
+                    catch (Exception ex)
                     {
                         _logger?.LogError(ex, "Failed to get data from {flowElementType}", jsonElement.GetType().Name);
                         jsonData = jsonElement.GetFallbackResponse(flowData);
@@ -279,7 +279,7 @@ namespace FiftyOne.Pipeline.Web.Shared.Services
                     {
                         jsData = flowData.GetFromElement(jsElement);
                     }
-                    catch (PipelineException ex)
+                    catch (Exception ex)
                     {
                         _logger?.LogError(ex, "Failed to get data from {flowElementType}", jsElement.GetType().Name);
                         jsData = jsElement.GetFallbackResponse(flowData, GetJsonData());
