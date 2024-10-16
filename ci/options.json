@@ -23,7 +23,7 @@
         "RunPerformance": true
     },
     {
-        "Image": "ubuntu-22.04",
+        "Image": "windows-latest",
         "Name": "Windows_AnyCPU_Core_Debug",
         "Configuration": "CoreDebug",
         "Arch": "Any CPU",
