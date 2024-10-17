@@ -25,6 +25,7 @@ using FiftyOne.Pipeline.Core.FlowElements;
 using FiftyOne.Pipeline.Engines.Data;
 using System;
 using System.Collections.Generic;
+using System.Collections.Immutable;
 using System.Linq;
 using System.Web;
 using System.Web.Configuration;
@@ -67,7 +68,10 @@ namespace FiftyOne.Pipeline.Web.Framework.Providers
             _baseCaps = baseCaps;
             _request = request;
             FlowData = flowData;
-            _availableElementProperties = FlowData.Pipeline.ElementAvailableProperties;
+            _availableElementProperties 
+                = (flowData.Errors != null && flowData.Errors.Count > 0)
+                ? ImmutableDictionary<string, IReadOnlyDictionary<string, IElementPropertyMetaData>>.Empty
+                : flowData.Pipeline.ElementAvailableProperties;
         }
 
         private string IterateDown(string[] keys, IDictionary<string, object> dict)
@@ -108,6 +112,10 @@ namespace FiftyOne.Pipeline.Web.Framework.Providers
         {
             get
             {
+                if (FlowData.Errors != null && FlowData.Errors.Count > 0)
+                {
+                    return _baseCaps[key];
+                }
                 string value = null;
                 // Try getting the value from the FlowData
                 try

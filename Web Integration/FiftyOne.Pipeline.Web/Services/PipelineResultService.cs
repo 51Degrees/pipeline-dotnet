@@ -21,6 +21,7 @@
  * ********************************************************************* */
 
 using System;
+using FiftyOne.Pipeline.Core.Exceptions;
 using FiftyOne.Pipeline.Core.FlowElements;
 using Microsoft.AspNetCore.Http;
 
@@ -70,13 +71,6 @@ namespace FiftyOne.Pipeline.Web.Services
         {
             if (context == null) { throw new ArgumentNullException(nameof(context)); }
 
-            // Create the flowData
-            var flowData = _pipeline.CreateFlowData();
-            context.Response.RegisterForDispose(flowData);
-            // Extract the required pieces of evidence from the request
-            _evidenceService.AddEvidenceFromRequest(flowData, context.Request);
-            // Start processing the data
-            flowData.Process();
             // Remove the existing flow data if there is one.
             // This will be from a previous request and the evidence may have 
             // changed so we need to update it.
@@ -84,8 +78,29 @@ namespace FiftyOne.Pipeline.Web.Services
             {
                 context.Items.Remove(Constants.HTTPCONTEXT_FLOWDATA);
             }
+
+            // Create the flowData
+            var flowData = _pipeline.CreateFlowData();
+            context.Response.RegisterForDispose(flowData);
+
             // Store the FlowData in the HttpContext
             context.Items.Add(Constants.HTTPCONTEXT_FLOWDATA, flowData);
+
+            try
+            {
+                // Extract the required pieces of evidence from the request
+                _evidenceService.AddEvidenceFromRequest(flowData, context.Request);
+
+                // Start processing the data
+                flowData.Process();
+            }
+            catch (Exception ex) 
+            when (ex is PipelineTemporarilyUnavailableException
+            || (ex is AggregateException
+            && ex.InnerException is PipelineTemporarilyUnavailableException))
+            {
+                // nop -- just suppress thrown error
+            }
         }
     }
 }

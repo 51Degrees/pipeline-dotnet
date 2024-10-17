@@ -98,5 +98,29 @@ namespace FiftyOne.Pipeline.CloudRequestEngine
         /// </summary>
         public const int CLOUD_REQUEST_TIMEOUT_DEFAULT_SECONDS = 100;
 
+        /// <summary>
+        /// Default recovery period for CloudRequestEngine
+        /// once enough requests to server fail in short time.
+        /// </summary>
+        public const double CLOUD_REQUEST_RECOVERY_SECONDS_DEFAULT = 60.0;
+
+        /// <summary>
+        /// Default number of failures to occur within some time
+        /// for CloudRequestEngine to temporarily stop sending requests.
+        /// </summary>
+        public const int CLOUD_REQUEST_FAILURES_TO_ENTER_RECOVERY_MIN = 1;
+
+        /// <summary>
+        /// Maximal number of failures to occur within some time
+        /// for CloudRequestEngine to temporarily stop sending requests.
+        /// </summary>
+        public const int CLOUD_REQUEST_FAILURES_TO_ENTER_RECOVERY_MAX = 100;
+
+        /// <summary>
+        /// Minimal number of failures to occur within some time
+        /// for CloudRequestEngine to temporarily stop sending requests.
+        /// </summary>
+        public const int CLOUD_REQUEST_FAILURES_TO_ENTER_RECOVERY_DEFAULT = 10;
+
     }
 }

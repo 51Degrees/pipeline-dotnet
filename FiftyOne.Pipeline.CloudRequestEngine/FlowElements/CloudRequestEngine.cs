@@ -20,8 +20,9 @@
  * such notice(s) shall fulfill the requirements of that article.
  * ********************************************************************* */
 
-using FiftyOne.Common;
 using FiftyOne.Pipeline.CloudRequestEngine.Data;
+using FiftyOne.Pipeline.CloudRequestEngine.FailHandling.Facade;
+using FiftyOne.Pipeline.CloudRequestEngine.FailHandling.Recovery;
 using FiftyOne.Pipeline.Core.Data;
 using FiftyOne.Pipeline.Core.FlowElements;
 using FiftyOne.Pipeline.Engines.Data;
@@ -34,6 +35,7 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
 using System.Net.Http;
+using System.Threading;
 
 namespace FiftyOne.Pipeline.CloudRequestEngine.FlowElements
 {
@@ -49,20 +51,76 @@ namespace FiftyOne.Pipeline.CloudRequestEngine.FlowElements
         AspectEngineBase<CloudRequestData, IAspectPropertyMetaData>,
         ICloudRequestEngine
     {
+        /// <summary>
+        /// Separator as a character array.
+        /// </summary>
+        private static readonly char[] EVIDENCE_SEPARATOR_CHAR_ARRAY = 
+            Core.Constants.EVIDENCE_SEPERATOR.ToCharArray();
+
         private HttpClient _httpClient;
 
-        private string _dataEndpoint;
-        private string _resourceKey;
-        private string _licenseKey;
-        private string _propertiesEndpoint;
-        private string _evidenceKeysEndpoint;
-        private string _cloudRequestOrigin;
+        /// <summary>
+        /// Raw string properties that describe
+        /// server destinations and query parameters.
+        /// </summary>
+        public struct EndpointsAndKeys
+        {
+            /// <summary>
+            /// The URL for the cloud endpoint that will take the supplied
+            /// evidence and return JSON formatted data.
+            /// </summary>
+            public string DataEndpoint;
 
-        private List<string> _requestedProperties;
-        private IEvidenceKeyFilter _evidenceKeyFilter;
+            /// <summary>
+            /// The resource key to use when making requests.
+            /// A resource key encapsulates details such as any license keys,
+            /// the properties that should be returned and the domains that
+            /// requests are permitted from. A new resource key can be
+            /// generated for free at https://configure.51degrees.com
+            /// </summary>
+            public string ResourceKey;
+
+            /// <summary>
+            /// The license key to use when making requests.
+            /// This parameter is obsolete, use resourceKey instead.
+            /// </summary>
+            public string LicenseKey;
+
+            /// <summary>
+            /// The URL for the cloud endpoint that will return meta-data
+            /// on properties that will be populated when the data endpoint 
+            /// is called using the given resource key.
+            /// </summary>
+            public string PropertiesEndpoint;
+
+            /// <summary>
+            /// The URL for the cloud endpoint that will return meta-data
+            /// on the evidence that will be used when the data endpoint 
+            /// is called using the given resource key.
+            /// </summary>
+            public string EvidenceKeysEndpoint;
+
+            /// <summary>
+            /// The value to use for the Origin header when making requests 
+            /// to cloud.
+            /// </summary>
+            public string CloudRequestOrigin;
+
+            /// <summary>
+            /// Not currently used.
+            /// </summary>
+            public IList<string> RequestedProperties;
+        }
+        private readonly EndpointsAndKeys _endpointsAndKeys;
+
+        private readonly IFailHandler _failHandler;
 
         /// <summary>
-        /// Default constructor.
+        /// Deprecated constructor.
+        /// Use the one with
+        /// <see cref="EndpointsAndKeys"/>
+        /// and
+        /// <see cref="IRecoveryStrategy"/>.
         /// </summary>
         /// <param name="logger">
         /// The logger for this instance
@@ -125,20 +183,81 @@ namespace FiftyOne.Pipeline.CloudRequestEngine.FlowElements
             int timeout,
             List<string> requestedProperties,
             string cloudRequestOrigin = null)
+            : this(
+                  logger, 
+                  aspectDataFactory, 
+                  httpClient,
+                  new EndpointsAndKeys
+                  {
+                      DataEndpoint = dataEndpoint,
+                      ResourceKey = resourceKey,
+                      LicenseKey = licenseKey,
+                      PropertiesEndpoint = propertiesEndpoint,
+                      EvidenceKeysEndpoint = evidenceKeysEndpoint,
+                      CloudRequestOrigin = cloudRequestOrigin,
+                      RequestedProperties = requestedProperties,
+                  },
+                  timeout,
+                  new SimpleFailHandler(new InstantRecoveryStrategy()))
+        { }
+
+
+
+        /// <summary>
+        /// Default constructor.
+        /// </summary>
+        /// <param name="logger">
+        /// The logger for this instance
+        /// </param>
+        /// <param name="aspectDataFactory">
+        /// A factory function to use when creating new 
+        /// <see cref="CloudRequestData"/> instances.
+        /// </param>
+        /// <param name="httpClient">
+        /// The HttpClient instance to use when making requests
+        /// </param>
+        /// <param name="endpointsAndKeys">
+        /// Raw string properties that describe
+        /// server destinations and query parameters.
+        /// </param>
+        /// <param name="timeout">
+        /// The timeout for HTTP requests in seconds.
+        /// </param>
+        /// <param name="failHandler">
+        /// Controls when to suspend requests
+        /// due to recent query failures.
+        /// You can pick
+        /// <see cref="InstantRecoveryStrategy"/>,
+        /// <see cref="NoRecoveryStrategy"/>
+        /// or
+        /// <see cref="SimpleRecoveryStrategy"/>
+        /// and wrap them in
+        /// <see cref="SimpleFailHandler"/>
+        /// or provide your own implementation of
+        /// <see cref="IFailHandler"/>
+        /// .
+        /// </param>
+        /// <exception cref="ArgumentNullException">
+        /// Thrown if a required parameter is null.
+        /// </exception>
+        public CloudRequestEngine(
+            ILogger<AspectEngineBase<CloudRequestData, IAspectPropertyMetaData>> logger,
+            Func<IPipeline, FlowElementBase<CloudRequestData, IAspectPropertyMetaData>,
+                CloudRequestData> aspectDataFactory,
+            HttpClient httpClient,
+            EndpointsAndKeys endpointsAndKeys,
+            int timeout,
+            IFailHandler failHandler)
             : base(logger, aspectDataFactory)
         {
             if (httpClient == null) throw new ArgumentNullException(nameof(httpClient));
+            if ((_failHandler = failHandler) is null) 
+                throw new ArgumentNullException(nameof(failHandler));
+
+            _endpointsAndKeys = endpointsAndKeys;
 
             try
             {
-                _dataEndpoint = dataEndpoint;
-                _resourceKey = resourceKey;
-                _licenseKey = licenseKey;
-                _propertiesEndpoint = propertiesEndpoint;
-                _evidenceKeysEndpoint = evidenceKeysEndpoint;
-                _requestedProperties = requestedProperties;
-                _cloudRequestOrigin = cloudRequestOrigin;
-
                 _httpClient = httpClient;
                 if (timeout > 0)
                 {
@@ -151,9 +270,33 @@ namespace FiftyOne.Pipeline.CloudRequestEngine.FlowElements
 
                 _propertyMetaData = new List<IAspectPropertyMetaData>()
                 {
-                     new AspectPropertyMetaData(this, "json-response", typeof(string), "", new List<string>(), true),
-                     new AspectPropertyMetaData(this, "process-started", typeof(bool), "", new List<string>(), true)
+                     new AspectPropertyMetaData(this, 
+                         "json-response", 
+                         typeof(string), 
+                         "",
+                         new List<string>(), 
+                         true),
+                     new AspectPropertyMetaData(
+                         this, 
+                         "process-started", 
+                         typeof(bool), 
+                         "", 
+                         new List<string>(), 
+                         true)
                 };
+
+                // Start the tasks to get the evidence keys and the public
+                // properties from the cloud service. If the stop token is
+                // not provided then warn via logging.
+
+                _lazyEvidenceKeyFilter 
+                    = new Lazy<IEvidenceKeyFilter>(
+                        GetCloudEvidenceKeys,
+                        LazyThreadSafetyMode.PublicationOnly);
+                _lazyPublicProperties 
+                    = new Lazy<IReadOnlyDictionary<string, ProductMetaData>>(
+                        GetCloudProperties,
+                        LazyThreadSafetyMode.PublicationOnly);
             }
             catch (Exception ex)
             {
@@ -163,13 +306,13 @@ namespace FiftyOne.Pipeline.CloudRequestEngine.FlowElements
         }
 
         private List<IAspectPropertyMetaData> _propertyMetaData;
-        private Dictionary<string, ProductMetaData> _publicProperties;
 
         /// <summary>
         /// A collection of the properties available in the aspect
         /// data instance that is populated by this engine.
         /// </summary>
-        public override IList<IAspectPropertyMetaData> Properties => _propertyMetaData;
+        public override IList<IAspectPropertyMetaData> Properties => 
+            _propertyMetaData;
 
         /// <summary>
         /// The 'tier' of the source data used to service this request.
@@ -183,38 +326,61 @@ namespace FiftyOne.Pipeline.CloudRequestEngine.FlowElements
         public override string ElementDataKey => "cloud-response";
 
         /// <summary>
-        /// A filter object that indicates the evidence keys that can be
-        /// used by this engine.
-        /// This will vary based on the supplied resource key so will
-        /// be populated after a call to the cloud service as part of 
+        /// Responsible for initializing IEvidenceKeyFilter
+        /// only once.
+        /// </summary>
+        private Lazy<IEvidenceKeyFilter> _lazyEvidenceKeyFilter;
+
+        /// <summary>
+        /// Responsible for initializing IReadOnlyDictionary{string, ProductMetaData}
+        /// only once.
+        /// </summary>
+        private Lazy<IReadOnlyDictionary<string, ProductMetaData>>
+            _lazyPublicProperties;
+
+        /// <summary>
+        /// A filter object that indicates the evidence keys that can be used 
+        /// by this engine. This will vary based on the supplied resource key 
+        /// so will be populated after a call to the cloud service as part of 
         /// object initialization.
         /// </summary>
         /// <exception cref="CloudRequestException">
         /// Thrown if there is an error from the cloud service or
         /// there is no data in the response.
         /// </exception>
-        public override IEvidenceKeyFilter EvidenceKeyFilter {
+        /// <exception cref="CloudRequestEngineTemporarilyUnavailableException">
+        /// <see cref="IRecoveryStrategy"/> 
+        /// temporarily suppresses further requests
+        /// due to recent error.
+        /// </exception>
+        public override IEvidenceKeyFilter EvidenceKeyFilter 
+        {
             get
             {
-                if (_evidenceKeyFilter == null)
+                try
                 {
-                    lock (_evidenceKeyFilterLock)
+                    if (_lazyEvidenceKeyFilter.IsValueCreated)
                     {
-                        if (_evidenceKeyFilter == null)
-                        {
-                            _evidenceKeyFilter = GetCloudEvidenceKeys();
-                        }
+                        return _lazyEvidenceKeyFilter.Value;
+                    }
+                    lock (_lazyEvidenceKeyFilter)
+                    {
+                        return _lazyEvidenceKeyFilter.Value;
                     }
                 }
-                return _evidenceKeyFilter;
+                catch (AggregateException ex)
+                {
+                    Logger?.LogWarning(
+                        "Could not fetch evidence key filter from '{0}'",
+                        _endpointsAndKeys.EvidenceKeysEndpoint);
+                    if (ex.InnerException is CloudRequestException cloudException)
+                    {
+                        throw ResurfaceCloudException(cloudException, ex);
+                    }
+                    throw;
+                }
             }
         }
-
-        /// <summary>
-        /// Lock used when constructing an EvidenceKeyFilter.
-        /// </summary>
-        private readonly object _evidenceKeyFilterLock = new object();
-
 
         /// <summary>
         /// A collection of the properties that the cloud service can
@@ -225,27 +391,38 @@ namespace FiftyOne.Pipeline.CloudRequestEngine.FlowElements
         /// Thrown if there is an error from the cloud service or
         /// there is no data in the response.
         /// </exception>
+        /// <exception cref="CloudRequestEngineTemporarilyUnavailableException">
+        /// <see cref="IRecoveryStrategy"/> 
+        /// temporarily suppresses further requests
+        /// due to recent error.
+        /// </exception>
         public IReadOnlyDictionary<string, ProductMetaData> PublicProperties {
             get
             {
-                if (_publicProperties == null)
+                try
                 {
-                    lock (_publicPropertiesLock)
+                    if (_lazyPublicProperties.IsValueCreated)
                     {
-                        if (_publicProperties == null)
-                        {
-                            _publicProperties = GetCloudProperties();
-                        }
+                        return _lazyPublicProperties.Value;
+                    }
+                    lock (_lazyPublicProperties)
+                    {
+                        return _lazyPublicProperties.Value;
                     }
                 }
-                return _publicProperties;
+                catch (AggregateException ex)
+                {
+                    Logger?.LogWarning(
+                        "Could not fetch public properties from '{0}'",
+                        _endpointsAndKeys.PropertiesEndpoint);
+                    if (ex.InnerException is CloudRequestException cloudException)
+                    {
+                        throw ResurfaceCloudException(cloudException, ex);
+                    }
+                    throw;
+                }
             }
         }
-
-        /// <summary>
-        /// Lock used when constructing PublicProperties.
-        /// </summary>
-        private readonly object _publicPropertiesLock = new object();
 
         /// <summary>
         /// Send evidence to the cloud and get back a JSON result.
@@ -259,30 +436,118 @@ namespace FiftyOne.Pipeline.CloudRequestEngine.FlowElements
         /// Thrown if there is an error from the cloud service or
         /// there is no data in the response.
         /// </exception>
-        protected override void ProcessEngine(IFlowData data, CloudRequestData aspectData)
+        /// <exception cref="CloudRequestEngineTemporarilyUnavailableException">
+        /// <see cref="IRecoveryStrategy"/> 
+        /// temporarily suppresses further requests
+        /// due to recent error.
+        /// </exception>
+        protected override void ProcessEngine(
+            IFlowData data, 
+            CloudRequestData aspectData)
         {
-            if (data == null) throw new ArgumentNullException(nameof(data));
-            if (aspectData == null) throw new ArgumentNullException(nameof(aspectData));
+            if (data == null)
+            {
+                throw new ArgumentNullException(nameof(data));
+            }
+            if (aspectData == null)
+            {
+                throw new ArgumentNullException(nameof(aspectData));
+            }
 
             aspectData.ProcessStarted = true;
 
+
             string jsonResult = string.Empty;
+            ThrowIfStillRecovering();
 
             using (var content = GetContent(data))
             using (var requestMessage =
-                new HttpRequestMessage(HttpMethod.Post, _dataEndpoint))
+                new HttpRequestMessage(HttpMethod.Post, _endpointsAndKeys.DataEndpoint))
             {
                 if (Logger?.IsEnabled(LogLevel.Debug) == true)
                 {
                     Logger?.LogDebug($"Sending request to cloud service at " +
-                        $"'{_dataEndpoint}'. Content: {content}");
+                        $"'{_endpointsAndKeys.DataEndpoint}'. Content: {content}");
                 }
 
                 requestMessage.Content = content;
-                jsonResult = ProcessResponse(AddCommonHeadersAndSend(requestMessage));
+                jsonResult = AmendSendAndProcess(
+                    requestMessage,
+                    checkForErrorMessages: true);
             }
 
             aspectData.JsonResponse = jsonResult;
+        }
+
+        private void ThrowIfStillRecovering()
+        {
+            try
+            {
+                _failHandler.ThrowIfStillRecovering();
+            }
+            catch (Exception ex)
+            {
+                throw new CloudRequestEngineTemporarilyUnavailableException(
+                    "Sending requests to cloud server"
+                    + " is temporarily restricted"
+                    + " due to recent failures.", ex);
+            }
+        }
+
+        private string AmendSendAndProcess(
+            HttpRequestMessage request,
+            bool checkForErrorMessages)
+        {
+            try
+            {
+                using (var requestScope = _failHandler.MakeAttemptScope())
+                {
+                    try
+                    {
+                        return ProcessResponse(
+                            AddCommonHeadersAndSend(
+                                request),
+                            checkForErrorMessages);
+                    }
+                    catch (Exception ex)
+                    when (!(ex is CloudRequestEngineTemporarilyUnavailableException))
+                    {
+                        requestScope.RecordFailure(ex);
+                        throw;
+                    }
+                }
+            }
+            catch (AggregateException ex)
+            when (ex.InnerException is CloudRequestException originalCloudException)
+            {
+                throw ResurfaceCloudException(originalCloudException, ex);
+            }
+        }
+
+        private CloudRequestException ResurfaceCloudException(
+            CloudRequestException cloudException,
+            Exception newInnerException)
+        {
+            Dictionary<string, string> responseHeaders;
+            if (cloudException.ResponseHeaders is IDictionary<string, string> oldHeaders)
+            {
+                if (oldHeaders is Dictionary<string, string> oldHeadersDic)
+                {
+                    responseHeaders = oldHeadersDic;
+                } 
+                else
+                {
+                    responseHeaders = new Dictionary<string, string>(oldHeaders);
+                }
+            } else
+            {
+                responseHeaders = null;
+            }
+            return new CloudRequestException(
+                            cloudException.Message,
+                            cloudException.HttpStatusCode,
+                            responseHeaders,
+                            newInnerException);
         }
 
         /// <summary>
@@ -326,7 +591,9 @@ namespace FiftyOne.Pipeline.CloudRequestEngine.FlowElements
                 }
                 catch (JsonReaderException ex)
                 {
-                    throw new CloudRequestException("Failed to parse server's response as JSON", (int)response.StatusCode, GetHeaders(), ex);
+                    throw new CloudRequestException(
+                        "Failed to parse server's response as JSON", 
+                        (int)response.StatusCode, GetHeaders(), ex);
                 }
                 var hasErrors = jObj.ContainsKey("errors");
                 hasData = hasErrors ?
@@ -336,14 +603,16 @@ namespace FiftyOne.Pipeline.CloudRequestEngine.FlowElements
                 if (hasErrors)
                 {
                     var errors = jObj.Value<JArray>("errors");
-                    messages.AddRange(errors.Children<JValue>().Select(t => t.Value.ToString()));
+                    messages.AddRange(errors.Children<JValue>().Select(t => 
+                        t.Value.ToString()));
                 }
 
                 // Log any warnings that were returned.
                 if (jObj.ContainsKey("warnings"))
                 {
                     var warnings = jObj.Value<JArray>("warnings");
-                    foreach (var warning in warnings.Children<JValue>().Select(t => t.Value.ToString()))
+                    foreach (var warning in warnings.Children<JValue>()
+                        .Select(t => t.Value.ToString()))
                     {
                         Logger?.LogWarning(warning);
                     }
@@ -358,7 +627,7 @@ namespace FiftyOne.Pipeline.CloudRequestEngine.FlowElements
             {
                 var msg = string.Format(CultureInfo.InvariantCulture,
                     Messages.MessageNoDataInResponse,
-                    _dataEndpoint);
+                    _endpointsAndKeys.DataEndpoint);
                 messages.Add(msg);
             }
             // If there is no detailed error message, but we got a
@@ -368,7 +637,7 @@ namespace FiftyOne.Pipeline.CloudRequestEngine.FlowElements
             {
                 var msg = string.Format(CultureInfo.InvariantCulture,
                     Messages.MessageErrorCodeReturned,
-                    _dataEndpoint,
+                    _endpointsAndKeys.DataEndpoint,
                     response.StatusCode,
                     jsonResult);
                 messages.Add(msg);
@@ -383,7 +652,8 @@ namespace FiftyOne.Pipeline.CloudRequestEngine.FlowElements
                     Messages.ExceptionCloudErrorsMultiple,
                     messages.Select(m => new CloudRequestException(m, 
                         (int)response.StatusCode, headers)));
-                throw new CloudRequestException(Messages.ExceptionCloudErrorsMultiple,
+                throw new CloudRequestException(
+                    Messages.ExceptionCloudErrorsMultiple,
                     (int)response.StatusCode, GetHeaders(), aggregated);
             }
             else if (messages.Count == 1)
@@ -414,16 +684,17 @@ namespace FiftyOne.Pipeline.CloudRequestEngine.FlowElements
         {
             var queryData = new Dictionary<string, string>();
 
-            queryData.Add("resource", _resourceKey);
+            queryData.Add("resource", _endpointsAndKeys.ResourceKey);
 
-            if (string.IsNullOrWhiteSpace(_licenseKey) == false)
+            if (string.IsNullOrWhiteSpace(_endpointsAndKeys.LicenseKey) == false)
             {
-                queryData.Add("license", _licenseKey);
+                queryData.Add("license", _endpointsAndKeys.LicenseKey);
             }
 
             var evidence = data.GetEvidence().AsDictionary();
 
-            // Add evidence in reverse alphabetical order, excluding special keys. 
+            // Add evidence in reverse alphabetical order, excluding special
+            // keys. 
             AddQueryData(queryData, evidence, evidence
                 .Where(e =>
                     KeyHasPrefix(e, Core.Constants.EVIDENCE_QUERY_PREFIX) == false &&
@@ -450,10 +721,14 @@ namespace FiftyOne.Pipeline.CloudRequestEngine.FlowElements
         /// <param name="item">The KeyValuePair to check.</param>
         /// <param name="prefix">The prefix to check for.</param>
         /// <returns>True if the key has the prefix.</returns>
-        private static bool KeyHasPrefix(KeyValuePair<string, object> item, string prefix) 
+        private static bool KeyHasPrefix(
+            KeyValuePair<string, object> item, 
+            string prefix) 
         {
-            var key = item.Key.Split(Core.Constants.EVIDENCE_SEPERATOR.ToCharArray());
-            return key[0].Equals(prefix, StringComparison.InvariantCultureIgnoreCase);
+            var key = item.Key.Split(EVIDENCE_SEPARATOR_CHAR_ARRAY);
+            return key[0].Equals(
+                prefix, 
+                StringComparison.InvariantCultureIgnoreCase);
         }
 
         /// <summary>
@@ -463,8 +738,8 @@ namespace FiftyOne.Pipeline.CloudRequestEngine.FlowElements
         /// The destination dictionary to add query data to.
         /// </param>
         /// <param name="allEvidence">
-        /// All evidence in the flow data. This is used to report which evidence
-        /// keys are conflicting.
+        /// All evidence in the flow data. This is used to report which 
+        /// evidence keys are conflicting.
         /// </param>
         /// <param name="evidence">
         /// Evidence to add to the query Data.
@@ -477,7 +752,7 @@ namespace FiftyOne.Pipeline.CloudRequestEngine.FlowElements
             foreach (var item in evidence)
             {
                 // Get the key parts
-                var key = item.Key.Split(Core.Constants.EVIDENCE_SEPERATOR.ToCharArray());
+                var key = item.Key.Split(EVIDENCE_SEPARATOR_CHAR_ARRAY);
                 var prefix = key[0];
                 var suffix = key.Last();
 
@@ -490,8 +765,8 @@ namespace FiftyOne.Pipeline.CloudRequestEngine.FlowElements
                 else
                 {
                     // Get the conflicting pieces of evidence and then log a 
-                    // warning, if the evidence prefix is not query. Otherwise a
-                    // warning is not needed as query evidence is expected 
+                    // warning, if the evidence prefix is not query. Otherwise
+                    // a warning is not needed as query evidence is expected 
                     // to overwrite any existing evidence with the same suffix.
                     if (prefix.Equals(Core.Constants.EVIDENCE_QUERY_PREFIX, 
                         StringComparison.InvariantCultureIgnoreCase) == false)
@@ -503,8 +778,9 @@ namespace FiftyOne.Pipeline.CloudRequestEngine.FlowElements
                                 StringComparison.InvariantCultureIgnoreCase))
                             .Select(e => $"{e.Key}={e.Value}");
 
-                        Logger?.LogWarning($"'{item.Key}={item.Value}' evidence " +
-                            $"conflicts with '{string.Join("', '", conflicts)}'");
+                        Logger?.LogWarning(
+                            $"'{item.Key}={item.Value}' evidence conflicts " +
+                            $"with '{string.Join("', '", conflicts)}'");
                     }
                     // Overwrite the existing queryParameter value.
                     queryData[suffix] = item.Value.ToString();
@@ -529,19 +805,23 @@ namespace FiftyOne.Pipeline.CloudRequestEngine.FlowElements
         /// Thrown if there is an error from the cloud service or
         /// there is no data in the response.
         /// </exception>
-        private Dictionary<string, ProductMetaData> GetCloudProperties()
+        private IReadOnlyDictionary<string, ProductMetaData> GetCloudProperties()
         {
-            string jsonResult = string.Empty;
-            Func<string> ErrorMessage = () => "Failed to retrieve available properties " +
-                    $"from cloud service at {_propertiesEndpoint}.";
+            ThrowIfStillRecovering();
+            var jsonResult = string.Empty;
+            Func<string> ErrorMessage = () => 
+                "Failed to retrieve available properties " +
+                $"from cloud service at {_endpointsAndKeys.PropertiesEndpoint}.";
 
-            var url = $"{_propertiesEndpoint}?resource={_resourceKey}";
+            var url = $"{_endpointsAndKeys.PropertiesEndpoint}?resource={_endpointsAndKeys.ResourceKey}";
             using (var requestMessage =
                 new HttpRequestMessage(HttpMethod.Get, url))
             {
                 try
                 {
-                    jsonResult = ProcessResponse(AddCommonHeadersAndSend(requestMessage));
+                    jsonResult = AmendSendAndProcess(
+                        requestMessage,
+                        checkForErrorMessages: true);
                 }
                 catch (Exception ex)
                 {
@@ -564,30 +844,29 @@ namespace FiftyOne.Pipeline.CloudRequestEngine.FlowElements
         }
 
         /// <summary>
-        /// Get the evidence keys that are required by the cloud service.
+        /// Get the evidence keys that can be consumed by the cloud service.
         /// </summary>
         /// <returns>
-        /// The value to be saved into <see cref="EvidenceKeyFilter"/>
+        /// The value to be saved into <see cref="EvidenceKeyFilter"/>.
         /// </returns>
-        /// <exception cref="CloudRequestException">
-        /// Thrown if there is an error from the cloud service or
-        /// there is no data in the response.
-        /// </exception>
         private IEvidenceKeyFilter GetCloudEvidenceKeys()
         {
-            string jsonResult = string.Empty;
-            Func<string> ErrorMessage = () => "Failed to retrieve evidence keys " +
-                    $"from cloud service at {_evidenceKeysEndpoint}.";
+            ThrowIfStillRecovering();
+            var jsonResult = string.Empty;
+            Func<string> ErrorMessage = () => 
+                "Failed to retrieve evidence keys " +
+                $"from cloud service at {_endpointsAndKeys.EvidenceKeysEndpoint}.";
 
             using (var requestMessage =
-                new HttpRequestMessage(HttpMethod.Get, _evidenceKeysEndpoint))
+                new HttpRequestMessage(HttpMethod.Get, _endpointsAndKeys.EvidenceKeysEndpoint))
             {
                 try
                 {
                     // Note - Don't check for error messages in the response
                     // as it is a flat JSON array.
-                    jsonResult = ProcessResponse(
-                        AddCommonHeadersAndSend(requestMessage), false);
+                    jsonResult = AmendSendAndProcess(
+                        requestMessage,
+                        checkForErrorMessages: false);
                 }
                 catch (Exception ex)
                 {
@@ -600,12 +879,12 @@ namespace FiftyOne.Pipeline.CloudRequestEngine.FlowElements
             {
                 var evidenceKeys = JsonConvert
                     .DeserializeObject<List<string>>(jsonResult);
-
                 return new EvidenceKeyFilterWhitelist(evidenceKeys);
             }
             else
             {
-                throw new Exception(ErrorMessage());
+                Logger?.LogWarning(ErrorMessage());
+                return null;
             }
         }
 
@@ -621,13 +900,14 @@ namespace FiftyOne.Pipeline.CloudRequestEngine.FlowElements
         private HttpResponseMessage AddCommonHeadersAndSend(
             HttpRequestMessage request)
         {
-            if (string.IsNullOrEmpty(_cloudRequestOrigin) == false &&
+            ThrowIfStillRecovering();
+            if (string.IsNullOrEmpty(_endpointsAndKeys.CloudRequestOrigin) == false &&
                 (request.Headers.Contains(Constants.ORIGIN_HEADER_NAME) == false ||
-                request.Headers.GetValues(Constants.ORIGIN_HEADER_NAME).Contains(_cloudRequestOrigin) == false))
+                request.Headers.GetValues(Constants.ORIGIN_HEADER_NAME).Contains(
+                    _endpointsAndKeys.CloudRequestOrigin) == false))
             {
-                request.Headers.Add(Constants.ORIGIN_HEADER_NAME, _cloudRequestOrigin);
+                request.Headers.Add(Constants.ORIGIN_HEADER_NAME, _endpointsAndKeys.CloudRequestOrigin);
             }
-
             return SendRequestAsync(request);
         }
 
@@ -643,17 +923,16 @@ namespace FiftyOne.Pipeline.CloudRequestEngine.FlowElements
         private HttpResponseMessage SendRequestAsync(
             HttpRequestMessage request)
         {
-            var task = _httpClient.SendAsync(request);
-
             try
             {
-                return task.Result;
+                return _httpClient.SendAsync(request).Result;
             }
-            catch (Exception ex)
+            catch (AggregateException httpException)
             {
                 throw new CloudRequestException(
-                    Messages.ExceptionCloudResponseFailure, ex);
+                    Messages.ExceptionCloudResponseFailure,
+                    httpException);
             }
-        } 
+        }
     }
 }
