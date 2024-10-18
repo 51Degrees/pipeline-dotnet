@@ -28,6 +28,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Runtime.CompilerServices;
+using System.Threading;
 
 [assembly: InternalsVisibleTo("FiftyOne.Pipeline.Web.Tests")]
 [assembly: InternalsVisibleTo("FiftyOne.Pipeline.Core.Tests")]
@@ -294,15 +295,43 @@ namespace FiftyOne.Pipeline.Core.Data
         /// <exception cref="ObjectDisposedException">
         /// Thrown if the Pipeline has already been disposed.
         /// </exception>
-        public void Process()
+        public void Process() => Process(default);
+
+        /// <summary>
+        /// Use the pipeline to process this FlowData instance and 
+        /// populate the aspect data values.
+        /// </summary>
+        /// <exception cref="PipelineException">
+        /// Thrown if this flow data object has already been processed.
+        /// </exception>
+        /// <exception cref="ObjectDisposedException">
+        /// Thrown if the Pipeline has already been disposed.
+        /// </exception>
+        /// <exception cref="OperationCanceledException">
+        /// Thrown if <paramref name="cancellationToken"/> tripped
+        /// before execution started.
+        /// </exception>
+        /// <param name="cancellationToken">
+        /// Token to cancel processing.
+        /// Can be retrieved by flow elements from
+        /// <see cref="ProcessingCancellationToken"/>.
+        /// </param>
+        public void Process(CancellationToken cancellationToken)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             if (_processed)
             {
                 throw new PipelineException(Messages.ExceptionFlowDataAlreadyProcessed);
             }
             _processed = true;
+            ProcessingCancellationToken = cancellationToken;
             PipelineInternal.Process(this);
         }
+
+        /// <summary>
+        /// Token passed into <see cref="Process(CancellationToken)"/>.
+        /// </summary>
+        public CancellationToken ProcessingCancellationToken { get; private set; }
 
         /// <summary>
         /// Add the specified evidence to the FlowData

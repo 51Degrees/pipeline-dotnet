@@ -22,6 +22,7 @@
 
 using System;
 using System.Collections.Generic;
+using System.Linq;
 
 namespace FiftyOne.Pipeline.Core.Data
 {
@@ -39,8 +40,8 @@ namespace FiftyOne.Pipeline.Core.Data
         /// <summary>
         /// Constructor
         /// </summary>
-        public EvidenceKeyFilterAggregator() : 
-            base(new List<string>(), StringComparer.OrdinalIgnoreCase)
+        public EvidenceKeyFilterAggregator() :
+            base(Enumerable.Empty<string>(), StringComparer.OrdinalIgnoreCase)
         {
             _filters = new List<IEvidenceKeyFilter>();
         }

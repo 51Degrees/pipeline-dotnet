@@ -21,6 +21,8 @@
  * ********************************************************************* */
 
 using FiftyOne.Pipeline.CloudRequestEngine.Data;
+using FiftyOne.Pipeline.CloudRequestEngine.FailHandling.Facade;
+using FiftyOne.Pipeline.CloudRequestEngine.FailHandling.Recovery;
 using FiftyOne.Pipeline.Core.Attributes;
 using FiftyOne.Pipeline.Core.Exceptions;
 using FiftyOne.Pipeline.Core.FlowElements;
@@ -45,9 +47,9 @@ namespace FiftyOne.Pipeline.CloudRequestEngine.FlowElements
     {
         #region Private Properties
 
-        private ILoggerFactory _loggerFactory;
-        private ILogger<CloudRequestData> _dataLogger;
-        private HttpClient _httpClient;
+        private readonly ILoggerFactory _loggerFactory;
+        private readonly ILogger<CloudRequestData> _dataLogger;
+        private readonly HttpClient _httpClient;
 
         // Note - Defaults for these fields are set in the Build method.
         private string _dataEndpoint = "";
@@ -58,6 +60,9 @@ namespace FiftyOne.Pipeline.CloudRequestEngine.FlowElements
         private string _licenseKey = Constants.LICENSE_KEY_DEFAULT;
         private string _cloudRequestOrigin = Constants.CLOUD_REQUEST_ORIGIN_DEFAULT;
         private int _timeout = Constants.CLOUD_REQUEST_TIMEOUT_DEFAULT_SECONDS;
+        private int _failuresToEnterRecovery = Constants.CLOUD_REQUEST_FAILURES_TO_ENTER_RECOVERY_DEFAULT;
+        private int _failuresWindowSeconds = Constants.CLOUD_REQUEST_TIMEOUT_DEFAULT_SECONDS;
+        private double _recoverySeconds = Constants.CLOUD_REQUEST_RECOVERY_SECONDS_DEFAULT;
 
         #endregion
 
@@ -188,6 +193,62 @@ namespace FiftyOne.Pipeline.CloudRequestEngine.FlowElements
         }
 
         /// <summary>
+        /// Number of failures to occur within
+        /// 
+        /// for CloudRequestEngine to temporarily stop sending requests.
+        /// </summary>
+        /// <param name="failuresToEnterRecovery"></param>
+        /// <returns></returns>
+        [DefaultValue(Constants.CLOUD_REQUEST_FAILURES_TO_ENTER_RECOVERY_DEFAULT)]
+        public CloudRequestEngineBuilder SetFailuresToEnterRecovery(
+            int failuresToEnterRecovery)
+        {
+            if (failuresToEnterRecovery < Constants.CLOUD_REQUEST_FAILURES_TO_ENTER_RECOVERY_MIN
+                || failuresToEnterRecovery > Constants.CLOUD_REQUEST_FAILURES_TO_ENTER_RECOVERY_MAX)
+            {
+                throw new ArgumentOutOfRangeException(
+                        nameof(failuresToEnterRecovery),
+                        $"{nameof(failuresToEnterRecovery)} must be within"
+                        + $" {Constants.CLOUD_REQUEST_FAILURES_TO_ENTER_RECOVERY_MIN} and"
+                        + $" {Constants.CLOUD_REQUEST_FAILURES_TO_ENTER_RECOVERY_MAX} (both inclusive)."
+                        + $" Received: {failuresToEnterRecovery}.");
+            }
+            _failuresToEnterRecovery = failuresToEnterRecovery;
+            return this;
+        }
+
+        /// <summary>
+        /// Timeout in seconds for the request to the endpoint.
+        /// </summary>
+        /// <param name="failuresWindowSeconds"></param>
+        /// <returns></returns>
+        [DefaultValue(Constants.CLOUD_REQUEST_TIMEOUT_DEFAULT_SECONDS)]
+        public CloudRequestEngineBuilder SetFailuresWindowSeconds(
+            int failuresWindowSeconds)
+        {
+            if ((_failuresWindowSeconds = failuresWindowSeconds) <= 0)
+            {
+                throw new ArgumentOutOfRangeException(
+                    nameof(failuresWindowSeconds),
+                    $"{nameof(failuresWindowSeconds)} must be positive,"
+                    + $" Received: {failuresWindowSeconds}.");
+            }
+            return this;
+        }
+
+        /// <summary>
+        /// For how long to disallow server calls after failure.
+        /// </summary>
+        /// <param name="recoverySeconds"></param>
+        /// <returns></returns>
+        [DefaultValue(Constants.CLOUD_REQUEST_RECOVERY_SECONDS_DEFAULT)]
+        public CloudRequestEngineBuilder SetRecoverySeconds(double recoverySeconds)
+        {
+            _recoverySeconds = recoverySeconds;
+            return this;
+        }
+
+        /// <summary>
         /// The value to set for the Origin header when making requests
         /// to the cloud service.
         /// This is used by the cloud service to check that the request
@@ -269,18 +330,30 @@ namespace FiftyOne.Pipeline.CloudRequestEngine.FlowElements
                     Messages.ExceptionResourceKeyNeeded);
             }
 
+            var failThrottlingStrategy 
+                = (_recoverySeconds > 0)
+                ? new SimpleRecoveryStrategy(_recoverySeconds)
+                : (IRecoveryStrategy)new InstantRecoveryStrategy();
+
             return new CloudRequestEngine(
                 _loggerFactory.CreateLogger<CloudRequestEngine>(),
                 CreateAspectData,
                 _httpClient,
-                _dataEndpoint,
-                _resourceKey,
-                _licenseKey,
-                _propertiesEndpoint,
-                _evidenceKeysEndpoint,
+                new CloudRequestEngine.EndpointsAndKeys
+                {
+                    DataEndpoint = _dataEndpoint,
+                    ResourceKey = _resourceKey,
+                    LicenseKey = _licenseKey,
+                    PropertiesEndpoint = _propertiesEndpoint,
+                    EvidenceKeysEndpoint = _evidenceKeysEndpoint,
+                    CloudRequestOrigin = _cloudRequestOrigin,
+                    RequestedProperties = properties,
+                },
                 _timeout,
-                properties,
-                _cloudRequestOrigin);
+                new WindowedFailHandler(
+                    failThrottlingStrategy,
+                    _failuresToEnterRecovery,
+                    TimeSpan.FromSeconds(_failuresWindowSeconds)));
         }
     }
 }

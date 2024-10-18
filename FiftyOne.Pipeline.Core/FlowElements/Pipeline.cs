@@ -29,6 +29,7 @@ using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Globalization;
 using System.Linq;
+using System.Threading;
 
 namespace FiftyOne.Pipeline.Core.FlowElements
 {
@@ -302,6 +303,11 @@ namespace FiftyOne.Pipeline.Core.FlowElements
         /// Thrown if an error occurred during processing, 
         /// unless <see ref="SuppressProcessExceptions"/> is true.
         /// </exception>
+        /// <exception cref="OperationCanceledException">
+        /// Thrown if 
+        /// <see cref="IFlowData.ProcessingCancellationToken"/>
+        /// tripped during execution.
+        /// </exception>
         public void Process(IFlowData data)
         {
             if(data == null)
@@ -316,6 +322,7 @@ namespace FiftyOne.Pipeline.Core.FlowElements
 
             foreach (var element in _flowElements)
             {
+                data.ProcessingCancellationToken.ThrowIfCancellationRequested();
                 try
                 {
                     element.Process(data);
@@ -509,7 +516,8 @@ namespace FiftyOne.Pipeline.Core.FlowElements
                     {
                         elementProps = element.Properties;
                     }
-                    catch (PropertiesNotYetLoadedException)
+                    catch (Exception e)
+                    when (e is PropertiesNotYetLoadedException || e is PipelineTemporarilyUnavailableException)
                     {
                         hadFailures = true;
                         continue;

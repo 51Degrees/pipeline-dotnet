@@ -38,8 +38,8 @@ using System;
 using System.Collections.Generic;
 using System.Collections.Specialized;
 using System.Linq;
+using System.Threading;
 using System.Web;
-using static System.Collections.Specialized.BitVector32;
 
 namespace FiftyOne.Pipeline.Web.Framework
 {
@@ -278,7 +278,7 @@ namespace FiftyOne.Pipeline.Web.Framework
                 }
 
                 // Process the evidence and return the result
-                flowData.Process();
+                flowData.Process(GetCancellationTokenForRequest(request));
 
                 if (GetInstance().SetHeaderPropertiesEnabled &&
                     request.RequestContext.HttpContext.ApplicationInstance != null)
@@ -290,14 +290,51 @@ namespace FiftyOne.Pipeline.Web.Framework
             } 
             catch (Exception ex)
             {
-                if (!GetInstance().Pipeline.SuppressProcessExceptions)
+                var shouldSuppress 
+                    // Suppress all ?
+                    = GetInstance().Pipeline.SuppressProcessExceptions
+                    // thrown by `EvidenceKeyFilter` ?
+                    || ex is PipelineTemporarilyUnavailableException
+                    // thrown by `Process` ?
+                    || (ex is AggregateException 
+                    && ex.InnerException is PipelineTemporarilyUnavailableException);
+                if (!shouldSuppress)
                 {
-                    if (ex is AggregateException) { throw; }
-                    throw new AggregateException(ex);
+                    Exception ex2 = null;
+                    try
+                    {
+                        flowData.Dispose();
+                    }
+                    catch (Exception ex3)
+                    {
+                        ex2 = ex3;
+                    }
+                    if (ex2 is null)
+                    {
+                        if (ex is AggregateException) { throw; }
+                        throw new AggregateException(ex);
+                    }
+                    throw new AggregateException(new Exception[] { ex, ex2 });
                 }
             }
 
             return flowData;
+        }
+
+        private static CancellationToken GetCancellationTokenForRequest(HttpRequest httpRequest)
+        {
+            var timedOutToken = httpRequest.TimedOutToken;
+            try
+            {
+                return CancellationTokenSource.CreateLinkedTokenSource(
+                    timedOutToken,
+                    httpRequest.RequestContext.HttpContext.Response.ClientDisconnectedToken)
+                    .Token;
+            }
+            catch (PlatformNotSupportedException)
+            {
+                return timedOutToken;
+            }
         }
 
         /// <summary>

@@ -29,6 +29,7 @@ using Microsoft.VisualStudio.TestTools.UnitTesting;
 using Moq;
 using System;
 using System.Collections.Generic;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace FiftyOne.Pipeline.Core.Tests.FlowElements
@@ -81,7 +82,7 @@ namespace FiftyOne.Pipeline.Core.Tests.FlowElements
                 element2.Object);
             // Don't create the flow data via the pipeline as we just want
             // to test Process.
-            IFlowData data = StaticFactories.CreateFlowData(pipeline);
+            using IFlowData data = StaticFactories.CreateFlowData(pipeline);
             data.Process();
 
             // Act            
@@ -97,6 +98,62 @@ namespace FiftyOne.Pipeline.Core.Tests.FlowElements
             // Check that element 1 was called before element 2.
             element2.Verify(e => e.Process(It.Is<IFlowData>(d => data.GetDataKeys().Contains("element1"))),
                 "element 1 should have been called before element 2.");
+        }
+
+        [TestMethod]
+        public void Pipeline_Process_SequenceOfTwo_WithCancellation()
+        {
+            // Arrange
+            var element1 = GetMockFlowElement();
+            var element2 = GetMockFlowElement();
+            var tokenSource = new CancellationTokenSource();
+
+            // Configure the elements
+            element1.Setup(e => e.Process(It.IsAny<IFlowData>())).Callback((IFlowData d) =>
+            {
+                var tempdata = d.GetOrAdd("element1", (p) => new TestElementData(p));
+                tempdata["key"] = "done";
+                tokenSource.Cancel();
+            });
+            element2.Setup(e => e.Process(It.IsAny<IFlowData>())).Callback((IFlowData d) =>
+            {
+                var tempdata = d.GetOrAdd("element2", (p) => new TestElementData(p));
+                tempdata["key"] = "done";
+            });
+
+            // Create the pipeline
+            var pipeline = CreatePipeline(
+                false,
+                false,
+                element1.Object,
+                element2.Object);
+            // Don't create the flow data via the pipeline as we just want
+            // to test Process.
+            using IFlowData data = StaticFactories.CreateFlowData(pipeline);
+            
+            // Act            
+            try
+            {
+                data.Process(tokenSource.Token);
+                Assert.Fail($"{nameof(pipeline.Process)} didn't throw.");
+            }
+            catch (OperationCanceledException)
+            {
+                // nop
+            }
+
+            // Assert
+            Assert.IsTrue(data.Errors == null || data.Errors.Count == 0, "Expected no errors");
+            // Check that the resulting data has the expected values
+            Assert.IsTrue(data.GetDataKeys().Contains("element1"),
+                "data from element 1 is missing in the result");
+            Assert.IsFalse(data.GetDataKeys().Contains("element2"), 
+                "data from element 2 is present in the result");
+            Assert.AreEqual("done", data.Get("element1")["key"].ToString(),
+                "element 1 result mismatch.");
+            // Check that element 1 was called before element 2.
+            element2.Verify(e => e.Process(It.Is<IFlowData>(d => data.GetDataKeys().Contains("element1"))),
+                Times.Never(), "element 2. should never be called.");
         }
 
         /// <summary>

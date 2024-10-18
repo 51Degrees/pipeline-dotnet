@@ -32,6 +32,7 @@ using Moq;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading;
 
 namespace FiftyOne.Pipeline.Core.Tests.Data
 {
@@ -85,6 +86,30 @@ namespace FiftyOne.Pipeline.Core.Tests.Data
         {
             _flowData.Process();
             _pipeline.Verify(p => p.Process(_flowData));
+        }
+
+        [TestMethod]
+        public void FlowData_Process_WithToken()
+        {
+            var token = new CancellationToken(canceled: false);
+            _flowData.Process(token);
+            _pipeline.Verify(p => p.Process(_flowData));
+        }
+
+        [TestMethod]
+        public void FlowData_Process_WithCancelledToken()
+        {
+            var token = new CancellationToken(canceled: true);
+            try
+            {
+                _flowData.Process(token);
+                Assert.Fail($"{nameof(_flowData.Process)} didn't throw.");
+            }
+            catch (OperationCanceledException)
+            {
+                // nop
+            }
+            _pipeline.Verify(p => p.Process(_flowData), Times.Never);
         }
 
         /// <summary>

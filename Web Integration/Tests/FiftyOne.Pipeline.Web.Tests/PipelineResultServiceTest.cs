@@ -26,6 +26,7 @@ using FiftyOne.Pipeline.Web.Services;
 using Microsoft.AspNetCore.Http;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using Moq;
+using System.Threading;
 
 namespace FiftyOne.Pipeline.Web.Tests
 {
@@ -67,7 +68,7 @@ namespace FiftyOne.Pipeline.Web.Tests
             _resultsService.Process(new DefaultHttpContext());
 
             _flowData.Verify(
-                f => f.Process(),
+                f => f.Process(It.IsAny<CancellationToken>()),
                 Times.Once,
                 "The process method on flow data should have been called " +
                 "once by the process method.");

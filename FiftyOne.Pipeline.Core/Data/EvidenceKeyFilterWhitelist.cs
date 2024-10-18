@@ -76,9 +76,40 @@ namespace FiftyOne.Pipeline.Core.Data
         /// The list of evidence keys that is filter will include.
         /// By default, all keys will have the same order of precedence.
         /// </param>
-        public EvidenceKeyFilterWhitelist(List<string> inclusionList)
+        public EvidenceKeyFilterWhitelist(IEnumerable<string> inclusionList)
         {
             PopulateFromList(inclusionList);
+        }
+
+        /// <summary>
+        /// Backwards compatible constructor
+        /// The filter will be case-insensitive. For a case-sensitive filter
+        /// use the overload that takes an <see cref="IEqualityComparer{T}"/>.
+        /// </summary>
+        /// <param name="inclusionList">
+        /// The list of evidence keys that is filter will include.
+        /// By default, all keys will have the same order of precedence.
+        /// </param>
+        public EvidenceKeyFilterWhitelist(List<string> inclusionList) :
+            this((IEnumerable<string>)inclusionList) 
+        { 
+        }
+
+        /// <summary>
+        /// Backwards compatible constructor
+        /// </summary>
+        /// <param name="inclusionList">
+        /// The list of evidence keys that is filter will include.
+        /// By default, all keys will have the same order of precedence.
+        /// </param>
+        /// <param name="comparer">
+        /// Comparator to use when comparing the keys.
+        /// </param>
+        public EvidenceKeyFilterWhitelist(
+            List<string> inclusionList,
+            IEqualityComparer<string> comparer)
+            : this((IEnumerable<string>)inclusionList, comparer)
+        {
         }
 
         /// <summary>
@@ -92,7 +123,7 @@ namespace FiftyOne.Pipeline.Core.Data
         /// Comparator to use when comparing the keys.
         /// </param>
         public EvidenceKeyFilterWhitelist(
-            List<string> inclusionList,
+            IEnumerable<string> inclusionList,
             IEqualityComparer<string> comparer)
         {
             _comparer = comparer;
@@ -109,9 +140,24 @@ namespace FiftyOne.Pipeline.Core.Data
         /// The order of precedence of each key is given by the value of
         /// the key/value pair.
         /// </param>
-        public EvidenceKeyFilterWhitelist(Dictionary<string, int> inclusionList)
+        public EvidenceKeyFilterWhitelist(IReadOnlyDictionary<string, int> inclusionList)
         {
             PopulateFromDictionary(inclusionList);
+        }
+
+        /// <summary>
+        /// Backwards compatible constructor
+        /// The filter will be case-insensitive. For a case-sensitive filter
+        /// use the overload that takes an <see cref="IEqualityComparer{T}"/>.
+        /// </summary>
+        /// <param name="inclusionList">
+        /// The dictionary of evidence keys that is filter will include.
+        /// The order of precedence of each key is given by the value of
+        /// the key/value pair.
+        /// </param>
+        public EvidenceKeyFilterWhitelist(Dictionary<string, int> inclusionList)
+            : this((IReadOnlyDictionary<string, int>)inclusionList)
+        {
         }
 
         /// <summary>
@@ -126,20 +172,38 @@ namespace FiftyOne.Pipeline.Core.Data
         /// Comparator to use when comparing the keys.
         /// </param>
         public EvidenceKeyFilterWhitelist(
-            Dictionary<string, int> inclusionList,
+            IReadOnlyDictionary<string, int> inclusionList,
             IEqualityComparer<string> comparer)
         {
             _comparer = comparer;
             PopulateFromDictionary(inclusionList);
         }
 
+        /// <summary>
+        /// Backwards compatible constructor
+        /// </summary>
+        /// <param name="inclusionList">
+        /// The dictionary of evidence keys that is filter will include.
+        /// The order of precedence of each key is given by the value of
+        /// the key/value pair.
+        /// </param>
+        /// <param name="comparer">
+        /// Comparator to use when comparing the keys.
+        /// </param>
+        public EvidenceKeyFilterWhitelist(
+            Dictionary<string, int> inclusionList,
+            IEqualityComparer<string> comparer)
+            : this((IReadOnlyDictionary<string, int>)inclusionList, comparer)
+        {
+        }
 
-        private void PopulateFromList(List<string> inclusionList)
+
+        private void PopulateFromList(IEnumerable<string> inclusionList)
         {
             _inclusionList = inclusionList.ToDictionary(w => w, w => 0, _comparer);
         }
 
-        private void PopulateFromDictionary(Dictionary<string, int> inclusionList)
+        private void PopulateFromDictionary(IReadOnlyDictionary<string, int> inclusionList)
         {
             _inclusionList = inclusionList.ToDictionary(w => w.Key, w => w.Value, _comparer);
         }
