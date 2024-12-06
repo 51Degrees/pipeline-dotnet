@@ -1287,7 +1287,7 @@ namespace FiftyOne.Pipeline.Engines.Services
 									result = AutoUpdateStatus.AUTO_UPDATE_HTTPS_ERR;
 									throw new DataUpdateException($"HTTP status code '{response.StatusCode}' " +
 										$"from data update service at " +
-										$"'{url}' for engine '{dataFile.EngineType?.Name}'", result); ;
+										$"'{url}' for engine '{dataFile.EngineType?.Name}'", result);
 							}
 						}
 					}

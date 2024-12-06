@@ -124,7 +124,7 @@ namespace FiftyOne.Pipeline.Core.Data
         }
 
         /// <summary>
-        /// Use the values in the specified dictionary to populate
+        /// Use the values in the specified enumerable to populate
         /// this data instance.
         /// </summary>
         /// <remarks>
@@ -138,16 +138,35 @@ namespace FiftyOne.Pipeline.Core.Data
         /// <exception cref="ArgumentNullException">
         /// Thrown if the supplied dictionary is null
         /// </exception>
-        public void PopulateFromDictionary(IDictionary<string, object> values)
+        public void PopulateFrom(IEnumerable<KeyValuePair<string, object>> values)
         {
-            if(values == null)
+            if (values == null)
             {
                 throw new ArgumentNullException(nameof(values));
             }
-            foreach(var value in values)
+
+            foreach (var value in values)
             {
                 this[value.Key] = value.Value;
             }
+        }
+        /// <summary>
+        /// Deprecated. Use PopulateFrom method.
+        /// Use the values in the specified dictionary to populate
+        /// this data instance.
+        /// </summary>
+        /// <remarks>
+        /// The data will not be cleared before the new values are added.
+        /// The new values will overwrite old values if any exist with the
+        /// same keys.
+        /// </remarks>
+        /// <param name="values">
+        /// The values to transfer to this data instance.
+        /// </param>
+        [Obsolete("PopulateFromDictionary is deprecated. Use PopulateFrom(IEnumerable<KeyValuePair<string, object>>) instead.")]
+        public void PopulateFromDictionary(IDictionary<string, object> values)
+        {
+            PopulateFrom(values);
         }
 
         /// <summary>

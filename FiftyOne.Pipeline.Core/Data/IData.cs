@@ -20,6 +20,7 @@
  * such notice(s) shall fulfill the requirements of that article.
  * ********************************************************************* */
 
+using System;
 using System.Collections.Generic;
 
 namespace FiftyOne.Pipeline.Core.Data
@@ -39,6 +40,20 @@ namespace FiftyOne.Pipeline.Core.Data
         IReadOnlyDictionary<string, object> AsDictionary();
 
         /// <summary>
+        /// Use the values in the specified enumerable to populate
+        /// this data instance.
+        /// </summary>
+        /// <remarks>
+        /// The data will not be cleared before the new values are added.
+        /// The new values will overwrite old values if any exist with the
+        /// same keys.
+        /// </remarks>
+        /// <param name="values">
+        /// The key-value pairs to transfer to this data instance.
+        /// </param>
+        void PopulateFrom(IEnumerable<KeyValuePair<string, object>> values);
+
+        /// <summary>
         /// Use the values in the specified dictionary to populate
         /// this data instance.
         /// </summary>
@@ -50,6 +65,7 @@ namespace FiftyOne.Pipeline.Core.Data
         /// <param name="values">
         /// The values to transfer to this data instance.
         /// </param>
+        [Obsolete("PopulateFromDictionary is deprecated. Use PopulateFrom(IEnumerable<KeyValuePair<string, object>>) instead.")]
         void PopulateFromDictionary(IDictionary<string, object> values);
 
         /// <summary>

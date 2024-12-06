@@ -38,7 +38,7 @@ namespace FiftyOne.Pipeline.JavaScriptBuilder.FlowElement
     /// </summary>
     public class JavaScriptBuilderElementBuilder
     {
-        private ILoggerFactory _loggerFactory;
+        protected ILoggerFactory _loggerFactory;
         private ILogger<JavaScriptBuilderElementData> _dataLogger; 
 
         /// <summary>
