@@ -138,10 +138,17 @@ Public Member Functions</h2>
 </div></td></tr>
 <!-- member dec start -->
 <!-- startMemberItem() -->
+<tr class="c-table__row memitem:a60a335ec638722e7dc9025a65f7d993b"><td class="c-table__cell">void<!-- insertMemberAlign -->
+&#160;</td><td class="c-table__cell"><a class="el" href="class_fifty_one_1_1_pipeline_1_1_core_1_1_data_1_1_data_base.html#a60a335ec638722e7dc9025a65f7d993b">PopulateFrom</a> (IEnumerable&lt; KeyValuePair&lt; string, object &gt;&gt; values)
+<!-- startMemberDescription -->
+<div class="c-table__desc memdesc:a60a335ec638722e7dc9025a65f7d993b">Use the values in the specified enumerable to populate this data instance.  <a href="#a60a335ec638722e7dc9025a65f7d993b">More...</a><!-- endMemberDescription -->
+</div></td></tr>
+<!-- member dec start -->
+<!-- startMemberItem() -->
 <tr class="c-table__row memitem:aac8a62379729b92f2738a55ba24a1f69"><td class="c-table__cell">void<!-- insertMemberAlign -->
 &#160;</td><td class="c-table__cell"><a class="el" href="class_fifty_one_1_1_pipeline_1_1_core_1_1_data_1_1_data_base.html#aac8a62379729b92f2738a55ba24a1f69">PopulateFromDictionary</a> (IDictionary&lt; string, object &gt; values)
 <!-- startMemberDescription -->
-<div class="c-table__desc memdesc:aac8a62379729b92f2738a55ba24a1f69">Use the values in the specified dictionary to populate this data instance.  <a href="#aac8a62379729b92f2738a55ba24a1f69">More...</a><!-- endMemberDescription -->
+<div class="c-table__desc memdesc:aac8a62379729b92f2738a55ba24a1f69">Deprecated.  <a href="#aac8a62379729b92f2738a55ba24a1f69">More...</a><!-- endMemberDescription -->
 </div></td></tr>
 <!-- endMemberList -->
 <!-- end member list -->
@@ -457,6 +464,55 @@ Properties</h2>
 </div>
 </article>
 <article class="c-member">
+<a id="a60a335ec638722e7dc9025a65f7d993b"></a><!-- startMemberDoc -->
+
+<h2 class="c-member__title"><span class="c-member__anchor"><a href="#a60a335ec638722e7dc9025a65f7d993b">&#9670;&nbsp;</a></span>PopulateFrom()</h2>
+
+<div class="c-member__main">
+<div class="c-member__head">
+<!-- startMemberDocName -->
+      <div class="c-member__split">
+        <div class="g-table g-table--overflow">
+          <table class="c-table c-table--article">
+            <tr class="c-table__row">
+              <td class="c-table__cell">void FiftyOne.Pipeline.Core.Data.DataBase.PopulateFrom <!-- endMemberDocName -->
+</td>
+<!-- startParameterList -->
+          <td>(</td>
+<!-- startFirstParameterType -->
+          <td class="c-table__cell">IEnumerable&lt; KeyValuePair&lt; string, object &gt;&gt;<!-- endParameterType -->
+&#160;</td>
+<!-- startParameterName -->
+          <td class="c-table__cell"><em>values</em><!-- endParameterName -->
+</td><td>)</td>
+          <td><!-- endParameterList -->
+</td>
+        </tr>
+<!-- endMemberDoc -->
+          </table>
+        </div>
+      </div>
+</div><!-- startIndent -->
+<div class="c-member__body">
+
+<p>Use the values in the specified enumerable to populate this data instance. </p>
+<p>The data will not be cleared before the new values are added. The new values will overwrite old values if any exist with the same keys. </p>
+<dl class="c-list-definition"><dt class="c-list-definition__title">Parameters</dt><dd class="c-list-definition__desc">
+    <tr><dd class="c-list-definition__desc"><span class="b-text--red">values</span> - The values to transfer to this data instance. </dd>
+  </dd>
+</dl>
+<dl class="c-list-definition"><dt class="c-list-definition__title">Exceptions</dt><dd class="c-list-definition__desc">
+    <tr><dd class="c-list-definition__desc"><span class="b-text--red">ArgumentNullException</span> - Thrown if the supplied dictionary is null </dd>
+  </dd>
+</dl>
+
+<p>Implements <a class="el" href="interface_fifty_one_1_1_pipeline_1_1_core_1_1_data_1_1_i_data.html#a4b59296cac382573871478acace1231c">FiftyOne.Pipeline.Core.Data.IData</a>.</p>
+<!-- endIndent -->
+
+</div>
+</div>
+</article>
+<article class="c-member">
 <a id="aac8a62379729b92f2738a55ba24a1f69"></a><!-- startMemberDoc -->
 
 <h2 class="c-member__title"><span class="c-member__anchor"><a href="#aac8a62379729b92f2738a55ba24a1f69">&#9670;&nbsp;</a></span>PopulateFromDictionary()</h2>
@@ -488,14 +544,11 @@ Properties</h2>
 </div><!-- startIndent -->
 <div class="c-member__body">
 
-<p>Use the values in the specified dictionary to populate this data instance. </p>
+<p>Deprecated. </p>
+<p>Use PopulateFrom method. Use the values in the specified dictionary to populate this data instance. </p>
 <p>The data will not be cleared before the new values are added. The new values will overwrite old values if any exist with the same keys. </p>
 <dl class="c-list-definition"><dt class="c-list-definition__title">Parameters</dt><dd class="c-list-definition__desc">
     <tr><dd class="c-list-definition__desc"><span class="b-text--red">values</span> - The values to transfer to this data instance. </dd>
-  </dd>
-</dl>
-<dl class="c-list-definition"><dt class="c-list-definition__title">Exceptions</dt><dd class="c-list-definition__desc">
-    <tr><dd class="c-list-definition__desc"><span class="b-text--red">ArgumentNullException</span> - Thrown if the supplied dictionary is null </dd>
   </dd>
 </dl>
 

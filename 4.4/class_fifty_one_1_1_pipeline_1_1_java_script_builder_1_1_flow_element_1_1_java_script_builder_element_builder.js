@@ -8,6 +8,7 @@ var class_fifty_one_1_1_pipeline_1_1_java_script_builder_1_1_flow_element_1_1_ja
     [ "SetMinify", "class_fifty_one_1_1_pipeline_1_1_java_script_builder_1_1_flow_element_1_1_java_script_builder_element_builder.html#ae56f3d1fe7165d11befa542f32a2257c", null ],
     [ "SetObjectName", "class_fifty_one_1_1_pipeline_1_1_java_script_builder_1_1_flow_element_1_1_java_script_builder_element_builder.html#a1602d96cc175ef93c47924338727f824", null ],
     [ "SetProtocol", "class_fifty_one_1_1_pipeline_1_1_java_script_builder_1_1_flow_element_1_1_java_script_builder_element_builder.html#a15bc6cf16fa33e2754709ba6bd2a28cf", null ],
+    [ "_loggerFactory", "class_fifty_one_1_1_pipeline_1_1_java_script_builder_1_1_flow_element_1_1_java_script_builder_element_builder.html#af55c60d6f61af959fc95dc9650228025", null ],
     [ "EnableCookies", "class_fifty_one_1_1_pipeline_1_1_java_script_builder_1_1_flow_element_1_1_java_script_builder_element_builder.html#a024d97f000aae16ded405a00a5496faf", null ],
     [ "Endpoint", "class_fifty_one_1_1_pipeline_1_1_java_script_builder_1_1_flow_element_1_1_java_script_builder_element_builder.html#ac763aae2bba97f5522c3f62f4dcd1bf9", null ],
     [ "Host", "class_fifty_one_1_1_pipeline_1_1_java_script_builder_1_1_flow_element_1_1_java_script_builder_element_builder.html#ab1ac500a8cb59e97b4da7c051b2e19c6", null ],
