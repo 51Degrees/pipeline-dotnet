@@ -36,6 +36,7 @@ using System.Globalization;
 using System.Linq;
 using System.Net.Http;
 using System.Threading;
+using System.Threading.Tasks;
 
 namespace FiftyOne.Pipeline.CloudRequestEngine.FlowElements
 {
@@ -925,7 +926,9 @@ namespace FiftyOne.Pipeline.CloudRequestEngine.FlowElements
         {
             try
             {
-                return _httpClient.SendAsync(request).Result;
+                var task = Task.Run(() => _httpClient.SendAsync(request));
+                task.Wait();
+                return task.Result;
             }
             catch (AggregateException httpException)
             {
