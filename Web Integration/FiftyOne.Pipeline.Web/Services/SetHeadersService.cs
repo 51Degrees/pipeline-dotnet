@@ -96,14 +96,7 @@ namespace FiftyOne.Pipeline.Web.Services
             foreach (var header in flowData.GetFromElement(element)
                 .ResponseHeaderDictionary)
             {
-                if (context.Response.Headers.ContainsKey(header.Key))
-                {
-                    context.Response.Headers.Append(header.Key, header.Value);
-                }
-                else
-                {
-                    context.Response.Headers.Add(header.Key, header.Value);
-                }
+                context.Response.Headers.Append(header.Key, header.Value);
             }
         }
     }

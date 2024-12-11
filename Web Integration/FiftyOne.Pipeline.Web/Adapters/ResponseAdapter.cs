@@ -65,7 +65,7 @@ namespace FiftyOne.Pipeline.Web.Adapters
         /// <inheritdoc/>
         public void SetHeader(string name, string value)
         {
-            _response.Headers.Add(name, value);
+            _response.Headers.Append(name, value);
         }
 
         /// <inheritdoc/>

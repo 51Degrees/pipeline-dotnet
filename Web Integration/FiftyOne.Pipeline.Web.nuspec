@@ -14,7 +14,7 @@
 		<tags>51degrees,pipeline,aggregate,data service,web</tags>
 		<repository type="git" url="https://github.com/51Degrees/pipeline-dotnet" />
 		<dependencies>
-			<group targetFramework="net6.0">
+			<group targetFramework="net8.0">
 				<dependency id="FiftyOne.Pipeline.Engines.FiftyOne" version="$version$" />
 				<dependency id="FiftyOne.Pipeline.Web.Shared" version="$version$" />
 				<dependency id="FiftyOne.Pipeline.JavaScriptBuilder" version="$version$" />
@@ -38,12 +38,12 @@
 			</group>
 		</dependencies>
         <frameworkAssemblies>
-            <frameworkAssembly assemblyName="Microsoft.AspNetCore.App" targetFramework="net6.0"/>
+            <frameworkAssembly assemblyName="Microsoft.AspNetCore.App" targetFramework="net8.0"/>
         </frameworkAssemblies>
     </metadata>
 	<files>
 		<file src="..\images\51d-logo.png" target="images\" />
-    <file src="FiftyOne.Pipeline.Web\bin\$config$\net6.0\FiftyOne.Pipeline.Web.dll" target="lib\net6.0" />
+    <file src="FiftyOne.Pipeline.Web\bin\$config$\net8.0\FiftyOne.Pipeline.Web.dll" target="lib\net8.0" />
     <file src="FiftyOne.Pipeline.Web\bin\$config$\netcoreapp3.1\FiftyOne.Pipeline.Web.dll" target="lib\netcoreapp3.1" />
 		<file src="FiftyOne.Pipeline.Web.Framework\bin\$config$\FiftyOne.Pipeline.Web.Framework.dll" target="lib\net462" />
 		<file src="FiftyOne.Pipeline.Web.Framework\Web.config.transform" target="content/net462/Web.config.transform" />
