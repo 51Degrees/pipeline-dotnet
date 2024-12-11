@@ -46,7 +46,7 @@ namespace FiftyOne.Pipeline.Engines.TestHelpers
         {
             LoggerFactory factory = new LoggerFactory();
             Evidence evidence = new Evidence(factory.CreateLogger<Evidence>());
-            evidence.PopulateFromDictionary(evidenceData);
+            evidence.PopulateFrom(evidenceData);
 
             Mock<IFlowData> data = new Mock<IFlowData>();
             data.Setup(d => d.GetEvidence()).Returns(evidence);

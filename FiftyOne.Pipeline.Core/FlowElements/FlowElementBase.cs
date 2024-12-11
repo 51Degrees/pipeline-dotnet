@@ -28,6 +28,7 @@ using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Diagnostics;
 using System.Linq;
+using Microsoft.Extensions.Logging.Abstractions;
 
 namespace FiftyOne.Pipeline.Core.FlowElements
 {
@@ -184,11 +185,8 @@ namespace FiftyOne.Pipeline.Core.FlowElements
             ILogger<FlowElementBase<T, TMeta>> logger,
             Func<IPipeline, FlowElementBase<T, TMeta>, T> elementDataFactory)
         {
-            Logger = logger;
-            if (Logger != null)
-            {
-                Logger.LogInformation($"FlowElement '{GetType().Name}' created.");
-            }
+            Logger = logger ?? NullLogger<FlowElementBase<T, TMeta>>.Instance;
+            Logger.LogInformation($"FlowElement '{GetType().Name}' created.");
             _elementDataFactory = elementDataFactory;
         }
 

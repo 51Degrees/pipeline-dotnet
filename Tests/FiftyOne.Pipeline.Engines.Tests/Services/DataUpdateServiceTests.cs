@@ -443,10 +443,13 @@ namespace FiftyOne.Pipeline.Engines.Tests.Services
                 string temp2 = Path.GetTempFileName();
                 File.WriteAllText(temp2, "Testing");
                 File.Copy(temp2, tempData, true);
+                
                 // Wait until processing is complete.
                 completeFlag.Wait(TEST_TIMEOUT_MS);
 
                 DumpLoggerLogs();
+                
+                //Wait until logging is done.
 
                 // Assert
                 Assert.IsTrue(completeFlag.IsSet, "The 'CheckForUpdateComplete' " +
@@ -470,7 +473,7 @@ namespace FiftyOne.Pipeline.Engines.Tests.Services
             finally
             {
                 // Make sure we tidy up the temp file.
-                if (File.Exists(tempData)) { File.Delete(tempData); }
+                //if (File.Exists(tempData)) { File.Delete(tempData); }
             }
         }
 

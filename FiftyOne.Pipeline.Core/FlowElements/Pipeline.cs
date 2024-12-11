@@ -509,7 +509,8 @@ namespace FiftyOne.Pipeline.Core.FlowElements
                     {
                         elementProps = element.Properties;
                     }
-                    catch (PropertiesNotYetLoadedException)
+                    catch (Exception e)
+                    when (e is PropertiesNotYetLoadedException || e is PipelineTemporarilyUnavailableException)
                     {
                         hadFailures = true;
                         continue;

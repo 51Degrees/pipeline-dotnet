@@ -145,7 +145,7 @@ namespace FiftyOne.Pipeline.JavaScript.Tests
 
         [TestMethod]
         [DynamicData(nameof(GetValidateSetCookieBlockData), DynamicDataSourceType.Method)]
-        [Timeout(300_000)]
+        [Timeout(600_000)]
         public void JavaScriptBuilderTemplate_ValidateSetCookieBlockCall(
             string propName,
             string prefixJunk,

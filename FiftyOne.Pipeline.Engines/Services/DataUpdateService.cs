@@ -263,8 +263,12 @@ namespace FiftyOne.Pipeline.Engines.Services
                         FileSystemWatcher watcher = new FileSystemWatcher(
 							Path.GetDirectoryName(dataFile.DataFilePath),
 							Path.GetFileName(dataFile.DataFilePath));
-						watcher.NotifyFilter = NotifyFilters.LastWrite;
+
+						//on macos NotifyFilters.FileName filter and Created subscription are needed
+						//because it seems to recreate the file when copying over
+						watcher.NotifyFilter = NotifyFilters.LastWrite | NotifyFilters.FileName;
 						watcher.Changed += DataFileUpdated;
+						watcher.Created += DataFileUpdated;
 						watcher.EnableRaisingEvents = true;
 						dataFile.FileWatcher = watcher;
 					}
@@ -1283,7 +1287,7 @@ namespace FiftyOne.Pipeline.Engines.Services
 									result = AutoUpdateStatus.AUTO_UPDATE_HTTPS_ERR;
 									throw new DataUpdateException($"HTTP status code '{response.StatusCode}' " +
 										$"from data update service at " +
-										$"'{url}' for engine '{dataFile.EngineType?.Name}'", result); ;
+										$"'{url}' for engine '{dataFile.EngineType?.Name}'", result);
 							}
 						}
 					}

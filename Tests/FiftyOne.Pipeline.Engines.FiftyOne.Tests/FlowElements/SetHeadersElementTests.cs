@@ -75,7 +75,7 @@ namespace FiftyOne.Pipeline.Engines.FiftyOne.Tests.FlowElements
             protected override void ProcessInternal(IFlowData data)
             {
                 var sourceData = data.GetOrAdd(ElementDataKey, p => CreateElementData(p));
-                sourceData.PopulateFromDictionary(_propertyNameValuesToReturn);
+                sourceData.PopulateFrom(_propertyNameValuesToReturn);
             }
 
             protected override void UnmanagedResourcesCleanup()

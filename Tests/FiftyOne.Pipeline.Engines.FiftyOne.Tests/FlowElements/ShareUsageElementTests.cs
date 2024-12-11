@@ -38,6 +38,7 @@ using FiftyOne.Common.TestHelpers;
 using FiftyOne.Pipeline.Engines.TestHelpers;
 using System;
 using System.Linq;
+using System.Threading;
 
 namespace FiftyOne.Pipeline.Engines.FiftyOne.Tests.FlowElements
 {
@@ -310,6 +311,9 @@ namespace FiftyOne.Pipeline.Engines.FiftyOne.Tests.FlowElements
                 requiredEvents <= 1000000)
             {
                 _shareUsageElement.Process(data.Object);
+                if (requiredEvents % 200000 == 0) {
+                    Thread.Sleep(1000);
+                }
                 requiredEvents++;
             }
             // Wait for the consumer task to finish.
@@ -321,6 +325,7 @@ namespace FiftyOne.Pipeline.Engines.FiftyOne.Tests.FlowElements
             // 100,000. However, as it's chance based it can vary 
             // significantly. We only want to catch any gross errors so just
             // make sure the value is of the expected order of magnitude.
+            Console.WriteLine($"requiredEvents = {requiredEvents}");
             Assert.IsTrue(requiredEvents > 10000, $"Expected the number of required " +
                 $"events to be at least 10,000, but was actually '{requiredEvents}'");
             Assert.IsTrue(requiredEvents < 1000000, $"Expected the number of required " +

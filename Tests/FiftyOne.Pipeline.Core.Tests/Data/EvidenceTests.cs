@@ -71,7 +71,7 @@ namespace FiftyOne.Pipeline.Core.Tests.Data
         public void Evidence_Maps(Dictionary<string, object> map)
         {
             var evidence = new Evidence(_logger.Object);
-            evidence.PopulateFromDictionary(map);
+            evidence.PopulateFrom(map);
             foreach(var expected in map)
             {
                 var actual = (StringValues)evidence[expected.Key];
@@ -85,7 +85,7 @@ namespace FiftyOne.Pipeline.Core.Tests.Data
         {
             const string newValue = "Value";
             var evidence = new Evidence(_logger.Object);
-            evidence.PopulateFromDictionary(map);
+            evidence.PopulateFrom(map);
             var first = map.First();
             evidence[first.Key] = newValue;
             Assert.AreEqual(evidence[first.Key], newValue);

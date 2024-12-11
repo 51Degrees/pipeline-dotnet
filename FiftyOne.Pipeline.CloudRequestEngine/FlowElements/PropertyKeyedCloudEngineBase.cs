@@ -120,7 +120,7 @@ namespace FiftyOne.Pipeline.CloudRequestEngine.FlowElements
                     propertyValues, 
                     propertyMetaData);
 
-                device.PopulateFromDictionary(deviceData);
+                device.PopulateFrom(deviceData);
                 //device.SetNoValueReasons(nullReasons);
                 aspectData.AddProfile(device);
             }

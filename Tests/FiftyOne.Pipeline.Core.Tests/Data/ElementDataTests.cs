@@ -238,7 +238,7 @@ namespace FiftyOne.Pipeline.Core.Tests.Data
             TestElementData data = new TestElementData(_pipeline.Object);
             Dictionary<string, object> newData = new Dictionary<string, object>();
             newData.Add("key", "value");
-            data.PopulateFromDictionary(newData);
+            data.PopulateFrom(newData);
 
             Assert.AreEqual("value", data["key"]);
         }
@@ -253,7 +253,7 @@ namespace FiftyOne.Pipeline.Core.Tests.Data
             TestElementData data = new TestElementData(_pipeline.Object);
             Dictionary<string, object> newData = new Dictionary<string, object>();
             newData.Add("result", "value");
-            data.PopulateFromDictionary(newData);
+            data.PopulateFrom(newData);
 
             Assert.AreEqual("value", data.Result);
         }
@@ -269,7 +269,7 @@ namespace FiftyOne.Pipeline.Core.Tests.Data
             Dictionary<string, object> newData = new Dictionary<string, object>();
             newData.Add("key1", "value1");
             newData.Add("key2", "value2");
-            data.PopulateFromDictionary(newData);
+            data.PopulateFrom(newData);
 
             Assert.AreEqual("value1", data["key1"]);
             Assert.AreEqual("value2", data["key2"]);
@@ -286,7 +286,7 @@ namespace FiftyOne.Pipeline.Core.Tests.Data
             Dictionary<string, object> newData = new Dictionary<string, object>();
             data["key1"] = "valueA";
             newData.Add("key1", "valueB");
-            data.PopulateFromDictionary(newData);
+            data.PopulateFrom(newData);
 
             Assert.AreEqual("valueB", data["key1"]);
         }
