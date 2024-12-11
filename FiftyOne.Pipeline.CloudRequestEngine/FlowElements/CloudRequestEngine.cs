@@ -34,6 +34,7 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
 using System.Net.Http;
+using System.Threading.Tasks;
 
 namespace FiftyOne.Pipeline.CloudRequestEngine.FlowElements
 {
@@ -643,8 +644,8 @@ namespace FiftyOne.Pipeline.CloudRequestEngine.FlowElements
         private HttpResponseMessage SendRequestAsync(
             HttpRequestMessage request)
         {
-            var task = _httpClient.SendAsync(request);
-
+            var task = Task.Run(() => _httpClient.SendAsync(request));
+            task.Wait();
             try
             {
                 return task.Result;
