@@ -117,38 +117,47 @@ namespace FiftyOne.Pipeline.Core.FlowElements
             // Clear the list of flow elements ready to be populated
             // from the configuration options.
             FlowElements.Clear();
-            int counter = 0;
 
+            // Create element builders in parallel
             try
             {
-                // Create element builders in parallel
-                var flowElementQueue = new ConcurrentQueue<IFlowElement>();
-                Parallel.ForEach(options.Elements, 
-                    new ParallelOptions()
+                var cts = new CancellationTokenSource();
+                var query = Enumerable.Range(0, options.Elements.Count)
+                        .AsParallel()
+                        .AsOrdered()
+                        .WithDegreeOfParallelism(Environment.ProcessorCount / 2)
+                        .WithCancellation(cts.Token)
+                        .Select(i =>
                     {
-                        MaxDegreeOfParallelism = Environment.ProcessorCount / 2
-                    },
-                    (elementOptions =>
-                {
-                    if (elementOptions.SubElements != null &&
-                        elementOptions.SubElements.Count > 0)
-                    {
-                        // The configuration has sub elements so create
-                        // a ParallelElements instance.
-                        ParallelEnqueueElement(flowElementQueue, elementOptions, counter);
-                    }
-                    else
-                    {
-                        // The configuration has no sub elements so create
-                        // a flow element.
-                        EnqueueElement(flowElementQueue, elementOptions,
-                            $"element {counter}");
-                    }
-                    Interlocked.Increment(ref counter);
-                }));
+                        var elementOptions = options.Elements[i];
+                        try
+                        {
+                            IFlowElement element = null;
+                            if (elementOptions.SubElements != null &&
+                                elementOptions.SubElements.Count > 0)
+                            {
+                                // The configuration has sub elements so create
+                                // a ParallelElements instance.
+                                element = ConstructParallelElement(elementOptions, i);
+                            }
+                            else
+                            {
+                                // The configuration has no sub elements so create
+                                // a flow element.
+                                element = ConstructElement(elementOptions, $"element {i}");
+                            }
+                            return element;
+                        }
+                        catch (Exception)
+                        {
+                            cts.Cancel();
+                            throw;
+                        }
+
+                    });
 
                 // Add created builders to flow elements
-                FlowElements.AddRange(flowElementQueue);
+                FlowElements.AddRange(query.ToArray());
 
                 // Process any additional parameters for the pipeline
                 // builder itself.
@@ -158,11 +167,13 @@ namespace FiftyOne.Pipeline.Core.FlowElements
                     this,
                     "pipeline");
             }
-            catch (PipelineConfigurationException ex)
+            catch (AggregateException ex)
             {
-                Logger.LogCritical(ex, Messages.MessagePipelineCreationFailed);
-                throw;
+                var innerException = ex.InnerException;
+                Logger.LogCritical(innerException, Messages.MessagePipelineCreationFailed);
+                throw innerException;
             }
+
             // As the elements are all created within the builder, the user
             // will not be handling disposal so make sure the pipeline is
             // configured to do so.
@@ -223,9 +234,6 @@ namespace FiftyOne.Pipeline.Core.FlowElements
         /// <see cref="ElementOptions"/> and add it to the supplied list
         /// of elements.
         /// </summary>
-        /// <param name="elements">
-        /// The list to add the new <see cref="IFlowElement"/> to.
-        /// </param>
         /// <param name="elementOptions">
         /// The <see cref="ElementOptions"/> instance to use when creating
         /// the <see cref="IFlowElement"/>.
@@ -234,8 +242,7 @@ namespace FiftyOne.Pipeline.Core.FlowElements
         /// The string description of the element's location within the 
         /// <see cref="PipelineOptions"/> instance.
         /// </param>
-        private void EnqueueElement(
-            ConcurrentQueue<IFlowElement> elements,
+        private IFlowElement ConstructElement(
             ElementOptions elementOptions,
             string elementLocation)
         {
@@ -396,17 +403,13 @@ namespace FiftyOne.Pipeline.Core.FlowElements
                     $"'IFlowElement' for {elementLocation}");
             }
 
-            // Add the element to the list.
-            elements.Enqueue(element);
+            return element;
         }
 
         /// <summary>
         /// Create a <see cref="ParallelElements"/> from the specified 
         /// configuration and add it to the _flowElements list.
         /// </summary>
-        /// <param name="elements">
-        /// The list to add the new <see cref="ParallelElements"/> to.
-        /// </param>
         /// <param name="elementOptions">
         /// The <see cref="ElementOptions"/> instance to use when creating
         /// the <see cref="ParallelElements"/>.
@@ -414,8 +417,7 @@ namespace FiftyOne.Pipeline.Core.FlowElements
         /// <param name="elementIndex">
         /// The index of the element within the <see cref="PipelineOptions"/>.
         /// </param>
-        private void ParallelEnqueueElement(
-            ConcurrentQueue<IFlowElement> elements,
+        private IFlowElement ConstructParallelElement(
             ElementOptions elementOptions,
             int elementIndex)
         {
@@ -445,8 +447,8 @@ namespace FiftyOne.Pipeline.Core.FlowElements
                 }
                 else
                 {
-                    EnqueueElement(parallelElements, subElement,
-                        $"element {subCounter} in element {elementIndex}");
+                    var s = ConstructElement(subElement, $"element {subCounter} in element {elementIndex}");
+                    parallelElements.Enqueue(s);
                 }
                 subCounter++;
             }
@@ -456,7 +458,7 @@ namespace FiftyOne.Pipeline.Core.FlowElements
             var parallelInstance = new ParallelElements(
                 LoggerFactory.CreateLogger<ParallelElements>(),
                 parallelElements.ToArray());
-            elements.Enqueue(parallelInstance);
+            return parallelInstance;
         }
 
         /// <summary>
