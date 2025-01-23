@@ -58,6 +58,12 @@ namespace FiftyOne.Pipeline.Core.FlowElements
         private IServiceProvider _services = null;
 
         /// <summary>
+        /// Used to build custom error messages that are raised when building 
+        /// pipeline. 
+        /// </summary>
+        private static StringBuilder _sb = new StringBuilder();
+
+        /// <summary>
         /// Create a new <see cref="PipelineBuilder"/> instance.
         /// </summary>
         /// <param name="loggerFactory">
@@ -128,7 +134,7 @@ namespace FiftyOne.Pipeline.Core.FlowElements
                 Parallel.ForEach(options.Elements, 
                     new ParallelOptions()
                     {
-                        MaxDegreeOfParallelism = 
+                        MaxDegreeOfParallelism =
                         Environment.ProcessorCount / 2
                     },
                     (elementOptions, state, index)  =>
@@ -155,11 +161,14 @@ namespace FiftyOne.Pipeline.Core.FlowElements
                                 $"element {index}",
                                 (int)index);
                         }
-                    } 
-                    catch(Exception)
+                    }
+                    catch (Exception ex)
                     {
                         state.Stop();
-                        throw;
+
+                        throw new Exception(BuildInformativeErrorMessage(
+                            elementOptions,
+                            ex));
                     }
                 });
 
@@ -200,6 +209,43 @@ namespace FiftyOne.Pipeline.Core.FlowElements
             // Build and return the pipeline using the list of flow elements
             // that have been created from the configuration options.
             return Build();
+        }
+
+        /// <summary>
+        /// Creates an Error message, displaying more detailed information
+        /// about the configuration that failed.
+        /// </summary>
+        /// <remarks>
+        /// Replace any null or String.Empty values with a message
+        /// informing the user. 
+        /// </remarks>
+        private static string BuildInformativeErrorMessage(
+            ElementOptions elementOptions,
+            Exception ex)
+        {
+            // Make sure previous error messages are wiped.
+            _sb.Clear();
+            _sb.AppendLine("Configuration failed to build.");
+
+            var builderName = elementOptions.BuilderName ??
+                "BuilderName not set";
+            var subElementBuilderNames = 
+                (elementOptions.SubElements == null || 
+                elementOptions.SubElements.Count == 0)
+                ?  "No SubElements" 
+                :  String.Join(",", elementOptions.SubElements                  
+                    .Select(i => i.BuilderName));
+
+            var innerException = ex.InnerException != null ?
+                ex.InnerException.Message :
+                "No Inner Exception.";
+
+            _sb.Append("BuilderName: ");
+            _sb.AppendLine(elementOptions.BuilderName);
+            _sb.Append("SubElement Builder Names: ");
+            _sb.AppendLine(subElementBuilderNames);
+            _sb.AppendLine(innerException);
+            return _sb.ToString();
         }
 
         /// <summary>
