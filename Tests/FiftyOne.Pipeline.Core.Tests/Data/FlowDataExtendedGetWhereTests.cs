@@ -34,8 +34,8 @@ public class FlowDataExtendedGetWhereTests
     /// <summary>
     /// Tests that the <see cref="FlowData.
     /// GetWhere(Func{IElementPropertyMetaData, bool})"/>
-    /// returns all elements, including parallel elements
-    /// and elemnts without an element data key.
+    /// returns all elements, inlcuding sub elements that are part of 
+    /// Parallel elements. 
     /// </summary>
     [TestMethod]
     public void FlowData_GetWhere_ParallelElement()
@@ -103,7 +103,84 @@ public class FlowDataExtendedGetWhereTests
             Assert.AreEqual(testingValue, getWhereValue);
         }
     }
-    
+
+    /// <summary>
+    /// Tests that the <see cref="FlowData.
+    /// GetWhere(Func{IElementPropertyMetaData, bool})"/>
+    /// returns all elements, inlcuding sub elements that are part of 
+    /// Parallel elements. 
+    /// </summary>
+    [TestMethod]
+    public void FlowData_GetWhere_NestedParallelElements()
+    {
+        // Arrange
+        var element1 = GetMockFlowElement("element1");
+        var element2 = GetMockFlowElement("element2");
+        var element3 = GetMockFlowElement("element3");
+        var element4 = GetMockFlowElement("element4");
+        SetUpElement(element1, "element1");
+        SetUpElement(element2, "element2");
+        SetUpElement(element3, "element3");
+        SetUpElement(element4, "element4");
+
+        var nestedParallelElement = new ParallelElements(
+            _logger.Object,
+            element2.Object,
+            element3.Object);
+
+        var parallelElement = new ParallelElements(
+            _logger.Object,
+            element1.Object,
+            nestedParallelElement);
+
+        var pipeline = new PipelineBuilder(_loggerFactory)
+            .AddFlowElement(parallelElement)
+            .AddFlowElement(element4.Object)
+            .Build();
+        var flowData = pipeline.CreateFlowData();
+        flowData.Process();
+
+        // Act
+        var elements = flowData.GetWhere(i =>
+        i.Element.ElementDataKey.Equals("element1") ||
+        i.Element.ElementDataKey.Equals("element2") ||
+        i.Element.ElementDataKey.Equals("element3") ||
+        i.Element.ElementDataKey.Equals("element4")
+        );
+
+        // Build list for testing 
+        var listOfTestedElements = new List<IFlowElement>()
+        {
+            element1.Object,
+            element2.Object,
+            element3.Object,
+            element4.Object
+        };
+
+        // Assert
+        // assert that the amount of elements returned is the same 
+        // as the amount added
+        Assert.AreEqual(pipeline.FlowElements.Count, elements.Count());
+
+        // check the list of elements is equal. 
+        for (int i = 0; i < listOfTestedElements.Count - 1; i++)
+        {
+            // build a comparable value from the ingredients used to make
+            // the elements.
+            var elementName = listOfTestedElements[i].ElementDataKey;
+            var elementData = flowData
+                .Get(listOfTestedElements[i].ElementDataKey);
+            var elementDataValue = elementData
+                .AsDictionary()
+                .Keys
+                .First();
+            var testingValue = $"{elementName}.{elementDataValue}";
+            // Returned value from the tested method.
+            var getWhereValue = elements.ElementAt(i).Key;
+            Assert.AreEqual(testingValue, getWhereValue);
+        }
+    }
+
     /// <summary>
     /// Tests that the <see cref="FlowData.
     /// GetWhere(Func{IElementPropertyMetaData, bool})"/>
@@ -206,10 +283,8 @@ public class FlowDataExtendedGetWhereTests
     }
     
     /// <summary>
-    /// Tests that the <see cref="FlowData.
-    /// GetWhere(Func{IElementPropertyMetaData, bool})"/>
-    /// returns all elements, including parallel elements
-    /// and elemnts without an element data key.
+    /// Tests that the Pipeline.FlowElements
+    /// returns all public elements, including sub elements.
     /// </summary>
     [TestMethod]
     public void FlowData_AllFlowElementsReturned()

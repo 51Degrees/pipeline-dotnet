@@ -196,10 +196,10 @@ namespace FiftyOne.Pipeline.Core.FlowElements
         /// Instances of ParallelElements are never included.
         /// </remarks>
         /// <remarks>
-        /// The double check lock could be removed if a 'Complete' or 
-        /// 'Finialize' method were added to the pipeline. This method 
-        /// would indicate that the pipeline would have completed all
-        /// set up tasks and FlowElements would be in a static state.
+        /// The double check lock could be removed if a 'Complete'
+        /// method were added to the pipeline. This method 
+        /// would indicate that the pipeline would have completed all of 
+        /// its set up tasks and FlowElements would be in a static state.
         /// </remarks>
         public IReadOnlyList<IFlowElement> FlowElements
         {
@@ -215,19 +215,9 @@ namespace FiftyOne.Pipeline.Core.FlowElements
                                 i is ParallelElements))
                             {
                                 var result = new List<IFlowElement>();
-                                foreach (var item in _flowElements)
+                                foreach (var element in _flowElements)
                                 {
-                                    if (item is ParallelElements)
-                                    {
-                                        result.AddRange(
-                                            (item as ParallelElements)
-                                            .FlowElements
-                                            .Select(e => e));
-                                    }
-                                    else
-                                    {
-                                        result.Add(item);
-                                    }
+                                    RecurseElements(result, element);
                                 }
                                 _allPublicFlowElements = 
                                     result.AsReadOnly();
@@ -242,8 +232,32 @@ namespace FiftyOne.Pipeline.Core.FlowElements
                 return _allPublicFlowElements;
             }
         }
+
         private readonly object _flowElementsLock = new object();
         private IReadOnlyList<IFlowElement> _allPublicFlowElements;
+
+        /// <summary>
+        /// Recursively add subelements to the result list.
+        /// </summary>
+        /// <param name="result"></param>
+        /// <param name="element"></param>
+        private void RecurseElements(
+            List<IFlowElement> result,
+            IFlowElement element)
+        {
+            if(element is ParallelElements == false)
+            {
+                result.Add(element);
+            }
+            else
+            {
+                foreach(var subelement in 
+                    (element as ParallelElements).FlowElements)
+                {
+                    RecurseElements(result, subelement);
+                }
+            }
+        }
 
         /// <summary>
         /// Get the dictionary of available properties for an
