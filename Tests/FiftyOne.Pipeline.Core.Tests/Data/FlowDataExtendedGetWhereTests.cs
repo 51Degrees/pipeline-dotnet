@@ -278,7 +278,8 @@ public class FlowDataExtendedGetWhereTests
         .Setup(e => e.Process(It.IsAny<IFlowData>()))
         .Callback((IFlowData d) =>
         {
-            var tempdata = d.GetOrAdd(name, (p) => new TestElementData(p, new Dictionary<string, object>()
+            var tempdata = d.GetOrAdd(name, (p) => 
+            new TestElementData(p, new Dictionary<string, object>()
             {
                 { name, "value" }
             }));
