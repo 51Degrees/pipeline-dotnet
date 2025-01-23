@@ -1,0 +1,309 @@
+﻿using Microsoft.VisualStudio.TestTools.UnitTesting;
+using FiftyOne.Pipeline.Core.Data;
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Text;
+using System.Threading.Tasks;
+using FiftyOne.Pipeline.Core.FlowElements;
+using Moq;
+using Microsoft.Extensions.Logging;
+using FiftyOne.Pipeline.Core.Tests.HelperClasses;
+using System.Threading;
+using FiftyOne.Pipeline.Core.TypedMap;
+using System.Xml.Linq;
+
+namespace FiftyOne.Pipeline.Core.Tests.Data;
+
+/// <summary>
+/// A seperate testing class that tests
+/// </summary>
+[TestClass]
+public class FlowDataExtendedGetWhereTests
+{
+    private Mock<ILogger<ParallelElements>> _logger;
+    private ILoggerFactory _loggerFactory;
+
+    [TestInitialize]
+    public void Initialize()
+    {
+        _logger = new Mock<ILogger<ParallelElements>>();
+        _loggerFactory = new LoggerFactory();
+    }
+
+    /// <summary>
+    /// Tests that the <see cref="FlowData.
+    /// GetWhere(Func{IElementPropertyMetaData, bool})"/>
+    /// returns all elements, including parallel elements
+    /// and elemnts without an element data key.
+    /// </summary>
+    [TestMethod]
+    public void FlowData_GetWhere_ParallelElement()
+    {
+        // Arrange
+        var element1 = GetMockFlowElement("element1");
+        var element2 = GetMockFlowElement("element2");
+        var element3 = GetMockFlowElement("element3");
+        var element4 = GetMockFlowElement("element4");
+        SetUpElement(element1, "element1");
+        SetUpElement(element2, "element2");
+        SetUpElement(element3, "element3");
+        SetUpElement(element4, "element4");
+
+        var parallelElement = new ParallelElements(
+            _logger.Object,
+            element1.Object,
+            element2.Object,
+            element3.Object);
+
+        var pipeline = new PipelineBuilder(_loggerFactory)
+            .AddFlowElement(parallelElement)
+            .AddFlowElement(element4.Object)
+            .Build();
+        var flowData = pipeline.CreateFlowData();
+        flowData.Process();
+
+        // Act
+        var elements = flowData.GetWhere(i => 
+        i.Element.ElementDataKey.Equals("element1") ||
+        i.Element.ElementDataKey.Equals("element2") ||
+        i.Element.ElementDataKey.Equals("element3") ||
+        i.Element.ElementDataKey.Equals("element4")
+        );
+
+        // Build list for testing 
+        var listOfTestedElements = new List<IFlowElement>()
+        {
+            element1.Object,
+            element2.Object,
+            element3.Object,
+            element4.Object
+        };
+
+        // Assert
+        // assert that the amount of elements returned is the same 
+        // as the amount added
+        Assert.AreEqual(pipeline.FlowElements.Count, elements.Count());
+
+        // check the list of elements is equal. 
+        for (int i = 0; i < listOfTestedElements.Count - 1; i++)
+        {
+            // build a comparable value from the ingredients used to make
+            // the elements.
+            var elementName = listOfTestedElements[i].ElementDataKey;
+            var elementData = flowData
+                .Get(listOfTestedElements[i].ElementDataKey);
+            var elementDataValue = elementData
+                .AsDictionary()
+                .Keys
+                .First();
+            var testingValue = $"{elementName}.{elementDataValue}";
+            // Returned value from the tested method.
+            var getWhereValue = elements.ElementAt(i).Key;
+            Assert.AreEqual(testingValue, getWhereValue);
+        }
+    }
+    
+    /// <summary>
+    /// Tests that the <see cref="FlowData.
+    /// GetWhere(Func{IElementPropertyMetaData, bool})"/>
+    /// returns all sub elements associated with parallel elements.
+    /// </summary>
+    [TestMethod]
+    public void FlowData_GetWhere_MutipleParallelElements()
+    {
+        // Arrange
+        var element1 = GetMockFlowElement("element1");
+        var element2 = GetMockFlowElement("element2");
+        var element3 = GetMockFlowElement("element3");
+        var element4 = GetMockFlowElement("element4");
+        SetUpElement(element1, "element1");
+        SetUpElement(element2, "element2");
+        SetUpElement(element3, "element3");
+        SetUpElement(element4, "element4");
+
+        var parallelElement = new ParallelElements(
+            _logger.Object,
+            element1.Object,
+            element2.Object);
+
+        var parallelElement2 = new ParallelElements(
+            _logger.Object,
+            element3.Object,
+            element4.Object);
+
+        var pipeline = new PipelineBuilder(_loggerFactory)
+            .AddFlowElement(parallelElement)
+            .AddFlowElement(parallelElement2)
+            .Build();
+        var flowData = pipeline.CreateFlowData();
+        flowData.Process();
+
+        // Act
+        var elements = flowData.GetWhere(i => 
+        i.Element.ElementDataKey.Equals("element1") ||
+        i.Element.ElementDataKey.Equals("element2") ||
+        i.Element.ElementDataKey.Equals("element3") ||
+        i.Element.ElementDataKey.Equals("element4")
+        );
+
+        // Build list for testing 
+        var listOfTestedElements = new List<IFlowElement>()
+        {
+            element1.Object,
+            element2.Object,
+            element3.Object,
+            element4.Object
+        };
+
+        // Assert
+        // assert that the amount of elements returned is the same 
+        // as the amount added
+        Assert.AreEqual(pipeline.FlowElements.Count, elements.Count());
+
+        // check the list of elements is equal. 
+        for (int i = 0; i < listOfTestedElements.Count - 1; i++)
+        {
+            // build a comparable value from the ingredients used to make
+            // the elements.
+            var elementName = listOfTestedElements[i].ElementDataKey;
+            var elementData = flowData
+                .Get(listOfTestedElements[i].ElementDataKey);
+            var elementDataValue = elementData
+                .AsDictionary()
+                .Keys
+                .First();
+            var testingValue = $"{elementName}.{elementDataValue}";
+            // Returned value from the tested method.
+            var getWhereValue = elements.ElementAt(i).Key;
+            Assert.AreEqual(testingValue, getWhereValue);
+        }
+    }
+    
+    /// <summary>
+    /// Tests that the <see cref="FlowData.
+    /// GetWhere(Func{IElementPropertyMetaData, bool})"/>
+    /// returns all elements, including parallel elements
+    /// and elemnts without an element data key.
+    /// </summary>
+    [TestMethod]
+    public void FlowData_GetWhere_NoElements()
+    {
+        // Arrange
+       // Add no elements to the pipeline
+
+        var pipeline = new PipelineBuilder(_loggerFactory)
+            .Build();
+        var flowData = pipeline.CreateFlowData();
+        flowData.Process();
+
+        // Act
+        var elements = flowData.GetWhere(i => i == i);
+
+        // Assert
+        Assert.IsTrue(elements.Count() == 0);
+        Assert.AreEqual(pipeline.FlowElements.Count, elements.Count());
+    }
+    
+    /// <summary>
+    /// Tests that the <see cref="FlowData.
+    /// GetWhere(Func{IElementPropertyMetaData, bool})"/>
+    /// returns all elements, including parallel elements
+    /// and elemnts without an element data key.
+    /// </summary>
+    [TestMethod]
+    public void FlowData_AllFlowElementsReturned()
+    {
+        // Arrange
+        var element1 = GetMockFlowElement("element1");
+        var element2 = GetMockFlowElement("element2");
+        var element3 = GetMockFlowElement("element3");
+        var element4 = GetMockFlowElement("element4");
+        var element5 = GetMockFlowElement("element4");
+        SetUpElement(element1, "element1");
+        SetUpElement(element2, "element2");
+        SetUpElement(element3, "element3");
+        SetUpElement(element4, "element4");
+        SetUpElement(element5, "element4");
+
+        var parallelElement = new ParallelElements(
+            _logger.Object,
+            element2.Object,
+            element3.Object,
+            element4.Object);
+
+        var pipeline = new PipelineBuilder(_loggerFactory)
+            .AddFlowElement(element1.Object)
+            .AddFlowElement(parallelElement)
+            .AddFlowElement(element5.Object)
+            .Build();
+        var flowData = pipeline.CreateFlowData();
+
+        // Build list for testing 
+        var listOfTestedElements = new List<IFlowElement>()
+        {
+            element1.Object,
+            element2.Object,
+            element3.Object,
+            element4.Object,
+            element5.Object
+        };
+
+        // Act
+        var elements = flowData.Pipeline.FlowElements;
+
+        // Assert
+        // assert that the amount of elements returned is the same 
+        // as the amount added
+        Assert.AreEqual(5, elements.Count);
+        foreach(var element in listOfTestedElements)
+        {
+            Assert.IsTrue(elements.Contains(element));
+        }
+    }
+
+    /// <summary>
+    /// Sets up the mocked element with elementdata. It is important for 
+    /// the test that element data be populated with data for the 
+    /// <see cref="FlowData.GetWhere(Func{IElementPropertyMetaData, bool})"/>
+    /// funtion to work.
+    /// </summary>
+    /// <param name="element"></param>
+    /// <param name="name"></param>
+    private static void SetUpElement(
+        Mock<IFlowElement> element,
+        string name)
+    {
+        element
+        .Setup(e => e.Process(It.IsAny<IFlowData>()))
+        .Callback((IFlowData d) =>
+        {
+            var tempdata = d.GetOrAdd(name, (p) => new TestElementData(p, new Dictionary<string, object>()
+            {
+                { name, "value" }
+            }));
+        });
+    }
+
+    /// <summary>
+    /// Creates and returns a MockFlowElement
+    /// </summary>
+    /// <returns></returns>
+    private static Mock<IFlowElement> GetMockFlowElement(
+        string elementDataKey)
+    {
+        var element = new Mock<IFlowElement>();
+        element.SetupGet(e => e.ElementDataKey)
+            .Returns(elementDataKey);
+        element.Setup(e => e.Properties)
+            .Returns(
+            [
+                new ElementPropertyMetaData(element.Object,
+                elementDataKey,
+                typeof(string),
+                true)
+            ]);
+       
+        return element;
+    }
+}

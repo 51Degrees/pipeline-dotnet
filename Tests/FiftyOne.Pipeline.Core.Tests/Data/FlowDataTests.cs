@@ -41,7 +41,6 @@ namespace FiftyOne.Pipeline.Core.Tests.Data
     [TestClass]
     public class FlowDataTests
     {
-
         private Mock<IPipelineInternal> _pipeline;
         private Mock<ILogger<FlowData>> _logger;
         private FlowData _flowData;

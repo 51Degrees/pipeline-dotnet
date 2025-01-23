@@ -241,7 +241,8 @@ namespace FiftyOne.Pipeline.Core.Data
         }
 
         /// <summary>
-        /// Get all element data AspectPropertyValues that match the specified predicate
+        /// Get all element data AspectPropertyValues that match the 
+        /// specified predicate.
         /// </summary>
         /// <param name="predicate">
         /// If a property passed to this function returns true then it will

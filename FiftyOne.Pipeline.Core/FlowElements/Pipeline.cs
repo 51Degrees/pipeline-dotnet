@@ -183,16 +183,67 @@ namespace FiftyOne.Pipeline.Core.FlowElements
         public bool SuppressProcessExceptions => _suppressProcessExceptions;
 
         /// <summary>
-        /// Get a read only list of the flow elements that are part of this 
-        /// pipeline.
+        /// Get a read only list of the flow elements that are part of 
+        /// this pipeline.
         /// </summary>
+        /// <remarks>
+        /// If there are no <see cref="ParallelElements"/> in the flow 
+        /// elements then this method simply returns the the internal
+        /// <see cref="_flowElements"/> list. If not then the flow 
+        /// elements in instances of ParallelElements are included.
+        /// </remarks>
+        /// <remarks>
+        /// Instances of ParallelElements are never included.
+        /// </remarks>
+        /// <remarks>
+        /// The double check lock could be removed if a 'Complete' or 
+        /// 'Finialize' method were added to the pipeline. This method 
+        /// would indicate that the pipeline would have completed all
+        /// set up tasks and FlowElements would be in a static state.
+        /// </remarks>
         public IReadOnlyList<IFlowElement> FlowElements
         {
             get
             {
-                return new ReadOnlyCollection<IFlowElement>(_flowElements);
+                if (_allPublicFlowElements == null)
+                {
+                    lock(_flowElementsLock)
+                    {
+                        if (_allPublicFlowElements == null)
+                        {
+                            if (_flowElements.Any(i => 
+                                i is ParallelElements))
+                            {
+                                var result = new List<IFlowElement>();
+                                foreach (var item in _flowElements)
+                                {
+                                    if (item is ParallelElements)
+                                    {
+                                        result.AddRange(
+                                            (item as ParallelElements)
+                                            .FlowElements
+                                            .Select(e => e));
+                                    }
+                                    else
+                                    {
+                                        result.Add(item);
+                                    }
+                                }
+                                _allPublicFlowElements = 
+                                    result.AsReadOnly();
+                            }
+                            else
+                            {
+                                _allPublicFlowElements = _flowElements;
+                            }
+                        }
+                    }
+                }
+                return _allPublicFlowElements;
             }
         }
+        private readonly object _flowElementsLock = new object();
+        private IReadOnlyList<IFlowElement> _allPublicFlowElements;
 
         /// <summary>
         /// Get the dictionary of available properties for an
