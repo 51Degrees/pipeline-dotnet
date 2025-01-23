@@ -211,51 +211,45 @@ namespace FiftyOne.Pipeline.Core.FlowElements
                     {
                         if (_allPublicFlowElements == null)
                         {
-                            if (_flowElements.Any(i => 
-                                i is ParallelElements))
-                            {
-                                var result = new List<IFlowElement>();
-                                foreach (var element in _flowElements)
-                                {
-                                    RecurseElements(result, element);
-                                }
-                                _allPublicFlowElements = 
-                                    result.AsReadOnly();
-                            }
-                            else
-                            {
-                                _allPublicFlowElements = _flowElements;
-                            }
+                            _allPublicFlowElements =
+                                GetAllPublicFlowElements();
                         }
                     }
                 }
                 return _allPublicFlowElements;
             }
         }
-
         private readonly object _flowElementsLock = new object();
         private IReadOnlyList<IFlowElement> _allPublicFlowElements;
 
-        /// <summary>
-        /// Recursively add subelements to the result list.
-        /// </summary>
-        /// <param name="result"></param>
-        /// <param name="element"></param>
-        private void RecurseElements(
-            List<IFlowElement> result,
-            IFlowElement element)
+        private IReadOnlyList<IFlowElement> GetAllPublicFlowElements()
         {
-            if(element is ParallelElements == false)
+            if (_flowElements.Any(i =>
+                i is ParallelElements))
             {
-                result.Add(element);
+                var result = new List<IFlowElement>();
+                var queue = new Queue<IFlowElement>(_flowElements);
+                while (queue.Count > 0)
+                {
+                    var element = queue.Dequeue();
+                    if (element is ParallelElements elements)
+                    {
+                        foreach (var child in 
+                            elements.FlowElements)
+                        {
+                            queue.Enqueue(child);
+                        }
+                    }
+                    else if (element.GetType().IsPublic)
+                    {
+                        result.Add(element);
+                    }
+                }
+                return result.AsReadOnly();
             }
             else
             {
-                foreach(var subelement in 
-                    (element as ParallelElements).FlowElements)
-                {
-                    RecurseElements(result, subelement);
-                }
+                return _flowElements;
             }
         }
 

@@ -81,27 +81,31 @@ public class FlowDataExtendedGetWhereTests
         };
 
         // Assert
-        // assert that the amount of elements returned is the same 
+        // Assert that the amount of elements returned is the same 
         // as the amount added
         Assert.AreEqual(pipeline.FlowElements.Count, elements.Count());
 
-        // check the list of elements is equal. 
-        for (int i = 0; i < listOfTestedElements.Count - 1; i++)
+        // Collect all testing values
+        var testingValues = listOfTestedElements.Select(element =>
         {
-            // build a comparable value from the ingredients used to make
-            // the elements.
-            var elementName = listOfTestedElements[i].ElementDataKey;
-            var elementData = flowData
-                .Get(listOfTestedElements[i].ElementDataKey);
+            var elementName = element.ElementDataKey;
+            var elementData = flowData.Get(element.ElementDataKey);
             var elementDataValue = elementData
-                .AsDictionary()
-                .Keys
-                .First();
-            var testingValue = $"{elementName}.{elementDataValue}";
-            // Returned value from the tested method.
-            var getWhereValue = elements.ElementAt(i).Key;
-            Assert.AreEqual(testingValue, getWhereValue);
-        }
+            .AsDictionary()
+            .Keys
+            .First();
+            return $"{elementName}.{elementDataValue}";
+        }).ToList();
+
+        var elementKeys = elements.ToDictionary().Keys;
+
+        // Assert that the collected tested elements' keys are equal to
+        // the keys from elements
+        CollectionAssert.AreEquivalent(
+            testingValues.ToArray(),
+            elementKeys.ToArray(),
+            "The elements lists are not the same.");
+
     }
 
     /// <summary>
@@ -162,23 +166,26 @@ public class FlowDataExtendedGetWhereTests
         // as the amount added
         Assert.AreEqual(pipeline.FlowElements.Count, elements.Count());
 
-        // check the list of elements is equal. 
-        for (int i = 0; i < listOfTestedElements.Count - 1; i++)
+        // Collect all testing values
+        var testingValues = listOfTestedElements.Select(element =>
         {
-            // build a comparable value from the ingredients used to make
-            // the elements.
-            var elementName = listOfTestedElements[i].ElementDataKey;
-            var elementData = flowData
-                .Get(listOfTestedElements[i].ElementDataKey);
+            var elementName = element.ElementDataKey;
+            var elementData = flowData.Get(element.ElementDataKey);
             var elementDataValue = elementData
-                .AsDictionary()
-                .Keys
-                .First();
-            var testingValue = $"{elementName}.{elementDataValue}";
-            // Returned value from the tested method.
-            var getWhereValue = elements.ElementAt(i).Key;
-            Assert.AreEqual(testingValue, getWhereValue);
-        }
+            .AsDictionary()
+            .Keys
+            .First();
+            return $"{elementName}.{elementDataValue}";
+        }).ToList();
+
+        var elementKeys = elements.ToDictionary().Keys;
+
+        // Assert that the collected tested elements' keys are equal to
+        // the keys from elements
+        CollectionAssert.AreEquivalent(
+            testingValues.ToArray(),
+            elementKeys.ToArray(),
+            "The elements lists are not the same.");
     }
 
     /// <summary>
@@ -238,23 +245,26 @@ public class FlowDataExtendedGetWhereTests
         // as the amount added
         Assert.AreEqual(pipeline.FlowElements.Count, elements.Count());
 
-        // check the list of elements is equal. 
-        for (int i = 0; i < listOfTestedElements.Count - 1; i++)
+        // Collect all testing values
+        var testingValues = listOfTestedElements.Select(element =>
         {
-            // build a comparable value from the ingredients used to make
-            // the elements.
-            var elementName = listOfTestedElements[i].ElementDataKey;
-            var elementData = flowData
-                .Get(listOfTestedElements[i].ElementDataKey);
+            var elementName = element.ElementDataKey;
+            var elementData = flowData.Get(element.ElementDataKey);
             var elementDataValue = elementData
-                .AsDictionary()
-                .Keys
-                .First();
-            var testingValue = $"{elementName}.{elementDataValue}";
-            // Returned value from the tested method.
-            var getWhereValue = elements.ElementAt(i).Key;
-            Assert.AreEqual(testingValue, getWhereValue);
-        }
+            .AsDictionary()
+            .Keys
+            .First();
+            return $"{elementName}.{elementDataValue}";
+        }).ToList();
+
+        var elementKeys = elements.ToDictionary().Keys;
+
+        // Assert that the collected tested elements' keys are equal to
+        // the keys from elements
+        CollectionAssert.AreEquivalent(
+            testingValues.ToArray(),
+            elementKeys.ToArray(),
+            "The elements lists are not the same.");
     }
     
     /// <summary>
@@ -331,10 +341,8 @@ public class FlowDataExtendedGetWhereTests
         // assert that the amount of elements returned is the same 
         // as the amount added
         Assert.AreEqual(5, elements.Count);
-        foreach(var element in listOfTestedElements)
-        {
-            Assert.IsTrue(elements.Contains(element));
-        }
+        CollectionAssert.AreEquivalent(listOfTestedElements,
+            elements.ToArray());
     }
 
     /// <summary>
