@@ -61,7 +61,9 @@ namespace FiftyOne.Pipeline.JavaScript.Tests
             {
                 var options = new ChromeOptions();
 
-                // Set the desired DevTools protocol version
+                // Temporarily set the devtools version to 127 as 
+                // Webdriver package is not quite ready for Chrome 132 
+                // that was recently updated on some runners on CI
                 options.AddAdditionalOption("devtoolsProtocolVersion", "127"); 
                 Driver = new ChromeDriver(chromeOptions);
             }
