@@ -27,12 +27,15 @@ using FiftyOne.Pipeline.Core.FlowElements;
 using FiftyOne.Pipeline.Core.Services;
 using FiftyOne.Pipeline.Core.Tests.HelperClasses;
 using FiftyOne.Pipeline.Core.Tests.HelperClasses.CompositeConfig;
+using FiftyOne.Pipeline.Engines;
 using FiftyOne.Pipeline.Engines.Services;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using Moq;
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Net.Http;
 using System.Xml.Linq;
 
@@ -125,7 +128,7 @@ namespace FiftyOne.Pipeline.Core.Tests.FlowElements
             };
             element.BuildParameters.Add("multiple", "8");
 
-            PipelineOptions opts = new PipelineOptions();
+            PipelineOptions opts = new();
             opts.Elements = new List<ElementOptions>
             {
                 element
@@ -502,6 +505,34 @@ namespace FiftyOne.Pipeline.Core.Tests.FlowElements
             _maxErrors = 1;
 
             VerifyListSplitterElementPipeline(opts, SplitOption.Comma);
+        }  
+        
+        /// <summary>
+        /// Test that setting an Enum type is properly parsed and set by 
+        /// BuildFromConfiguration. 
+        /// </summary>
+        [TestMethod]
+        public void PipelineBuilder_BuildFromConfiguration_EnumType()
+        {
+            var element = new ElementOptions()
+            {
+                BuilderName = "EnumPerfProfile"
+            };
+            element.BuildParameters.Add("SetPerformanceProfile",
+                PerformanceProfiles.HighPerformance);
+
+            // Create the configuration object.
+            PipelineOptions opts = new();
+            opts.Elements =
+            [
+                element
+            ];
+
+            var pipeline = _builder.BuildFromConfiguration(opts);
+            var retreivedElement = pipeline.GetElement<EnumPerfProfileElement>();
+
+            Assert.IsTrue(retreivedElement.PerfProfile ==
+                PerformanceProfiles.HighPerformance);
         }
 
 
@@ -1021,6 +1052,6 @@ namespace FiftyOne.Pipeline.Core.Tests.FlowElements
                 var elementData = flowData.GetFromElement(element);
                 Assert.AreEqual(40, elementData.Result);
             }
-        }
+        }   
     }
 }

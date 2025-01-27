@@ -178,7 +178,7 @@ namespace FiftyOne.Pipeline.Core.FlowElements
                     this,
                     "pipeline");
             }
-            // Paralell foreach aggregates the exceptions.
+            // Parallel foreach aggregates the exceptions.
             catch (AggregateException ex)
             {
                 if(ex.InnerExceptions.Count > 1)
@@ -396,6 +396,7 @@ namespace FiftyOne.Pipeline.Core.FlowElements
             var buildMethod = possibleBuildMethods.Single();
             var caseInsensitiveParameters = elementOptions.BuildParameters
                 .ToDictionary(d => d.Key.ToUpperInvariant(), d => d.Value);
+            var test = buildMethod.GetParameters();
             foreach (var parameterInfo in buildMethod.GetParameters())
             {
                 var paramType = parameterInfo.ParameterType;
@@ -427,7 +428,7 @@ namespace FiftyOne.Pipeline.Core.FlowElements
                     $"'IFlowElement' for {elementLocation}");
             }
 
-            elements.TryAdd(elementIndex,element);
+            elements.TryAdd(elementIndex, element);
         }
 
         /// <summary>
@@ -946,7 +947,6 @@ namespace FiftyOne.Pipeline.Core.FlowElements
         private static object ParseToType(Type targetType, string value, string errorTextPrefix)
         {
             object result = null;
-
             if (typeof(IList<string>).IsAssignableFrom(targetType) ||
                 targetType.IsArray)
             {
@@ -975,6 +975,23 @@ namespace FiftyOne.Pipeline.Core.FlowElements
                         $"example a list of text values containing 6 inches " +
                         $"and 12 inches would look like this: " +
                         $"\"6\"\"\",\"12\"\"\")", ex);
+                }
+            }
+            else if (targetType.IsEnum)
+            {
+                try
+                {
+                    result = Enum.Parse(targetType, value, true);
+                }
+                catch(ArgumentException ex)
+                {
+                    throw new PipelineConfigurationException(
+                        $"{errorTextPrefix}. Failed to parse enum " +
+                        $"value '{value}'. " +
+                        $"Valid values are: " +
+                        $"{string.Join(", ", Enum.GetNames(targetType))}",
+                        ex
+                    );
                 }
             }
             else
