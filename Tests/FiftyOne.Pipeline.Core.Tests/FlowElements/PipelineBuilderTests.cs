@@ -512,14 +512,19 @@ namespace FiftyOne.Pipeline.Core.Tests.FlowElements
         /// BuildFromConfiguration. 
         /// </summary>
         [TestMethod]
-        public void PipelineBuilder_BuildFromConfiguration_EnumType()
+        [DataRow("HighPerformance", PerformanceProfiles.HighPerformance)]
+        [DataRow("Balanced", PerformanceProfiles.Balanced)]
+        [DataRow(PerformanceProfiles.MaxPerformance, PerformanceProfiles.MaxPerformance)]
+        public void PipelineBuilder_BuildFromConfiguration_EnumType(
+            object enumValue,
+            PerformanceProfiles expected)
         {
             var element = new ElementOptions()
             {
                 BuilderName = "EnumPerfProfile"
             };
             element.BuildParameters.Add("SetPerformanceProfile",
-                PerformanceProfiles.HighPerformance);
+                enumValue);
 
             // Create the configuration object.
             PipelineOptions opts = new();
@@ -531,8 +536,7 @@ namespace FiftyOne.Pipeline.Core.Tests.FlowElements
             var pipeline = _builder.BuildFromConfiguration(opts);
             var retreivedElement = pipeline.GetElement<EnumPerfProfileElement>();
 
-            Assert.IsTrue(retreivedElement.PerfProfile ==
-                PerformanceProfiles.HighPerformance);
+            Assert.IsTrue(retreivedElement.PerfProfile == expected);
         }
 
 
