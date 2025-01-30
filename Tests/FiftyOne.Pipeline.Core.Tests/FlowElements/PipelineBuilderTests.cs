@@ -610,7 +610,7 @@ namespace FiftyOne.Pipeline.Core.Tests.FlowElements
         /// is not available in the service collection.
         /// </summary>
         [TestMethod]
-        [ExpectedException(typeof(InvalidOperationException))]
+        [ExpectedException(typeof(PipelineConfigurationException))]
         public void PipelineBuilder_BuildFromConfiguration_NotInServiceCollection()
         {
             var element = new ElementOptions()
