@@ -38,8 +38,8 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="FiftyOne.Caching" Version="4.4.22" />
-    <PackageReference Include="FiftyOne.Common" Version="4.4.23" />
+    <PackageReference Include="FiftyOne.Caching" Version="4.4.23" />
+    <PackageReference Include="FiftyOne.Common" Version="4.4.24" />
     <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
   </ItemGroup>
 
