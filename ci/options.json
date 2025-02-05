@@ -50,12 +50,5 @@
         "Configuration": "CoreRelease",
         "Arch": "Any CPU",
         "BuildMethod": "dotnet",
-    },
-    {
-        "Image": "macos-latest",
-        "Name": "macos_AnyCPU_Debug",
-        "Configuration": "CoreDebug",
-        "Arch": "Any CPU",
-        "BuildMethod": "dotnet"
     }
 ]
