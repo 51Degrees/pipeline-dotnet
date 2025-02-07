@@ -41,6 +41,12 @@ namespace FiftyOne.Pipeline.JavaScript.Tests
         private JObject jsonData { get; set; } = new();
         private string fullJS { get; set; } = "";
 
+        [ClassInitialize]
+        public static new void ClassInit(TestContext context) => JavaScriptBuilderElementTestsBase.ClassInit(context).Wait();
+
+        [ClassCleanup]
+        public static new void ClassCleanup() => JavaScriptBuilderElementTestsBase.ClassCleanup().Wait();
+
         [TestInitialize]
         public override async Task Init()
         {

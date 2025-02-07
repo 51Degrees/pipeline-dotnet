@@ -51,6 +51,12 @@ namespace FiftyOne.Pipeline.JavaScript.Tests
         private CancellationTokenSource clientServerTokenSource;
         private HttpListener _clientServer;
 
+        [ClassInitialize]
+        public static new void ClassInit(TestContext context) => JavaScriptBuilderElementTestsBase.ClassInit(context).Wait();
+
+        [ClassCleanup]
+        public static new void ClassCleanup() => JavaScriptBuilderElementTestsBase.ClassCleanup().Wait();
+
         /// <summary>
         /// Initialise the test.
         /// </summary>

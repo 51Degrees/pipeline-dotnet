@@ -36,8 +36,8 @@ namespace FiftyOne.Pipeline.JavaScript.Tests
     {
         public string ClientServerUrl { get; private set; }
 
-        public ChromeDriver Driver { get; private set; }
-        public INetwork Interceptor => Driver?.Manage().Network;
+        public static ChromeDriver Driver { get; private set; }
+        public static INetwork Interceptor => Driver?.Manage().Network;
 
         public ILoggerFactory LoggerFactory { get; private set; }
 
@@ -46,12 +46,10 @@ namespace FiftyOne.Pipeline.JavaScript.Tests
         private Mock<IElementData> _elementDataMock;
         private IList<IElementPropertyMetaData> _elementPropertyMetaDatas;
 
-        public Action<NetworkRequestSentEventArgs> OnRequestSent { get; set; } = null;
+        public static Action<NetworkRequestSentEventArgs> OnRequestSent { get; set; } = null;
 
-        public virtual async Task Init()
+        public static async Task ClassInit(TestContext context)
         {
-            ClientServerUrl = $"http://localhost:{TestHttpListener.GetRandomUnusedPort()}/";
-
             var chromeOptions = new ChromeOptions();
             chromeOptions.SetLoggingPreference(LogType.Browser, OpenQA.Selenium.LogLevel.Info);
             chromeOptions.AcceptInsecureCertificates = true;
@@ -61,6 +59,7 @@ namespace FiftyOne.Pipeline.JavaScript.Tests
             {
                 var options = new ChromeOptions();
 
+                // Set the desired DevTools protocol version
                 // Temporarily set the devtools version to 127 as 
                 // Webdriver package is not quite ready for Chrome 132 
                 // that was recently updated on some runners on CI
@@ -70,12 +69,16 @@ namespace FiftyOne.Pipeline.JavaScript.Tests
             catch (WebDriverException)
             {
                 Assert.Inconclusive("Could not create a ChromeDriver, check " +
-                    "that the Chromium driver is installed");
+                                    "that the Chromium driver is installed");
             }
 
             Interceptor.NetworkRequestSent += OnNetworkRequestSent;
             await Interceptor.StartMonitoring();
-
+        }
+        
+        public virtual async Task Init() {
+            ClientServerUrl = $"http://localhost:{TestHttpListener.GetRandomUnusedPort()}/";
+            
             _mockjsonBuilderElement = new Mock<IJsonBuilderElement>();
 
             _elementPropertyMetaDatas = new List<IElementPropertyMetaData>() {
@@ -90,7 +93,7 @@ namespace FiftyOne.Pipeline.JavaScript.Tests
             LoggerFactory = new LoggerFactory();
         }
 
-        private void OnNetworkRequestSent(object sender, NetworkRequestSentEventArgs e)
+        private static void OnNetworkRequestSent(object sender, NetworkRequestSentEventArgs e)
             => OnRequestSent?.Invoke(e);
 
 
@@ -183,16 +186,20 @@ namespace FiftyOne.Pipeline.JavaScript.Tests
             flowData.Setup(d => d.Get(It.IsAny<string>())).Returns(_elementDataMock.Object);
         }
 
-        public virtual async Task Cleanup()
+        public virtual Task Cleanup()
+        {
+            // Ignore request monitoring events
+            OnRequestSent = null;
+            return Task.CompletedTask;
+        }
+
+        public static async Task ClassCleanup()
         {
             if (Driver != null)
             {
                 await Interceptor.StopMonitoring();
                 Driver.Quit();
             }
-
-            // Ignore request monitoring events
-            OnRequestSent = null;
         }
     }
 }
