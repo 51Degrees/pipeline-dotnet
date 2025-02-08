@@ -1,5 +1,7 @@
 var class_fifty_one_1_1_pipeline_1_1_java_script_1_1_tests_1_1_java_script_builder_element_template_tests =
 [
+    [ "ClassCleanup", "class_fifty_one_1_1_pipeline_1_1_java_script_1_1_tests_1_1_java_script_builder_element_template_tests.html#af07e6b23475f2f7f1698d34d4d6d42d1", null ],
+    [ "ClassInit", "class_fifty_one_1_1_pipeline_1_1_java_script_1_1_tests_1_1_java_script_builder_element_template_tests.html#a7337cb2833a0d77acc2b247b41970d96", null ],
     [ "Cleanup", "class_fifty_one_1_1_pipeline_1_1_java_script_1_1_tests_1_1_java_script_builder_element_template_tests.html#a929d0de7559439d9a59d465066271204", null ],
     [ "GetValidateSetCookieBlockData", "class_fifty_one_1_1_pipeline_1_1_java_script_1_1_tests_1_1_java_script_builder_element_template_tests.html#a336aca70ebad4a20fcb907beb6cf942e", null ],
     [ "Init", "class_fifty_one_1_1_pipeline_1_1_java_script_1_1_tests_1_1_java_script_builder_element_template_tests.html#a5f84e62a8b7cbb658535091574eaa220", null ],
