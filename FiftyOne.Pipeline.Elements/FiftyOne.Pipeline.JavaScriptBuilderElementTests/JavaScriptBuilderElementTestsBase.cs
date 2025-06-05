@@ -55,15 +55,15 @@ namespace FiftyOne.Pipeline.JavaScript.Tests
             chromeOptions.AcceptInsecureCertificates = true;
             // run in headless mode.
             chromeOptions.AddArgument("--headless");
+            
+            // Add additional stability arguments for CI environments
+            chromeOptions.AddArgument("--no-sandbox");
+            chromeOptions.AddArgument("--disable-dev-shm-usage");
+            chromeOptions.AddArgument("--disable-gpu");
+            chromeOptions.AddArgument("--remote-debugging-port=0");
+            
             try
             {
-                var options = new ChromeOptions();
-
-                // Set the desired DevTools protocol version
-                // Temporarily set the devtools version to 127 as 
-                // Webdriver package is not quite ready for Chrome 132 
-                // that was recently updated on some runners on CI
-                options.AddAdditionalOption("devtoolsProtocolVersion", "127"); 
                 Driver = new ChromeDriver(chromeOptions);
             }
             catch (WebDriverException)
