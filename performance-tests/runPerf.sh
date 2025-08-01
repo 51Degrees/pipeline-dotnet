@@ -3,7 +3,7 @@
 # Constants
 PASSES=20000
 PROJECT=..
-HOST=localhost:5000
+HOST=127.0.0.1:5000
 CAL=calibrate
 PRO=process?operation=1plus1
 PERF=./ApacheBench-prefix/src/ApacheBench-build/bin/runPerf.sh
