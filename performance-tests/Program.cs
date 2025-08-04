@@ -37,6 +37,9 @@ namespace performance_tests
                 .ConfigureWebHostDefaults(webBuilder =>
                 {
                     webBuilder.UseStartup<Startup>();
+                    // Ensure we use Kestrel and bind to the correct URL
+                    webBuilder.UseKestrel();
+                    webBuilder.UseUrls("http://localhost:5000");
                 });
     }
 }
