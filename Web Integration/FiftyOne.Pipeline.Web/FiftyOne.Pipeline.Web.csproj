@@ -31,14 +31,14 @@
 	     update the dependencies in the nuspec file in the parent directory. -->
     <FrameworkReference Include="Microsoft.AspNetCore.App" />
     <PackageReference Include="Microsoft.AspNetCore.Mvc.Razor.RuntimeCompilation" Version="3.1.32" />
-    <PackageReference Include="Microsoft.Extensions.FileProviders.Embedded" Version="8.0.18" />
+    <PackageReference Include="Microsoft.Extensions.FileProviders.Embedded" Version="8.0.19" />
   </ItemGroup>
   <ItemGroup Condition=" '$(TargetFramework)' == 'net8.0' ">
     <!-- If these package references are updated or modified then don't forget to also 
 	     update the dependencies in the nuspec file in the parent directory. -->
     <FrameworkReference Include="Microsoft.AspNetCore.App" />
-    <PackageReference Include="Microsoft.AspNetCore.Mvc.Razor.RuntimeCompilation" Version="8.0.18" />
-    <PackageReference Include="Microsoft.Extensions.FileProviders.Embedded" Version="8.0.18" />
+    <PackageReference Include="Microsoft.AspNetCore.Mvc.Razor.RuntimeCompilation" Version="8.0.19" />
+    <PackageReference Include="Microsoft.Extensions.FileProviders.Embedded" Version="8.0.19" />
   </ItemGroup>
   <ItemGroup>
     <None Include="..\..\README.md">
