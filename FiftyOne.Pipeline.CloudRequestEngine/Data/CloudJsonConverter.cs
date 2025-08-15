@@ -24,6 +24,7 @@ using Newtonsoft.Json;
 using System;
 using System.Collections.Generic;
 using System.Globalization;
+using System.Linq;
 
 namespace FiftyOne.Pipeline.CloudRequestEngine.Data
 {
@@ -96,14 +97,23 @@ namespace FiftyOne.Pipeline.CloudRequestEngine.Data
                 // and add each item in turn.
                 if (reader.TokenType == JsonToken.StartArray)
                 {
-                    var list = new List<string>();
+                    var list = new List<object>();
                     reader.Read();
+                    bool nonString = false;
                     while (reader.TokenType != JsonToken.EndArray)
                     {
-                        list.Add(reader.Value.ToString());
+                        if (reader.TokenType == JsonToken.StartObject)
+                        {
+                            list.Add(ReadJson(reader, objectType, null, serializer));
+                            nonString = true;
+                        }
+                        else
+                        {
+                            list.Add(reader.Value.ToString());
+                        }
                         reader.Read();
                     }
-                    value = list;
+                    value = nonString ? list : (object)list.Select(x => x as string).ToList();
                 }
                 else if (reader.TokenType == JsonToken.Integer)
                 {
