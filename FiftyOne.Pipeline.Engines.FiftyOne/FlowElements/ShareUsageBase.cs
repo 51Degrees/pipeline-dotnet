@@ -796,7 +796,7 @@ namespace FiftyOne.Pipeline.Engines.FiftyOne.FlowElements
                     else
                     {
                         IsCanceled = true;
-                        Logger.LogError(Messages.MessageShareUsageFailedToAddData);
+                        Logger.LogWarning(Messages.MessageShareUsageFailedToAddData);
 
                     }
                 }
