@@ -23,6 +23,8 @@
 using FiftyOne.Caching;
 using FiftyOne.Pipeline.Core.Data;
 using FiftyOne.Pipeline.Core.Exceptions;
+using FiftyOne.Pipeline.Core.FailHandling.ExceptionCaching;
+using FiftyOne.Pipeline.Core.FailHandling.Recovery;
 using FiftyOne.Pipeline.Core.FlowElements;
 using FiftyOne.Pipeline.Engines.Configuration;
 using FiftyOne.Pipeline.Engines.FiftyOne.Data;
@@ -65,6 +67,11 @@ namespace FiftyOne.Pipeline.Engines.FiftyOne.FlowElements
         /// The HttpClient to use when sending the data.
         /// </summary>
         protected HttpClient HttpClient => _httpClient;
+
+        /// <summary>
+        /// Recovery strategy for handling failed attempts to add data to the queue.
+        /// </summary>
+        private readonly ExponentialBackoffRecoveryStrategy _recoveryStrategy;
 
         /// <summary>
         /// Inner class that is used to store details of data in memory
@@ -610,6 +617,7 @@ namespace FiftyOne.Pipeline.Engines.FiftyOne.FlowElements
             }
 
             _httpClient = httpClient;
+            _recoveryStrategy = new ExponentialBackoffRecoveryStrategy();
 
             EvidenceCollection = new BlockingCollection<ShareUsageData>(maximumQueueSize);
 
@@ -775,6 +783,12 @@ namespace FiftyOne.Pipeline.Engines.FiftyOne.FlowElements
         /// </param>
         private void ProcessData(IFlowData data)
         {
+            // Check if we're still in recovery period
+            if (!_recoveryStrategy.MayTryNow(out CachedException cachedException))
+            {
+                return;
+            }
+
             if (_rng.NextDouble() <= _sharePercentage)
             {
                 // Check if the tracker will allow sharing of this data
@@ -795,8 +809,11 @@ namespace FiftyOne.Pipeline.Engines.FiftyOne.FlowElements
                     }
                     else
                     {
+                        var exception = new InvalidOperationException("Failed to add data to usage sharing queue");
+                        _recoveryStrategy.RecordFailure(new CachedException(exception));
+                        
                         IsCanceled = true;
-                        Logger.LogError(Messages.MessageShareUsageFailedToAddData);
+                        Logger.LogWarning(Messages.MessageShareUsageFailedToAddData);
 
                     }
                 }
