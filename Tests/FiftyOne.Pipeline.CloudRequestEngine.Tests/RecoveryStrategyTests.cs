@@ -21,8 +21,8 @@
  * ********************************************************************* */
 
 
-using FiftyOne.Pipeline.CloudRequestEngine.FailHandling.ExceptionCaching;
-using FiftyOne.Pipeline.CloudRequestEngine.FailHandling.Recovery;
+using FiftyOne.Pipeline.Core.FailHandling.ExceptionCaching;
+using FiftyOne.Pipeline.Core.FailHandling.Recovery;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using System.Threading;
 

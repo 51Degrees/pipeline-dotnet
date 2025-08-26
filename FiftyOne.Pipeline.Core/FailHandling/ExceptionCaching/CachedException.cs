@@ -20,42 +20,40 @@
  * such notice(s) shall fulfill the requirements of that article.
  * ********************************************************************* */
 
-using FiftyOne.Pipeline.CloudRequestEngine.FailHandling.ExceptionCaching;
+using System;
+using System.Collections.Generic;
+using System.Text;
 
-namespace FiftyOne.Pipeline.CloudRequestEngine.FailHandling.Recovery
+namespace FiftyOne.Pipeline.Core.FailHandling.ExceptionCaching
 {
     /// <summary>
-    /// Always allows to make new server call
-    /// regardless of previous failures.
+    /// Links the exception and the timestamp.
     /// </summary>
-    public class InstantRecoveryStrategy : IRecoveryStrategy
+    public class CachedException
     {
+        private readonly Exception _exception;
+        private readonly DateTime _dateTime;
+
         /// <summary>
-        /// Called when querying the server failed.
+        /// The exception that did happen.
         /// </summary>
-        /// <param name="cachedException">
-        /// Timestampted exception.
+        public Exception Exception => _exception;
+
+        /// <summary>
+        /// When the exception did happen.
+        /// </summary>
+        public DateTime DateTime => _dateTime;
+
+        /// <summary>
+        /// Designated constructor.
+        /// </summary>
+        /// <param name="exception">
+        /// The exception.
         /// </param>
-        public void RecordFailure(CachedException cachedException) { /* nop */ }
-
-        /// <summary>
-        /// Whether the new request may be sent already.
-        /// </summary>
-        /// <returns>
-        /// true -- send, false -- skip
-        /// </returns>
-        /// <param name="cachedException">
-        /// Timestampted exception that prevents new requests.
-        /// </param>>
-        public bool MayTryNow(out CachedException cachedException)
+        public CachedException(Exception exception)
         {
-            cachedException = null;
-            return true;
-        }
-
-        /// <summary>
-        /// Called once the request succeeds (after recovery).
-        /// </summary>
-        public void Reset() { /* nop */ }
+            _exception = exception;
+            _dateTime = DateTime.Now;
+        }   
     }
 }

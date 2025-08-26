@@ -20,14 +20,15 @@
  * such notice(s) shall fulfill the requirements of that article.
  * ********************************************************************* */
 
-using FiftyOne.Pipeline.CloudRequestEngine.FailHandling.ExceptionCaching;
-using FiftyOne.Pipeline.CloudRequestEngine.FailHandling.Recovery;
-using FiftyOne.Pipeline.CloudRequestEngine.FailHandling.Scope;
+using FiftyOne.Pipeline.Core.Exceptions;
+using FiftyOne.Pipeline.Core.FailHandling.ExceptionCaching;
+using FiftyOne.Pipeline.Core.FailHandling.Recovery;
+using FiftyOne.Pipeline.Core.FailHandling.Scope;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 
-namespace FiftyOne.Pipeline.CloudRequestEngine.FailHandling.Facade
+namespace FiftyOne.Pipeline.Core.FailHandling.Facade
 {
     /// <summary>
     /// Tracks failures and throttles requests.
@@ -149,7 +150,7 @@ namespace FiftyOne.Pipeline.CloudRequestEngine.FailHandling.Facade
         /// Throws if the strategy indicates that
         /// requests may not be sent now.
         /// </summary>
-        /// <exception cref="CloudRequestEngineTemporarilyUnavailableException">
+        /// <exception cref="PipelineTemporarilyUnavailableException">
         /// </exception>
         public void ThrowIfStillRecovering()
         {
@@ -201,7 +202,7 @@ namespace FiftyOne.Pipeline.CloudRequestEngine.FailHandling.Facade
                             break;
                     }
                 }
-                throw new Exception(
+                throw new PipelineTemporarilyUnavailableException(
                     $"Recovered exception from {(DateTime.Now - cachedException.DateTime).TotalSeconds}s ago.", 
                     cachedException.Exception);
             }

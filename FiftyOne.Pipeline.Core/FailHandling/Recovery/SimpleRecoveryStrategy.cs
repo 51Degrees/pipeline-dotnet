@@ -20,10 +20,10 @@
  * such notice(s) shall fulfill the requirements of that article.
  * ********************************************************************* */
 
-using FiftyOne.Pipeline.CloudRequestEngine.FailHandling.ExceptionCaching;
+using FiftyOne.Pipeline.Core.FailHandling.ExceptionCaching;
 using System;
 
-namespace FiftyOne.Pipeline.CloudRequestEngine.FailHandling.Recovery
+namespace FiftyOne.Pipeline.Core.FailHandling.Recovery
 {
     /// <summary>
     /// Disallows calling the server for

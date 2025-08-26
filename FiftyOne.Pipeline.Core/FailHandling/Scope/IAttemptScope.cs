@@ -20,34 +20,25 @@
  * such notice(s) shall fulfill the requirements of that article.
  * ********************************************************************* */
 
-using FiftyOne.Pipeline.CloudRequestEngine.FailHandling.Scope;
 using System;
 using System.Collections.Generic;
 using System.Text;
 
-namespace FiftyOne.Pipeline.CloudRequestEngine.FailHandling.Facade
+namespace FiftyOne.Pipeline.Core.FailHandling.Scope
 {
     /// <summary>
-    /// Tracks failures and throttles requests.
+    /// A scope within which an attempt will be made.
+    /// Call <see cref="RecordFailure(Exception)"/>
+    /// to indicate the failure and cache the reason.
     /// </summary>
-    public interface IFailHandler
+    public interface IAttemptScope: IDisposable
     {
         /// <summary>
-        /// Throws if the strategy indicates that
-        /// requests may not be sent now.
+        /// Signals that attempt failed.
         /// </summary>
-        /// <exception cref="CloudRequestEngineTemporarilyUnavailableException">
-        /// </exception>
-        void ThrowIfStillRecovering();
-
-        /// <summary>
-        /// Lets a consumer to wrap an attempt in `using` scope
-        /// to implicitly report success 
-        /// or explicitly provide exception on failure.
-        /// </summary>
-        /// <returns>
-        /// Attempt scope that report to this handler once disposed.
-        /// </returns>
-        IAttemptScope MakeAttemptScope();
+        /// <param name="exception">
+        /// The cause of failure.
+        /// </param>
+        void RecordFailure(Exception exception);
     }
 }
