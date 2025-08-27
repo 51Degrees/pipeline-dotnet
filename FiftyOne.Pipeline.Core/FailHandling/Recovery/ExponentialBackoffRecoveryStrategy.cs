@@ -35,6 +35,20 @@ namespace FiftyOne.Pipeline.Core.FailHandling.Recovery
     public class ExponentialBackoffRecoveryStrategy : IRecoveryStrategy
     {
         /// <summary>
+        /// Default initial delay in seconds for exponential backoff recovery.
+        /// </summary>
+        public const double INITIAL_DELAY_SECONDS_DEFAULT = 2.0;
+
+        /// <summary>
+        /// Default maximum delay in seconds for exponential backoff recovery.
+        /// </summary>
+        public const double MAX_DELAY_SECONDS_DEFAULT = 300.0;
+
+        /// <summary>
+        /// Default multiplier for exponential backoff recovery.
+        /// </summary>
+        public const double MULTIPLIER_DEFAULT = 2.0;
+        /// <summary>
         /// Initial delay in seconds for the first failure.
         /// </summary>
         public readonly double InitialDelaySeconds;
@@ -63,18 +77,18 @@ namespace FiftyOne.Pipeline.Core.FailHandling.Recovery
         /// Constructor with default exponential backoff parameters.
         /// </summary>
         /// <param name="initialDelaySeconds">
-        /// Initial delay in seconds (default: 2.0).
+        /// Initial delay in seconds (default: INITIAL_DELAY_SECONDS_DEFAULT).
         /// </param>
         /// <param name="maxDelaySeconds">
-        /// Maximum delay in seconds to cap growth (default: 300.0).
+        /// Maximum delay in seconds to cap growth (default: MAX_DELAY_SECONDS_DEFAULT).
         /// </param>
         /// <param name="multiplier">
-        /// Exponential multiplier (default: 2.0 for doubling).
+        /// Exponential multiplier (default: MULTIPLIER_DEFAULT for doubling).
         /// </param>
         public ExponentialBackoffRecoveryStrategy(
-            double initialDelaySeconds = 2.0, 
-            double maxDelaySeconds = 300.0, 
-            double multiplier = 2.0)
+            double initialDelaySeconds = INITIAL_DELAY_SECONDS_DEFAULT, 
+            double maxDelaySeconds = MAX_DELAY_SECONDS_DEFAULT, 
+            double multiplier = MULTIPLIER_DEFAULT)
         {
             if (initialDelaySeconds <= 0)
                 throw new ArgumentException("Initial delay must be positive", nameof(initialDelaySeconds));
