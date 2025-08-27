@@ -71,7 +71,7 @@ namespace FiftyOne.Pipeline.Engines.FiftyOne.FlowElements
         /// <summary>
         /// Recovery strategy for handling failed attempts to add data to the queue.
         /// </summary>
-        private readonly ExponentialBackoffRecoveryStrategy _recoveryStrategy;
+        private readonly IRecoveryStrategy _recoveryStrategy;
 
         /// <summary>
         /// Inner class that is used to store details of data in memory
@@ -420,7 +420,8 @@ namespace FiftyOne.Pipeline.Engines.FiftyOne.FlowElements
                   ignoreDataEvidenceFilter,
                   aspSessionCookieName,
                   null,
-                  false)
+                  false,
+                  null)
         {
         }
 
@@ -511,7 +512,8 @@ namespace FiftyOne.Pipeline.Engines.FiftyOne.FlowElements
                   ignoreDataEvidenceFilter,
                   aspSessionCookieName,
                   tracker,
-                  false)
+                  false,
+                  null)
         {
         }
 
@@ -576,6 +578,10 @@ namespace FiftyOne.Pipeline.Engines.FiftyOne.FlowElements
         /// the blockedHttpHeaders, includedQueryStringParameters and
         /// ignoreDataEvidenceFilter parameters will be ignored.
         /// </param>
+        /// <param name="recoveryStrategy">
+        /// The recovery strategy to use when failures occur while sending data.
+        /// If null, a default ExponentialBackoffRecoveryStrategy will be created.
+        /// </param>
         /// <exception cref="ArgumentNullException">
         /// Thrown if certain arguments are null.
         /// </exception>
@@ -598,7 +604,8 @@ namespace FiftyOne.Pipeline.Engines.FiftyOne.FlowElements
             List<KeyValuePair<string, string>> ignoreDataEvidenceFilter,
             string aspSessionCookieName,
             ITracker tracker,
-            bool shareAllEvidence)
+            bool shareAllEvidence,
+            IRecoveryStrategy recoveryStrategy = null)
             : base(logger)
         {
             if (blockedHttpHeaders == null)
@@ -617,7 +624,7 @@ namespace FiftyOne.Pipeline.Engines.FiftyOne.FlowElements
             }
 
             _httpClient = httpClient;
-            _recoveryStrategy = new ExponentialBackoffRecoveryStrategy();
+            _recoveryStrategy = recoveryStrategy ?? new ExponentialBackoffRecoveryStrategy();
 
             EvidenceCollection = new BlockingCollection<ShareUsageData>(maximumQueueSize);
 

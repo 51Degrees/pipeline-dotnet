@@ -114,7 +114,17 @@ namespace FiftyOne.Pipeline.Core.FailHandling.Recovery
         {
             lock (_lock)
             {
-                _consecutiveFailures++;
+                // Only increment failure count if this is a new failure, not a concurrent
+                // recording of the same failure event. We consider it a new failure if:
+                // 1. This is the first failure (_exception is null), or
+                // 2. The new failure occurred after the current recovery time would have ended
+                bool isNewFailure = _exception == null || 
+                                   cachedException.DateTime >= _recoveryDateTime;
+
+                if (isNewFailure)
+                {
+                    _consecutiveFailures++;
+                }
                 
                 // Calculate new delay: initialDelay * multiplier^(failures-1)
                 // For failures=1: initialDelay * multiplier^0 = initialDelay
