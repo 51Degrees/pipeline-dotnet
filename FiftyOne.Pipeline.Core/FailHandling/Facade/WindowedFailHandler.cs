@@ -237,6 +237,18 @@ namespace FiftyOne.Pipeline.Core.FailHandling.Facade
         }
 
         /// <summary>
+        /// Checks if requests may be sent now without throwing exceptions.
+        /// Use this for non-critical operations that should silently skip when unavailable.
+        /// </summary>
+        /// <returns>
+        /// True if requests may be sent, false if still in recovery mode.
+        /// </returns>
+        public bool IsAvailable()
+        {
+            return _recoveryStrategy.MayTryNow(out var _);
+        }
+
+        /// <summary>
         /// Lets a consumer to wrap an attempt in `using` scope
         /// to implicitly report success 
         /// or explicitly provide exception on failure.

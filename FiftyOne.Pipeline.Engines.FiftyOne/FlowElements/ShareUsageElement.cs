@@ -20,6 +20,7 @@
  * such notice(s) shall fulfill the requirements of that article.
  * ********************************************************************* */
 
+using FiftyOne.Pipeline.Core.FailHandling.Facade;
 using FiftyOne.Pipeline.Core.FailHandling.Recovery;
 using FiftyOne.Pipeline.Engines.Trackers;
 using Microsoft.Extensions.Logging;
@@ -64,7 +65,7 @@ namespace FiftyOne.Pipeline.Engines.FiftyOne.FlowElements
             string aspSessionCookieName,
             ITracker tracker,
             bool shareAllEvidence,
-            IRecoveryStrategy recoveryStrategy = null)
+            IFailHandler failHandler = null)
             : base(logger,
                   httpClient,
                   sharePercentage,
@@ -81,7 +82,7 @@ namespace FiftyOne.Pipeline.Engines.FiftyOne.FlowElements
                   aspSessionCookieName,
                   tracker,
                   shareAllEvidence,
-                  recoveryStrategy)
+                  failHandler)
         {
         }
 

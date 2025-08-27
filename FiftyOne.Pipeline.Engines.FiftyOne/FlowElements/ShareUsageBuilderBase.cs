@@ -21,6 +21,7 @@
  * ********************************************************************* */
 
 using FiftyOne.Pipeline.Core.Attributes;
+using FiftyOne.Pipeline.Core.FailHandling.Facade;
 using FiftyOne.Pipeline.Core.FailHandling.Recovery;
 using Microsoft.Extensions.Logging;
 using System;
@@ -140,6 +141,16 @@ namespace FiftyOne.Pipeline.Engines.FiftyOne.FlowElements
         /// If set to true then all evidence values will be shared.
         /// </summary>
         protected bool ShareAllEvidence { get; private set; } = Constants.SHARE_USAGE_DEFAULT_SHARE_ALL_EVIDENCE;
+
+        /// <summary>
+        /// Number of failures required to enter recovery mode.
+        /// </summary>
+        protected int FailuresToEnterRecovery { get; private set; } = 1;
+
+        /// <summary>
+        /// Time window in seconds for tracking failures.
+        /// </summary>
+        protected int FailuresWindowSeconds { get; private set; } = 10;
 
         /// <summary>
         /// Initial delay in seconds for exponential backoff recovery strategy.
@@ -522,6 +533,34 @@ namespace FiftyOne.Pipeline.Engines.FiftyOne.FlowElements
         public ShareUsageBuilderBase<T> SetTrackSession(bool track)
         {
             TrackSession = track;
+            return this;
+        }
+
+        /// <summary>
+        /// Set the number of failures required to enter recovery mode.
+        /// </summary>
+        /// <param name="failuresToEnterRecovery">
+        /// Number of failures within the window to trigger recovery.
+        /// </param>
+        /// <returns>This builder instance.</returns>
+        [DefaultValue(1)]
+        public ShareUsageBuilderBase<T> SetFailuresToEnterRecovery(int failuresToEnterRecovery)
+        {
+            FailuresToEnterRecovery = failuresToEnterRecovery;
+            return this;
+        }
+
+        /// <summary>
+        /// Set the time window in seconds for tracking failures.
+        /// </summary>
+        /// <param name="failuresWindowSeconds">
+        /// Time window in seconds for failure tracking.
+        /// </param>
+        /// <returns>This builder instance.</returns>
+        [DefaultValue(10)]
+        public ShareUsageBuilderBase<T> SetFailuresWindowSeconds(int failuresWindowSeconds)
+        {
+            FailuresWindowSeconds = failuresWindowSeconds;
             return this;
         }
 

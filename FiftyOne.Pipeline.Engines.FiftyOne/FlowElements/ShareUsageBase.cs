@@ -23,7 +23,7 @@
 using FiftyOne.Caching;
 using FiftyOne.Pipeline.Core.Data;
 using FiftyOne.Pipeline.Core.Exceptions;
-using FiftyOne.Pipeline.Core.FailHandling.ExceptionCaching;
+using FiftyOne.Pipeline.Core.FailHandling.Facade;
 using FiftyOne.Pipeline.Core.FailHandling.Recovery;
 using FiftyOne.Pipeline.Core.FlowElements;
 using FiftyOne.Pipeline.Engines.Configuration;
@@ -69,9 +69,9 @@ namespace FiftyOne.Pipeline.Engines.FiftyOne.FlowElements
         protected HttpClient HttpClient => _httpClient;
 
         /// <summary>
-        /// Recovery strategy for handling failed attempts to add data to the queue.
+        /// Fail handler for managing failed attempts to add data to the queue.
         /// </summary>
-        private readonly IRecoveryStrategy _recoveryStrategy;
+        private readonly IFailHandler _failHandler;
 
         /// <summary>
         /// Inner class that is used to store details of data in memory
@@ -578,9 +578,9 @@ namespace FiftyOne.Pipeline.Engines.FiftyOne.FlowElements
         /// the blockedHttpHeaders, includedQueryStringParameters and
         /// ignoreDataEvidenceFilter parameters will be ignored.
         /// </param>
-        /// <param name="recoveryStrategy">
-        /// The recovery strategy to use when failures occur while sending data.
-        /// If null, a default ExponentialBackoffRecoveryStrategy will be created.
+        /// <param name="failHandler">
+        /// The fail handler to use when failures occur while sending data.
+        /// If null, a default WindowedFailHandler with ExponentialBackoffRecoveryStrategy will be created.
         /// </param>
         /// <exception cref="ArgumentNullException">
         /// Thrown if certain arguments are null.
@@ -605,7 +605,7 @@ namespace FiftyOne.Pipeline.Engines.FiftyOne.FlowElements
             string aspSessionCookieName,
             ITracker tracker,
             bool shareAllEvidence,
-            IRecoveryStrategy recoveryStrategy = null)
+            IFailHandler failHandler = null)
             : base(logger)
         {
             if (blockedHttpHeaders == null)
@@ -624,7 +624,10 @@ namespace FiftyOne.Pipeline.Engines.FiftyOne.FlowElements
             }
 
             _httpClient = httpClient;
-            _recoveryStrategy = recoveryStrategy ?? new ExponentialBackoffRecoveryStrategy();
+            _failHandler = failHandler ?? new WindowedFailHandler(
+                new ExponentialBackoffRecoveryStrategy(), 
+                1, 
+                TimeSpan.FromSeconds(10));
 
             EvidenceCollection = new BlockingCollection<ShareUsageData>(maximumQueueSize);
 
@@ -791,7 +794,8 @@ namespace FiftyOne.Pipeline.Engines.FiftyOne.FlowElements
         private void ProcessData(IFlowData data)
         {
             // Check if we're still in recovery period
-            if (!_recoveryStrategy.MayTryNow(out CachedException cachedException))
+            // Use IsAvailable for non-critical operations that should silently skip
+            if (!_failHandler.IsAvailable())
             {
                 return;
             }
@@ -817,8 +821,7 @@ namespace FiftyOne.Pipeline.Engines.FiftyOne.FlowElements
                     else
                     {
                         var exception = new InvalidOperationException("Failed to add data to usage sharing queue");
-                        _recoveryStrategy.RecordFailure(new CachedException(exception));
-                        
+                        // For queue failures, we simply disable sharing rather than using fail handler
                         IsCanceled = true;
                         Logger.LogWarning(Messages.MessageShareUsageFailedToAddData);
 

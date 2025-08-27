@@ -42,6 +42,15 @@ namespace FiftyOne.Pipeline.Core.FailHandling.Facade
         void ThrowIfStillRecovering();
 
         /// <summary>
+        /// Checks if requests may be sent now without throwing exceptions.
+        /// Use this for non-critical operations that should silently skip when unavailable.
+        /// </summary>
+        /// <returns>
+        /// True if requests may be sent, false if still in recovery mode.
+        /// </returns>
+        bool IsAvailable();
+
+        /// <summary>
         /// Lets a consumer to wrap an attempt in `using` scope
         /// to implicitly report success 
         /// or explicitly provide exception on failure.
