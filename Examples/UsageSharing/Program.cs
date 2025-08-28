@@ -51,7 +51,7 @@ using System.Net.Http;
 /// @include UsageSharing/appsettings.json
 /// 
 /// For further details of what each setting does, see the 
-/// [share usage builder reference](https://51degrees.com/pipeline-dotnet/class_fifty_one_1_1_pipeline_1_1_engines_1_1_fifty_one_1_1_flow_elements_1_1_share_usage_builder_base.html) 
+/// [Share Usage reference](/documentation/4.5/_pipeline_api__features__usage_sharing.html) 
 ///
 /// This example is available in full on [GitHub](https://github.com/51Degrees/pipeline-dotnet/blob/master/Examples/UsageSharing/Program.cs).
 /// 
