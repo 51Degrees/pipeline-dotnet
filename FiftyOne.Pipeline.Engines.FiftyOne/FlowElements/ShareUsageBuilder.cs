@@ -86,10 +86,7 @@ namespace FiftyOne.Pipeline.Engines.FiftyOne.FlowElements
         /// </returns>
         public override ShareUsageElement Build()
         {
-            var recoveryStrategy = RecoveryStrategyFactory.CreateExponentialBackoff(
-                InitialRecoveryDelaySeconds,
-                MaxRecoveryDelaySeconds,
-                RecoveryMultiplier);
+            var recoveryStrategy = CreateRecoveryStrategy();
 
             var failHandler = new WindowedFailHandler(
                 recoveryStrategy,

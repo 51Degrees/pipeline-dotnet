@@ -277,19 +277,23 @@ namespace FiftyOne.Pipeline.CloudRequestEngine.Tests
                 "Should recover after 2 seconds (capped), not 10 seconds.");
         }
 
+        private const double INITIAL_DELAY_SECONDS_DEFAULT = 2.0;
+        private const double MAX_DELAY_SECONDS_DEFAULT = 300.0;
+        private const double MULTIPLIER_DEFAULT = 2.0;
+
         [TestMethod]
         public void ExponentialBackoffRecoveryStrategyShouldUseConstants()
         {
             // Test that constants are properly set
-            Assert.AreEqual(2.0, Constants.EXPONENTIAL_BACKOFF_INITIAL_DELAY_SECONDS_DEFAULT);
-            Assert.AreEqual(300.0, Constants.EXPONENTIAL_BACKOFF_MAX_DELAY_SECONDS_DEFAULT);
-            Assert.AreEqual(2.0, Constants.EXPONENTIAL_BACKOFF_MULTIPLIER_DEFAULT);
+            Assert.AreEqual(2.0, INITIAL_DELAY_SECONDS_DEFAULT);
+            Assert.AreEqual(300.0, MAX_DELAY_SECONDS_DEFAULT);
+            Assert.AreEqual(2.0, MULTIPLIER_DEFAULT);
 
             // Test default constructor uses constants
             var strategy = new ExponentialBackoffRecoveryStrategy(
-                initialDelaySeconds: Constants.EXPONENTIAL_BACKOFF_INITIAL_DELAY_SECONDS_DEFAULT,
-                maxDelaySeconds: Constants.EXPONENTIAL_BACKOFF_MAX_DELAY_SECONDS_DEFAULT,
-                multiplier: Constants.EXPONENTIAL_BACKOFF_MULTIPLIER_DEFAULT);
+                initialDelaySeconds: INITIAL_DELAY_SECONDS_DEFAULT,
+                maxDelaySeconds: MAX_DELAY_SECONDS_DEFAULT,
+                multiplier: MULTIPLIER_DEFAULT);
             
             // Should work with default values
             Assert.IsTrue(strategy.MayTryNow(out _),
@@ -411,9 +415,9 @@ namespace FiftyOne.Pipeline.CloudRequestEngine.Tests
         public void RecoveryStrategyFactoryCreateExponentialBackoffShouldUseDefaults()
         {
             var strategy = RecoveryStrategyFactory.CreateExponentialBackoff(
-                initialDelaySeconds: Constants.EXPONENTIAL_BACKOFF_INITIAL_DELAY_SECONDS_DEFAULT,
-                maxDelaySeconds: Constants.EXPONENTIAL_BACKOFF_MAX_DELAY_SECONDS_DEFAULT,
-                multiplier: Constants.EXPONENTIAL_BACKOFF_MULTIPLIER_DEFAULT);
+                initialDelaySeconds: INITIAL_DELAY_SECONDS_DEFAULT,
+                maxDelaySeconds: MAX_DELAY_SECONDS_DEFAULT,
+                multiplier: MULTIPLIER_DEFAULT);
             
             Assert.IsNotNull(strategy, "Factory should create strategy with defaults.");
             Assert.IsTrue(strategy.MayTryNow(out _), "Created strategy should work with defaults.");
@@ -457,9 +461,9 @@ namespace FiftyOne.Pipeline.CloudRequestEngine.Tests
             var simpleStrategy = RecoveryStrategyFactory.Create(
                 useExponentialBackoff: false,
                 recoverySeconds: 5.0,
-                initialDelaySeconds: Constants.EXPONENTIAL_BACKOFF_INITIAL_DELAY_SECONDS_DEFAULT,
-                maxDelaySeconds: Constants.EXPONENTIAL_BACKOFF_MAX_DELAY_SECONDS_DEFAULT,
-                multiplier: Constants.EXPONENTIAL_BACKOFF_MULTIPLIER_DEFAULT);
+                initialDelaySeconds: INITIAL_DELAY_SECONDS_DEFAULT,
+                maxDelaySeconds: MAX_DELAY_SECONDS_DEFAULT,
+                multiplier: MULTIPLIER_DEFAULT);
             
             Assert.IsInstanceOfType(simpleStrategy, typeof(SimpleRecoveryStrategy),
                 "Should create SimpleRecoveryStrategy when useExponentialBackoff=false and recoverySeconds>0.");
@@ -468,10 +472,10 @@ namespace FiftyOne.Pipeline.CloudRequestEngine.Tests
             var instantStrategy = RecoveryStrategyFactory.Create(
                 useExponentialBackoff: false,
                 recoverySeconds: 0.0,
-                initialDelaySeconds: Constants.EXPONENTIAL_BACKOFF_INITIAL_DELAY_SECONDS_DEFAULT,
-                maxDelaySeconds: Constants.EXPONENTIAL_BACKOFF_MAX_DELAY_SECONDS_DEFAULT,
-                multiplier: Constants.EXPONENTIAL_BACKOFF_MULTIPLIER_DEFAULT);
-            
+                initialDelaySeconds: INITIAL_DELAY_SECONDS_DEFAULT,
+                maxDelaySeconds: MAX_DELAY_SECONDS_DEFAULT,
+                multiplier: MULTIPLIER_DEFAULT);
+
             Assert.IsInstanceOfType(instantStrategy, typeof(InstantRecoveryStrategy),
                 "Should create InstantRecoveryStrategy when useExponentialBackoff=false and recoverySeconds<=0.");
         }

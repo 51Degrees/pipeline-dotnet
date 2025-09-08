@@ -625,9 +625,12 @@ namespace FiftyOne.Pipeline.Engines.FiftyOne.FlowElements
 
             _httpClient = httpClient;
             _failHandler = failHandler ?? new WindowedFailHandler(
-                new ExponentialBackoffRecoveryStrategy(), 
-                1, 
-                TimeSpan.FromSeconds(10));
+                new ExponentialBackoffRecoveryStrategy(
+                    initialDelaySeconds: Constants.SHARE_USAGE_EXPONENTIAL_BACKOFF_INITIAL_DELAY_SECONDS_DEFAULT,
+                    maxDelaySeconds: Constants.SHARE_USAGE_EXPONENTIAL_BACKOFF_MAX_DELAY_SECONDS_DEFAULT,
+                    multiplier: Constants.SHARE_USAGE_EXPONENTIAL_BACKOFF_MULTIPLIER_DEFAULT),
+                Constants.SHARE_USAGE_FAILURES_TO_ENTER_RECOVERY_DEFAULT, 
+                TimeSpan.FromSeconds(Constants.SHARE_USAGE_FAILURES_WINDOW_SECONDS_DEFAULT));
 
             EvidenceCollection = new BlockingCollection<ShareUsageData>(maximumQueueSize);
 
