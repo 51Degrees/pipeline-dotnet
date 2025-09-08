@@ -49,11 +49,6 @@ namespace FiftyOne.Pipeline.Core.FailHandling.Recovery
         /// </summary>
         public readonly double Multiplier;
 
-        /// <summary>
-        /// Current delay in seconds based on consecutive failures.
-        /// </summary>
-        public double CurrentDelaySeconds { get; private set; }
-
         private CachedException _exception = null;
         private DateTime _recoveryDateTime = DateTime.MinValue;
         private int _consecutiveFailures = 0;
@@ -86,7 +81,6 @@ namespace FiftyOne.Pipeline.Core.FailHandling.Recovery
             InitialDelaySeconds = initialDelaySeconds;
             MaxDelaySeconds = maxDelaySeconds;
             Multiplier = multiplier;
-            CurrentDelaySeconds = initialDelaySeconds;
         }
 
         /// <summary>
@@ -116,11 +110,11 @@ namespace FiftyOne.Pipeline.Core.FailHandling.Recovery
                 // For failures=1: initialDelay * multiplier^0 = initialDelay
                 // For failures=2: initialDelay * multiplier^1 = initialDelay * multiplier
                 // For failures=3: initialDelay * multiplier^2, etc.
-                CurrentDelaySeconds = Math.Min(
+                var currentDelaySeconds = Math.Min(
                     InitialDelaySeconds * Math.Pow(Multiplier, _consecutiveFailures - 1),
                     MaxDelaySeconds);
 
-                var newRecoveryTime = cachedException.DateTime.AddSeconds(CurrentDelaySeconds);
+                var newRecoveryTime = cachedException.DateTime.AddSeconds(currentDelaySeconds);
                 
                 _exception = cachedException;
                 _recoveryDateTime = newRecoveryTime;
@@ -166,7 +160,6 @@ namespace FiftyOne.Pipeline.Core.FailHandling.Recovery
             lock (_lock)
             {
                 _consecutiveFailures = 0;
-                CurrentDelaySeconds = InitialDelaySeconds;
                 _exception = null;
                 _recoveryDateTime = DateTime.MinValue;
             }
