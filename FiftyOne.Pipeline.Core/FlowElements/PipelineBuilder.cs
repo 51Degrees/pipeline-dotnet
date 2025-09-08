@@ -129,7 +129,7 @@ namespace FiftyOne.Pipeline.Core.FlowElements
                     new ParallelOptions()
                     {
                         MaxDegreeOfParallelism =
-                        Environment.ProcessorCount / 2
+                            Math.Max(1, Environment.ProcessorCount / 2)
                     },
                     (elementOptions, state, index)  =>
                 {
