@@ -28,7 +28,7 @@ using System;
 using System.Threading;
 using System.Threading.Tasks;
 
-namespace FiftyOne.Pipeline.CloudRequestEngine.Tests
+namespace FiftyOne.Pipeline.Core.Tests
 {
     [TestClass]
     public class RecoveryStrategyTests
