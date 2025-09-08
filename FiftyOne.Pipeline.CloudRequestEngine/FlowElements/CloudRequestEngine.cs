@@ -37,6 +37,7 @@ using System.Linq;
 using System.Net.Http;
 using System.Threading;
 using System.Threading.Tasks;
+using FiftyOne.Pipeline.Core.Exceptions;
 
 namespace FiftyOne.Pipeline.CloudRequestEngine.FlowElements
 {
@@ -484,7 +485,8 @@ namespace FiftyOne.Pipeline.CloudRequestEngine.FlowElements
         {
             try
             {
-                _failHandler.ThrowIfStillRecovering();
+                _failHandler.CheckIfRecovered(
+                    (msg, ex) => new PipelineTemporarilyUnavailableException(msg, ex));
             }
             catch (Exception ex)
             {

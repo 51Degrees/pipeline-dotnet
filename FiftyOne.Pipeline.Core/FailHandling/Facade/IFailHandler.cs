@@ -34,21 +34,19 @@ namespace FiftyOne.Pipeline.Core.FailHandling.Facade
     public interface IFailHandler
     {
         /// <summary>
-        /// Throws if the strategy indicates that
+        /// Checks if the strategy indicates that
         /// requests may not be sent now.
         /// </summary>
-        /// <exception cref="PipelineTemporarilyUnavailableException">
+        /// <param name="exceptionFactory">
+        /// Optional factory to wrap an error into a critical path exception.
+        /// </param>
+        /// <exception cref="Exception">
+        /// Underlying exception wrapped by <paramref name="exceptionFactory"/>
         /// </exception>
-        void ThrowIfStillRecovering();
-
-        /// <summary>
-        /// Checks if requests may be sent now without throwing exceptions.
-        /// Use this for non-critical operations that should silently skip when unavailable.
-        /// </summary>
         /// <returns>
-        /// True if requests may be sent, false if still in recovery mode.
+        /// true if recovered, false if not yet.
         /// </returns>
-        bool IsAvailable();
+        bool CheckIfRecovered(Func<string, Exception, Exception> exceptionFactory);
 
         /// <summary>
         /// Lets a consumer to wrap an attempt in `using` scope

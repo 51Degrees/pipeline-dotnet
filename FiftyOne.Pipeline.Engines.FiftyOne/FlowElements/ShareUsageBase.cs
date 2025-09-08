@@ -795,7 +795,7 @@ namespace FiftyOne.Pipeline.Engines.FiftyOne.FlowElements
         {
             // Check if we're still in recovery period
             // Use IsAvailable for non-critical operations that should silently skip
-            if (!_failHandler.IsAvailable())
+            if (!_failHandler.CheckIfRecovered(exceptionFactory: null))
             {
                 return;
             }

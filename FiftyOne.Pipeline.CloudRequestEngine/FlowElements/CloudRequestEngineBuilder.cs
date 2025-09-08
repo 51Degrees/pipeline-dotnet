@@ -64,9 +64,9 @@ namespace FiftyOne.Pipeline.CloudRequestEngine.FlowElements
         private int _failuresWindowSeconds = Constants.CLOUD_REQUEST_FAILURES_WINDOW_SECONDS_DEFAULT;
         private double _recoverySeconds = Constants.CLOUD_REQUEST_RECOVERY_SECONDS_DEFAULT;
         private bool _useExponentialBackoff = false;
-        private double _exponentialBackoffInitialDelay = ExponentialBackoffRecoveryStrategy.INITIAL_DELAY_SECONDS_DEFAULT;
-        private double _exponentialBackoffMaxDelay = ExponentialBackoffRecoveryStrategy.MAX_DELAY_SECONDS_DEFAULT;
-        private double _exponentialBackoffMultiplier = ExponentialBackoffRecoveryStrategy.MULTIPLIER_DEFAULT;
+        private double _exponentialBackoffInitialDelay = Constants.EXPONENTIAL_BACKOFF_INITIAL_DELAY_SECONDS_DEFAULT;
+        private double _exponentialBackoffMaxDelay = Constants.EXPONENTIAL_BACKOFF_MAX_DELAY_SECONDS_DEFAULT;
+        private double _exponentialBackoffMultiplier = Constants.EXPONENTIAL_BACKOFF_MULTIPLIER_DEFAULT;
 
         #endregion
 
@@ -271,7 +271,7 @@ namespace FiftyOne.Pipeline.CloudRequestEngine.FlowElements
         /// </summary>
         /// <param name="initialDelaySeconds">Initial delay in seconds</param>
         /// <returns>This builder instance</returns>
-        [DefaultValue(ExponentialBackoffRecoveryStrategy.INITIAL_DELAY_SECONDS_DEFAULT)]
+        [DefaultValue(Constants.EXPONENTIAL_BACKOFF_INITIAL_DELAY_SECONDS_DEFAULT)]
         public CloudRequestEngineBuilder SetExponentialBackoffInitialDelay(double initialDelaySeconds)
         {
             _exponentialBackoffInitialDelay = initialDelaySeconds;
@@ -284,7 +284,7 @@ namespace FiftyOne.Pipeline.CloudRequestEngine.FlowElements
         /// </summary>
         /// <param name="maxDelaySeconds">Maximum delay in seconds</param>
         /// <returns>This builder instance</returns>
-        [DefaultValue(ExponentialBackoffRecoveryStrategy.MAX_DELAY_SECONDS_DEFAULT)]
+        [DefaultValue(Constants.EXPONENTIAL_BACKOFF_MAX_DELAY_SECONDS_DEFAULT)]
         public CloudRequestEngineBuilder SetExponentialBackoffMaxDelay(double maxDelaySeconds)
         {
             _exponentialBackoffMaxDelay = maxDelaySeconds;
@@ -297,7 +297,7 @@ namespace FiftyOne.Pipeline.CloudRequestEngine.FlowElements
         /// </summary>
         /// <param name="multiplier">Exponential multiplier (typically 2.0 for doubling)</param>
         /// <returns>This builder instance</returns>
-        [DefaultValue(ExponentialBackoffRecoveryStrategy.MULTIPLIER_DEFAULT)]
+        [DefaultValue(Constants.EXPONENTIAL_BACKOFF_MULTIPLIER_DEFAULT)]
         public CloudRequestEngineBuilder SetExponentialBackoffMultiplier(double multiplier)
         {
             _exponentialBackoffMultiplier = multiplier;

@@ -146,13 +146,8 @@ namespace FiftyOne.Pipeline.Core.FailHandling.Facade
             _failures = new Queue<CachedException>(failuresToEnterRecovery);
         }
 
-        /// <summary>
-        /// Throws if the strategy indicates that
-        /// requests may not be sent now.
-        /// </summary>
-        /// <exception cref="PipelineTemporarilyUnavailableException">
-        /// </exception>
-        public void ThrowIfStillRecovering()
+        /// <inheritdoc cref="IFailHandler.CheckIfRecovered(Func{string, Exception, Exception})"/>
+        public bool CheckIfRecovered(Func<string, Exception, Exception> exceptionFactory)
         {
             if (!_recoveryStrategy.MayTryNow(out var cachedException))
             {
@@ -202,9 +197,14 @@ namespace FiftyOne.Pipeline.Core.FailHandling.Facade
                             break;
                     }
                 }
-                throw new PipelineTemporarilyUnavailableException(
-                    $"Recovered exception from {(DateTime.Now - cachedException.DateTime).TotalSeconds}s ago.", 
+                var ex = exceptionFactory?.Invoke(
+                    $"Recovered exception from {(DateTime.Now - cachedException.DateTime).TotalSeconds}s ago.",
                     cachedException.Exception);
+                if (!(ex is null))
+                {
+                    throw ex;
+                }
+                return false;
             }
             lock (_lock)
             {
@@ -234,18 +234,7 @@ namespace FiftyOne.Pipeline.Core.FailHandling.Facade
                         break;
                 }
             }
-        }
-
-        /// <summary>
-        /// Checks if requests may be sent now without throwing exceptions.
-        /// Use this for non-critical operations that should silently skip when unavailable.
-        /// </summary>
-        /// <returns>
-        /// True if requests may be sent, false if still in recovery mode.
-        /// </returns>
-        public bool IsAvailable()
-        {
-            return _recoveryStrategy.MayTryNow(out var _);
+            return true;
         }
 
         /// <summary>

@@ -35,20 +35,6 @@ namespace FiftyOne.Pipeline.Core.FailHandling.Recovery
     public class ExponentialBackoffRecoveryStrategy : IRecoveryStrategy
     {
         /// <summary>
-        /// Default initial delay in seconds for exponential backoff recovery.
-        /// </summary>
-        public const double INITIAL_DELAY_SECONDS_DEFAULT = 2.0;
-
-        /// <summary>
-        /// Default maximum delay in seconds for exponential backoff recovery.
-        /// </summary>
-        public const double MAX_DELAY_SECONDS_DEFAULT = 300.0;
-
-        /// <summary>
-        /// Default multiplier for exponential backoff recovery.
-        /// </summary>
-        public const double MULTIPLIER_DEFAULT = 2.0;
-        /// <summary>
         /// Initial delay in seconds for the first failure.
         /// </summary>
         public readonly double InitialDelaySeconds;
@@ -86,9 +72,9 @@ namespace FiftyOne.Pipeline.Core.FailHandling.Recovery
         /// Exponential multiplier (default: MULTIPLIER_DEFAULT for doubling).
         /// </param>
         public ExponentialBackoffRecoveryStrategy(
-            double initialDelaySeconds = INITIAL_DELAY_SECONDS_DEFAULT, 
-            double maxDelaySeconds = MAX_DELAY_SECONDS_DEFAULT, 
-            double multiplier = MULTIPLIER_DEFAULT)
+            double initialDelaySeconds, 
+            double maxDelaySeconds, 
+            double multiplier)
         {
             if (initialDelaySeconds <= 0)
                 throw new ArgumentException("Initial delay must be positive", nameof(initialDelaySeconds));
