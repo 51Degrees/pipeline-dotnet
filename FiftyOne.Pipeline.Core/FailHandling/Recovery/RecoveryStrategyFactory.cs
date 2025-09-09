@@ -35,9 +35,9 @@ namespace FiftyOne.Pipeline.Core.FailHandling.Recovery
         /// <param name="multiplier">Exponential multiplier</param>
         /// <returns>A new ExponentialBackoffRecoveryStrategy instance</returns>
         public static IRecoveryStrategy CreateExponentialBackoff(
-            double initialDelaySeconds = ExponentialBackoffRecoveryStrategy.INITIAL_DELAY_SECONDS_DEFAULT,
-            double maxDelaySeconds = ExponentialBackoffRecoveryStrategy.MAX_DELAY_SECONDS_DEFAULT,
-            double multiplier = ExponentialBackoffRecoveryStrategy.MULTIPLIER_DEFAULT)
+            double initialDelaySeconds,
+            double maxDelaySeconds,
+            double multiplier)
         {
             return new ExponentialBackoffRecoveryStrategy(initialDelaySeconds, maxDelaySeconds, multiplier);
         }
@@ -71,11 +71,11 @@ namespace FiftyOne.Pipeline.Core.FailHandling.Recovery
         /// <param name="multiplier">Multiplier for exponential backoff</param>
         /// <returns>The appropriate recovery strategy instance</returns>
         public static IRecoveryStrategy Create(
-            bool useExponentialBackoff = false,
-            double recoverySeconds = 60.0,
-            double initialDelaySeconds = ExponentialBackoffRecoveryStrategy.INITIAL_DELAY_SECONDS_DEFAULT,
-            double maxDelaySeconds = ExponentialBackoffRecoveryStrategy.MAX_DELAY_SECONDS_DEFAULT,
-            double multiplier = ExponentialBackoffRecoveryStrategy.MULTIPLIER_DEFAULT)
+            bool useExponentialBackoff,
+            double recoverySeconds,
+            double initialDelaySeconds,
+            double maxDelaySeconds,
+            double multiplier)
         {
             if (useExponentialBackoff)
             {

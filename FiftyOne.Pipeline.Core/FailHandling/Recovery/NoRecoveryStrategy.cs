@@ -21,6 +21,7 @@
  * ********************************************************************* */
 
 using FiftyOne.Pipeline.Core.FailHandling.ExceptionCaching;
+using System;
 
 namespace FiftyOne.Pipeline.Core.FailHandling.Recovery
 {
@@ -42,18 +43,14 @@ namespace FiftyOne.Pipeline.Core.FailHandling.Recovery
             _cachedException = cachedException;
         }
 
-        /// <summary>
-        /// Whether the new request may be sent already.
-        /// </summary>
-        /// <returns>true -- send, false -- skip</returns>
-        /// <param name="cachedException">
-        /// Timestampted exception that prevents new requests.
-        /// </param>
-        public bool MayTryNow(out CachedException cachedException)
+        /// <inheritdoc cref="IRecoveryStrategy.MayTryNow(out CachedException, out Func{string})"/>
+        public bool MayTryNow(out CachedException cachedException, out Func<string> suspensionStatus)
         {
             // volatile read, can’t be reordered with subsequent operations
             cachedException = _cachedException;
-            return cachedException is null;
+            bool suspended = cachedException is null;
+            suspensionStatus = suspended ? () => "stopped forever" : (Func<string>)null;
+            return suspended;
         }
 
         /// <summary>

@@ -67,14 +67,8 @@ namespace FiftyOne.Pipeline.Core.FailHandling.Recovery
             }
         }
 
-        /// <summary>
-        /// Whether the new request may be sent already.
-        /// </summary>
-        /// <returns>true -- send, false -- skip</returns>
-        /// <param name="cachedException">
-        /// Timestampted exception that prevents new requests.
-        /// </param>
-        public bool MayTryNow(out CachedException cachedException)
+        /// <inheritdoc cref="IRecoveryStrategy.MayTryNow(out CachedException, out Func{string})"/>
+        public bool MayTryNow(out CachedException cachedException, out Func<string> suspensionStatus)
         {
             DateTime recoveryDateTime;
             CachedException lastCachedException;
@@ -83,14 +77,17 @@ namespace FiftyOne.Pipeline.Core.FailHandling.Recovery
                 recoveryDateTime = _recoveryDateTime;
                 lastCachedException = _exception;
             }
-            if (recoveryDateTime < DateTime.Now)
+            var now = DateTime.Now;
+            if (recoveryDateTime < now)
             {
                 cachedException = null;
+                suspensionStatus = null;
                 return true;
             }
             else
             {
                 cachedException = lastCachedException;
+                suspensionStatus = () => $"paused for {(now - recoveryDateTime).TotalSeconds} seconds";
                 return false;
             }
         }

@@ -21,6 +21,7 @@
  * ********************************************************************* */
 
 using FiftyOne.Pipeline.Core.FailHandling.ExceptionCaching;
+using System;
 
 namespace FiftyOne.Pipeline.Core.FailHandling.Recovery
 {
@@ -45,7 +46,10 @@ namespace FiftyOne.Pipeline.Core.FailHandling.Recovery
         /// <param name="cachedException">
         /// Timestampted exception that prevents new requests.
         /// </param>
-        bool MayTryNow(out CachedException cachedException);
+        /// <param name="suspensionStatus">
+        /// Delegate that provides a description of remaining suspension status.
+        /// </param>
+        bool MayTryNow(out CachedException cachedException, out Func<string> suspensionStatus);
 
         /// <summary>
         /// Called once the request succeeds (after recovery).

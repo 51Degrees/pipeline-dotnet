@@ -143,29 +143,40 @@ namespace FiftyOne.Pipeline.Engines.FiftyOne.FlowElements
         protected bool ShareAllEvidence { get; private set; } = Constants.SHARE_USAGE_DEFAULT_SHARE_ALL_EVIDENCE;
 
         /// <summary>
+        /// Recovery seconds for linear strategies.
+        /// </summary>
+        protected double RecoverySeconds { get; private set; } = Constants.SHARE_USAGE_RECOVERY_SECONDS_DEFAULT;
+
+        /// <summary>
+        /// Enable exponential backoff recovery strategy instead of simple recovery.
+        /// </summary>
+        protected bool UseExponentialBackoff { get; private set; } = Constants.SHARE_USAGE_EXPONENTIAL_BACKOFF_ENABLED_DEFAULT;
+
+        /// <summary>
         /// Number of failures required to enter recovery mode.
         /// </summary>
-        protected int FailuresToEnterRecovery { get; private set; } = 1;
+        protected int FailuresToEnterRecovery { get; private set; } = Constants.SHARE_USAGE_FAILURES_TO_ENTER_RECOVERY_DEFAULT;
 
         /// <summary>
         /// Time window in seconds for tracking failures.
         /// </summary>
-        protected int FailuresWindowSeconds { get; private set; } = 10;
+        protected int FailuresWindowSeconds { get; private set; } = Constants.SHARE_USAGE_FAILURES_WINDOW_SECONDS_DEFAULT;
 
         /// <summary>
         /// Initial delay in seconds for exponential backoff recovery strategy.
         /// </summary>
-        protected double InitialRecoveryDelaySeconds { get; private set; } = ExponentialBackoffRecoveryStrategy.INITIAL_DELAY_SECONDS_DEFAULT;
+        protected double InitialRecoveryDelaySeconds { get; private set; } = Constants.SHARE_USAGE_EXPONENTIAL_BACKOFF_INITIAL_DELAY_SECONDS_DEFAULT;
 
         /// <summary>
         /// Maximum delay in seconds for exponential backoff recovery strategy.
         /// </summary>
-        protected double MaxRecoveryDelaySeconds { get; private set; } = ExponentialBackoffRecoveryStrategy.MAX_DELAY_SECONDS_DEFAULT;
+        protected double MaxRecoveryDelaySeconds { get; private set; } = Constants.SHARE_USAGE_EXPONENTIAL_BACKOFF_MAX_DELAY_SECONDS_DEFAULT;
 
         /// <summary>
         /// Multiplier for exponential backoff recovery strategy.
         /// </summary>
-        protected double RecoveryMultiplier { get; private set; } = ExponentialBackoffRecoveryStrategy.MULTIPLIER_DEFAULT;
+        protected double RecoveryMultiplier { get; private set; } = Constants.SHARE_USAGE_EXPONENTIAL_BACKOFF_MULTIPLIER_DEFAULT;
+
 
         /// <summary>
         /// Constructor
@@ -543,9 +554,19 @@ namespace FiftyOne.Pipeline.Engines.FiftyOne.FlowElements
         /// Number of failures within the window to trigger recovery.
         /// </param>
         /// <returns>This builder instance.</returns>
-        [DefaultValue(1)]
+        [DefaultValue(Constants.SHARE_USAGE_FAILURES_TO_ENTER_RECOVERY_DEFAULT)]
         public ShareUsageBuilderBase<T> SetFailuresToEnterRecovery(int failuresToEnterRecovery)
         {
+            if (failuresToEnterRecovery < Constants.SHARE_USAGE_FAILURES_TO_ENTER_RECOVERY_MIN
+                || failuresToEnterRecovery > Constants.SHARE_USAGE_FAILURES_TO_ENTER_RECOVERY_MAX)
+            {
+                throw new ArgumentOutOfRangeException(
+                        nameof(failuresToEnterRecovery),
+                        $"{nameof(failuresToEnterRecovery)} must be within"
+                        + $" {Constants.SHARE_USAGE_FAILURES_TO_ENTER_RECOVERY_MIN} and"
+                        + $" {Constants.SHARE_USAGE_FAILURES_TO_ENTER_RECOVERY_MAX} (both inclusive)."
+                        + $" Received: {failuresToEnterRecovery}.");
+            }
             FailuresToEnterRecovery = failuresToEnterRecovery;
             return this;
         }
@@ -557,7 +578,7 @@ namespace FiftyOne.Pipeline.Engines.FiftyOne.FlowElements
         /// Time window in seconds for failure tracking.
         /// </param>
         /// <returns>This builder instance.</returns>
-        [DefaultValue(10)]
+        [DefaultValue(Constants.SHARE_USAGE_FAILURES_WINDOW_SECONDS_DEFAULT)]
         public ShareUsageBuilderBase<T> SetFailuresWindowSeconds(int failuresWindowSeconds)
         {
             FailuresWindowSeconds = failuresWindowSeconds;
@@ -571,7 +592,7 @@ namespace FiftyOne.Pipeline.Engines.FiftyOne.FlowElements
         /// Initial delay in seconds for the first failure.
         /// </param>
         /// <returns>This builder instance.</returns>
-        [DefaultValue(ExponentialBackoffRecoveryStrategy.INITIAL_DELAY_SECONDS_DEFAULT)]
+        [DefaultValue(Constants.SHARE_USAGE_EXPONENTIAL_BACKOFF_INITIAL_DELAY_SECONDS_DEFAULT)]
         public ShareUsageBuilderBase<T> SetInitialRecoveryDelaySeconds(double initialDelaySeconds)
         {
             InitialRecoveryDelaySeconds = initialDelaySeconds;
@@ -585,7 +606,7 @@ namespace FiftyOne.Pipeline.Engines.FiftyOne.FlowElements
         /// Maximum delay in seconds to cap the exponential growth.
         /// </param>
         /// <returns>This builder instance.</returns>
-        [DefaultValue(ExponentialBackoffRecoveryStrategy.MAX_DELAY_SECONDS_DEFAULT)]
+        [DefaultValue(Constants.SHARE_USAGE_EXPONENTIAL_BACKOFF_MAX_DELAY_SECONDS_DEFAULT)]
         public ShareUsageBuilderBase<T> SetMaxRecoveryDelaySeconds(double maxDelaySeconds)
         {
             MaxRecoveryDelaySeconds = maxDelaySeconds;
@@ -599,11 +620,25 @@ namespace FiftyOne.Pipeline.Engines.FiftyOne.FlowElements
         /// Exponential multiplier (typically 2.0 for doubling).
         /// </param>
         /// <returns>This builder instance.</returns>
-        [DefaultValue(ExponentialBackoffRecoveryStrategy.MULTIPLIER_DEFAULT)]
+        [DefaultValue(Constants.SHARE_USAGE_EXPONENTIAL_BACKOFF_MULTIPLIER_DEFAULT)]
         public ShareUsageBuilderBase<T> SetRecoveryMultiplier(double multiplier)
         {
             RecoveryMultiplier = multiplier;
             return this;
+        }
+
+        /// <summary>
+        /// Create the appropriate recovery strategy based on current configuration.
+        /// </summary>
+        /// <returns>The configured recovery strategy</returns>
+        protected IRecoveryStrategy CreateRecoveryStrategy()
+        {
+            return RecoveryStrategyFactory.Create(
+                UseExponentialBackoff,
+                RecoverySeconds,
+                InitialRecoveryDelaySeconds,
+                MaxRecoveryDelaySeconds,
+                RecoveryMultiplier);
         }
 
         /// <summary>
