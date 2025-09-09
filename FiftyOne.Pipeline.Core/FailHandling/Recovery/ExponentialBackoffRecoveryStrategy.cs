@@ -98,14 +98,16 @@ namespace FiftyOne.Pipeline.Core.FailHandling.Recovery
                 // recording of the same failure event. We consider it a new failure if:
                 // 1. This is the first failure (_exception is null), or
                 // 2. The new failure occurred after the current recovery time would have ended
-                bool isNewFailure = _exception == null || 
+                bool isNewFailure = _exception is null || 
                                    cachedException.DateTime >= _recoveryDateTime;
 
-                if (isNewFailure)
+                if (!isNewFailure)
                 {
-                    _consecutiveFailures++;
+                    return;
                 }
-                
+
+                _consecutiveFailures++;
+
                 // Calculate new delay: initialDelay * multiplier^(failures-1)
                 // For failures=1: initialDelay * multiplier^0 = initialDelay
                 // For failures=2: initialDelay * multiplier^1 = initialDelay * multiplier
@@ -121,14 +123,8 @@ namespace FiftyOne.Pipeline.Core.FailHandling.Recovery
             }
         }
 
-        /// <summary>
-        /// Whether the new request may be sent already.
-        /// </summary>
-        /// <param name="cachedException">
-        /// Timestamped exception that prevents new requests.
-        /// </param>
-        /// <returns>true -- send, false -- skip</returns>
-        public bool MayTryNow(out CachedException cachedException)
+        /// <inheritdoc cref="IRecoveryStrategy.MayTryNow(out CachedException, out Func{string})"/>
+        public bool MayTryNow(out CachedException cachedException, out Func<string> suspensionStatus)
         {
             DateTime recoveryDateTime;
             CachedException lastCachedException;
@@ -139,14 +135,17 @@ namespace FiftyOne.Pipeline.Core.FailHandling.Recovery
                 lastCachedException = _exception;
             }
 
-            if (recoveryDateTime < DateTime.Now)
+            var now = DateTime.Now;
+            if (recoveryDateTime < now)
             {
                 cachedException = null;
+                suspensionStatus = null;
                 return true;
             }
             else
             {
                 cachedException = lastCachedException;
+                suspensionStatus = () => $"paused for {(now - recoveryDateTime).TotalSeconds} seconds";
                 return false;
             }
         }

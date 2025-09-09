@@ -21,6 +21,7 @@
  * ********************************************************************* */
 
 using FiftyOne.Pipeline.Core.FailHandling.ExceptionCaching;
+using System;
 
 namespace FiftyOne.Pipeline.Core.FailHandling.Recovery
 {
@@ -38,18 +39,11 @@ namespace FiftyOne.Pipeline.Core.FailHandling.Recovery
         /// </param>
         public void RecordFailure(CachedException cachedException) { /* nop */ }
 
-        /// <summary>
-        /// Whether the new request may be sent already.
-        /// </summary>
-        /// <returns>
-        /// true -- send, false -- skip
-        /// </returns>
-        /// <param name="cachedException">
-        /// Timestampted exception that prevents new requests.
-        /// </param>>
-        public bool MayTryNow(out CachedException cachedException)
+        /// <inheritdoc cref="IRecoveryStrategy.MayTryNow(out CachedException, out Func{string})"/>
+        public bool MayTryNow(out CachedException cachedException, out Func<string> suspensionStatus)
         {
             cachedException = null;
+            suspensionStatus = null;
             return true;
         }
 

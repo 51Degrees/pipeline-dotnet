@@ -40,7 +40,7 @@ namespace FiftyOne.Pipeline.Core.Tests
         {
             IRecoveryStrategy strategy = new InstantRecoveryStrategy();
 
-            Assert.IsTrue(strategy.MayTryNow(out var cachedException), 
+            Assert.IsTrue(strategy.MayTryNow(out var cachedException, out _), 
                 $"{nameof(InstantRecoveryStrategy)}.{nameof(IRecoveryStrategy.MayTryNow)}"
                 + " should return true.");
             Assert.IsNull(cachedException,
@@ -56,7 +56,7 @@ namespace FiftyOne.Pipeline.Core.Tests
 
             strategy.RecordFailure(ex);
 
-            Assert.IsTrue(strategy.MayTryNow(out var ex2),
+            Assert.IsTrue(strategy.MayTryNow(out var ex2, out _),
                 $"{nameof(InstantRecoveryStrategy)}.{nameof(IRecoveryStrategy.MayTryNow)}"
                 + " should return true.");
             Assert.IsNull(ex2,
@@ -72,7 +72,7 @@ namespace FiftyOne.Pipeline.Core.Tests
         {
             IRecoveryStrategy strategy = new NoRecoveryStrategy();
 
-            Assert.IsTrue(strategy.MayTryNow(out var cachedException),
+            Assert.IsTrue(strategy.MayTryNow(out var cachedException, out _),
                 $"{nameof(NoRecoveryStrategy)}.{nameof(IRecoveryStrategy.MayTryNow)}"
                 + " should return true.");
             Assert.IsNull(cachedException,
@@ -88,7 +88,7 @@ namespace FiftyOne.Pipeline.Core.Tests
 
             strategy.RecordFailure(ex);
 
-            Assert.IsFalse(strategy.MayTryNow(out var ex2),
+            Assert.IsFalse(strategy.MayTryNow(out var ex2, out _),
                 $"{nameof(NoRecoveryStrategy)}.{nameof(IRecoveryStrategy.MayTryNow)}"
                 + " should return false.");
             Assert.AreSame(ex, ex2,
@@ -105,7 +105,7 @@ namespace FiftyOne.Pipeline.Core.Tests
             IRecoveryStrategy strategy 
                 = new SimpleRecoveryStrategy(recoverySeconds: 3);
 
-            Assert.IsTrue(strategy.MayTryNow(out var cachedException),
+            Assert.IsTrue(strategy.MayTryNow(out var cachedException, out _),
                 $"{nameof(SimpleRecoveryStrategy)}.{nameof(IRecoveryStrategy.MayTryNow)}"
                 + " should return true.");
             Assert.IsNull(cachedException,
@@ -122,7 +122,7 @@ namespace FiftyOne.Pipeline.Core.Tests
 
             strategy.RecordFailure(ex);
 
-            Assert.IsFalse(strategy.MayTryNow(out var ex2),
+            Assert.IsFalse(strategy.MayTryNow(out var ex2, out _),
                 $"{nameof(SimpleRecoveryStrategy)}.{nameof(IRecoveryStrategy.MayTryNow)}"
                 + " should return false.");
             Assert.AreSame(ex, ex2,
@@ -139,7 +139,7 @@ namespace FiftyOne.Pipeline.Core.Tests
 
             strategy.RecordFailure(ex);
 
-            Assert.IsFalse(strategy.MayTryNow(out var ex2),
+            Assert.IsFalse(strategy.MayTryNow(out var ex2, out _),
                 $"{nameof(SimpleRecoveryStrategy)}.{nameof(IRecoveryStrategy.MayTryNow)}"
                 + " should return false before failure.");
             Assert.AreSame(ex, ex2,
@@ -147,7 +147,7 @@ namespace FiftyOne.Pipeline.Core.Tests
 
             Thread.Sleep(millisecondsTimeout: 200);
 
-            Assert.IsTrue(strategy.MayTryNow(out var ex3),
+            Assert.IsTrue(strategy.MayTryNow(out var ex3, out _),
                 $"{nameof(SimpleRecoveryStrategy)}.{nameof(IRecoveryStrategy.MayTryNow)}"
                 + " should return true after recovery.");
             Assert.IsNull(ex3,
@@ -166,7 +166,7 @@ namespace FiftyOne.Pipeline.Core.Tests
                 maxDelaySeconds: 60.0,
                 multiplier: 2.0);
 
-            Assert.IsTrue(strategy.MayTryNow(out var cachedException),
+            Assert.IsTrue(strategy.MayTryNow(out var cachedException, out _),
                 $"{nameof(ExponentialBackoffRecoveryStrategy)}.{nameof(IRecoveryStrategy.MayTryNow)}"
                 + " should return true initially.");
             Assert.IsNull(cachedException,
@@ -184,7 +184,7 @@ namespace FiftyOne.Pipeline.Core.Tests
             var ex = new CachedException(new System.Exception("dummy exception"));
             strategy.RecordFailure(ex);
 
-            Assert.IsFalse(strategy.MayTryNow(out var ex2),
+            Assert.IsFalse(strategy.MayTryNow(out var ex2, out _),
                 $"{nameof(ExponentialBackoffRecoveryStrategy)}.{nameof(IRecoveryStrategy.MayTryNow)}"
                 + " should return false after failure.");
             Assert.AreSame(ex, ex2,
@@ -202,7 +202,7 @@ namespace FiftyOne.Pipeline.Core.Tests
             var ex = new CachedException(new System.Exception("dummy exception"));
             strategy.RecordFailure(ex);
 
-            Assert.IsFalse(strategy.MayTryNow(out var ex2),
+            Assert.IsFalse(strategy.MayTryNow(out var ex2, out _),
                 $"{nameof(ExponentialBackoffRecoveryStrategy)}.{nameof(IRecoveryStrategy.MayTryNow)}"
                 + " should return false immediately after failure.");
             Assert.AreSame(ex, ex2,
@@ -210,7 +210,7 @@ namespace FiftyOne.Pipeline.Core.Tests
 
             Thread.Sleep(millisecondsTimeout: 200);
 
-            Assert.IsTrue(strategy.MayTryNow(out var ex3),
+            Assert.IsTrue(strategy.MayTryNow(out var ex3, out _),
                 $"{nameof(ExponentialBackoffRecoveryStrategy)}.{nameof(IRecoveryStrategy.MayTryNow)}"
                 + " should return true after recovery.");
             Assert.IsNull(ex3,
@@ -229,29 +229,29 @@ namespace FiftyOne.Pipeline.Core.Tests
             var ex1 = new CachedException(new System.Exception("failure 1"));
             strategy.RecordFailure(ex1);
             
-            Assert.IsFalse(strategy.MayTryNow(out _),
+            Assert.IsFalse(strategy.MayTryNow(out _, out _),
                 "Should be in recovery after first failure.");
 
             // Wait for first recovery
             Thread.Sleep(millisecondsTimeout: 150);
-            Assert.IsTrue(strategy.MayTryNow(out _),
+            Assert.IsTrue(strategy.MayTryNow(out _, out _),
                 "Should be available after first recovery period.");
 
             // Second consecutive failure - should delay for 0.2 seconds
             var ex2 = new CachedException(new System.Exception("failure 2"));
             strategy.RecordFailure(ex2);
             
-            Assert.IsFalse(strategy.MayTryNow(out _),
+            Assert.IsFalse(strategy.MayTryNow(out _, out _),
                 "Should be in recovery after second failure.");
 
             // Should still be in recovery after first delay period
             Thread.Sleep(millisecondsTimeout: 150);
-            Assert.IsFalse(strategy.MayTryNow(out _),
+            Assert.IsFalse(strategy.MayTryNow(out _, out _),
                 "Should still be in recovery after 0.15 seconds (delay should be 0.2s).");
 
             // Should be available after full second delay period
             Thread.Sleep(millisecondsTimeout: 100);
-            Assert.IsTrue(strategy.MayTryNow(out _),
+            Assert.IsTrue(strategy.MayTryNow(out _, out _),
                 "Should be available after full second delay period.");
         }
 
@@ -267,13 +267,13 @@ namespace FiftyOne.Pipeline.Core.Tests
             var ex1 = new CachedException(new System.Exception("failure 1"));
             strategy.RecordFailure(ex1);
             Thread.Sleep(millisecondsTimeout: 1100);
-            Assert.IsTrue(strategy.MayTryNow(out _), "Should recover after 1 second.");
+            Assert.IsTrue(strategy.MayTryNow(out _, out _), "Should recover after 1 second.");
 
             // Second failure - should be capped at 2 seconds, not 10 seconds
             var ex2 = new CachedException(new System.Exception("failure 2"));
             strategy.RecordFailure(ex2);
             Thread.Sleep(millisecondsTimeout: 2100);
-            Assert.IsTrue(strategy.MayTryNow(out _), 
+            Assert.IsTrue(strategy.MayTryNow(out _, out _), 
                 "Should recover after 2 seconds (capped), not 10 seconds.");
         }
 
@@ -296,7 +296,7 @@ namespace FiftyOne.Pipeline.Core.Tests
                 multiplier: MULTIPLIER_DEFAULT);
             
             // Should work with default values
-            Assert.IsTrue(strategy.MayTryNow(out _),
+            Assert.IsTrue(strategy.MayTryNow(out _, out _),
                 "Default strategy should allow initial attempts.");
         }
 
@@ -323,12 +323,12 @@ namespace FiftyOne.Pipeline.Core.Tests
             Task.WaitAll(tasks);
 
             // Should still be in recovery mode
-            Assert.IsFalse(strategy.MayTryNow(out _),
+            Assert.IsFalse(strategy.MayTryNow(out _, out _),
                 "Should be in recovery after concurrent failures.");
 
             // Should eventually recover
             Thread.Sleep(millisecondsTimeout: 1000);
-            Assert.IsTrue(strategy.MayTryNow(out _),
+            Assert.IsTrue(strategy.MayTryNow(out _, out _),
                 "Should eventually recover from concurrent failures.");
         }
 
@@ -344,7 +344,7 @@ namespace FiftyOne.Pipeline.Core.Tests
                 multiplier: 2.0);
 
             // All threads get MayTryNow = true at the same time
-            Assert.IsTrue(strategy.MayTryNow(out _), "All threads should initially be allowed.");
+            Assert.IsTrue(strategy.MayTryNow(out _, out _), "All threads should initially be allowed.");
 
             // Simulate the race condition scenario described in the PR:
             // [00:10.50] (4x threads) MayTryNow returns true
@@ -366,12 +366,12 @@ namespace FiftyOne.Pipeline.Core.Tests
             strategy.RecordFailure(ex4); // Should NOT increment (same failure window due to race condition fix)
 
             // Should be in recovery for stage 1 (0.2 seconds), NOT stage 4 (1.6 seconds)
-            Assert.IsFalse(strategy.MayTryNow(out _),
+            Assert.IsFalse(strategy.MayTryNow(out _, out _),
                 "Should be in recovery after recording failures.");
 
             // Should recover after stage 1 delay (~0.2s), not stage 4 delay (~1.6s)
             Thread.Sleep(millisecondsTimeout: 300);
-            Assert.IsTrue(strategy.MayTryNow(out _),
+            Assert.IsTrue(strategy.MayTryNow(out _, out _),
                 "Should recover after stage 1 delay, proving race condition was prevented.");
 
             // Now record a genuinely new failure after recovery window
@@ -380,17 +380,17 @@ namespace FiftyOne.Pipeline.Core.Tests
             strategy.RecordFailure(ex5);
 
             // This should now be stage 2 (0.4 seconds)
-            Assert.IsFalse(strategy.MayTryNow(out _),
+            Assert.IsFalse(strategy.MayTryNow(out _, out _),
                 "Should be in recovery for stage 2.");
 
             // Should still be in recovery after stage 1 delay
             Thread.Sleep(millisecondsTimeout: 250);
-            Assert.IsFalse(strategy.MayTryNow(out _),
+            Assert.IsFalse(strategy.MayTryNow(out _, out _),
                 "Should still be in recovery after 0.25s (stage 2 delay is 0.4s).");
 
             // Should recover after stage 2 delay
             Thread.Sleep(millisecondsTimeout: 200);
-            Assert.IsTrue(strategy.MayTryNow(out _),
+            Assert.IsTrue(strategy.MayTryNow(out _, out _),
                 "Should recover after stage 2 delay.");
         }
 
@@ -408,7 +408,7 @@ namespace FiftyOne.Pipeline.Core.Tests
                 "Factory should create ExponentialBackoffRecoveryStrategy.");
             
             // Test it works
-            Assert.IsTrue(strategy.MayTryNow(out _), "Created strategy should work.");
+            Assert.IsTrue(strategy.MayTryNow(out _, out _), "Created strategy should work.");
         }
 
         [TestMethod]
@@ -420,7 +420,7 @@ namespace FiftyOne.Pipeline.Core.Tests
                 multiplier: MULTIPLIER_DEFAULT);
             
             Assert.IsNotNull(strategy, "Factory should create strategy with defaults.");
-            Assert.IsTrue(strategy.MayTryNow(out _), "Created strategy should work with defaults.");
+            Assert.IsTrue(strategy.MayTryNow(out _, out _), "Created strategy should work with defaults.");
         }
 
         [TestMethod]

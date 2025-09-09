@@ -88,13 +88,17 @@ namespace FiftyOne.Pipeline.Engines.FiftyOne.FlowElements
         {
             var recoveryStrategy = CreateRecoveryStrategy();
 
+            var logger = LoggerFactory.CreateLogger<ShareUsageElement>();
+
             var failHandler = new WindowedFailHandler(
                 recoveryStrategy,
                 FailuresToEnterRecovery,
-                TimeSpan.FromSeconds(FailuresWindowSeconds));
+                TimeSpan.FromSeconds(FailuresWindowSeconds),
+                logger,
+                nameof(ShareUsageElement));
 
             return new ShareUsageElement(
-                LoggerFactory.CreateLogger<ShareUsageElement>(),
+                logger,
                 _httpClient,
                 SharePercentage,
                 MinimumEntriesPerMessage,

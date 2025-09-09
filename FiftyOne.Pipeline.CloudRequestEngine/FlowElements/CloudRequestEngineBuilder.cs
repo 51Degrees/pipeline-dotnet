@@ -402,8 +402,10 @@ namespace FiftyOne.Pipeline.CloudRequestEngine.FlowElements
 
             var failThrottlingStrategy = CreateRecoveryStrategy();
 
+            var logger = _loggerFactory.CreateLogger<CloudRequestEngine>();
+
             return new CloudRequestEngine(
-                _loggerFactory.CreateLogger<CloudRequestEngine>(),
+                logger,
                 CreateAspectData,
                 _httpClient,
                 new CloudRequestEngine.EndpointsAndKeys
@@ -420,7 +422,9 @@ namespace FiftyOne.Pipeline.CloudRequestEngine.FlowElements
                 new WindowedFailHandler(
                     failThrottlingStrategy,
                     _failuresToEnterRecovery,
-                    TimeSpan.FromSeconds(_failuresWindowSeconds)));
+                    TimeSpan.FromSeconds(_failuresWindowSeconds),
+                    logger,
+                    nameof(CloudRequestEngine)));
         }
     }
 }

@@ -52,7 +52,7 @@ namespace FiftyOne.Pipeline.Core.FailHandling.Facade
         /// <inheritdoc cref="IFailHandler.CheckIfRecovered(Func{string, Exception, Exception})"/>
         public bool CheckIfRecovered(Func<string, Exception, Exception> exceptionFactory)
         {
-            if (!_recoveryStrategy.MayTryNow(out var cachedException))
+            if (!_recoveryStrategy.MayTryNow(out var cachedException, out _))
             {
                 var ex = exceptionFactory?.Invoke(
                     $"Recovered exception from {(DateTime.Now - cachedException.DateTime).TotalSeconds}s ago.",

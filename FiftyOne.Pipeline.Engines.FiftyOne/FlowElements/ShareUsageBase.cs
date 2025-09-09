@@ -311,12 +311,6 @@ namespace FiftyOne.Pipeline.Engines.FiftyOne.FlowElements
         }
 
         /// <summary>
-        /// Indicates whether share usage has been canceled as a result of an
-        /// error.
-        /// </summary>
-        protected internal bool IsCanceled { get; set; } = false;
-
-        /// <summary>
         /// True if there is a task running to send usage data to the remote
         /// service.
         /// </summary>
@@ -630,7 +624,14 @@ namespace FiftyOne.Pipeline.Engines.FiftyOne.FlowElements
                     maxDelaySeconds: Constants.SHARE_USAGE_EXPONENTIAL_BACKOFF_MAX_DELAY_SECONDS_DEFAULT,
                     multiplier: Constants.SHARE_USAGE_EXPONENTIAL_BACKOFF_MULTIPLIER_DEFAULT),
                 Constants.SHARE_USAGE_FAILURES_TO_ENTER_RECOVERY_DEFAULT, 
-                TimeSpan.FromSeconds(Constants.SHARE_USAGE_FAILURES_WINDOW_SECONDS_DEFAULT));
+                TimeSpan.FromSeconds(Constants.SHARE_USAGE_FAILURES_WINDOW_SECONDS_DEFAULT),
+                logger,
+                GetType().Name,
+                WindowedFailHandler.State.Active
+                | WindowedFailHandler.State.QueueFilled
+                | WindowedFailHandler.State.ShuttingDown
+                | WindowedFailHandler.State.WaitingForGreenLight
+                | WindowedFailHandler.State.WaitingForReset);
 
             EvidenceCollection = new BlockingCollection<ShareUsageData>(maximumQueueSize);
 
@@ -748,7 +749,7 @@ namespace FiftyOne.Pipeline.Engines.FiftyOne.FlowElements
                 }
             }
 
-            if (IsCanceled == false && ignoreData == false)
+            if (ignoreData == false)
             {
                 ProcessData(data);
             }
@@ -796,23 +797,25 @@ namespace FiftyOne.Pipeline.Engines.FiftyOne.FlowElements
         /// </param>
         private void ProcessData(IFlowData data)
         {
-            // Check if we're still in recovery period
-            // Use IsAvailable for non-critical operations that should silently skip
-            if (!_failHandler.CheckIfRecovered(exceptionFactory: null))
+            if (_rng.NextDouble() > _sharePercentage || !_failHandler.CheckIfRecovered(null))
             {
                 return;
             }
-
-            if (_rng.NextDouble() <= _sharePercentage)
+            using (var requestScope = _failHandler.MakeAttemptScope())
             {
-                // Check if the tracker will allow sharing of this data
-                if (_tracker.Track(data))
+                try
                 {
+                    // Check if the tracker will allow sharing of this data
+                    if (!_tracker.Track(data))
+                    {
+                        return;
+                    }
+
                     // Extract the data we want from the evidence and add
                     // it to the collection.
                     if (EvidenceCollection.TryAdd(
                         GetDataFromEvidence(data.GetEvidence()),
-                        _addTimeout) == true)
+                        _addTimeout))
                     {
                         // If the collection has enough entries then start
                         // taking data from it to be sent.
@@ -823,12 +826,13 @@ namespace FiftyOne.Pipeline.Engines.FiftyOne.FlowElements
                     }
                     else
                     {
-                        var exception = new InvalidOperationException("Failed to add data to usage sharing queue");
-                        // For queue failures, we simply disable sharing rather than using fail handler
-                        IsCanceled = true;
-                        Logger.LogWarning(Messages.MessageShareUsageFailedToAddData);
-
+                        requestScope.RecordFailure(null);
                     }
+                }
+                catch (Exception ex)
+                {
+                    requestScope.RecordFailure(ex);
+                    throw;
                 }
             }
         }
@@ -931,8 +935,7 @@ namespace FiftyOne.Pipeline.Engines.FiftyOne.FlowElements
         /// <returns></returns>
         protected void TrySendData()
         {
-            if (IsCanceled == false &&
-                IsRunning == false)
+            if (_failHandler.CheckIfRecovered(null) && IsRunning == false)
             {
                 lock (_lock)
                 {
