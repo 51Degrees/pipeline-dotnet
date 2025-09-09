@@ -801,6 +801,10 @@ namespace FiftyOne.Pipeline.Engines.FiftyOne.FlowElements
             {
                 return;
             }
+            if (!_failHandler.CheckIfRecovered(null))
+            {
+                return;
+            }
             using (var requestScope = _failHandler.MakeAttemptScope())
             {
                 try
@@ -943,7 +947,18 @@ namespace FiftyOne.Pipeline.Engines.FiftyOne.FlowElements
                     {
                         SendDataTask = Task.Run(() =>
                         {
-                            BuildAndSendXml();
+                            using (var requestScope = _failHandler.MakeAttemptScope())
+                            {
+                                try
+                                {
+                                    BuildAndSendXml();
+                                }
+                                catch (Exception ex)
+                                {
+                                    requestScope.RecordFailure(ex);
+                                    throw;
+                                }
+                            }
                         }).ContinueWith(t =>
                         {
                             if(t.Exception != null)

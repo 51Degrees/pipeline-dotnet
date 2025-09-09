@@ -104,7 +104,7 @@ namespace FiftyOne.Pipeline.Core.FailHandling.Facade
             /// </summary>
             WaitingForReset,
         }
-        private State _state;
+        private State _state = State.Active;
 
         /// <summary>
         /// Protects
