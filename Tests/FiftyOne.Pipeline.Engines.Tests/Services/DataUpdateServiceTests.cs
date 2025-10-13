@@ -876,6 +876,8 @@ namespace FiftyOne.Pipeline.Engines.Tests.Services
                 _dataUpdate.RegisterDataFile(file);
                 // Wait until processing is complete.
                 completeFlag.Wait(TEST_TIMEOUT_MS);
+                // Give the background thread a moment to finish cleanup and release locks
+                Thread.Sleep(100);
 
                 DumpLoggerLogs();
 
