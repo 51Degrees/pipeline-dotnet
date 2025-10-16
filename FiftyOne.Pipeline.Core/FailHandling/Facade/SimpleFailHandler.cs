@@ -20,14 +20,15 @@
  * such notice(s) shall fulfill the requirements of that article.
  * ********************************************************************* */
 
-using FiftyOne.Pipeline.CloudRequestEngine.FailHandling.ExceptionCaching;
-using FiftyOne.Pipeline.CloudRequestEngine.FailHandling.Recovery;
-using FiftyOne.Pipeline.CloudRequestEngine.FailHandling.Scope;
+using FiftyOne.Pipeline.Core.Exceptions;
+using FiftyOne.Pipeline.Core.FailHandling.ExceptionCaching;
+using FiftyOne.Pipeline.Core.FailHandling.Recovery;
+using FiftyOne.Pipeline.Core.FailHandling.Scope;
 using System;
 using System.Collections.Generic;
 using System.Text;
 
-namespace FiftyOne.Pipeline.CloudRequestEngine.FailHandling.Facade
+namespace FiftyOne.Pipeline.Core.FailHandling.Facade
 {
     /// <summary>
     /// Tracks failures and throttles requests.
@@ -52,16 +53,28 @@ namespace FiftyOne.Pipeline.CloudRequestEngine.FailHandling.Facade
         /// Throws if the strategy indicates that
         /// requests may not be sent now.
         /// </summary>
-        /// <exception cref="CloudRequestEngineTemporarilyUnavailableException">
+        /// <exception cref="PipelineTemporarilyUnavailableException">
         /// </exception>
         public void ThrowIfStillRecovering()
         {
             if (!_recoveryStrategy.MayTryNow(out var cachedException))
             {
-                throw new Exception(
+                throw new PipelineTemporarilyUnavailableException(
                     $"Recovered exception from {(DateTime.Now - cachedException.DateTime).TotalSeconds}s ago.", 
                     cachedException.Exception);
             }
+        }
+
+        /// <summary>
+        /// Checks if requests may be sent now without throwing exceptions.
+        /// Use this for non-critical operations that should silently skip when unavailable.
+        /// </summary>
+        /// <returns>
+        /// True if requests may be sent, false if still in recovery mode.
+        /// </returns>
+        public bool IsAvailable()
+        {
+            return _recoveryStrategy.MayTryNow(out var _);
         }
 
         /// <summary>

@@ -21,8 +21,8 @@
  * ********************************************************************* */
 
 using FiftyOne.Pipeline.CloudRequestEngine.Data;
-using FiftyOne.Pipeline.CloudRequestEngine.FailHandling.Facade;
-using FiftyOne.Pipeline.CloudRequestEngine.FailHandling.Recovery;
+using FiftyOne.Pipeline.Core.FailHandling.Facade;
+using FiftyOne.Pipeline.Core.FailHandling.Recovery;
 using FiftyOne.Pipeline.Core.Data;
 using FiftyOne.Pipeline.Core.FlowElements;
 using FiftyOne.Pipeline.Engines.Data;
