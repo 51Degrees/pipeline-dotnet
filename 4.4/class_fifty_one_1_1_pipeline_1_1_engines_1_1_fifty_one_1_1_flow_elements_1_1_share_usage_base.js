@@ -5,7 +5,7 @@ var class_fifty_one_1_1_pipeline_1_1_engines_1_1_fifty_one_1_1_flow_elements_1_1
     [ "ShareUsageBase", "class_fifty_one_1_1_pipeline_1_1_engines_1_1_fifty_one_1_1_flow_elements_1_1_share_usage_base.html#ab401b7de00434b8aa05eda3926b22aed", null ],
     [ "ShareUsageBase", "class_fifty_one_1_1_pipeline_1_1_engines_1_1_fifty_one_1_1_flow_elements_1_1_share_usage_base.html#a6ee1353b8cfd8a51b2d76b9f53a1f0a9", null ],
     [ "AddPipeline", "class_fifty_one_1_1_pipeline_1_1_engines_1_1_fifty_one_1_1_flow_elements_1_1_share_usage_base.html#a2ae5600f41e92007416f1f5671cae65e", null ],
-    [ "BuildAndSendXml", "class_fifty_one_1_1_pipeline_1_1_engines_1_1_fifty_one_1_1_flow_elements_1_1_share_usage_base.html#a4852986f9f27653a63df31d65bf59945", null ],
+    [ "BuildAndSendXmlAsync", "class_fifty_one_1_1_pipeline_1_1_engines_1_1_fifty_one_1_1_flow_elements_1_1_share_usage_base.html#a3010908ff5bebb93ed3b8aad56c3b079", null ],
     [ "EncodeInvalidXMLChars", "class_fifty_one_1_1_pipeline_1_1_engines_1_1_fifty_one_1_1_flow_elements_1_1_share_usage_base.html#aee98ef478918e4f8fd2dcfaf815d2478", null ],
     [ "ManagedResourcesCleanup", "class_fifty_one_1_1_pipeline_1_1_engines_1_1_fifty_one_1_1_flow_elements_1_1_share_usage_base.html#a6e785097428e5ef6bc3fe8d30e6b9d1a", null ],
     [ "ProcessInternal", "class_fifty_one_1_1_pipeline_1_1_engines_1_1_fifty_one_1_1_flow_elements_1_1_share_usage_base.html#a0f2b57c1677dec2ecdac7909d331d4b7", null ],
