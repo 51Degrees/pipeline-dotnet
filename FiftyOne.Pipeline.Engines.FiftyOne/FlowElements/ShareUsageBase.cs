@@ -894,7 +894,7 @@ namespace FiftyOne.Pipeline.Engines.FiftyOne.FlowElements
         /// <summary>
         /// Attempt to send the data to the remote service. This only happens
         /// if there is not a task already running.
-        /// 
+        ///
         /// If any error occurs while sending the data, then usage sharing is
         /// stopped.
         /// </summary>
@@ -908,9 +908,9 @@ namespace FiftyOne.Pipeline.Engines.FiftyOne.FlowElements
                 {
                     if (IsRunning == false)
                     {
-                        SendDataTask = Task.Run(() =>
+                        SendDataTask = Task.Run(async () =>
                         {
-                            BuildAndSendXml();
+                            await BuildAndSendXmlAsync().ConfigureAwait(false);
                         }).ContinueWith(t =>
                         {
                             if(t.Exception != null)
@@ -926,9 +926,9 @@ namespace FiftyOne.Pipeline.Engines.FiftyOne.FlowElements
         }
 
         /// <summary>
-        /// 
+        /// Abstract method to build XML from queued data and send it to the remote service.
         /// </summary>
-        protected abstract void BuildAndSendXml();
+        protected abstract Task BuildAndSendXmlAsync();
 
         /// <summary>
         /// Virtual method to be overridden in extending usage share elements.
