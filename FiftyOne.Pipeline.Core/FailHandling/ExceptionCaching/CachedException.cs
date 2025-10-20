@@ -20,45 +20,40 @@
  * such notice(s) shall fulfill the requirements of that article.
  * ********************************************************************* */
 
-using FiftyOne.Pipeline.CloudRequestEngine.FailHandling.ExceptionCaching;
+using System;
+using System.Collections.Generic;
+using System.Text;
 
-namespace FiftyOne.Pipeline.CloudRequestEngine.FailHandling.Recovery
+namespace FiftyOne.Pipeline.Core.FailHandling.ExceptionCaching
 {
     /// <summary>
-    /// Drops all server calls after first failure.
+    /// Links the exception and the timestamp.
     /// </summary>
-    public class NoRecoveryStrategy : IRecoveryStrategy
+    public class CachedException
     {
-        private volatile CachedException _cachedException = null;
+        private readonly Exception _exception;
+        private readonly DateTime _dateTime;
 
         /// <summary>
-        /// Called when querying the server failed.
+        /// The exception that did happen.
         /// </summary>
-        /// <param name="cachedException">
-        /// Timestampted exception.
+        public Exception Exception => _exception;
+
+        /// <summary>
+        /// When the exception did happen.
+        /// </summary>
+        public DateTime DateTime => _dateTime;
+
+        /// <summary>
+        /// Designated constructor.
+        /// </summary>
+        /// <param name="exception">
+        /// The exception.
         /// </param>
-        public void RecordFailure(CachedException cachedException)
+        public CachedException(Exception exception)
         {
-            _cachedException = cachedException;
-        }
-
-        /// <summary>
-        /// Whether the new request may be sent already.
-        /// </summary>
-        /// <returns>true -- send, false -- skip</returns>
-        /// <param name="cachedException">
-        /// Timestampted exception that prevents new requests.
-        /// </param>
-        public bool MayTryNow(out CachedException cachedException)
-        {
-            // volatile read, can’t be reordered with subsequent operations
-            cachedException = _cachedException;
-            return cachedException is null;
-        }
-
-        /// <summary>
-        /// Called once the request succeeds (after recovery).
-        /// </summary>
-        public void Reset() => _cachedException = null;
+            _exception = exception;
+            _dateTime = DateTime.Now;
+        }   
     }
 }

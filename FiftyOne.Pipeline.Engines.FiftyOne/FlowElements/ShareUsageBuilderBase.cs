@@ -21,6 +21,8 @@
  * ********************************************************************* */
 
 using FiftyOne.Pipeline.Core.Attributes;
+using FiftyOne.Pipeline.Core.FailHandling.Facade;
+using FiftyOne.Pipeline.Core.FailHandling.Recovery;
 using Microsoft.Extensions.Logging;
 using System;
 using System.Collections.Generic;
@@ -139,6 +141,31 @@ namespace FiftyOne.Pipeline.Engines.FiftyOne.FlowElements
         /// If set to true then all evidence values will be shared.
         /// </summary>
         protected bool ShareAllEvidence { get; private set; } = Constants.SHARE_USAGE_DEFAULT_SHARE_ALL_EVIDENCE;
+
+        /// <summary>
+        /// Number of failures required to enter recovery mode.
+        /// </summary>
+        protected int FailuresToEnterRecovery { get; private set; } = 1;
+
+        /// <summary>
+        /// Time window in seconds for tracking failures.
+        /// </summary>
+        protected int FailuresWindowSeconds { get; private set; } = 10;
+
+        /// <summary>
+        /// Initial delay in seconds for exponential backoff recovery strategy.
+        /// </summary>
+        protected double InitialRecoveryDelaySeconds { get; private set; } = ExponentialBackoffRecoveryStrategy.INITIAL_DELAY_SECONDS_DEFAULT;
+
+        /// <summary>
+        /// Maximum delay in seconds for exponential backoff recovery strategy.
+        /// </summary>
+        protected double MaxRecoveryDelaySeconds { get; private set; } = ExponentialBackoffRecoveryStrategy.MAX_DELAY_SECONDS_DEFAULT;
+
+        /// <summary>
+        /// Multiplier for exponential backoff recovery strategy.
+        /// </summary>
+        protected double RecoveryMultiplier { get; private set; } = ExponentialBackoffRecoveryStrategy.MULTIPLIER_DEFAULT;
 
         /// <summary>
         /// Constructor
@@ -506,6 +533,76 @@ namespace FiftyOne.Pipeline.Engines.FiftyOne.FlowElements
         public ShareUsageBuilderBase<T> SetTrackSession(bool track)
         {
             TrackSession = track;
+            return this;
+        }
+
+        /// <summary>
+        /// Set the number of failures required to enter recovery mode.
+        /// </summary>
+        /// <param name="failuresToEnterRecovery">
+        /// Number of failures within the window to trigger recovery.
+        /// </param>
+        /// <returns>This builder instance.</returns>
+        [DefaultValue(1)]
+        public ShareUsageBuilderBase<T> SetFailuresToEnterRecovery(int failuresToEnterRecovery)
+        {
+            FailuresToEnterRecovery = failuresToEnterRecovery;
+            return this;
+        }
+
+        /// <summary>
+        /// Set the time window in seconds for tracking failures.
+        /// </summary>
+        /// <param name="failuresWindowSeconds">
+        /// Time window in seconds for failure tracking.
+        /// </param>
+        /// <returns>This builder instance.</returns>
+        [DefaultValue(10)]
+        public ShareUsageBuilderBase<T> SetFailuresWindowSeconds(int failuresWindowSeconds)
+        {
+            FailuresWindowSeconds = failuresWindowSeconds;
+            return this;
+        }
+
+        /// <summary>
+        /// Set the initial delay in seconds for exponential backoff recovery strategy.
+        /// </summary>
+        /// <param name="initialDelaySeconds">
+        /// Initial delay in seconds for the first failure.
+        /// </param>
+        /// <returns>This builder instance.</returns>
+        [DefaultValue(ExponentialBackoffRecoveryStrategy.INITIAL_DELAY_SECONDS_DEFAULT)]
+        public ShareUsageBuilderBase<T> SetInitialRecoveryDelaySeconds(double initialDelaySeconds)
+        {
+            InitialRecoveryDelaySeconds = initialDelaySeconds;
+            return this;
+        }
+
+        /// <summary>
+        /// Set the maximum delay in seconds for exponential backoff recovery strategy.
+        /// </summary>
+        /// <param name="maxDelaySeconds">
+        /// Maximum delay in seconds to cap the exponential growth.
+        /// </param>
+        /// <returns>This builder instance.</returns>
+        [DefaultValue(ExponentialBackoffRecoveryStrategy.MAX_DELAY_SECONDS_DEFAULT)]
+        public ShareUsageBuilderBase<T> SetMaxRecoveryDelaySeconds(double maxDelaySeconds)
+        {
+            MaxRecoveryDelaySeconds = maxDelaySeconds;
+            return this;
+        }
+
+        /// <summary>
+        /// Set the multiplier for exponential backoff recovery strategy.
+        /// </summary>
+        /// <param name="multiplier">
+        /// Exponential multiplier (typically 2.0 for doubling).
+        /// </param>
+        /// <returns>This builder instance.</returns>
+        [DefaultValue(ExponentialBackoffRecoveryStrategy.MULTIPLIER_DEFAULT)]
+        public ShareUsageBuilderBase<T> SetRecoveryMultiplier(double multiplier)
+        {
+            RecoveryMultiplier = multiplier;
             return this;
         }
 
