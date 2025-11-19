@@ -27,7 +27,6 @@ jobs:
       repo-name: ${{ github.event.repository.name }}
       org-name: ${{ github.event.repository.owner.login }}
       dryrun: ${{ inputs.dryrun || false }}
-      separate-examples: true
     secrets:
       token: ${{ secrets.ACCESS_TOKEN }}
 
