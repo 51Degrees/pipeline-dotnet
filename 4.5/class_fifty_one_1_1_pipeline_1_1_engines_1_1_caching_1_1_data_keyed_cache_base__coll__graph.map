@@ -1,0 +1,5 @@
+<map id="FiftyOne.Pipeline.Engines.Caching.DataKeyedCacheBase&lt; TValue &gt;" name="FiftyOne.Pipeline.Engines.Caching.DataKeyedCacheBase&lt; TValue &gt;">
+<area shape="rect" id="node1" title="Abstract base class for caches that use IFlowData as the key." alt="" coords="5,169,227,225"/>
+<area shape="rect" id="node2" href="$interface_fifty_one_1_1_pipeline_1_1_engines_1_1_caching_1_1_i_data_keyed_cache.html" title="Represents a put cache where the key is a IFlowData instance." alt="" coords="11,95,221,121"/>
+<area shape="rect" id="node3" title=" " alt="" coords="30,5,202,47"/>
+</map>

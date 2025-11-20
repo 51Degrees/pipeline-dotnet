@@ -1,0 +1,4 @@
+<map id="FiftyOne.Pipeline.Engines.Services.DataUpdateService" name="FiftyOne.Pipeline.Engines.Services.DataUpdateService">
+<area shape="rect" id="node1" title="Service that manages updates to data files that are used by IAspectEngine instances." alt="" coords="5,80,212,121"/>
+<area shape="rect" id="node2" href="$interface_fifty_one_1_1_pipeline_1_1_engines_1_1_services_1_1_i_data_update_service.html" title="Service that manages updates to data files that are used by IOnPremiseAspectEngine instances." alt="" coords="33,5,185,32"/>
+</map>

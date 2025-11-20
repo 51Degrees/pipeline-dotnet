@@ -1,0 +1,5 @@
+<map id="FiftyOne.Pipeline.Engines.FiftyOne.Data.EvidenceKeyFilterShareUsageTracker" name="FiftyOne.Pipeline.Engines.FiftyOne.Data.EvidenceKeyFilterShareUsageTracker">
+<area shape="rect" id="node1" title="Wrapper for EvidenceKeyFilter for Share Usage, to be used with the ShareUsageTracker to exclude speci..." alt="" coords="5,155,236,211"/>
+<area shape="rect" id="node2" href="$class_fifty_one_1_1_pipeline_1_1_engines_1_1_fifty_one_1_1_data_1_1_evidence_key_filter_share_usage.html" title="This filter is used by the ShareUsageElement." alt="" coords="13,80,229,107"/>
+<area shape="rect" id="node3" href="$interface_fifty_one_1_1_pipeline_1_1_core_1_1_data_1_1_i_evidence_key_filter.html" title="Represents an object that filters evidence key names based on some criteria." alt="" coords="49,5,192,32"/>
+</map>

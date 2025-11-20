@@ -1,0 +1,4 @@
+var class_fifty_one_1_1_pipeline_1_1_engines_1_1_fifty_one_1_1_configuration_1_1_fifty_one_data_file_configuration =
+[
+    [ "FiftyOneDataFileConfiguration", "class_fifty_one_1_1_pipeline_1_1_engines_1_1_fifty_one_1_1_configuration_1_1_fifty_one_data_file_configuration.html#a397c7f2056ad38c9932d8f61424f8f2f", null ]
+];

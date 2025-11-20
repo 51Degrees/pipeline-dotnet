@@ -1,0 +1,11 @@
+<map id="FiftyOne.Pipeline.Math.MathElement" name="FiftyOne.Pipeline.Math.MathElement">
+<area shape="rect" id="node1" title=" " alt="" coords="1475,87,1681,129"/>
+<area shape="rect" id="node2" href="$class_fifty_one_1_1_pipeline_1_1_core_1_1_flow_elements_1_1_flow_element_base.html" title=" " alt="" coords="1069,14,1296,55"/>
+<area shape="rect" id="node3" href="$class_fifty_one_1_1_pipeline_1_1_core_1_1_flow_elements_1_1_flow_element_base.html" title="Abstract base class for Flow Elements." alt="" coords="597,7,801,63"/>
+<area shape="rect" id="node4" href="$interface_fifty_one_1_1_pipeline_1_1_core_1_1_flow_elements_1_1_i_flow_element.html" title=" " alt="" coords="347,21,545,48"/>
+<area shape="rect" id="node5" href="$interface_fifty_one_1_1_pipeline_1_1_core_1_1_flow_elements_1_1_i_flow_element.html" title="IFlowElement is the basic building block of a pipeline." alt="" coords="5,14,207,55"/>
+<area shape="rect" id="node6" href="$class_fifty_one_1_1_pipeline_1_1_core_1_1_typed_map_1_1_typed_key.html" title=" " alt="" coords="1060,80,1305,136"/>
+<area shape="rect" id="node7" href="$class_fifty_one_1_1_pipeline_1_1_core_1_1_typed_map_1_1_typed_key.html" title="A key to a ITypedKeyMap data store." alt="" coords="595,87,803,129"/>
+<area shape="rect" id="node8" href="$interface_fifty_one_1_1_pipeline_1_1_core_1_1_typed_map_1_1_i_typed_key.html" title="Represents a key to a ITypedKeyMap data store." alt="" coords="383,95,509,121"/>
+<area shape="rect" id="node9" href="$interface_fifty_one_1_1_pipeline_1_1_core_1_1_data_1_1_i_evidence_key_filter.html" title="Represents an object that filters evidence key names based on some criteria." alt="" coords="1080,161,1285,202"/>
+</map>

@@ -1,0 +1,8 @@
+<map id="FiftyOne.Pipeline.JavaScriptBuilder.FlowElement.JavaScriptBuilderElement" name="FiftyOne.Pipeline.JavaScriptBuilder.FlowElement.JavaScriptBuilderElement">
+<area shape="rect" id="node1" title="JavaScript Builder Element generates a JavaScript include to be run on the client device." alt="" coords="1523,63,1793,119"/>
+<area shape="rect" id="node2" href="$class_fifty_one_1_1_pipeline_1_1_core_1_1_flow_elements_1_1_flow_element_base.html" title=" " alt="" coords="1079,7,1353,63"/>
+<area shape="rect" id="node3" href="$class_fifty_one_1_1_pipeline_1_1_core_1_1_flow_elements_1_1_flow_element_base.html" title="Abstract base class for Flow Elements." alt="" coords="595,7,799,63"/>
+<area shape="rect" id="node4" href="$interface_fifty_one_1_1_pipeline_1_1_core_1_1_flow_elements_1_1_i_flow_element.html" title=" " alt="" coords="347,21,545,48"/>
+<area shape="rect" id="node5" href="$interface_fifty_one_1_1_pipeline_1_1_core_1_1_flow_elements_1_1_i_flow_element.html" title="IFlowElement is the basic building block of a pipeline." alt="" coords="5,14,207,55"/>
+<area shape="rect" id="node6" href="$interface_fifty_one_1_1_pipeline_1_1_core_1_1_data_1_1_i_evidence_key_filter.html" title="Represents an object that filters evidence key names based on some criteria." alt="" coords="1113,87,1319,129"/>
+</map>

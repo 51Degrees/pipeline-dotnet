@@ -1,0 +1,5 @@
+<map id="FiftyOne.Pipeline.IpSplitter.ISplitIpData" name="FiftyOne.Pipeline.IpSplitter.ISplitIpData">
+<area shape="rect" id="node1" title=" " alt="" coords="5,155,204,196"/>
+<area shape="rect" id="node2" href="$interface_fifty_one_1_1_pipeline_1_1_core_1_1_data_1_1_i_element_data.html" title="Represents property values that have been determined by a specific FlowElement based on the supplied ..." alt="" coords="49,80,160,107"/>
+<area shape="rect" id="node3" href="$interface_fifty_one_1_1_pipeline_1_1_core_1_1_data_1_1_i_data.html" title="Represents property values" alt="" coords="76,5,133,32"/>
+</map>

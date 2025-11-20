@@ -1,0 +1,5 @@
+<map id="FiftyOne.Pipeline.Engines.FiftyOne.FlowElements.ShareUsageBuilder" name="FiftyOne.Pipeline.Engines.FiftyOne.FlowElements.ShareUsageBuilder">
+<area shape="rect" id="node1" title="Builder class that is used to create ShareUsageElement instances." alt="" coords="5,215,260,271"/>
+<area shape="rect" id="node2" href="$class_fifty_one_1_1_pipeline_1_1_engines_1_1_fifty_one_1_1_flow_elements_1_1_share_usage_builder_base.html" title=" " alt="" coords="41,124,225,165"/>
+<area shape="rect" id="node3" href="$class_fifty_one_1_1_pipeline_1_1_engines_1_1_fifty_one_1_1_flow_elements_1_1_share_usage_builder_base.html" title="Abstract base class for ShareUsageElement builders." alt="" coords="5,5,260,61"/>
+</map>

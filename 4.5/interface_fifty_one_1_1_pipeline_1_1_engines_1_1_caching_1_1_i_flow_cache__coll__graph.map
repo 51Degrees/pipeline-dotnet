@@ -1,0 +1,6 @@
+<map id="FiftyOne.Pipeline.Engines.Caching.IFlowCache" name="FiftyOne.Pipeline.Engines.Caching.IFlowCache">
+<area shape="rect" id="node1" title="Represents a &#39;flow cache&#39; See the Specification" alt="" coords="15,305,206,347"/>
+<area shape="rect" id="node2" href="$interface_fifty_one_1_1_pipeline_1_1_engines_1_1_caching_1_1_i_data_keyed_cache.html" title=" " alt="" coords="5,215,216,256"/>
+<area shape="rect" id="node3" href="$interface_fifty_one_1_1_pipeline_1_1_engines_1_1_caching_1_1_i_data_keyed_cache.html" title="Represents a put cache where the key is a IFlowData instance." alt="" coords="14,96,207,152"/>
+<area shape="rect" id="node4" title=" " alt="" coords="25,5,197,47"/>
+</map>

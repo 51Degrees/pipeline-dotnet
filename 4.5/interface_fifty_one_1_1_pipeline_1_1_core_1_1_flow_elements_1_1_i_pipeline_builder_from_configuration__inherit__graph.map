@@ -1,0 +1,5 @@
+<map id="FiftyOne.Pipeline.Core.FlowElements.IPipelineBuilderFromConfiguration" name="FiftyOne.Pipeline.Core.FlowElements.IPipelineBuilderFromConfiguration">
+<area shape="rect" id="node1" title="Pipeline builders implementing this interface are capable of building a IPipeline based on a supplied..." alt="" coords="5,5,315,47"/>
+<area shape="rect" id="node2" href="$class_fifty_one_1_1_pipeline_1_1_core_1_1_flow_elements_1_1_pipeline_builder.html" title="Default pipeline builder." alt="" coords="59,95,261,136"/>
+<area shape="rect" id="node3" href="$class_fifty_one_1_1_pipeline_1_1_engines_1_1_fifty_one_1_1_flow_elements_1_1_fifty_one_pipeline_builder.html" title="Pipeline builder class that allows the 51Degrees share usage element to be enabled/disabled." alt="" coords="45,184,275,240"/>
+</map>

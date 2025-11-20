@@ -1,0 +1,7 @@
+<map id="FiftyOne.Pipeline.Engines.Configuration.DataFileConfigurationBuilderBase&lt; TBuilder, TConfig &gt;" name="FiftyOne.Pipeline.Engines.Configuration.DataFileConfigurationBuilderBase&lt; TBuilder, TConfig &gt;">
+<area shape="rect" id="node1" title="Builder class that is used to create instances of DataFileConfiguration objects." alt="" coords="5,61,260,117"/>
+<area shape="rect" id="node2" href="$class_fifty_one_1_1_pipeline_1_1_engines_1_1_configuration_1_1_data_file_configuration_builder_base.html" title=" " alt="" coords="575,5,882,76"/>
+<area shape="rect" id="node4" href="$class_fifty_one_1_1_pipeline_1_1_engines_1_1_configuration_1_1_data_file_configuration_builder_base.html" title=" " alt="" coords="573,100,884,171"/>
+<area shape="rect" id="node3" href="$class_fifty_one_1_1_pipeline_1_1_engines_1_1_configuration_1_1_data_file_configuration_builder.html" title="Builder class for DataFileConfiguration instances." alt="" coords="933,13,1188,69"/>
+<area shape="rect" id="node5" href="$class_fifty_one_1_1_pipeline_1_1_engines_1_1_fifty_one_1_1_configuration_1_1_fifty_one_data_file_configuration_builder.html" title="Builder class for 51Degrees specific data file configuration instances." alt="" coords="948,107,1173,163"/>
+</map>

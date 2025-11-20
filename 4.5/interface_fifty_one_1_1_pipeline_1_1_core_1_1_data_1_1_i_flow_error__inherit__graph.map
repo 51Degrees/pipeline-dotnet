@@ -1,0 +1,4 @@
+<map id="FiftyOne.Pipeline.Core.Data.IFlowError" name="FiftyOne.Pipeline.Core.Data.IFlowError">
+<area shape="rect" id="node1" title="Represents an error that occurred during processing" alt="" coords="5,5,211,47"/>
+<area shape="rect" id="node2" href="$class_fifty_one_1_1_pipeline_1_1_core_1_1_data_1_1_flow_error.html" title="This class contains details about errors that occur during processing" alt="" coords="5,95,211,136"/>
+</map>

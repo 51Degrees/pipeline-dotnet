@@ -1,0 +1,4 @@
+<map id="FiftyOne.Pipeline.Engines.FiftyOne.Data.FiftyOneUrlFormatter" name="FiftyOne.Pipeline.Engines.FiftyOne.Data.FiftyOneUrlFormatter">
+<area shape="rect" id="node1" title="51Degrees specific URL formatter." alt="" coords="5,80,257,121"/>
+<area shape="rect" id="node2" href="$interface_fifty_one_1_1_pipeline_1_1_engines_1_1_data_1_1_i_data_update_url_formatter.html" title="Represents an class that can build a complete update URL from a supplied IAspectEngineDataFile instan..." alt="" coords="38,5,225,32"/>
+</map>

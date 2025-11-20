@@ -1,0 +1,7 @@
+<map id="FiftyOne.Pipeline.Engines.FiftyOne.Data.FiftyOneDataFile" name="FiftyOne.Pipeline.Engines.FiftyOne.Data.FiftyOneDataFile">
+<area shape="rect" id="node1" title="Class that stores meta&#45;data relating to a data file associated with a 51Degrees engine." alt="" coords="63,229,285,271"/>
+<area shape="rect" id="node2" href="$class_fifty_one_1_1_pipeline_1_1_engines_1_1_data_1_1_aspect_engine_data_file.html" title="This class contains all configuration and run&#45;time state information that is associated with a partic..." alt="" coords="5,155,169,181"/>
+<area shape="rect" id="node3" href="$interface_fifty_one_1_1_pipeline_1_1_engines_1_1_data_1_1_i_aspect_engine_data_file.html" title="Interface for the details of a data file used by an Aspect engine." alt="" coords="90,80,258,107"/>
+<area shape="rect" id="node5" href="$interface_fifty_one_1_1_pipeline_1_1_engines_1_1_fifty_one_1_1_data_1_1_i_fifty_one_data_file.html" title="A specialized can of IAspectEngineDataFile for files that will be distributed by the 51Degrees &#39;Distr..." alt="" coords="193,155,328,181"/>
+<area shape="rect" id="node4" title=" " alt="" coords="125,5,223,32"/>
+</map>

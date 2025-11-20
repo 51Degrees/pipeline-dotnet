@@ -1,0 +1,5 @@
+<map id="FiftyOne.Pipeline.Engines.Services.DataUpdateCompleteArgs" name="FiftyOne.Pipeline.Engines.Services.DataUpdateCompleteArgs">
+<area shape="rect" id="node1" title="Event arguments used when an &#39;UpdteComplete&#39; event is fired by an IDataUpdateService" alt="" coords="5,155,256,196"/>
+<area shape="rect" id="node2" href="$class_fifty_one_1_1_pipeline_1_1_engines_1_1_services_1_1_data_update_event_args.html" title="Event arguments used when events are fired by an IDataUpdateService" alt="" coords="47,80,214,107"/>
+<area shape="rect" id="node3" title=" " alt="" coords="87,5,175,32"/>
+</map>
