@@ -20,7 +20,10 @@
  * such notice(s) shall fulfill the requirements of that article.
  * ********************************************************************* */
 
+using FiftyOne.Pipeline.Core.FailHandling.Facade;
+using FiftyOne.Pipeline.Core.FailHandling.Recovery;
 using Microsoft.Extensions.Logging;
+using System;
 using System.Net.Http;
 using System.Runtime.CompilerServices;
 
@@ -83,6 +86,16 @@ namespace FiftyOne.Pipeline.Engines.FiftyOne.FlowElements
         /// </returns>
         public override ShareUsageElement Build()
         {
+            var recoveryStrategy = RecoveryStrategyFactory.CreateExponentialBackoff(
+                InitialRecoveryDelaySeconds,
+                MaxRecoveryDelaySeconds,
+                RecoveryMultiplier);
+
+            var failHandler = new WindowedFailHandler(
+                recoveryStrategy,
+                FailuresToEnterRecovery,
+                TimeSpan.FromSeconds(FailuresWindowSeconds));
+
             return new ShareUsageElement(
                 LoggerFactory.CreateLogger<ShareUsageElement>(),
                 _httpClient,
@@ -99,7 +112,8 @@ namespace FiftyOne.Pipeline.Engines.FiftyOne.FlowElements
                 IgnoreDataEvidenceFilter,
                 AspSessionCookieName,
                 null,
-                ShareAllEvidence);
+                ShareAllEvidence,
+                failHandler);
         }
     }
 }

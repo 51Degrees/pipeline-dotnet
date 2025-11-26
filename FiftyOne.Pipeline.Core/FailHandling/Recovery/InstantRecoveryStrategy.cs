@@ -20,34 +20,42 @@
  * such notice(s) shall fulfill the requirements of that article.
  * ********************************************************************* */
 
-using FiftyOne.Pipeline.CloudRequestEngine.FailHandling.Scope;
-using System;
-using System.Collections.Generic;
-using System.Text;
+using FiftyOne.Pipeline.Core.FailHandling.ExceptionCaching;
 
-namespace FiftyOne.Pipeline.CloudRequestEngine.FailHandling.Facade
+namespace FiftyOne.Pipeline.Core.FailHandling.Recovery
 {
     /// <summary>
-    /// Tracks failures and throttles requests.
+    /// Always allows to make new server call
+    /// regardless of previous failures.
     /// </summary>
-    public interface IFailHandler
+    public class InstantRecoveryStrategy : IRecoveryStrategy
     {
         /// <summary>
-        /// Throws if the strategy indicates that
-        /// requests may not be sent now.
+        /// Called when querying the server failed.
         /// </summary>
-        /// <exception cref="CloudRequestEngineTemporarilyUnavailableException">
-        /// </exception>
-        void ThrowIfStillRecovering();
+        /// <param name="cachedException">
+        /// Timestampted exception.
+        /// </param>
+        public void RecordFailure(CachedException cachedException) { /* nop */ }
 
         /// <summary>
-        /// Lets a consumer to wrap an attempt in `using` scope
-        /// to implicitly report success 
-        /// or explicitly provide exception on failure.
+        /// Whether the new request may be sent already.
         /// </summary>
         /// <returns>
-        /// Attempt scope that report to this handler once disposed.
+        /// true -- send, false -- skip
         /// </returns>
-        IAttemptScope MakeAttemptScope();
+        /// <param name="cachedException">
+        /// Timestampted exception that prevents new requests.
+        /// </param>>
+        public bool MayTryNow(out CachedException cachedException)
+        {
+            cachedException = null;
+            return true;
+        }
+
+        /// <summary>
+        /// Called once the request succeeds (after recovery).
+        /// </summary>
+        public void Reset() { /* nop */ }
     }
 }

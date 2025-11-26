@@ -20,25 +20,36 @@
  * such notice(s) shall fulfill the requirements of that article.
  * ********************************************************************* */
 
-using System;
-using System.Collections.Generic;
-using System.Text;
+using FiftyOne.Pipeline.Core.FailHandling.ExceptionCaching;
 
-namespace FiftyOne.Pipeline.CloudRequestEngine.FailHandling.Scope
+namespace FiftyOne.Pipeline.Core.FailHandling.Recovery
 {
     /// <summary>
-    /// A scope within which an attempt will be made.
-    /// Call <see cref="RecordFailure(Exception)"/>
-    /// to indicate the failure and cache the reason.
+    /// Controls when to suspend requests
+    /// due to recent query failures.
     /// </summary>
-    public interface IAttemptScope: IDisposable
+    public interface IRecoveryStrategy
     {
         /// <summary>
-        /// Signals that attempt failed.
+        /// Called when querying the server failed.
         /// </summary>
-        /// <param name="exception">
-        /// The cause of failure.
+        /// <param name="cachedException">
+        /// Timestampted exception.
         /// </param>
-        void RecordFailure(Exception exception);
+        void RecordFailure(CachedException cachedException);
+
+        /// <summary>
+        /// Whether the new request may be sent already.
+        /// </summary>
+        /// <returns>true -- send, false -- skip</returns>
+        /// <param name="cachedException">
+        /// Timestampted exception that prevents new requests.
+        /// </param>
+        bool MayTryNow(out CachedException cachedException);
+
+        /// <summary>
+        /// Called once the request succeeds (after recovery).
+        /// </summary>
+        void Reset();
     }
 }

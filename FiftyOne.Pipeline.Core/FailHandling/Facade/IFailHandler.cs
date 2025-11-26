@@ -20,36 +20,44 @@
  * such notice(s) shall fulfill the requirements of that article.
  * ********************************************************************* */
 
-using FiftyOne.Pipeline.CloudRequestEngine.FailHandling.ExceptionCaching;
+using FiftyOne.Pipeline.Core.Exceptions;
+using FiftyOne.Pipeline.Core.FailHandling.Scope;
+using System;
+using System.Collections.Generic;
+using System.Text;
 
-namespace FiftyOne.Pipeline.CloudRequestEngine.FailHandling.Recovery
+namespace FiftyOne.Pipeline.Core.FailHandling.Facade
 {
     /// <summary>
-    /// Controls when to suspend requests
-    /// due to recent query failures.
+    /// Tracks failures and throttles requests.
     /// </summary>
-    public interface IRecoveryStrategy
+    public interface IFailHandler
     {
         /// <summary>
-        /// Called when querying the server failed.
+        /// Throws if the strategy indicates that
+        /// requests may not be sent now.
         /// </summary>
-        /// <param name="cachedException">
-        /// Timestampted exception.
-        /// </param>
-        void RecordFailure(CachedException cachedException);
+        /// <exception cref="PipelineTemporarilyUnavailableException">
+        /// </exception>
+        void ThrowIfStillRecovering();
 
         /// <summary>
-        /// Whether the new request may be sent already.
+        /// Checks if requests may be sent now without throwing exceptions.
+        /// Use this for non-critical operations that should silently skip when unavailable.
         /// </summary>
-        /// <returns>true -- send, false -- skip</returns>
-        /// <param name="cachedException">
-        /// Timestampted exception that prevents new requests.
-        /// </param>
-        bool MayTryNow(out CachedException cachedException);
+        /// <returns>
+        /// True if requests may be sent, false if still in recovery mode.
+        /// </returns>
+        bool IsAvailable();
 
         /// <summary>
-        /// Called once the request succeeds (after recovery).
+        /// Lets a consumer to wrap an attempt in `using` scope
+        /// to implicitly report success 
+        /// or explicitly provide exception on failure.
         /// </summary>
-        void Reset();
+        /// <returns>
+        /// Attempt scope that report to this handler once disposed.
+        /// </returns>
+        IAttemptScope MakeAttemptScope();
     }
 }

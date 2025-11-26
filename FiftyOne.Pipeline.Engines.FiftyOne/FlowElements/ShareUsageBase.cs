@@ -23,6 +23,8 @@
 using FiftyOne.Caching;
 using FiftyOne.Pipeline.Core.Data;
 using FiftyOne.Pipeline.Core.Exceptions;
+using FiftyOne.Pipeline.Core.FailHandling.Facade;
+using FiftyOne.Pipeline.Core.FailHandling.Recovery;
 using FiftyOne.Pipeline.Core.FlowElements;
 using FiftyOne.Pipeline.Engines.Configuration;
 using FiftyOne.Pipeline.Engines.FiftyOne.Data;
@@ -65,6 +67,11 @@ namespace FiftyOne.Pipeline.Engines.FiftyOne.FlowElements
         /// The HttpClient to use when sending the data.
         /// </summary>
         protected HttpClient HttpClient => _httpClient;
+
+        /// <summary>
+        /// Fail handler for managing failed attempts to add data to the queue.
+        /// </summary>
+        private readonly IFailHandler _failHandler;
 
         /// <summary>
         /// Inner class that is used to store details of data in memory
@@ -413,7 +420,8 @@ namespace FiftyOne.Pipeline.Engines.FiftyOne.FlowElements
                   ignoreDataEvidenceFilter,
                   aspSessionCookieName,
                   null,
-                  false)
+                  false,
+                  null)
         {
         }
 
@@ -504,7 +512,8 @@ namespace FiftyOne.Pipeline.Engines.FiftyOne.FlowElements
                   ignoreDataEvidenceFilter,
                   aspSessionCookieName,
                   tracker,
-                  false)
+                  false,
+                  null)
         {
         }
 
@@ -569,6 +578,10 @@ namespace FiftyOne.Pipeline.Engines.FiftyOne.FlowElements
         /// the blockedHttpHeaders, includedQueryStringParameters and
         /// ignoreDataEvidenceFilter parameters will be ignored.
         /// </param>
+        /// <param name="failHandler">
+        /// The fail handler to use when failures occur while sending data.
+        /// If null, a default WindowedFailHandler with ExponentialBackoffRecoveryStrategy will be created.
+        /// </param>
         /// <exception cref="ArgumentNullException">
         /// Thrown if certain arguments are null.
         /// </exception>
@@ -591,7 +604,8 @@ namespace FiftyOne.Pipeline.Engines.FiftyOne.FlowElements
             List<KeyValuePair<string, string>> ignoreDataEvidenceFilter,
             string aspSessionCookieName,
             ITracker tracker,
-            bool shareAllEvidence)
+            bool shareAllEvidence,
+            IFailHandler failHandler = null)
             : base(logger)
         {
             if (blockedHttpHeaders == null)
@@ -610,6 +624,10 @@ namespace FiftyOne.Pipeline.Engines.FiftyOne.FlowElements
             }
 
             _httpClient = httpClient;
+            _failHandler = failHandler ?? new WindowedFailHandler(
+                new ExponentialBackoffRecoveryStrategy(), 
+                1, 
+                TimeSpan.FromSeconds(10));
 
             EvidenceCollection = new BlockingCollection<ShareUsageData>(maximumQueueSize);
 
@@ -775,6 +793,13 @@ namespace FiftyOne.Pipeline.Engines.FiftyOne.FlowElements
         /// </param>
         private void ProcessData(IFlowData data)
         {
+            // Check if we're still in recovery period
+            // Use IsAvailable for non-critical operations that should silently skip
+            if (!_failHandler.IsAvailable())
+            {
+                return;
+            }
+
             if (_rng.NextDouble() <= _sharePercentage)
             {
                 // Check if the tracker will allow sharing of this data
@@ -795,8 +820,10 @@ namespace FiftyOne.Pipeline.Engines.FiftyOne.FlowElements
                     }
                     else
                     {
+                        var exception = new InvalidOperationException("Failed to add data to usage sharing queue");
+                        // For queue failures, we simply disable sharing rather than using fail handler
                         IsCanceled = true;
-                        Logger.LogError(Messages.MessageShareUsageFailedToAddData);
+                        Logger.LogWarning(Messages.MessageShareUsageFailedToAddData);
 
                     }
                 }
