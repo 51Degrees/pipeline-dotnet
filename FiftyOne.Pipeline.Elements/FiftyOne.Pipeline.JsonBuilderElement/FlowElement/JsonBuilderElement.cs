@@ -691,8 +691,7 @@ namespace FiftyOne.Pipeline.JsonBuilder.FlowElement
                 // recursively call this method for each instance
                 // in the list.
                 if (propertyValue is IList elementDatas &&
-                    (typeof(IElementData).IsAssignableFrom(propertyValue.GetType().GetElementType()) ||
-                    typeof(IElementData).IsAssignableFrom(propertyValue.GetType().GenericTypeArguments[0])))
+                    IsContainerFor<IElementData>(propertyValue.GetType()))
                 {
                     var results = new List<object>();
                     foreach (var elementData in elementDatas)
@@ -721,6 +720,15 @@ namespace FiftyOne.Pipeline.JsonBuilder.FlowElement
             {
                 jsonValues.Add(name + "evidenceproperties", evidenceProperties);
             }
+        }
+
+        private static bool IsContainerFor<TTarget>(Type type)
+        {
+            if (type.GetElementType() is Type elementType)
+                return typeof(TTarget).IsAssignableFrom(elementType);
+            if (type.GetGenericArguments() is Type[] args && args.Length > 0)
+                return typeof(TTarget).IsAssignableFrom(args[0]);
+            return typeof(TTarget).IsAssignableFrom(type);
         }
 
         /// <summary>
