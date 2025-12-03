@@ -35,20 +35,6 @@ namespace FiftyOne.Pipeline.Core.FailHandling.Recovery
     public class ExponentialBackoffRecoveryStrategy : IRecoveryStrategy
     {
         /// <summary>
-        /// Default initial delay in seconds for exponential backoff recovery.
-        /// </summary>
-        public const double INITIAL_DELAY_SECONDS_DEFAULT = 2.0;
-
-        /// <summary>
-        /// Default maximum delay in seconds for exponential backoff recovery.
-        /// </summary>
-        public const double MAX_DELAY_SECONDS_DEFAULT = 300.0;
-
-        /// <summary>
-        /// Default multiplier for exponential backoff recovery.
-        /// </summary>
-        public const double MULTIPLIER_DEFAULT = 2.0;
-        /// <summary>
         /// Initial delay in seconds for the first failure.
         /// </summary>
         public readonly double InitialDelaySeconds;
@@ -62,11 +48,6 @@ namespace FiftyOne.Pipeline.Core.FailHandling.Recovery
         /// Multiplier for exponential backoff (typically 2.0 for doubling).
         /// </summary>
         public readonly double Multiplier;
-
-        /// <summary>
-        /// Current delay in seconds based on consecutive failures.
-        /// </summary>
-        public double CurrentDelaySeconds { get; private set; }
 
         private CachedException _exception = null;
         private DateTime _recoveryDateTime = DateTime.MinValue;
@@ -86,9 +67,9 @@ namespace FiftyOne.Pipeline.Core.FailHandling.Recovery
         /// Exponential multiplier (default: MULTIPLIER_DEFAULT for doubling).
         /// </param>
         public ExponentialBackoffRecoveryStrategy(
-            double initialDelaySeconds = INITIAL_DELAY_SECONDS_DEFAULT, 
-            double maxDelaySeconds = MAX_DELAY_SECONDS_DEFAULT, 
-            double multiplier = MULTIPLIER_DEFAULT)
+            double initialDelaySeconds, 
+            double maxDelaySeconds, 
+            double multiplier)
         {
             if (initialDelaySeconds <= 0)
                 throw new ArgumentException("Initial delay must be positive", nameof(initialDelaySeconds));
@@ -100,7 +81,6 @@ namespace FiftyOne.Pipeline.Core.FailHandling.Recovery
             InitialDelaySeconds = initialDelaySeconds;
             MaxDelaySeconds = maxDelaySeconds;
             Multiplier = multiplier;
-            CurrentDelaySeconds = initialDelaySeconds;
         }
 
         /// <summary>
@@ -118,37 +98,33 @@ namespace FiftyOne.Pipeline.Core.FailHandling.Recovery
                 // recording of the same failure event. We consider it a new failure if:
                 // 1. This is the first failure (_exception is null), or
                 // 2. The new failure occurred after the current recovery time would have ended
-                bool isNewFailure = _exception == null || 
+                bool isNewFailure = _exception is null || 
                                    cachedException.DateTime >= _recoveryDateTime;
 
-                if (isNewFailure)
+                if (!isNewFailure)
                 {
-                    _consecutiveFailures++;
+                    return;
                 }
-                
+
+                _consecutiveFailures++;
+
                 // Calculate new delay: initialDelay * multiplier^(failures-1)
                 // For failures=1: initialDelay * multiplier^0 = initialDelay
                 // For failures=2: initialDelay * multiplier^1 = initialDelay * multiplier
                 // For failures=3: initialDelay * multiplier^2, etc.
-                CurrentDelaySeconds = Math.Min(
+                var currentDelaySeconds = Math.Min(
                     InitialDelaySeconds * Math.Pow(Multiplier, _consecutiveFailures - 1),
                     MaxDelaySeconds);
 
-                var newRecoveryTime = cachedException.DateTime.AddSeconds(CurrentDelaySeconds);
+                var newRecoveryTime = cachedException.DateTime.AddSeconds(currentDelaySeconds);
                 
                 _exception = cachedException;
                 _recoveryDateTime = newRecoveryTime;
             }
         }
 
-        /// <summary>
-        /// Whether the new request may be sent already.
-        /// </summary>
-        /// <param name="cachedException">
-        /// Timestamped exception that prevents new requests.
-        /// </param>
-        /// <returns>true -- send, false -- skip</returns>
-        public bool MayTryNow(out CachedException cachedException)
+        /// <inheritdoc cref="IRecoveryStrategy.MayTryNow(out CachedException, out Func{string})"/>
+        public bool MayTryNow(out CachedException cachedException, out Func<string> suspensionStatus)
         {
             DateTime recoveryDateTime;
             CachedException lastCachedException;
@@ -159,14 +135,17 @@ namespace FiftyOne.Pipeline.Core.FailHandling.Recovery
                 lastCachedException = _exception;
             }
 
-            if (recoveryDateTime < DateTime.Now)
+            var now = DateTime.Now;
+            if (recoveryDateTime < now)
             {
                 cachedException = null;
+                suspensionStatus = null;
                 return true;
             }
             else
             {
                 cachedException = lastCachedException;
+                suspensionStatus = () => $"paused for {(now - recoveryDateTime).TotalSeconds} seconds";
                 return false;
             }
         }
@@ -180,7 +159,6 @@ namespace FiftyOne.Pipeline.Core.FailHandling.Recovery
             lock (_lock)
             {
                 _consecutiveFailures = 0;
-                CurrentDelaySeconds = InitialDelaySeconds;
                 _exception = null;
                 _recoveryDateTime = DateTime.MinValue;
             }

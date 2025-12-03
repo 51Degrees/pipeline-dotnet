@@ -105,6 +105,26 @@ namespace FiftyOne.Pipeline.CloudRequestEngine
         public const double CLOUD_REQUEST_RECOVERY_SECONDS_DEFAULT = 60.0;
 
         /// <summary>
+        /// Whether exponential backoff is enabled by default.
+        /// </summary>
+        public const bool CLOUD_REQUEST_EXPONENTIAL_BACKOFF_ENABLED_DEFAULT = false;
+
+        /// <summary>
+        /// Default initial delay in seconds for exponential backoff recovery.
+        /// </summary>
+        public const double CLOUD_REQUEST_EXPONENTIAL_BACKOFF_INITIAL_DELAY_SECONDS_DEFAULT = 2.0;
+
+        /// <summary>
+        /// Default maximum delay in seconds for exponential backoff recovery.
+        /// </summary>
+        public const double CLOUD_REQUEST_EXPONENTIAL_BACKOFF_MAX_DELAY_SECONDS_DEFAULT = 300.0;
+
+        /// <summary>
+        /// Default multiplier for exponential backoff recovery.
+        /// </summary>
+        public const double CLOUD_REQUEST_EXPONENTIAL_BACKOFF_MULTIPLIER_DEFAULT = 2.0;
+
+        /// <summary>
         /// Default number of failures to occur within some time
         /// for CloudRequestEngine to temporarily stop sending requests.
         /// </summary>

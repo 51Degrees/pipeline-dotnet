@@ -63,10 +63,10 @@ namespace FiftyOne.Pipeline.CloudRequestEngine.FlowElements
         private int _failuresToEnterRecovery = Constants.CLOUD_REQUEST_FAILURES_TO_ENTER_RECOVERY_DEFAULT;
         private int _failuresWindowSeconds = Constants.CLOUD_REQUEST_FAILURES_WINDOW_SECONDS_DEFAULT;
         private double _recoverySeconds = Constants.CLOUD_REQUEST_RECOVERY_SECONDS_DEFAULT;
-        private bool _useExponentialBackoff = false;
-        private double _exponentialBackoffInitialDelay = ExponentialBackoffRecoveryStrategy.INITIAL_DELAY_SECONDS_DEFAULT;
-        private double _exponentialBackoffMaxDelay = ExponentialBackoffRecoveryStrategy.MAX_DELAY_SECONDS_DEFAULT;
-        private double _exponentialBackoffMultiplier = ExponentialBackoffRecoveryStrategy.MULTIPLIER_DEFAULT;
+        private bool _useExponentialBackoff = Constants.CLOUD_REQUEST_EXPONENTIAL_BACKOFF_ENABLED_DEFAULT;
+        private double _exponentialBackoffInitialDelay = Constants.CLOUD_REQUEST_EXPONENTIAL_BACKOFF_INITIAL_DELAY_SECONDS_DEFAULT;
+        private double _exponentialBackoffMaxDelay = Constants.CLOUD_REQUEST_EXPONENTIAL_BACKOFF_MAX_DELAY_SECONDS_DEFAULT;
+        private double _exponentialBackoffMultiplier = Constants.CLOUD_REQUEST_EXPONENTIAL_BACKOFF_MULTIPLIER_DEFAULT;
 
         #endregion
 
@@ -258,7 +258,7 @@ namespace FiftyOne.Pipeline.CloudRequestEngine.FlowElements
         /// </summary>
         /// <param name="useExponentialBackoff">True to use exponential backoff, false for simple recovery</param>
         /// <returns>This builder instance</returns>
-        [DefaultValue(false)]
+        [DefaultValue(Constants.CLOUD_REQUEST_EXPONENTIAL_BACKOFF_ENABLED_DEFAULT)]
         public CloudRequestEngineBuilder SetUseExponentialBackoff(bool useExponentialBackoff)
         {
             _useExponentialBackoff = useExponentialBackoff;
@@ -271,7 +271,7 @@ namespace FiftyOne.Pipeline.CloudRequestEngine.FlowElements
         /// </summary>
         /// <param name="initialDelaySeconds">Initial delay in seconds</param>
         /// <returns>This builder instance</returns>
-        [DefaultValue(ExponentialBackoffRecoveryStrategy.INITIAL_DELAY_SECONDS_DEFAULT)]
+        [DefaultValue(Constants.CLOUD_REQUEST_EXPONENTIAL_BACKOFF_INITIAL_DELAY_SECONDS_DEFAULT)]
         public CloudRequestEngineBuilder SetExponentialBackoffInitialDelay(double initialDelaySeconds)
         {
             _exponentialBackoffInitialDelay = initialDelaySeconds;
@@ -284,7 +284,7 @@ namespace FiftyOne.Pipeline.CloudRequestEngine.FlowElements
         /// </summary>
         /// <param name="maxDelaySeconds">Maximum delay in seconds</param>
         /// <returns>This builder instance</returns>
-        [DefaultValue(ExponentialBackoffRecoveryStrategy.MAX_DELAY_SECONDS_DEFAULT)]
+        [DefaultValue(Constants.CLOUD_REQUEST_EXPONENTIAL_BACKOFF_MAX_DELAY_SECONDS_DEFAULT)]
         public CloudRequestEngineBuilder SetExponentialBackoffMaxDelay(double maxDelaySeconds)
         {
             _exponentialBackoffMaxDelay = maxDelaySeconds;
@@ -297,7 +297,7 @@ namespace FiftyOne.Pipeline.CloudRequestEngine.FlowElements
         /// </summary>
         /// <param name="multiplier">Exponential multiplier (typically 2.0 for doubling)</param>
         /// <returns>This builder instance</returns>
-        [DefaultValue(ExponentialBackoffRecoveryStrategy.MULTIPLIER_DEFAULT)]
+        [DefaultValue(Constants.CLOUD_REQUEST_EXPONENTIAL_BACKOFF_MULTIPLIER_DEFAULT)]
         public CloudRequestEngineBuilder SetExponentialBackoffMultiplier(double multiplier)
         {
             _exponentialBackoffMultiplier = multiplier;
@@ -402,8 +402,10 @@ namespace FiftyOne.Pipeline.CloudRequestEngine.FlowElements
 
             var failThrottlingStrategy = CreateRecoveryStrategy();
 
+            var logger = _loggerFactory.CreateLogger<CloudRequestEngine>();
+
             return new CloudRequestEngine(
-                _loggerFactory.CreateLogger<CloudRequestEngine>(),
+                logger,
                 CreateAspectData,
                 _httpClient,
                 new CloudRequestEngine.EndpointsAndKeys
@@ -420,7 +422,9 @@ namespace FiftyOne.Pipeline.CloudRequestEngine.FlowElements
                 new WindowedFailHandler(
                     failThrottlingStrategy,
                     _failuresToEnterRecovery,
-                    TimeSpan.FromSeconds(_failuresWindowSeconds)));
+                    TimeSpan.FromSeconds(_failuresWindowSeconds),
+                    logger,
+                    nameof(CloudRequestEngine)));
         }
     }
 }
