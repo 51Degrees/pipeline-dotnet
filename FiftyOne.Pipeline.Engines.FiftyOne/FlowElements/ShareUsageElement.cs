@@ -1,6 +1,6 @@
 /* *********************************************************************
  * This Original Work is copyright of 51 Degrees Mobile Experts Limited.
- * Copyright 2023 51 Degrees Mobile Experts Limited, Davidson House,
+ * Copyright 2025 51 Degrees Mobile Experts Limited, Davidson House,
  * Forbury Square, Reading, Berkshire, United Kingdom RG1 3EU.
  *
  * This Original Work is licensed under the European Union Public Licence
@@ -90,7 +90,7 @@ namespace FiftyOne.Pipeline.Engines.FiftyOne.FlowElements
         /// Create the XML file from the specified data and send it to
         /// the configured URL.
         /// </summary>
-        protected override void BuildAndSendXml()
+        protected override async System.Threading.Tasks.Task BuildAndSendXmlAsync()
         {
             List<ShareUsageData> allData = new List<ShareUsageData>();
             ShareUsageData currentData;
@@ -122,18 +122,18 @@ namespace FiftyOne.Pipeline.Engines.FiftyOne.FlowElements
                     content.Headers.Add("content-encoding", "gzip");
                     content.Headers.Add("content-type", "text/xml");
 
-                    var res = HttpClient.PostAsync(ShareUsageUri, content).Result;
+                    var res = await HttpClient.PostAsync(ShareUsageUri, content).ConfigureAwait(false);
                     if (res.StatusCode == HttpStatusCode.OK)
                     {
                         Interlocked.Increment(ref _successCount);
-                    } 
+                    }
                     else
                     {
                         Interlocked.Increment(ref _failCount);
                         string response = "";
                         try
                         {
-                            response = res.Content.ReadAsStringAsync().Result;
+                            response = await res.Content.ReadAsStringAsync().ConfigureAwait(false);
                         }
                         // Ignore any failures to read the response content, we're only logging it.
 #pragma warning disable CA1031 // Do not catch general exception types

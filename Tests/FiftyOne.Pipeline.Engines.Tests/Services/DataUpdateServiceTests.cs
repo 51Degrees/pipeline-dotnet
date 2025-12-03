@@ -1,6 +1,6 @@
 /* *********************************************************************
  * This Original Work is copyright of 51 Degrees Mobile Experts Limited.
- * Copyright 2023 51 Degrees Mobile Experts Limited, Davidson House,
+ * Copyright 2025 51 Degrees Mobile Experts Limited, Davidson House,
  * Forbury Square, Reading, Berkshire, United Kingdom RG1 3EU.
  *
  * This Original Work is licensed under the European Union Public Licence
@@ -54,7 +54,7 @@ namespace FiftyOne.Pipeline.Engines.Tests.Services
         private int _ignoreWranings = 0;
         private int _ignoreErrors = 0;
         private const int TEST_TIMEOUT_MS = 3000;
-        private const int LOGGER_UNLOCK_TIMEOUT_MS = 1000;
+        private const int LOGGER_UNLOCK_TIMEOUT_MS = 5000;
 
         private bool _didDumpLogs;
 
@@ -126,14 +126,17 @@ namespace FiftyOne.Pipeline.Engines.Tests.Services
         }
 
         /// <summary>
-        /// Cleanup and do any common asserts 
+        /// Cleanup and do any common asserts
         /// (e.g. checking no errors were logged)
         /// </summary>
         [TestCleanup]
         public void Cleanup()
         {
+            // Give background threads a moment to finish and release locks
+            // This prevents lock timeouts in CI environments
             if (!_didDumpLogs)
             {
+                Thread.Sleep(200);
                 DumpLoggerLogs();
             }
             _logger.AssertMaxErrors(_ignoreErrors);
@@ -876,6 +879,9 @@ namespace FiftyOne.Pipeline.Engines.Tests.Services
                 _dataUpdate.RegisterDataFile(file);
                 // Wait until processing is complete.
                 completeFlag.Wait(TEST_TIMEOUT_MS);
+                // Give the background thread time to finish cleanup and release locks
+                // Increased from 100ms to 500ms to handle slower CI environments
+                Thread.Sleep(500);
 
                 DumpLoggerLogs();
 

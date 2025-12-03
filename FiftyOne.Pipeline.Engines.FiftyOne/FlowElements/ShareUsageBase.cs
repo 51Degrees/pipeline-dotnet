@@ -1,6 +1,6 @@
 /* *********************************************************************
  * This Original Work is copyright of 51 Degrees Mobile Experts Limited.
- * Copyright 2023 51 Degrees Mobile Experts Limited, Davidson House,
+ * Copyright 2025 51 Degrees Mobile Experts Limited, Davidson House,
  * Forbury Square, Reading, Berkshire, United Kingdom RG1 3EU.
  *
  * This Original Work is licensed under the European Union Public Licence
@@ -932,7 +932,7 @@ namespace FiftyOne.Pipeline.Engines.FiftyOne.FlowElements
         /// <summary>
         /// Attempt to send the data to the remote service. This only happens
         /// if there is not a task already running.
-        /// 
+        ///
         /// If any error occurs while sending the data, then usage sharing is
         /// stopped.
         /// </summary>
@@ -945,13 +945,13 @@ namespace FiftyOne.Pipeline.Engines.FiftyOne.FlowElements
                 {
                     if (IsRunning == false)
                     {
-                        SendDataTask = Task.Run(() =>
+                        SendDataTask = Task.Run(async () =>
                         {
                             using (var requestScope = _failHandler.MakeAttemptScope())
                             {
                                 try
                                 {
-                                    BuildAndSendXml();
+                                    await BuildAndSendXmlAsync();
                                 }
                                 catch (Exception ex)
                                 {
@@ -974,9 +974,9 @@ namespace FiftyOne.Pipeline.Engines.FiftyOne.FlowElements
         }
 
         /// <summary>
-        /// 
+        /// Abstract method to build XML from queued data and send it to the remote service.
         /// </summary>
-        protected abstract void BuildAndSendXml();
+        protected abstract Task BuildAndSendXmlAsync();
 
         /// <summary>
         /// Virtual method to be overridden in extending usage share elements.
