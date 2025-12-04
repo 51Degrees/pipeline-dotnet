@@ -20,36 +20,40 @@
  * such notice(s) shall fulfill the requirements of that article.
  * ********************************************************************* */
 
-using FiftyOne.Pipeline.CloudRequestEngine.FailHandling.ExceptionCaching;
+using System;
+using System.Collections.Generic;
+using System.Text;
 
-namespace FiftyOne.Pipeline.CloudRequestEngine.FailHandling.Recovery
+namespace FiftyOne.Pipeline.Core.FailHandling.ExceptionCaching
 {
     /// <summary>
-    /// Controls when to suspend requests
-    /// due to recent query failures.
+    /// Links the exception and the timestamp.
     /// </summary>
-    public interface IRecoveryStrategy
+    public class CachedException
     {
-        /// <summary>
-        /// Called when querying the server failed.
-        /// </summary>
-        /// <param name="cachedException">
-        /// Timestampted exception.
-        /// </param>
-        void RecordFailure(CachedException cachedException);
+        private readonly Exception _exception;
+        private readonly DateTime _dateTime;
 
         /// <summary>
-        /// Whether the new request may be sent already.
+        /// The exception that did happen.
         /// </summary>
-        /// <returns>true -- send, false -- skip</returns>
-        /// <param name="cachedException">
-        /// Timestampted exception that prevents new requests.
-        /// </param>
-        bool MayTryNow(out CachedException cachedException);
+        public Exception Exception => _exception;
 
         /// <summary>
-        /// Called once the request succeeds (after recovery).
+        /// When the exception did happen.
         /// </summary>
-        void Reset();
+        public DateTime DateTime => _dateTime;
+
+        /// <summary>
+        /// Designated constructor.
+        /// </summary>
+        /// <param name="exception">
+        /// The exception.
+        /// </param>
+        public CachedException(Exception exception)
+        {
+            _exception = exception;
+            _dateTime = DateTime.Now;
+        }   
     }
 }

@@ -20,34 +20,42 @@
  * such notice(s) shall fulfill the requirements of that article.
  * ********************************************************************* */
 
-using FiftyOne.Pipeline.CloudRequestEngine.FailHandling.Scope;
+using FiftyOne.Pipeline.Core.FailHandling.ExceptionCaching;
 using System;
-using System.Collections.Generic;
-using System.Text;
 
-namespace FiftyOne.Pipeline.CloudRequestEngine.FailHandling.Facade
+namespace FiftyOne.Pipeline.Core.FailHandling.Recovery
 {
     /// <summary>
-    /// Tracks failures and throttles requests.
+    /// Drops all server calls after first failure.
     /// </summary>
-    public interface IFailHandler
+    public class NoRecoveryStrategy : IRecoveryStrategy
     {
-        /// <summary>
-        /// Throws if the strategy indicates that
-        /// requests may not be sent now.
-        /// </summary>
-        /// <exception cref="CloudRequestEngineTemporarilyUnavailableException">
-        /// </exception>
-        void ThrowIfStillRecovering();
+        private volatile CachedException _cachedException = null;
 
         /// <summary>
-        /// Lets a consumer to wrap an attempt in `using` scope
-        /// to implicitly report success 
-        /// or explicitly provide exception on failure.
+        /// Called when querying the server failed.
         /// </summary>
-        /// <returns>
-        /// Attempt scope that report to this handler once disposed.
-        /// </returns>
-        IAttemptScope MakeAttemptScope();
+        /// <param name="cachedException">
+        /// Timestampted exception.
+        /// </param>
+        public void RecordFailure(CachedException cachedException)
+        {
+            _cachedException = cachedException;
+        }
+
+        /// <inheritdoc cref="IRecoveryStrategy.MayTryNow(out CachedException, out Func{string})"/>
+        public bool MayTryNow(out CachedException cachedException, out Func<string> suspensionStatus)
+        {
+            // volatile read, can’t be reordered with subsequent operations
+            cachedException = _cachedException;
+            bool suspended = cachedException is null;
+            suspensionStatus = suspended ? () => "stopped forever" : (Func<string>)null;
+            return suspended;
+        }
+
+        /// <summary>
+        /// Called once the request succeeds (after recovery).
+        /// </summary>
+        public void Reset() => _cachedException = null;
     }
 }

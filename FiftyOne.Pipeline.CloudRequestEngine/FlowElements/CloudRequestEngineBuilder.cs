@@ -21,8 +21,8 @@
  * ********************************************************************* */
 
 using FiftyOne.Pipeline.CloudRequestEngine.Data;
-using FiftyOne.Pipeline.CloudRequestEngine.FailHandling.Facade;
-using FiftyOne.Pipeline.CloudRequestEngine.FailHandling.Recovery;
+using FiftyOne.Pipeline.Core.FailHandling.Facade;
+using FiftyOne.Pipeline.Core.FailHandling.Recovery;
 using FiftyOne.Pipeline.Core.Attributes;
 using FiftyOne.Pipeline.Core.Exceptions;
 using FiftyOne.Pipeline.Core.FlowElements;
@@ -63,6 +63,10 @@ namespace FiftyOne.Pipeline.CloudRequestEngine.FlowElements
         private int _failuresToEnterRecovery = Constants.CLOUD_REQUEST_FAILURES_TO_ENTER_RECOVERY_DEFAULT;
         private int _failuresWindowSeconds = Constants.CLOUD_REQUEST_FAILURES_WINDOW_SECONDS_DEFAULT;
         private double _recoverySeconds = Constants.CLOUD_REQUEST_RECOVERY_SECONDS_DEFAULT;
+        private bool _useExponentialBackoff = Constants.CLOUD_REQUEST_EXPONENTIAL_BACKOFF_ENABLED_DEFAULT;
+        private double _exponentialBackoffInitialDelay = Constants.CLOUD_REQUEST_EXPONENTIAL_BACKOFF_INITIAL_DELAY_SECONDS_DEFAULT;
+        private double _exponentialBackoffMaxDelay = Constants.CLOUD_REQUEST_EXPONENTIAL_BACKOFF_MAX_DELAY_SECONDS_DEFAULT;
+        private double _exponentialBackoffMultiplier = Constants.CLOUD_REQUEST_EXPONENTIAL_BACKOFF_MULTIPLIER_DEFAULT;
 
         #endregion
 
@@ -250,6 +254,57 @@ namespace FiftyOne.Pipeline.CloudRequestEngine.FlowElements
         }
 
         /// <summary>
+        /// Enable exponential backoff recovery strategy instead of simple recovery.
+        /// </summary>
+        /// <param name="useExponentialBackoff">True to use exponential backoff, false for simple recovery</param>
+        /// <returns>This builder instance</returns>
+        [DefaultValue(Constants.CLOUD_REQUEST_EXPONENTIAL_BACKOFF_ENABLED_DEFAULT)]
+        public CloudRequestEngineBuilder SetUseExponentialBackoff(bool useExponentialBackoff)
+        {
+            _useExponentialBackoff = useExponentialBackoff;
+            return this;
+        }
+
+        /// <summary>
+        /// Set the initial delay in seconds for exponential backoff recovery strategy.
+        /// Only used when exponential backoff is enabled.
+        /// </summary>
+        /// <param name="initialDelaySeconds">Initial delay in seconds</param>
+        /// <returns>This builder instance</returns>
+        [DefaultValue(Constants.CLOUD_REQUEST_EXPONENTIAL_BACKOFF_INITIAL_DELAY_SECONDS_DEFAULT)]
+        public CloudRequestEngineBuilder SetExponentialBackoffInitialDelay(double initialDelaySeconds)
+        {
+            _exponentialBackoffInitialDelay = initialDelaySeconds;
+            return this;
+        }
+
+        /// <summary>
+        /// Set the maximum delay in seconds for exponential backoff recovery strategy.
+        /// Only used when exponential backoff is enabled.
+        /// </summary>
+        /// <param name="maxDelaySeconds">Maximum delay in seconds</param>
+        /// <returns>This builder instance</returns>
+        [DefaultValue(Constants.CLOUD_REQUEST_EXPONENTIAL_BACKOFF_MAX_DELAY_SECONDS_DEFAULT)]
+        public CloudRequestEngineBuilder SetExponentialBackoffMaxDelay(double maxDelaySeconds)
+        {
+            _exponentialBackoffMaxDelay = maxDelaySeconds;
+            return this;
+        }
+
+        /// <summary>
+        /// Set the multiplier for exponential backoff recovery strategy.
+        /// Only used when exponential backoff is enabled.
+        /// </summary>
+        /// <param name="multiplier">Exponential multiplier (typically 2.0 for doubling)</param>
+        /// <returns>This builder instance</returns>
+        [DefaultValue(Constants.CLOUD_REQUEST_EXPONENTIAL_BACKOFF_MULTIPLIER_DEFAULT)]
+        public CloudRequestEngineBuilder SetExponentialBackoffMultiplier(double multiplier)
+        {
+            _exponentialBackoffMultiplier = multiplier;
+            return this;
+        }
+
+        /// <summary>
         /// The value to set for the Origin header when making requests
         /// to the cloud service.
         /// This is used by the cloud service to check that the request
@@ -315,6 +370,20 @@ namespace FiftyOne.Pipeline.CloudRequestEngine.FlowElements
         }
 
         /// <summary>
+        /// Create the appropriate recovery strategy based on current configuration.
+        /// </summary>
+        /// <returns>The configured recovery strategy</returns>
+        private IRecoveryStrategy CreateRecoveryStrategy()
+        {
+            return RecoveryStrategyFactory.Create(
+                _useExponentialBackoff,
+                _recoverySeconds,
+                _exponentialBackoffInitialDelay,
+                _exponentialBackoffMaxDelay,
+                _exponentialBackoffMultiplier);
+        }
+
+        /// <summary>
         /// Create a new engine using the current configuration.
         /// </summary>
         /// <param name="properties">
@@ -331,13 +400,12 @@ namespace FiftyOne.Pipeline.CloudRequestEngine.FlowElements
                     Messages.ExceptionResourceKeyNeeded);
             }
 
-            var failThrottlingStrategy 
-                = (_recoverySeconds > 0)
-                ? new SimpleRecoveryStrategy(_recoverySeconds)
-                : (IRecoveryStrategy)new InstantRecoveryStrategy();
+            var failThrottlingStrategy = CreateRecoveryStrategy();
+
+            var logger = _loggerFactory.CreateLogger<CloudRequestEngine>();
 
             return new CloudRequestEngine(
-                _loggerFactory.CreateLogger<CloudRequestEngine>(),
+                logger,
                 CreateAspectData,
                 _httpClient,
                 new CloudRequestEngine.EndpointsAndKeys
@@ -354,7 +422,9 @@ namespace FiftyOne.Pipeline.CloudRequestEngine.FlowElements
                 new WindowedFailHandler(
                     failThrottlingStrategy,
                     _failuresToEnterRecovery,
-                    TimeSpan.FromSeconds(_failuresWindowSeconds)));
+                    TimeSpan.FromSeconds(_failuresWindowSeconds),
+                    logger,
+                    nameof(CloudRequestEngine)));
         }
     }
 }

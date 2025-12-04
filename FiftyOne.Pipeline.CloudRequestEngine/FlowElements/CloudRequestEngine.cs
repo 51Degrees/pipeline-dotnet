@@ -21,8 +21,8 @@
  * ********************************************************************* */
 
 using FiftyOne.Pipeline.CloudRequestEngine.Data;
-using FiftyOne.Pipeline.CloudRequestEngine.FailHandling.Facade;
-using FiftyOne.Pipeline.CloudRequestEngine.FailHandling.Recovery;
+using FiftyOne.Pipeline.Core.FailHandling.Facade;
+using FiftyOne.Pipeline.Core.FailHandling.Recovery;
 using FiftyOne.Pipeline.Core.Data;
 using FiftyOne.Pipeline.Core.FlowElements;
 using FiftyOne.Pipeline.Engines.Data;
@@ -37,6 +37,7 @@ using System.Linq;
 using System.Net.Http;
 using System.Threading;
 using System.Threading.Tasks;
+using FiftyOne.Pipeline.Core.Exceptions;
 
 namespace FiftyOne.Pipeline.CloudRequestEngine.FlowElements
 {
@@ -484,7 +485,8 @@ namespace FiftyOne.Pipeline.CloudRequestEngine.FlowElements
         {
             try
             {
-                _failHandler.ThrowIfStillRecovering();
+                _failHandler.CheckIfRecovered(
+                    (msg, ex) => new PipelineTemporarilyUnavailableException(msg, ex));
             }
             catch (Exception ex)
             {

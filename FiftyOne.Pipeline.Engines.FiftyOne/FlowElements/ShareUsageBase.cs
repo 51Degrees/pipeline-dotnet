@@ -23,6 +23,8 @@
 using FiftyOne.Caching;
 using FiftyOne.Pipeline.Core.Data;
 using FiftyOne.Pipeline.Core.Exceptions;
+using FiftyOne.Pipeline.Core.FailHandling.Facade;
+using FiftyOne.Pipeline.Core.FailHandling.Recovery;
 using FiftyOne.Pipeline.Core.FlowElements;
 using FiftyOne.Pipeline.Engines.Configuration;
 using FiftyOne.Pipeline.Engines.FiftyOne.Data;
@@ -65,6 +67,11 @@ namespace FiftyOne.Pipeline.Engines.FiftyOne.FlowElements
         /// The HttpClient to use when sending the data.
         /// </summary>
         protected HttpClient HttpClient => _httpClient;
+
+        /// <summary>
+        /// Fail handler for managing failed attempts to add data to the queue.
+        /// </summary>
+        private readonly IFailHandler _failHandler;
 
         /// <summary>
         /// Inner class that is used to store details of data in memory
@@ -304,12 +311,6 @@ namespace FiftyOne.Pipeline.Engines.FiftyOne.FlowElements
         }
 
         /// <summary>
-        /// Indicates whether share usage has been canceled as a result of an
-        /// error.
-        /// </summary>
-        protected internal bool IsCanceled { get; set; } = false;
-
-        /// <summary>
         /// True if there is a task running to send usage data to the remote
         /// service.
         /// </summary>
@@ -413,7 +414,8 @@ namespace FiftyOne.Pipeline.Engines.FiftyOne.FlowElements
                   ignoreDataEvidenceFilter,
                   aspSessionCookieName,
                   null,
-                  false)
+                  false,
+                  null)
         {
         }
 
@@ -504,7 +506,8 @@ namespace FiftyOne.Pipeline.Engines.FiftyOne.FlowElements
                   ignoreDataEvidenceFilter,
                   aspSessionCookieName,
                   tracker,
-                  false)
+                  false,
+                  null)
         {
         }
 
@@ -569,6 +572,10 @@ namespace FiftyOne.Pipeline.Engines.FiftyOne.FlowElements
         /// the blockedHttpHeaders, includedQueryStringParameters and
         /// ignoreDataEvidenceFilter parameters will be ignored.
         /// </param>
+        /// <param name="failHandler">
+        /// The fail handler to use when failures occur while sending data.
+        /// If null, a default WindowedFailHandler with ExponentialBackoffRecoveryStrategy will be created.
+        /// </param>
         /// <exception cref="ArgumentNullException">
         /// Thrown if certain arguments are null.
         /// </exception>
@@ -591,7 +598,8 @@ namespace FiftyOne.Pipeline.Engines.FiftyOne.FlowElements
             List<KeyValuePair<string, string>> ignoreDataEvidenceFilter,
             string aspSessionCookieName,
             ITracker tracker,
-            bool shareAllEvidence)
+            bool shareAllEvidence,
+            IFailHandler failHandler = null)
             : base(logger)
         {
             if (blockedHttpHeaders == null)
@@ -610,6 +618,20 @@ namespace FiftyOne.Pipeline.Engines.FiftyOne.FlowElements
             }
 
             _httpClient = httpClient;
+            _failHandler = failHandler ?? new WindowedFailHandler(
+                new ExponentialBackoffRecoveryStrategy(
+                    initialDelaySeconds: Constants.SHARE_USAGE_EXPONENTIAL_BACKOFF_INITIAL_DELAY_SECONDS_DEFAULT,
+                    maxDelaySeconds: Constants.SHARE_USAGE_EXPONENTIAL_BACKOFF_MAX_DELAY_SECONDS_DEFAULT,
+                    multiplier: Constants.SHARE_USAGE_EXPONENTIAL_BACKOFF_MULTIPLIER_DEFAULT),
+                Constants.SHARE_USAGE_FAILURES_TO_ENTER_RECOVERY_DEFAULT, 
+                TimeSpan.FromSeconds(Constants.SHARE_USAGE_FAILURES_WINDOW_SECONDS_DEFAULT),
+                logger,
+                GetType().Name,
+                WindowedFailHandler.State.Active
+                | WindowedFailHandler.State.QueueFilled
+                | WindowedFailHandler.State.ShuttingDown
+                | WindowedFailHandler.State.WaitingForGreenLight
+                | WindowedFailHandler.State.WaitingForReset);
 
             EvidenceCollection = new BlockingCollection<ShareUsageData>(maximumQueueSize);
 
@@ -727,7 +749,7 @@ namespace FiftyOne.Pipeline.Engines.FiftyOne.FlowElements
                 }
             }
 
-            if (IsCanceled == false && ignoreData == false)
+            if (ignoreData == false)
             {
                 ProcessData(data);
             }
@@ -775,16 +797,29 @@ namespace FiftyOne.Pipeline.Engines.FiftyOne.FlowElements
         /// </param>
         private void ProcessData(IFlowData data)
         {
-            if (_rng.NextDouble() <= _sharePercentage)
+            if (_rng.NextDouble() > _sharePercentage || !_failHandler.CheckIfRecovered(null))
             {
-                // Check if the tracker will allow sharing of this data
-                if (_tracker.Track(data))
+                return;
+            }
+            if (!_failHandler.CheckIfRecovered(null))
+            {
+                return;
+            }
+            using (var requestScope = _failHandler.MakeAttemptScope())
+            {
+                try
                 {
+                    // Check if the tracker will allow sharing of this data
+                    if (!_tracker.Track(data))
+                    {
+                        return;
+                    }
+
                     // Extract the data we want from the evidence and add
                     // it to the collection.
                     if (EvidenceCollection.TryAdd(
                         GetDataFromEvidence(data.GetEvidence()),
-                        _addTimeout) == true)
+                        _addTimeout))
                     {
                         // If the collection has enough entries then start
                         // taking data from it to be sent.
@@ -795,10 +830,13 @@ namespace FiftyOne.Pipeline.Engines.FiftyOne.FlowElements
                     }
                     else
                     {
-                        IsCanceled = true;
-                        Logger.LogError(Messages.MessageShareUsageFailedToAddData);
-
+                        requestScope.RecordFailure(null);
                     }
+                }
+                catch (Exception ex)
+                {
+                    requestScope.RecordFailure(ex);
+                    throw;
                 }
             }
         }
@@ -901,8 +939,7 @@ namespace FiftyOne.Pipeline.Engines.FiftyOne.FlowElements
         /// <returns></returns>
         protected void TrySendData()
         {
-            if (IsCanceled == false &&
-                IsRunning == false)
+            if (_failHandler.CheckIfRecovered(null) && IsRunning == false)
             {
                 lock (_lock)
                 {
@@ -910,7 +947,18 @@ namespace FiftyOne.Pipeline.Engines.FiftyOne.FlowElements
                     {
                         SendDataTask = Task.Run(async () =>
                         {
-                            await BuildAndSendXmlAsync().ConfigureAwait(false);
+                            using (var requestScope = _failHandler.MakeAttemptScope())
+                            {
+                                try
+                                {
+                                    await BuildAndSendXmlAsync();
+                                }
+                                catch (Exception ex)
+                                {
+                                    requestScope.RecordFailure(ex);
+                                    throw;
+                                }
+                            }
                         }).ContinueWith(t =>
                         {
                             if(t.Exception != null)

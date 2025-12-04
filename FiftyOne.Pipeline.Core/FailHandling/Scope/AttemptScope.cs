@@ -20,12 +20,12 @@
  * such notice(s) shall fulfill the requirements of that article.
  * ********************************************************************* */
 
-using FiftyOne.Pipeline.CloudRequestEngine.FailHandling.ExceptionCaching;
+using FiftyOne.Pipeline.Core.FailHandling.ExceptionCaching;
 using System;
 using System.Collections.Generic;
 using System.Text;
 
-namespace FiftyOne.Pipeline.CloudRequestEngine.FailHandling.Scope
+namespace FiftyOne.Pipeline.Core.FailHandling.Scope
 {
     /// <summary>
     /// A scope within which an attempt will be made.

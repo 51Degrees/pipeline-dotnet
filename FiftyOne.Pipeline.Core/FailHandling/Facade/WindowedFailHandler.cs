@@ -20,14 +20,16 @@
  * such notice(s) shall fulfill the requirements of that article.
  * ********************************************************************* */
 
-using FiftyOne.Pipeline.CloudRequestEngine.FailHandling.ExceptionCaching;
-using FiftyOne.Pipeline.CloudRequestEngine.FailHandling.Recovery;
-using FiftyOne.Pipeline.CloudRequestEngine.FailHandling.Scope;
+using FiftyOne.Pipeline.Core.Exceptions;
+using FiftyOne.Pipeline.Core.FailHandling.ExceptionCaching;
+using FiftyOne.Pipeline.Core.FailHandling.Recovery;
+using FiftyOne.Pipeline.Core.FailHandling.Scope;
+using Microsoft.Extensions.Logging;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 
-namespace FiftyOne.Pipeline.CloudRequestEngine.FailHandling.Facade
+namespace FiftyOne.Pipeline.Core.FailHandling.Facade
 {
     /// <summary>
     /// Tracks failures and throttles requests.
@@ -38,6 +40,9 @@ namespace FiftyOne.Pipeline.CloudRequestEngine.FailHandling.Facade
         private readonly IRecoveryStrategy _recoveryStrategy;
         private readonly int _failuresToEnterRecovery;
         private readonly TimeSpan _failuresWindow;
+        private readonly ILogger _logger;
+        private readonly string _messagePrefix;
+        private readonly State _logMask;
 
         /// <summary>
         /// Only to be filled in
@@ -57,8 +62,18 @@ namespace FiftyOne.Pipeline.CloudRequestEngine.FailHandling.Facade
         private readonly Queue<CachedException> _failures;
         private UInt64 _requestsInProgress = 0;
 
-        private enum State
+        /// <summary>
+        /// Internal state.
+        /// </summary>
+        [Flags]
+        public enum State
         {
+            /// <summary>
+            /// Last strategy's decision was 'allow'.
+            /// Queue is yet to be filled with valid errors.
+            /// </summary>
+            NoLogs,
+
             /// <summary>
             /// Last strategy's decision was 'allow'.
             /// Queue is yet to be filled with valid errors.
@@ -89,7 +104,7 @@ namespace FiftyOne.Pipeline.CloudRequestEngine.FailHandling.Facade
             /// </summary>
             WaitingForReset,
         }
-        private State _state;
+        private State _state = State.Active;
 
         /// <summary>
         /// Protects
@@ -121,10 +136,22 @@ namespace FiftyOne.Pipeline.CloudRequestEngine.FailHandling.Facade
         /// before the event is passed to
         /// <paramref name="recoveryStrategy"/>.
         /// </param>
+        /// <param name="logger">
+        /// Logger to log state changes into
+        /// </param>
+        /// <param name="messagePrefix">
+        /// Prefix for messages logged into <paramref name="logger"/>
+        /// </param>
+        /// <param name="logMask">
+        /// What events to log into <paramref name="logger"/>
+        /// </param>
         public WindowedFailHandler(
             IRecoveryStrategy recoveryStrategy,
             int failuresToEnterRecovery,
-            TimeSpan failuresWindow)
+            TimeSpan failuresWindow,
+            ILogger logger,
+            string messagePrefix,
+            State? logMask = null)
         {
             if ((_recoveryStrategy = recoveryStrategy) is null)
             {
@@ -143,17 +170,26 @@ namespace FiftyOne.Pipeline.CloudRequestEngine.FailHandling.Facade
                     $"{nameof(failuresWindow)} should be positive.");
             }
             _failures = new Queue<CachedException>(failuresToEnterRecovery);
+            _logger = logger;
+            _messagePrefix = messagePrefix;
+            _logMask = logMask ?? (
+                State.Active
+                | State.QueueFilled
+                | State.ShuttingDown
+                | State.WaitingForGreenLight
+                | State.WaitingForReset);
+            if (!(logger is null) && (messagePrefix is null))
+            {
+                throw new ArgumentException(
+                    nameof(messagePrefix),
+                    $"{nameof(messagePrefix)} must be provided when {nameof(logger)} is.");
+            }
         }
 
-        /// <summary>
-        /// Throws if the strategy indicates that
-        /// requests may not be sent now.
-        /// </summary>
-        /// <exception cref="CloudRequestEngineTemporarilyUnavailableException">
-        /// </exception>
-        public void ThrowIfStillRecovering()
+        /// <inheritdoc cref="IFailHandler.CheckIfRecovered(Func{string, Exception, Exception})"/>
+        public bool CheckIfRecovered(Func<string, Exception, Exception> exceptionFactory)
         {
-            if (!_recoveryStrategy.MayTryNow(out var cachedException))
+            if (!_recoveryStrategy.MayTryNow(out var cachedException, out var suspensionStatus))
             {
                 lock (_lock)
                 {
@@ -189,21 +225,35 @@ namespace FiftyOne.Pipeline.CloudRequestEngine.FailHandling.Facade
                             goto case State.QueueFilled;
 
                         case State.QueueFilled:
-                            _state
-                                = (_requestsInProgress > 0)
-
+                            if (_requestsInProgress > 0)
+                            {
                                 // wait for active requests to die out
                                 // before adding new errors to the queue.
-                                ? State.ShuttingDown
-
+                                _state = State.ShuttingDown;
+                                if ((_state & _logMask) != State.NoLogs)
+                                {
+                                    _logger?.LogInformation("{messagePrefix} is entering suspension -- {suspensionStatus}", _messagePrefix, suspensionStatus?.Invoke());
+                                }
+                            } else
+                            {
                                 // queue is immediately ready for new items.
-                                : State.WaitingForGreenLight;
+                                _state = State.WaitingForGreenLight;
+                                if ((_state & _logMask) != State.NoLogs)
+                                {
+                                    _logger?.LogInformation("{messagePrefix} is waiting for green light -- {suspensionStatus}", _messagePrefix, suspensionStatus?.Invoke());
+                                }
+                            }
                             break;
                     }
                 }
-                throw new Exception(
-                    $"Recovered exception from {(DateTime.Now - cachedException.DateTime).TotalSeconds}s ago.", 
+                var ex = exceptionFactory?.Invoke(
+                    $"Recovered exception from {(DateTime.Now - cachedException.DateTime).TotalSeconds}s ago.",
                     cachedException.Exception);
+                if (!(ex is null))
+                {
+                    throw ex;
+                }
+                return false;
             }
             lock (_lock)
             {
@@ -230,9 +280,14 @@ namespace FiftyOne.Pipeline.CloudRequestEngine.FailHandling.Facade
                     case State.WaitingForGreenLight:
                         // reset strategy on next success
                         _state = State.WaitingForReset;
+                        if ((_state & _logMask) != State.NoLogs)
+                        {
+                            _logger?.LogInformation("{messagePrefix} is reactivating", _messagePrefix);
+                        }
                         break;
                 }
             }
+            return true;
         }
 
         /// <summary>
@@ -272,6 +327,10 @@ namespace FiftyOne.Pipeline.CloudRequestEngine.FailHandling.Facade
                             // awaited success arrived
                             _state = State.Active;
                             shouldReset = true;
+                            if ((_state & _logMask) != State.NoLogs)
+                            {
+                                _logger?.LogInformation("{messagePrefix} is reactivated", _messagePrefix);
+                            }
                             break;
 
                         case State.QueueFilled:
@@ -316,6 +375,10 @@ namespace FiftyOne.Pipeline.CloudRequestEngine.FailHandling.Facade
                             {
                                 // desired state reached.
                                 _state = State.WaitingForGreenLight;
+                                if ((_state & _logMask) != State.NoLogs)
+                                {
+                                    _logger?.LogInformation("{messagePrefix} is waiting for green light", _messagePrefix);
+                                }
                             }
                             break;
 

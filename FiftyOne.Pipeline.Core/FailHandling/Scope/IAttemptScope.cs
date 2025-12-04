@@ -24,36 +24,21 @@ using System;
 using System.Collections.Generic;
 using System.Text;
 
-namespace FiftyOne.Pipeline.CloudRequestEngine.FailHandling.ExceptionCaching
+namespace FiftyOne.Pipeline.Core.FailHandling.Scope
 {
     /// <summary>
-    /// Links the exception and the timestamp.
+    /// A scope within which an attempt will be made.
+    /// Call <see cref="RecordFailure(Exception)"/>
+    /// to indicate the failure and cache the reason.
     /// </summary>
-    public class CachedException
+    public interface IAttemptScope: IDisposable
     {
-        private readonly Exception _exception;
-        private readonly DateTime _dateTime;
-
         /// <summary>
-        /// The exception that did happen.
-        /// </summary>
-        public Exception Exception => _exception;
-
-        /// <summary>
-        /// When the exception did happen.
-        /// </summary>
-        public DateTime DateTime => _dateTime;
-
-        /// <summary>
-        /// Designated constructor.
+        /// Signals that attempt failed.
         /// </summary>
         /// <param name="exception">
-        /// The exception.
+        /// The cause of failure.
         /// </param>
-        public CachedException(Exception exception)
-        {
-            _exception = exception;
-            _dateTime = DateTime.Now;
-        }   
+        void RecordFailure(Exception exception);
     }
 }
