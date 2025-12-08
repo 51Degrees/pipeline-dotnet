@@ -8,7 +8,7 @@ $ErrorActionPreference = "Stop"
 $PSNativeCommandUseErrorActionPreference = $true
 
 $perfTests = "$PSScriptRoot/../performance-tests"
-$testResults = New-Item -ItemType Directory -Force -Path "$PSScriptRoot/../test-results/performance-summary/"
+$testResults = New-Item -ItemType Directory -Force -Path "$PSScriptRoot/../test-results/performance-summary"
 
 dotnet build $perfTests -c $Configuration /p:Platform=$Arch
 try {
@@ -18,12 +18,17 @@ try {
     Stop-Job $server
 }
 
-Write-Host "Writing performance test results"
-@{
+if ($results.overhead_ms -gt 200) {
+    Write-Error "Unacceptable request overhead: $($results.overhead_ms)"
+} elseif ($results.overhead_ms -lt 0) {
+    Write-Error "Request overhead shouldn't be negative: $($results.overhead_ms)"
+}
+
+ConvertTo-Json @{
     'HigherIsBetter' = @{
         'DetectionsPerSecond' = 1/($results.overhead_ms / 1000)
     }
     'LowerIsBetter' = @{
         'MsPerDetection' = $results.overhead_ms
     }
-} | ConvertTo-Json | Tee-Object "$testResults/results_$Name.json" | Write-Host
+} | Tee-Object "$testResults/results_$Name.json" | Write-Host
