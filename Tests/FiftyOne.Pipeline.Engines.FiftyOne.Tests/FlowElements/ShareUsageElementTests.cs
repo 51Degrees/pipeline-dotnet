@@ -152,8 +152,7 @@ namespace FiftyOne.Pipeline.Engines.FiftyOne.Tests.FlowElements
             // Act
             _shareUsageElement.Process(data.Object);
             // Wait for the consumer task to finish.
-            Assert.IsNotNull(_shareUsageElement.SendDataTask);
-            _shareUsageElement.SendDataTask.Wait();
+            WaitForSendDataTask();
 
             // Assert
             // Check that one and only one HTTP message was sent
@@ -220,8 +219,7 @@ namespace FiftyOne.Pipeline.Engines.FiftyOne.Tests.FlowElements
             _shareUsageElement.Process(data.Object);
 
             // Wait for the consumer task to finish.
-            Assert.IsNotNull(_shareUsageElement.SendDataTask);
-            _shareUsageElement.SendDataTask.Wait();
+            WaitForSendDataTask();
 
             // Assert
             // Check that one and only one HTTP message was sent.
@@ -269,8 +267,7 @@ namespace FiftyOne.Pipeline.Engines.FiftyOne.Tests.FlowElements
             // Act
             _shareUsageElement.Process(data.Object);
             // Wait for the consumer task to finish.
-            Assert.IsNotNull(_shareUsageElement.SendDataTask);
-            _shareUsageElement.SendDataTask.Wait();
+            WaitForSendDataTask();
 
             // Assert
             // Check that one and only one HTTP message was sent.
@@ -317,12 +314,11 @@ namespace FiftyOne.Pipeline.Engines.FiftyOne.Tests.FlowElements
                 requiredEvents++;
             }
             // Wait for the consumer task to finish.
-            Assert.IsNotNull(_shareUsageElement.SendDataTask);
-            _shareUsageElement.SendDataTask.Wait();
+            WaitForSendDataTask();
 
             // Assert
-            // On average, the number of required events should be around 
-            // 100,000. However, as it's chance based it can vary 
+            // On average, the number of required events should be around
+            // 100,000. However, as it's chance based it can vary
             // significantly. We only want to catch any gross errors so just
             // make sure the value is of the expected order of magnitude.
             Console.WriteLine($"requiredEvents = {requiredEvents}");
@@ -358,11 +354,15 @@ namespace FiftyOne.Pipeline.Engines.FiftyOne.Tests.FlowElements
             Assert.IsNull(_shareUsageElement.SendDataTask);
             _httpHandler.Verify(h => h.Send(It.IsAny<HttpRequestMessage>()), Times.Never);
 
-            // Dispose of the element.
+            // Dispose of the element - this should trigger sending remaining data.
             _shareUsageElement.Dispose();
 
+            // The dispose should have completed the send synchronously, but allow
+            // a small buffer for async operations on slower CI environments.
+            Thread.Sleep(200);
+
             // Assert
-            // Check that no HTTP messages were sent.
+            // Check that one HTTP message was sent during cleanup.
             _httpHandler.Verify(h => h.Send(It.IsAny<HttpRequestMessage>()), Times.Once);
         }
 
@@ -387,8 +387,11 @@ namespace FiftyOne.Pipeline.Engines.FiftyOne.Tests.FlowElements
             // Act
             _shareUsageElement.Process(data.Object);
             // Wait for the consumer task to finish.
-            Assert.IsNotNull(_shareUsageElement.SendDataTask);
-            _shareUsageElement.SendDataTask.Wait();
+            Assert.IsNotNull(_shareUsageElement.SendDataTask,
+                "SendDataTask should not be null after processing evidence");
+            var completed = _shareUsageElement.SendDataTask.Wait(5000);
+            Assert.IsTrue(completed,
+                $"SendDataTask did not complete within 5000ms. Task status: {_shareUsageElement.SendDataTask.Status}");
 
             // Assert
             // Check that a warning was logged.
@@ -452,8 +455,7 @@ namespace FiftyOne.Pipeline.Engines.FiftyOne.Tests.FlowElements
             // Act
             _shareUsageElement.Process(data.Object);
             // Wait for the consumer task to finish.
-            Assert.IsNotNull(_shareUsageElement.SendDataTask);
-            _shareUsageElement.SendDataTask.Wait();
+            WaitForSendDataTask();
 
             // Assert
             // Check that one and only one HTTP message was sent.
@@ -539,8 +541,7 @@ namespace FiftyOne.Pipeline.Engines.FiftyOne.Tests.FlowElements
             _sequenceElement.Process(data);
             _shareUsageElement.Process(data);
             // Wait for the consumer task to finish.
-            Assert.IsNotNull(_shareUsageElement.SendDataTask);
-            _shareUsageElement.SendDataTask.Wait();
+            WaitForSendDataTask();
 
             // Assert
             // Check that one and only one HTTP message was sent
@@ -586,8 +587,7 @@ namespace FiftyOne.Pipeline.Engines.FiftyOne.Tests.FlowElements
             _sequenceElement.Process(data);
             _shareUsageElement.Process(data);
             // Wait for the consumer task to finish.
-            Assert.IsNotNull(_shareUsageElement.SendDataTask);
-            _shareUsageElement.SendDataTask.Wait();
+            WaitForSendDataTask();
 
             // Assert
             // Check that one and only one HTTP message was sent
@@ -631,8 +631,7 @@ namespace FiftyOne.Pipeline.Engines.FiftyOne.Tests.FlowElements
             // Act
             _shareUsageElement.Process(data.Object);
             // Wait for the consumer task to finish.
-            Assert.IsNotNull(_shareUsageElement.SendDataTask);
-            _shareUsageElement.SendDataTask.Wait();
+            WaitForSendDataTask();
 
             // Assert
             // Check that one and only one HTTP message was sent
@@ -673,8 +672,7 @@ namespace FiftyOne.Pipeline.Engines.FiftyOne.Tests.FlowElements
             // Act
             _shareUsageElement.Process(data.Object);
             // Wait for the consumer task to finish.
-            Assert.IsNotNull(_shareUsageElement.SendDataTask);
-            _shareUsageElement.SendDataTask.Wait();
+            WaitForSendDataTask();
 
             // Assert
             // Check that one and only one HTTP message was sent
@@ -691,7 +689,7 @@ namespace FiftyOne.Pipeline.Engines.FiftyOne.Tests.FlowElements
         }
 
         /// <summary>
-        /// Helper method used to extract the XML data from an 
+        /// Helper method used to extract the XML data from an
         /// HTTP request.
         /// </summary>
         /// <param name="request">
@@ -706,6 +704,55 @@ namespace FiftyOne.Pipeline.Engines.FiftyOne.Tests.FlowElements
             using (StreamReader reader = new StreamReader(decompressedStream))
             {
                 _xmlContent.Add(reader.ReadToEnd());
+            }
+        }
+
+        /// <summary>
+        /// Helper method to wait for the SendDataTask to complete with proper
+        /// timeout handling and exception checking.
+        /// </summary>
+        /// <param name="timeout">Optional timeout in milliseconds. Default is 5000ms.</param>
+        private void WaitForSendDataTask(int timeout = 5000)
+        {
+            Assert.IsNotNull(_shareUsageElement.SendDataTask,
+                "SendDataTask should not be null after processing evidence");
+
+            var completed = _shareUsageElement.SendDataTask.Wait(timeout);
+
+            // Build diagnostic message with all available information
+            var diagnostics = new List<string>();
+            diagnostics.Add($"Task Status: {_shareUsageElement.SendDataTask.Status}");
+            diagnostics.Add($"Task Completed: {completed}");
+            diagnostics.Add($"XML Content Count: {_xmlContent.Count}");
+
+            // Check for logged errors
+            var errors = _logger.ErrorEntries.ToList();
+            if (errors.Count > 0)
+            {
+                diagnostics.Add($"Logged Errors: {string.Join("; ", errors)}");
+            }
+
+            // Check for logged warnings
+            var warnings = _logger.WarningEntries.ToList();
+            if (warnings.Count > 0)
+            {
+                diagnostics.Add($"Logged Warnings: {string.Join("; ", warnings)}");
+            }
+
+            // Check if task is faulted
+            if (_shareUsageElement.SendDataTask.IsFaulted)
+            {
+                var exception = _shareUsageElement.SendDataTask.Exception;
+                diagnostics.Add($"Task Exception: {exception}");
+            }
+
+            Assert.IsTrue(completed,
+                $"SendDataTask did not complete within {timeout}ms. Diagnostics: {string.Join(" | ", diagnostics)}");
+
+            // Additional check: if task completed but errors were logged, fail with details
+            if (errors.Count > 0)
+            {
+                Assert.Fail($"SendDataTask completed but errors were logged: {string.Join("; ", errors)}");
             }
         }
 
