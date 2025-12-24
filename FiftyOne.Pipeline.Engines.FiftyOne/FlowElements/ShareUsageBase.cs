@@ -38,6 +38,7 @@ using System.Globalization;
 using System.Linq;
 using System.Net;
 using System.Net.Http;
+using System.Threading;
 using System.Net.Sockets;
 using System.Reflection;
 using System.Runtime.CompilerServices;
@@ -945,7 +946,7 @@ namespace FiftyOne.Pipeline.Engines.FiftyOne.FlowElements
                 {
                     if (IsRunning == false)
                     {
-                        SendDataTask = Task.Run(async () =>
+                        SendDataTask = Task.Factory.StartNew(async () =>
                         {
                             using (var requestScope = _failHandler.MakeAttemptScope())
                             {
@@ -961,7 +962,7 @@ namespace FiftyOne.Pipeline.Engines.FiftyOne.FlowElements
                                         Messages.MessageShareUsageUnexpectedFailure);
                                 }
                             }
-                        });
+                        }, CancellationToken.None, TaskCreationOptions.LongRunning, TaskScheduler.Default).Unwrap();
                     }
                 }
             }
