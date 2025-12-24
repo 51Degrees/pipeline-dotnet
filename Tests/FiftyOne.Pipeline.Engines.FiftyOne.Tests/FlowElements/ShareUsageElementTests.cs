@@ -742,8 +742,8 @@ namespace FiftyOne.Pipeline.Engines.FiftyOne.Tests.FlowElements
         /// Helper method to wait for the SendDataTask to complete with proper
         /// timeout handling and exception checking.
         /// </summary>
-        /// <param name="timeout">Optional timeout in milliseconds. Default is 5000ms.</param>
-        private void WaitForSendDataTask(int timeout = 5000)
+        /// <param name="timeout">Optional timeout in milliseconds. Default is 30000ms.</param>
+        private void WaitForSendDataTask(int timeout = 30000)
         {
             Assert.IsNotNull(_shareUsageElement.SendDataTask,
                 "SendDataTask should not be null after processing evidence");

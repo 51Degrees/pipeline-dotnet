@@ -946,7 +946,7 @@ namespace FiftyOne.Pipeline.Engines.FiftyOne.FlowElements
                 {
                     if (IsRunning == false)
                     {
-                        SendDataTask = Task.Factory.StartNew(async () =>
+                        SendDataTask = Task.Run(async () =>
                         {
                             using (var requestScope = _failHandler.MakeAttemptScope())
                             {
@@ -962,7 +962,7 @@ namespace FiftyOne.Pipeline.Engines.FiftyOne.FlowElements
                                         Messages.MessageShareUsageUnexpectedFailure);
                                 }
                             }
-                        }, CancellationToken.None, TaskCreationOptions.LongRunning, TaskScheduler.Default).Unwrap();
+                        });
                     }
                 }
             }
