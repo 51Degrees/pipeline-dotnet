@@ -956,18 +956,12 @@ namespace FiftyOne.Pipeline.Engines.FiftyOne.FlowElements
                                 catch (Exception ex)
                                 {
                                     requestScope.RecordFailure(ex);
-                                    throw;
+                                    Logger.LogError(
+                                        ex,
+                                        Messages.MessageShareUsageUnexpectedFailure);
                                 }
                             }
-                        }).ContinueWith(t =>
-                        {
-                            if(t.Exception != null)
-                            {
-                                Logger.LogError(
-                                    t.Exception,
-                                    Messages.MessageShareUsageUnexpectedFailure);
-                            }
-                        }, TaskScheduler.Default);
+                        });
                     }
                 }
             }
