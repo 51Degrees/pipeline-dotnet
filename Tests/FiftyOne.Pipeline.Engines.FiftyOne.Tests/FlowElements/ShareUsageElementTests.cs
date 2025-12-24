@@ -729,9 +729,11 @@ namespace FiftyOne.Pipeline.Engines.FiftyOne.Tests.FlowElements
         /// </param>
         private void StoreRequestXml(HttpRequestMessage request)
         {
-            using (var stream = request.Content.ReadAsStreamAsync().Result)
+            // Read the content bytes first to avoid stream disposal issues
+            var bytes = request.Content.ReadAsByteArrayAsync().GetAwaiter().GetResult();
+            using (var memoryStream = new MemoryStream(bytes))
             using (GZipStream decompressedStream =
-                new GZipStream(stream, CompressionMode.Decompress, true))
+                new GZipStream(memoryStream, CompressionMode.Decompress, true))
             using (StreamReader reader = new StreamReader(decompressedStream))
             {
                 _xmlContent.Add(reader.ReadToEnd());
