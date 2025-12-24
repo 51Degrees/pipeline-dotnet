@@ -39,6 +39,7 @@ using FiftyOne.Pipeline.Engines.TestHelpers;
 using System;
 using System.Linq;
 using System.Threading;
+using System.Threading.Tasks;
 
 namespace FiftyOne.Pipeline.Engines.FiftyOne.Tests.FlowElements
 {
@@ -52,13 +53,46 @@ namespace FiftyOne.Pipeline.Engines.FiftyOne.Tests.FlowElements
 
         // Mocks and dependencies
         private TestLogger<ShareUsageElement> _logger;
-        private Mock<MockHttpMessageHandler> _httpHandler;
+        private TestHttpHandler _httpHandler;
         private Mock<IPipeline> _pipeline;
         private Mock<ITracker> _tracker;
         private HttpClient _httpClient;
 
         // Test instance data.
         private List<string> _xmlContent = new List<string>();
+
+        /// <summary>
+        /// Simple HTTP handler for tests that directly implements SendAsync
+        /// without relying on Moq's CallBase behavior for protected methods.
+        /// </summary>
+        private class TestHttpHandler : HttpMessageHandler
+        {
+            private Func<HttpRequestMessage, HttpResponseMessage> _responseFactory;
+            public int SendCallCount { get; private set; } = 0;
+
+            public void SetupResponse(Func<HttpRequestMessage, HttpResponseMessage> responseFactory)
+            {
+                _responseFactory = responseFactory;
+            }
+
+            protected override Task<HttpResponseMessage> SendAsync(
+                HttpRequestMessage request,
+                CancellationToken cancellationToken)
+            {
+                SendCallCount++;
+                if (_responseFactory == null)
+                {
+                    throw new InvalidOperationException("Response factory not configured. Call SetupResponse first.");
+                }
+                return Task.FromResult(_responseFactory(request));
+            }
+
+            public void VerifySendCalled(int expectedCount)
+            {
+                Assert.AreEqual(expectedCount, SendCallCount,
+                    $"Expected Send to be called {expectedCount} time(s), but was called {SendCallCount} time(s).");
+            }
+        }
 
         /// <summary>
         /// Initialise the test instance.
@@ -68,21 +102,21 @@ namespace FiftyOne.Pipeline.Engines.FiftyOne.Tests.FlowElements
         {
             _logger = new TestLogger<ShareUsageElement>();
 
-            // Create the HttpClient using the mock handler
-            _httpHandler = new Mock<MockHttpMessageHandler>() { CallBase = true };
-            _httpClient = new HttpClient(_httpHandler.Object);
+            // Create the HttpClient using a simple test handler that directly
+            // implements SendAsync without relying on Moq's CallBase behavior.
+            _httpHandler = new TestHttpHandler();
+            _httpClient = new HttpClient(_httpHandler);
 
-            // Configure the mock handler to store the XML content of requests
+            // Configure the handler to store the XML content of requests
             // in the _xmlContent list and return an 'OK' status code.
-            _httpHandler.Setup(h => h.Send(It.IsAny<HttpRequestMessage>()))
-                .Callback((HttpRequestMessage request) =>
-                {
-                    StoreRequestXml(request);
-                })
-                .Returns(new HttpResponseMessage(System.Net.HttpStatusCode.OK)
+            _httpHandler.SetupResponse(request =>
+            {
+                StoreRequestXml(request);
+                return new HttpResponseMessage(System.Net.HttpStatusCode.OK)
                 {
                     Content = new StringContent("<empty />", Encoding.UTF8, "application/xml"),
-                });
+                };
+            });
 
             // Configure the pipeline to return an empty list of flow elements
             _pipeline = new Mock<IPipeline>();
@@ -156,7 +190,7 @@ namespace FiftyOne.Pipeline.Engines.FiftyOne.Tests.FlowElements
 
             // Assert
             // Check that one and only one HTTP message was sent
-            _httpHandler.Verify(h => h.Send(It.IsAny<HttpRequestMessage>()), Times.Once);
+            _httpHandler.VerifySendCalled(1);
             Assert.AreEqual(1, _xmlContent.Count);
 
             // Validate that the XML is well formed by passing it through a reader
@@ -194,7 +228,7 @@ namespace FiftyOne.Pipeline.Engines.FiftyOne.Tests.FlowElements
 
             // Assert
             // Check that no HTTP messages were sent.
-            _httpHandler.Verify(h => h.Send(It.IsAny<HttpRequestMessage>()), Times.Never);
+            _httpHandler.VerifySendCalled(0);
         }
 
         /// <summary>
@@ -223,7 +257,7 @@ namespace FiftyOne.Pipeline.Engines.FiftyOne.Tests.FlowElements
 
             // Assert
             // Check that one and only one HTTP message was sent.
-            _httpHandler.Verify(h => h.Send(It.IsAny<HttpRequestMessage>()), Times.Once);
+            _httpHandler.VerifySendCalled(1);
             Assert.AreEqual(1, _xmlContent.Count);
 
             // Validate that the XML is well formed by passing it through a reader
@@ -271,7 +305,7 @@ namespace FiftyOne.Pipeline.Engines.FiftyOne.Tests.FlowElements
 
             // Assert
             // Check that one and only one HTTP message was sent.
-            _httpHandler.Verify(h => h.Send(It.IsAny<HttpRequestMessage>()), Times.Once);
+            _httpHandler.VerifySendCalled(1);
             Assert.AreEqual(1, _xmlContent.Count);
 
             // Validate that the XML is well formed by passing it through a reader
@@ -327,7 +361,7 @@ namespace FiftyOne.Pipeline.Engines.FiftyOne.Tests.FlowElements
             Assert.IsTrue(requiredEvents < 1000000, $"Expected the number of required " +
                 $"events to be less than 1,000,000, but was actually '{requiredEvents}'");
             // Check that one and only one HTTP message was sent.
-            _httpHandler.Verify(h => h.Send(It.IsAny<HttpRequestMessage>()), Times.Once);
+            _httpHandler.VerifySendCalled(1);
             Assert.AreEqual(1, _xmlContent.Count);
         }
 
@@ -352,7 +386,7 @@ namespace FiftyOne.Pipeline.Engines.FiftyOne.Tests.FlowElements
 
             // No data should be being sending yet.
             Assert.IsNull(_shareUsageElement.SendDataTask);
-            _httpHandler.Verify(h => h.Send(It.IsAny<HttpRequestMessage>()), Times.Never);
+            _httpHandler.VerifySendCalled(0);
 
             // Dispose of the element - this should trigger sending remaining data.
             _shareUsageElement.Dispose();
@@ -363,7 +397,7 @@ namespace FiftyOne.Pipeline.Engines.FiftyOne.Tests.FlowElements
 
             // Assert
             // Check that one HTTP message was sent during cleanup.
-            _httpHandler.Verify(h => h.Send(It.IsAny<HttpRequestMessage>()), Times.Once);
+            _httpHandler.VerifySendCalled(1);
         }
 
         /// <summary>
@@ -373,9 +407,8 @@ namespace FiftyOne.Pipeline.Engines.FiftyOne.Tests.FlowElements
         public void ShareUsageElement_LogErrors()
         {
             // Arrange
-            _httpHandler.Setup(h => h.Send(It.IsAny<HttpRequestMessage>()))
-                .Returns(new HttpResponseMessage(
-                    System.Net.HttpStatusCode.InternalServerError));
+            _httpHandler.SetupResponse(request =>
+                new HttpResponseMessage(System.Net.HttpStatusCode.InternalServerError));
             CreateShareUsage(1, 1, 1, new List<string>(), new List<string>(), new List<KeyValuePair<string, string>>());
 
             Dictionary<string, object> evidenceData = new Dictionary<string, object>()
@@ -408,9 +441,7 @@ namespace FiftyOne.Pipeline.Engines.FiftyOne.Tests.FlowElements
         public void ShareUsageElement_IgnoreOnEvidence()
         {
             // Arrange
-            _httpHandler.Setup(h => h.Send(It.IsAny<HttpRequestMessage>()))
-                .Returns(new HttpResponseMessage(
-                    System.Net.HttpStatusCode.OK));
+            // Note: SetupResponse is already configured in Init(), no need to override for OK response
             CreateShareUsage(1, 1, 1, new List<string>(), new List<string>(),
                 new List<KeyValuePair<string, string>>()
                 {
@@ -431,7 +462,7 @@ namespace FiftyOne.Pipeline.Engines.FiftyOne.Tests.FlowElements
 
             // Assert
             // Check that no HTTP messages were sent.
-            _httpHandler.Verify(h => h.Send(It.IsAny<HttpRequestMessage>()), Times.Never);
+            _httpHandler.VerifySendCalled(0);
         }
 
         /// <summary>
@@ -459,7 +490,7 @@ namespace FiftyOne.Pipeline.Engines.FiftyOne.Tests.FlowElements
 
             // Assert
             // Check that one and only one HTTP message was sent.
-            _httpHandler.Verify(h => h.Send(It.IsAny<HttpRequestMessage>()), Times.Once);
+            _httpHandler.VerifySendCalled(1);
             Assert.AreEqual(1, _xmlContent.Count);
 
             // Validate that the XML is well formed by passing it through a reader
@@ -545,7 +576,7 @@ namespace FiftyOne.Pipeline.Engines.FiftyOne.Tests.FlowElements
 
             // Assert
             // Check that one and only one HTTP message was sent
-            _httpHandler.Verify(h => h.Send(It.IsAny<HttpRequestMessage>()), Times.Once);
+            _httpHandler.VerifySendCalled(1);
             Assert.AreEqual(1, _xmlContent.Count);
 
             // Validate that the XML is well formed by passing it through a reader
@@ -591,7 +622,7 @@ namespace FiftyOne.Pipeline.Engines.FiftyOne.Tests.FlowElements
 
             // Assert
             // Check that one and only one HTTP message was sent
-            _httpHandler.Verify(h => h.Send(It.IsAny<HttpRequestMessage>()), Times.Once);
+            _httpHandler.VerifySendCalled(1);
             Assert.AreEqual(1, _xmlContent.Count);
 
             // Validate that the XML is well formed by passing it through a reader
@@ -635,7 +666,7 @@ namespace FiftyOne.Pipeline.Engines.FiftyOne.Tests.FlowElements
 
             // Assert
             // Check that one and only one HTTP message was sent
-            _httpHandler.Verify(h => h.Send(It.IsAny<HttpRequestMessage>()), Times.Once);
+            _httpHandler.VerifySendCalled(1);
             Assert.AreEqual(1, _xmlContent.Count);
 
             // Validate that the XML is well formed by passing it through a reader
@@ -676,7 +707,7 @@ namespace FiftyOne.Pipeline.Engines.FiftyOne.Tests.FlowElements
 
             // Assert
             // Check that one and only one HTTP message was sent
-            _httpHandler.Verify(h => h.Send(It.IsAny<HttpRequestMessage>()), Times.Once);
+            _httpHandler.VerifySendCalled(1);
             Assert.AreEqual(1, _xmlContent.Count);
 
             // Validate that the XML is well formed by passing it through a reader
