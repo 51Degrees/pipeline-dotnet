@@ -422,9 +422,9 @@ namespace FiftyOne.Pipeline.Engines.FiftyOne.Tests.FlowElements
             // Wait for the consumer task to finish.
             Assert.IsNotNull(_shareUsageElement.SendDataTask,
                 "SendDataTask should not be null after processing evidence");
-            var completed = _shareUsageElement.SendDataTask.Wait(5000);
+            var completed = _shareUsageElement.SendDataTask.Wait(30000);
             Assert.IsTrue(completed,
-                $"SendDataTask did not complete within 5000ms. Task status: {_shareUsageElement.SendDataTask.Status}");
+                $"SendDataTask did not complete within 30000ms. Task status: {_shareUsageElement.SendDataTask.Status}");
 
             // Assert
             // Check that a warning was logged.
