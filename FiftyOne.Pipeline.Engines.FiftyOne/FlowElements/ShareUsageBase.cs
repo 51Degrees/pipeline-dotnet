@@ -38,6 +38,7 @@ using System.Globalization;
 using System.Linq;
 using System.Net;
 using System.Net.Http;
+using System.Threading;
 using System.Net.Sockets;
 using System.Reflection;
 using System.Runtime.CompilerServices;
@@ -956,18 +957,12 @@ namespace FiftyOne.Pipeline.Engines.FiftyOne.FlowElements
                                 catch (Exception ex)
                                 {
                                     requestScope.RecordFailure(ex);
-                                    throw;
+                                    Logger.LogError(
+                                        ex,
+                                        Messages.MessageShareUsageUnexpectedFailure);
                                 }
                             }
-                        }).ContinueWith(t =>
-                        {
-                            if(t.Exception != null)
-                            {
-                                Logger.LogError(
-                                    t.Exception,
-                                    Messages.MessageShareUsageUnexpectedFailure);
-                            }
-                        }, TaskScheduler.Default);
+                        });
                     }
                 }
             }

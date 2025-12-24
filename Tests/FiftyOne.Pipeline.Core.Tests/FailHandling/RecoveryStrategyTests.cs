@@ -220,37 +220,39 @@ namespace FiftyOne.Pipeline.Core.Tests
         [TestMethod]
         public void ExponentialBackoffRecoveryStrategyShouldDoubleDelayOnConsecutiveFailures()
         {
+            // Use larger delays to avoid timing sensitivity on CI environments
+            // where Thread.Sleep can overshoot significantly under load
             IRecoveryStrategy strategy = new ExponentialBackoffRecoveryStrategy(
-                initialDelaySeconds: 0.1,
+                initialDelaySeconds: 0.5,
                 maxDelaySeconds: 10.0,
                 multiplier: 2.0);
 
-            // First failure - should delay for 0.1 seconds
+            // First failure - should delay for 0.5 seconds
             var ex1 = new CachedException(new System.Exception("failure 1"));
             strategy.RecordFailure(ex1);
-            
+
             Assert.IsFalse(strategy.MayTryNow(out _, out _),
                 "Should be in recovery after first failure.");
 
-            // Wait for first recovery
-            Thread.Sleep(millisecondsTimeout: 150);
+            // Wait for first recovery (0.5s delay + margin)
+            Thread.Sleep(millisecondsTimeout: 700);
             Assert.IsTrue(strategy.MayTryNow(out _, out _),
                 "Should be available after first recovery period.");
 
-            // Second consecutive failure - should delay for 0.2 seconds
+            // Second consecutive failure - should delay for 1.0 seconds (doubled)
             var ex2 = new CachedException(new System.Exception("failure 2"));
             strategy.RecordFailure(ex2);
-            
+
             Assert.IsFalse(strategy.MayTryNow(out _, out _),
                 "Should be in recovery after second failure.");
 
-            // Should still be in recovery after first delay period
-            Thread.Sleep(millisecondsTimeout: 150);
+            // Should still be in recovery after 0.7 seconds (delay is 1.0s, 300ms margin)
+            Thread.Sleep(millisecondsTimeout: 700);
             Assert.IsFalse(strategy.MayTryNow(out _, out _),
-                "Should still be in recovery after 0.15 seconds (delay should be 0.2s).");
+                "Should still be in recovery after 0.7 seconds (delay should be 1.0s).");
 
             // Should be available after full second delay period
-            Thread.Sleep(millisecondsTimeout: 100);
+            Thread.Sleep(millisecondsTimeout: 400);
             Assert.IsTrue(strategy.MayTryNow(out _, out _),
                 "Should be available after full second delay period.");
         }
@@ -337,9 +339,9 @@ namespace FiftyOne.Pipeline.Core.Tests
         {
             // This test verifies the fix for the race condition where multiple threads
             // calling RecordFailure simultaneously could cause unexpected skips of exponential stages
-            
+            // Uses larger delays to avoid timing sensitivity on CI environments
             var strategy = new ExponentialBackoffRecoveryStrategy(
-                initialDelaySeconds: 0.2,
+                initialDelaySeconds: 0.5,
                 maxDelaySeconds: 10.0,
                 multiplier: 2.0);
 
@@ -347,11 +349,8 @@ namespace FiftyOne.Pipeline.Core.Tests
             Assert.IsTrue(strategy.MayTryNow(out _, out _), "All threads should initially be allowed.");
 
             // Simulate the race condition scenario described in the PR:
-            // [00:10.50] (4x threads) MayTryNow returns true
-            // [00:11.03] (thread A) RecordFailure -- should be stage 1 (0.2s recovery)
-            // [00:11.05] (thread B) RecordFailure -- should NOT increment to stage 2 if it's the same failure event
-            // [00:11.06] (thread C) RecordFailure -- should NOT increment to stage 3 if it's the same failure event  
-            // [00:11.08] (thread D) RecordFailure -- should NOT increment to stage 4 if it's the same failure event
+            // Multiple threads calling RecordFailure simultaneously should NOT
+            // cause the exponential stage to increment multiple times
 
             var ex1 = new CachedException(new System.Exception("failure 1"));
             var ex2 = new CachedException(new System.Exception("failure 2"));
@@ -362,15 +361,15 @@ namespace FiftyOne.Pipeline.Core.Tests
             // The fix should prevent unconditional increment of consecutive failures
             strategy.RecordFailure(ex1); // Should set stage 1
             strategy.RecordFailure(ex2); // Should NOT increment (same failure window due to race condition fix)
-            strategy.RecordFailure(ex3); // Should NOT increment (same failure window due to race condition fix)  
+            strategy.RecordFailure(ex3); // Should NOT increment (same failure window due to race condition fix)
             strategy.RecordFailure(ex4); // Should NOT increment (same failure window due to race condition fix)
 
-            // Should be in recovery for stage 1 (0.2 seconds), NOT stage 4 (1.6 seconds)
+            // Should be in recovery for stage 1 (0.5 seconds), NOT stage 4 (4.0 seconds)
             Assert.IsFalse(strategy.MayTryNow(out _, out _),
                 "Should be in recovery after recording failures.");
 
-            // Should recover after stage 1 delay (~0.2s), not stage 4 delay (~1.6s)
-            Thread.Sleep(millisecondsTimeout: 300);
+            // Should recover after stage 1 delay (~0.5s), not stage 4 delay (~4.0s)
+            Thread.Sleep(millisecondsTimeout: 700);
             Assert.IsTrue(strategy.MayTryNow(out _, out _),
                 "Should recover after stage 1 delay, proving race condition was prevented.");
 
@@ -379,17 +378,17 @@ namespace FiftyOne.Pipeline.Core.Tests
             var ex5 = new CachedException(new System.Exception("failure 5"));
             strategy.RecordFailure(ex5);
 
-            // This should now be stage 2 (0.4 seconds)
+            // This should now be stage 2 (1.0 seconds)
             Assert.IsFalse(strategy.MayTryNow(out _, out _),
                 "Should be in recovery for stage 2.");
 
-            // Should still be in recovery after stage 1 delay
-            Thread.Sleep(millisecondsTimeout: 250);
+            // Should still be in recovery after 0.7s (stage 2 delay is 1.0s, 300ms margin)
+            Thread.Sleep(millisecondsTimeout: 700);
             Assert.IsFalse(strategy.MayTryNow(out _, out _),
-                "Should still be in recovery after 0.25s (stage 2 delay is 0.4s).");
+                "Should still be in recovery after 0.7s (stage 2 delay is 1.0s).");
 
             // Should recover after stage 2 delay
-            Thread.Sleep(millisecondsTimeout: 200);
+            Thread.Sleep(millisecondsTimeout: 400);
             Assert.IsTrue(strategy.MayTryNow(out _, out _),
                 "Should recover after stage 2 delay.");
         }
