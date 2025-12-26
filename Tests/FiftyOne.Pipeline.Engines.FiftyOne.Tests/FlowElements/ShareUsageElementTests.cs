@@ -782,10 +782,14 @@ namespace FiftyOne.Pipeline.Engines.FiftyOne.Tests.FlowElements
             Assert.IsTrue(completed,
                 $"SendDataTask did not complete within {timeout}ms. Diagnostics: {string.Join(" | ", diagnostics)}");
 
-            // Additional check: if task completed but errors were logged, fail with details
+            // Additional check: if task completed but errors were logged, fail with details including exceptions
             if (errors.Count > 0)
             {
-                Assert.Fail($"SendDataTask completed but errors were logged: {string.Join("; ", errors)}");
+                // Get full error entries with exceptions for better diagnostics
+                var errorDetails = _logger.ExtendedEntries
+                    .Where(e => e.LogLevel == LogLevel.Error)
+                    .Select(e => $"Message: {e.Message}" + (e.Exception != null ? $" | Exception: {e.Exception}" : ""));
+                Assert.Fail($"SendDataTask completed but errors were logged: {string.Join("; ", errorDetails)}");
             }
         }
 
