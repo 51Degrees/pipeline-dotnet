@@ -174,14 +174,14 @@ namespace FiftyOne.Pipeline.Engines.Tests.Services
         }
 
         /// <summary>
-        /// Check that an argument null exception is thrown if the 
+        /// Check that an argument null exception is thrown if the
         /// configuration parameter is null
         /// </summary>
         [TestMethod]
-        [ExpectedException(typeof(ArgumentNullException))]
         public void DataUpdateService_Register_Null()
         {
-            _dataUpdate.RegisterDataFile(null);
+            Assert.ThrowsExactly<ArgumentNullException>(() =>
+                _dataUpdate.RegisterDataFile(null));
         }
 
         /// <summary>

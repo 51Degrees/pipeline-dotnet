@@ -368,7 +368,6 @@ namespace FiftyOne.Pipeline.Core.Tests.FlowElements
         /// when no matching property exists
         /// </summary>
         [TestMethod]
-        [ExpectedException(typeof(PipelineDataException))]
         public void Pipeline_GetPropertyMetaData_None()
         {
             var element1 = GetMockFlowElement();
@@ -383,7 +382,8 @@ namespace FiftyOne.Pipeline.Core.Tests.FlowElements
                 element2.Object);
 
             // Get the requested property meta data
-            var metadata = pipeline.GetMetaDataForProperty("noproperty");
+            Assert.ThrowsExactly<PipelineDataException>(() =>
+                pipeline.GetMetaDataForProperty("noproperty"));
         }
 
         /// <summary>
@@ -391,7 +391,6 @@ namespace FiftyOne.Pipeline.Core.Tests.FlowElements
         /// when multiple properties match
         /// </summary>
         [TestMethod]
-        [ExpectedException(typeof(PipelineDataException))]
         public void Pipeline_GetPropertyMetaData_Multiple()
         {
             var element1 = GetMockFlowElement();
@@ -414,7 +413,8 @@ namespace FiftyOne.Pipeline.Core.Tests.FlowElements
                 element2.Object);
 
             // Get the requested property meta data
-            var metadata = pipeline.GetMetaDataForProperty("testproperty");
+            Assert.ThrowsExactly<PipelineDataException>(() =>
+                pipeline.GetMetaDataForProperty("testproperty"));
         }
 
         /// <summary>

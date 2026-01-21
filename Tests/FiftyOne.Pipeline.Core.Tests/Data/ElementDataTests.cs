@@ -215,17 +215,19 @@ namespace FiftyOne.Pipeline.Core.Tests.Data
         }
 
         /// <summary>
-        /// Test that the expected exception is thrown when the key 
+        /// Test that the expected exception is thrown when the key
         /// parameter is null.
         /// </summary>
         [TestMethod]
-        [ExpectedException(typeof(ArgumentNullException))]
         public void ElementData_NullKey()
         {
             TestElementData data = new TestElementData(_pipeline.Object);
             string key = null;
 
-            var result = data[key];
+            Assert.ThrowsExactly<ArgumentNullException>(() =>
+            {
+                var result = data[key];
+            });
         }
 
         /// <summary>

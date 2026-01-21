@@ -96,14 +96,16 @@ namespace FiftyOne.Pipeline.CloudRequestEngine.Tests
         /// Test exception is thrown if no resource key is specified.
         /// </summary>
         [TestMethod]
-        [ExpectedException(typeof(PipelineConfigurationException))]
         public void BuildEngine_ResourceKey_NotSet()
         {
-            var cloudRequestsEngine =
-                new CloudRequestEngineBuilder(
-                    new LoggerFactory(), 
-                    new HttpClient())
-                .Build();
+            Assert.ThrowsExactly<PipelineConfigurationException>(() =>
+            {
+                var cloudRequestsEngine =
+                    new CloudRequestEngineBuilder(
+                        new LoggerFactory(),
+                        new HttpClient())
+                    .Build();
+            });
         }
 
         /// <summary>

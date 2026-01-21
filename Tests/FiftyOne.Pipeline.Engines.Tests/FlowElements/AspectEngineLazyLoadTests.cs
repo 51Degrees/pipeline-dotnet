@@ -132,7 +132,6 @@ namespace FiftyOne.Pipeline.Engines.Tests.FlowElements
         /// takes longer than the timeout works as expected.
         /// </summary>
         [TestMethod]
-        [ExpectedException(typeof(TimeoutException))]
         public void AspectEngineLazyLoad_PropertyTimeout()
         {
             // Arrange
@@ -144,7 +143,7 @@ namespace FiftyOne.Pipeline.Engines.Tests.FlowElements
             {
                 { "user-agent", "1234" }
             };
-            // Use the mock flow data to populate this variable with the 
+            // Use the mock flow data to populate this variable with the
             // engine data from the call to process.
             var mockData = MockFlowData.CreateFromEvidence(evidence, false);
             EmptyEngineData engineData = null;
@@ -162,21 +161,20 @@ namespace FiftyOne.Pipeline.Engines.Tests.FlowElements
 
             // Process the data
             _engine.Process(data);
-            // Attempt to get the value. This should cause the timeout 
+            // Attempt to get the value. This should cause the timeout
             // to be triggered.
-            var result = engineData.ValueTwo;
-
-            // No asserts needed. Just the ExpectedException attribute
-            // on the method.
+            Assert.ThrowsExactly<TimeoutException>(() =>
+            {
+                var result = engineData.ValueTwo;
+            });
         }
 
         /// <summary>
         /// Check that activating the cancellation token while
-        /// waiting for processing for a lazy loaded property to 
+        /// waiting for processing for a lazy loaded property to
         /// complete will function as expected.
         /// </summary>
         [TestMethod]
-        [ExpectedException(typeof(OperationCanceledException))]
         public void AspectEngineLazyLoad_ProcessCancelled()
         {
             // Arrange
@@ -188,7 +186,7 @@ namespace FiftyOne.Pipeline.Engines.Tests.FlowElements
             {
                 { "user-agent", "1234" }
             };
-            // Use the mock flow data to populate this variable with the 
+            // Use the mock flow data to populate this variable with the
             // engine data from the call to process.
             var mockData = MockFlowData.CreateFromEvidence(evidence, false);
             EmptyEngineData engineData = null;
@@ -208,11 +206,11 @@ namespace FiftyOne.Pipeline.Engines.Tests.FlowElements
             _engine.Process(data);
 
             // Ideally, start a new task that will wait a short time and
-            // then trigger the cancellation token. 
+            // then trigger the cancellation token.
             // If we've only got one core to work with then this approach
-            // can cause the test to fail as the cancellation task may 
+            // can cause the test to fail as the cancellation task may
             // not get run in time.
-            // If we only have one core then just trigger cancellation 
+            // If we only have one core then just trigger cancellation
             // up-front.
             if (Environment.ProcessorCount > 1)
             {
@@ -228,12 +226,12 @@ namespace FiftyOne.Pipeline.Engines.Tests.FlowElements
             }
 
             // Attempt to get the value.
-            var result = engineData.ValueTwo;
-            // These asserts are not really needed but can help work out
-            // what is happening if the test fails to throw the expected
-            // exception.
+            Assert.ThrowsExactly<OperationCanceledException>(() =>
+            {
+                var result = engineData.ValueTwo;
+            });
+            // This assert can help work out what is happening if the test fails.
             Assert.IsTrue(_cancellationTokenSource.IsCancellationRequested);
-            Assert.IsNull(result);
         }
 
         /// <summary>

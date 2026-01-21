@@ -46,12 +46,14 @@ namespace FiftyOne.Pipeline.Engines.Tests.Data
         /// the default constructor.
         /// </summary>
         [TestMethod]
-        [ExpectedException(typeof(NoValueException))]
         public void AspectPropertyValue_DefaultConstructor()
         {
             AspectPropertyValue<int> value = new AspectPropertyValue<int>();
             Assert.IsFalse(value.HasValue);
-            var result = value.Value;
+            Assert.ThrowsExactly<NoValueException>(() =>
+            {
+                var result = value.Value;
+            });
         }
 
         /// <summary>

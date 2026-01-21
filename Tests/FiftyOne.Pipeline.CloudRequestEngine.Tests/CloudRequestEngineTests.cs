@@ -553,14 +553,13 @@ namespace FiftyOne.Pipeline.CloudRequestEngine.Tests
         }
 
         /// <summary>
-        /// Test cloud request engine handles a lack of data from the 
+        /// Test cloud request engine handles a lack of data from the
         /// cloud service as expected.
         /// An exception should be thrown by the cloud request engine
-        /// and the pipeline is configured to throw any exceptions up 
+        /// and the pipeline is configured to throw any exceptions up
         /// the stack as an AggregateException.
         /// </summary>
         [TestMethod]
-        [ExpectedException(typeof(AggregateException))]
         public void ValidateErrorHandling_NoData()
         {
             string resourceKey = "resource_key";
@@ -573,7 +572,7 @@ namespace FiftyOne.Pipeline.CloudRequestEngine.Tests
             );
 
             var engine = new CloudRequestEngineBuilder(
-                _loggerFactory, 
+                _loggerFactory,
                 _httpClient)
                 .SetResourceKey(resourceKey)
                 .Build();
@@ -583,19 +582,18 @@ namespace FiftyOne.Pipeline.CloudRequestEngine.Tests
                 var data = pipeline.CreateFlowData();
                 data.AddEvidence("query.User-Agent", userAgent);
 
-                data.Process();
+                Assert.ThrowsExactly<AggregateException>(() => data.Process());
             }
         }
 
         /// <summary>
-        /// Test cloud request engine handles a lack of data from the 
+        /// Test cloud request engine handles a lack of data from the
         /// cloud service as expected.
         /// An exception should be thrown by the cloud request engine
-        /// and the pipeline is configured to throw any exceptions up 
+        /// and the pipeline is configured to throw any exceptions up
         /// the stack as an AggregateException.
         /// </summary>
         [TestMethod]
-        [ExpectedException(typeof(CloudRequestException))]
         public void ValidateErrorHandling_NotJson()
         {
             string resourceKey = "resource_key";
@@ -612,24 +610,20 @@ namespace FiftyOne.Pipeline.CloudRequestEngine.Tests
             ConfigureMockedClient(_ => true);
 
             var engine = new CloudRequestEngineBuilder(
-                _loggerFactory, 
+                _loggerFactory,
                 _httpClient)
                 .SetResourceKey(resourceKey)
                 .Build();
 
-            try
+            var ex = Assert.ThrowsExactly<CloudRequestException>(() =>
             {
                 var cloudEngineProps = engine.PublicProperties;
-                Assert.Fail("Expected exception did not occur");
-            }
-            catch (CloudRequestException ex)
-            {
-                Assert.AreEqual(ex.HttpStatusCode, 404, "Status code should be 404");
-                Assert.IsNotNull(ex.ResponseHeaders, "Response headers not populated");
-                Assert.IsNotNull(ex.InnerException, "Inner exception not populated");
-                Assert.IsInstanceOfType<JsonReaderException>(ex.InnerException, $"Inner exception is not an instance of {nameof(JsonReaderException)}");
-                throw;
-            }
+            });
+
+            Assert.AreEqual(ex.HttpStatusCode, 404, "Status code should be 404");
+            Assert.IsNotNull(ex.ResponseHeaders, "Response headers not populated");
+            Assert.IsNotNull(ex.InnerException, "Inner exception not populated");
+            Assert.IsInstanceOfType<JsonReaderException>(ex.InnerException, $"Inner exception is not an instance of {nameof(JsonReaderException)}");
         }
 
         /// <summary>

@@ -236,7 +236,6 @@ namespace FiftyOne.Pipeline.CloudRequestEngine.Tests
         /// gets wrapped in <see cref="PropertiesNotYetLoadedException"/>.
         /// </summary>
         [TestMethod]
-        [ExpectedException(typeof(PropertiesNotYetLoadedException))]
         public void LoadProperties_CloudRequestExceptionOnPublicProperties()
         {
             // prepare flow elements
@@ -258,7 +257,7 @@ namespace FiftyOne.Pipeline.CloudRequestEngine.Tests
                     .AddFlowElement(mockRequestEngine.Object)
                     .AddFlowElement(mockTestInstance.Object)
                     .Build();
-            } 
+            }
             catch(Exception ex)
             {
                 // Else fail the test
@@ -269,7 +268,10 @@ namespace FiftyOne.Pipeline.CloudRequestEngine.Tests
             Assert.AreEqual(1, exceptionsGenerated[0]);
 
             // Verify `CloudAspectEngineBase` wraps `CloudRequestException` into `PropertiesNotYetLoadedException`
-            _ = mockTestInstance.Object.Properties;
+            Assert.ThrowsExactly<PropertiesNotYetLoadedException>(() =>
+            {
+                _ = mockTestInstance.Object.Properties;
+            });
         }
 
         /// <summary>
@@ -398,7 +400,6 @@ namespace FiftyOne.Pipeline.CloudRequestEngine.Tests
         /// and has an array type.
         /// </summary>
         [TestMethod]
-        [ExpectedException(typeof(PipelineException))]
         public void LoadProperties_NoMatchArray()
         {
             List<PropertyMetaData> properties = new List<PropertyMetaData>();
@@ -407,7 +408,7 @@ namespace FiftyOne.Pipeline.CloudRequestEngine.Tests
             devicePropertyData.Properties = properties;
             _propertiesReturnedByRequestEngine.Add("test", devicePropertyData);
 
-            CreatePipeline();
+            Assert.ThrowsExactly<PipelineException>(() => CreatePipeline());
         }
 
         /// <summary>
@@ -416,7 +417,6 @@ namespace FiftyOne.Pipeline.CloudRequestEngine.Tests
         /// and has sub-properties.
         /// </summary>
         [TestMethod]
-        [ExpectedException(typeof(PipelineException))]
         public void LoadProperties_NoMatchSubProperties()
         {
             List<PropertyMetaData> subproperties = new List<PropertyMetaData>();
@@ -431,7 +431,7 @@ namespace FiftyOne.Pipeline.CloudRequestEngine.Tests
             devicePropertyData.Properties = properties;
             _propertiesReturnedByRequestEngine.Add("test", devicePropertyData);
 
-            CreatePipeline();
+            Assert.ThrowsExactly<PipelineException>(() => CreatePipeline());
         }
 
         /// <summary>
@@ -618,18 +618,20 @@ namespace FiftyOne.Pipeline.CloudRequestEngine.Tests
         }
 
         /// <summary>
-        /// Test that the expected exception is thrown when the 
-        /// CloudRequestEngine has not been added to the Pipeline but a 
+        /// Test that the expected exception is thrown when the
+        /// CloudRequestEngine has not been added to the Pipeline but a
         /// CloudAspectEngine has
         /// </summary>
         [TestMethod]
-        [ExpectedException(typeof(PipelineConfigurationException))]
         public void CloudEngines_NoRequestEngine()
         {
             var engine = new TestInstance();
-            var pipeline = new PipelineBuilder(new LoggerFactory())
-                .AddFlowElement(engine)
-                .Build();
+            Assert.ThrowsExactly<PipelineConfigurationException>(() =>
+            {
+                var pipeline = new PipelineBuilder(new LoggerFactory())
+                    .AddFlowElement(engine)
+                    .Build();
+            });
         }
 
         #endregion

@@ -72,20 +72,24 @@ namespace FiftyOne.Pipeline.Core.Tests.TypedMap
         public void TypedMap_Concurrent_Overwrite() { TypedMap_Overwrite(); }
 
         /// <summary>
-        /// Check that the map will throw an exception if there is no 
+        /// Check that the map will throw an exception if there is no
         /// data for the given key.
         /// </summary>
         [TestMethod]
-        [ExpectedException(typeof(KeyNotFoundException))]
-        public void TypedMap_Concurrent_NoData() { TypedMap_NoData(); }
+        public void TypedMap_Concurrent_NoData()
+        {
+            Assert.ThrowsExactly<KeyNotFoundException>(() => TypedMap_NoData());
+        }
 
         /// <summary>
-        /// Check that an <see cref="InvalidCastException"/> is thrown if the 
+        /// Check that an <see cref="InvalidCastException"/> is thrown if the
         /// data is not of the expected type.
         /// </summary>
         [TestMethod]
-        [ExpectedException(typeof(InvalidCastException))]
-        public void TypedMap_Concurrent_WrongKeyType() { TypedMap_WrongKeyType(); }
+        public void TypedMap_Concurrent_WrongKeyType()
+        {
+            Assert.ThrowsExactly<InvalidCastException>(() => TypedMap_WrongKeyType());
+        }
 
         /// <summary>
         /// Check that a null value can be stored and retrieved successfully.
@@ -104,16 +108,20 @@ namespace FiftyOne.Pipeline.Core.Tests.TypedMap
         /// when it contains no data of the requested type.
         /// </summary>
         [TestMethod]
-        [ExpectedException(typeof(PipelineDataException))]
-        public void TypedMap_Concurrent_GetByTypeNoMatch() { TypedMap_GetByTypeNoMatch(); }
+        public void TypedMap_Concurrent_GetByTypeNoMatch()
+        {
+            Assert.ThrowsExactly<PipelineDataException>(() => TypedMap_GetByTypeNoMatch());
+        }
 
         /// <summary>
         /// Check that the Get&lt;T&gt;() method throws an exception
         /// when it contains multiple instances of the requested type.
         /// </summary>
         [TestMethod]
-        [ExpectedException(typeof(PipelineDataException))]
-        public void TypedMap_Concurrent_GetByTypeMultiMatch() { TypedMap_GetByTypeMultiMatch(); }
+        public void TypedMap_Concurrent_GetByTypeMultiMatch()
+        {
+            Assert.ThrowsExactly<PipelineDataException>(() => TypedMap_GetByTypeMultiMatch());
+        }
 
         /// <summary>
         /// Check that the Get&lt;T&gt;() method works as expected when

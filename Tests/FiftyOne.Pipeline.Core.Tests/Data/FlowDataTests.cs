@@ -90,11 +90,10 @@ namespace FiftyOne.Pipeline.Core.Tests.Data
         /// Check that the Process method will not allow multiple calls
         /// </summary>
         [TestMethod]
-        [ExpectedException(typeof(PipelineException))]
         public void FlowData_ProcessAlreadyDone()
         {
             _flowData.Process();
-            _flowData.Process();
+            Assert.ThrowsExactly<PipelineException>(() => _flowData.Process());
         }
 
         /// <summary>
@@ -304,102 +303,98 @@ namespace FiftyOne.Pipeline.Core.Tests.Data
         /// Check that the expected exception is thrown if the key is null
         /// </summary>
         [TestMethod]
-        [ExpectedException(typeof(ArgumentNullException))]
         public void FlowData_GetWithNullStringKey()
         {
             _flowData.Process();
-            var result = _flowData.Get(null);
+            Assert.ThrowsExactly<ArgumentNullException>(() => _flowData.Get(null));
         }
 
         /// <summary>
         /// Check that the expected exception is thrown if the key is null
         /// </summary>
         [TestMethod]
-        [ExpectedException(typeof(ArgumentNullException))]
         public void FlowData_GetWithNullTypedKey()
         {
             _flowData.Process();
-            var result = _flowData.Get<TestElementData>(null);
+            Assert.ThrowsExactly<ArgumentNullException>(() => _flowData.Get<TestElementData>(null));
         }
 
         /// <summary>
         /// Check that the expected exception is thrown if the key is null
         /// </summary>
         [TestMethod]
-        [ExpectedException(typeof(ArgumentNullException))]
         public void FlowData_GetWithNullElement()
         {
             _flowData.Process();
-            var result = _flowData.GetFromElement<TestElementData, IElementPropertyMetaData>(null);
+            Assert.ThrowsExactly<ArgumentNullException>(() =>
+                _flowData.GetFromElement<TestElementData, IElementPropertyMetaData>(null));
         }
 
         /// <summary>
-        /// Check that the expected exception is thrown if the FlowData 
+        /// Check that the expected exception is thrown if the FlowData
         /// has not yet been processed.
         /// </summary>
         [TestMethod]
-        [ExpectedException(typeof(PipelineException))]
         public void FlowData_GetBeforeProcess_String()
         {
-            var result = _flowData.Get("key");
+            Assert.ThrowsExactly<PipelineException>(() => _flowData.Get("key"));
         }
 
         /// <summary>
-        /// Check that the expected exception is thrown if the FlowData 
+        /// Check that the expected exception is thrown if the FlowData
         /// has not yet been processed.
         /// </summary>
         [TestMethod]
-        [ExpectedException(typeof(PipelineException))]
         public void FlowData_GetBeforeProcess_TypedKey()
         {
-            var result = _flowData.Get(new TypedKey<TestElementData>("key"));
+            Assert.ThrowsExactly<PipelineException>(() =>
+                _flowData.Get(new TypedKey<TestElementData>("key")));
         }
 
         /// <summary>
-        /// Check that the expected exception is thrown if the FlowData 
+        /// Check that the expected exception is thrown if the FlowData
         /// has not yet been processed.
         /// </summary>
         [TestMethod]
-        [ExpectedException(typeof(PipelineException))]
         public void FlowData_GetBeforeProcess_FlowElement()
         {
-            var result = _flowData.GetFromElement(new TestElement());
+            Assert.ThrowsExactly<PipelineException>(() =>
+                _flowData.GetFromElement(new TestElement()));
         }
 
         /// <summary>
-        /// Check that the expected exception is thrown  if the data key 
+        /// Check that the expected exception is thrown if the data key
         /// is not present
         /// </summary>
         [TestMethod]
-        [ExpectedException(typeof(KeyNotFoundException))]
         public void FlowData_GetNotPresent_String()
         {
             _flowData.Process();
-            var result = _flowData.Get("key");
+            Assert.ThrowsExactly<KeyNotFoundException>(() => _flowData.Get("key"));
         }
 
         /// <summary>
-        /// Check that the expected exception is thrown  if the data key 
+        /// Check that the expected exception is thrown if the data key
         /// is not present
         /// </summary>
         [TestMethod]
-        [ExpectedException(typeof(KeyNotFoundException))]
         public void FlowData_GetNotPresent_TypedKey()
         {
             _flowData.Process();
-            var result = _flowData.Get(new TypedKey<TestElementData>("key"));
+            Assert.ThrowsExactly<KeyNotFoundException>(() =>
+                _flowData.Get(new TypedKey<TestElementData>("key")));
         }
 
         /// <summary>
-        /// Check that the expected exception is thrown  if the data key 
+        /// Check that the expected exception is thrown if the data key
         /// is not present
         /// </summary>
         [TestMethod]
-        [ExpectedException(typeof(KeyNotFoundException))]
         public void FlowData_GetNotPresent_Element()
         {
             _flowData.Process();
-            var result = _flowData.GetFromElement(new TestElement());
+            Assert.ThrowsExactly<KeyNotFoundException>(() =>
+                _flowData.GetFromElement(new TestElement()));
         }
 
         /// <summary>
@@ -508,65 +503,65 @@ namespace FiftyOne.Pipeline.Core.Tests.Data
         }
 
         /// <summary>
-        /// Test that getting a property value directly using 'GetAs' 
+        /// Test that getting a property value directly using 'GetAs'
         /// throws the expected error if flow data has not yet been processed
         /// </summary>
         [TestMethod]
-        [ExpectedException(typeof(PipelineException))]
         public void FlowData_GetAs_NotProcessed()
         {
             ConfigureMultiElementValues();
             var flowData = StaticFactories.CreateFlowData(_pipeline.Object);
 
-            var result = flowData.GetAs<string>(STRING_PROPERTY);
+            Assert.ThrowsExactly<PipelineException>(() =>
+                flowData.GetAs<string>(STRING_PROPERTY));
         }
 
         /// <summary>
-        /// Test that getting a property value directly using 'GetAs' 
+        /// Test that getting a property value directly using 'GetAs'
         /// throws the expected error if the requested property does not
         /// exist
         /// </summary>
         [TestMethod]
-        [ExpectedException(typeof(PipelineDataException))]
         public void FlowData_GetAs_NoProperty()
         {
             ConfigureMultiElementValues();
             var flowData = StaticFactories.CreateFlowData(_pipeline.Object);
             flowData.Process();
 
-            var result = flowData.GetAs<string>("not a property");
+            Assert.ThrowsExactly<PipelineDataException>(() =>
+                flowData.GetAs<string>("not a property"));
         }
 
         /// <summary>
-        /// Test that getting a property value directly using 'GetAs' 
-        /// throws the expected error if there are two elements with 
+        /// Test that getting a property value directly using 'GetAs'
+        /// throws the expected error if there are two elements with
         /// the requested property.
         /// </summary>
         [TestMethod]
-        [ExpectedException(typeof(PipelineDataException))]
         public void FlowData_GetAs_MultipleProperties()
         {
             ConfigureMultiElementValues();
             var flowData = StaticFactories.CreateFlowData(_pipeline.Object);
             flowData.Process();
 
-            var result = flowData.GetAs<string>(DUPLICATE_PROPERTY);
+            Assert.ThrowsExactly<PipelineDataException>(() =>
+                flowData.GetAs<string>(DUPLICATE_PROPERTY));
         }
 
         /// <summary>
-        /// Test that getting a property value directly using 'GetAs' 
+        /// Test that getting a property value directly using 'GetAs'
         /// throws the expected error if the property is being cast to
         /// the wrong type.
         /// </summary>
         [TestMethod]
-        [ExpectedException(typeof(InvalidCastException))]
         public void FlowData_GetAs_WrongType()
         {
             ConfigureMultiElementValues();
             var flowData = StaticFactories.CreateFlowData(_pipeline.Object);
             flowData.Process();
 
-            var result = flowData.GetAs<int>(STRING_PROPERTY);
+            Assert.ThrowsExactly<InvalidCastException>(() =>
+                flowData.GetAs<int>(STRING_PROPERTY));
         }
         
 
