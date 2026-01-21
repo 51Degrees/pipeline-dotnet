@@ -80,10 +80,12 @@ namespace FiftyOne.Pipeline.Engines.Tests.Data
         /// a null property name
         /// </summary>
         [TestMethod]
-        [ExpectedException(typeof(ArgumentNullException))]
         public void AspectData_Indexer_NullKey()
         {
-            var result = _data[null];
+            Assert.ThrowsExactly<ArgumentNullException>(() =>
+            {
+                var result = _data[null];
+            });
         }
 
         /// <summary>
@@ -99,15 +101,17 @@ namespace FiftyOne.Pipeline.Engines.Tests.Data
         }
 
         /// <summary>
-        /// Check that the base class will throw a 
+        /// Check that the base class will throw a
         /// <see cref="PropertyMissingException"/> if the property
         /// is not present.
         /// </summary>
         [TestMethod]
-        [ExpectedException(typeof(PropertyMissingException))]
         public void AspectData_Indexer_GetMissing()
         {
-            var result = _data["testproperty"];
+            Assert.ThrowsExactly<PropertyMissingException>(() =>
+            {
+                var result = _data["testproperty"];
+            });
         }
     }
 }

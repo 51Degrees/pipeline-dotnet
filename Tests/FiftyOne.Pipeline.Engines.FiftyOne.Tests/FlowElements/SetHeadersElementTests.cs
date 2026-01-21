@@ -210,13 +210,12 @@ namespace FiftyOne.Pipeline.Engines.FiftyOne.Tests.FlowElements
         }
 
         /// <summary>
-        /// Test that various invalid property names cause 
+        /// Test that various invalid property names cause
         /// an exception to be thrown
         /// </summary>
         [DataTestMethod]
         [DataRow("SetHeader")]
         [DataRow("SetHeaderBrowser")]
-        [ExpectedException(typeof(AggregateException))]
         public void SetHeadersElement_InvalidPropertyNames(string sourcePropertyName)
         {
             var propertyNameValues = new Dictionary<string, object>()
@@ -225,7 +224,7 @@ namespace FiftyOne.Pipeline.Engines.FiftyOne.Tests.FlowElements
             };
             CreatePipeline(propertyNameValues);
             var data = _pipeline.CreateFlowData();
-            data.Process();
+            Assert.ThrowsExactly<AggregateException>(() => data.Process());
         }
 
 

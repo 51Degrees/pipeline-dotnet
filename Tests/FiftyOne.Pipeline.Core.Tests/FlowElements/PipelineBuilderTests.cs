@@ -78,38 +78,38 @@ namespace FiftyOne.Pipeline.Core.Tests.FlowElements
         /// <see cref="IFlowElement"/> is added to the builder.
         /// </summary>
         [TestMethod]
-        [ExpectedException(typeof(ObjectDisposedException))]
         public void PipelineBuilder_AddFlowElement_Disposed()
         {
             _element.Setup(e => e.IsDisposed).Returns(true);
-            _builder.AddFlowElement(_element.Object);
+            Assert.ThrowsExactly<ObjectDisposedException>(() =>
+                _builder.AddFlowElement(_element.Object));
         }
 
         /// <summary>
         /// Test that the expected exception is thrown if a disposed
-        /// <see cref="IFlowElement"/> is added to the builder using 
+        /// <see cref="IFlowElement"/> is added to the builder using
         /// the AddFlowElementsParallel method.
         /// </summary>
         [TestMethod]
-        [ExpectedException(typeof(ObjectDisposedException))]
         public void PipelineBuilder_AddFlowElementsParallel_Disposed()
         {
             _element = new Mock<IFlowElement>();
             _element.Setup(e => e.IsDisposed).Returns(true);
             Mock<IFlowElement> element2 = new Mock<IFlowElement>();
 
-            _builder.AddFlowElementsParallel(element2.Object, _element.Object);
+            Assert.ThrowsExactly<ObjectDisposedException>(() =>
+                _builder.AddFlowElementsParallel(element2.Object, _element.Object));
         }
 
         /// <summary>
-        /// Test that the expected exception gets thrown if 
+        /// Test that the expected exception gets thrown if
         /// BuildFromConfiguration is passed a null parameter.
         /// </summary>
         [TestMethod]
-        [ExpectedException(typeof(ArgumentNullException))]
         public void PipelineBuilder_BuildFromConfiguration_Null()
         {
-            var pipeline = _builder.BuildFromConfiguration(null);
+            Assert.ThrowsExactly<ArgumentNullException>(() =>
+                _builder.BuildFromConfiguration(null));
         }
 
         /// <summary>
@@ -193,7 +193,6 @@ namespace FiftyOne.Pipeline.Core.Tests.FlowElements
         /// object.
         /// </summary>
         [TestMethod]
-        [ExpectedException(typeof(PipelineConfigurationException))]
         public void PipelineBuilder_BuildFromConfiguration_MandatoryParameterNotSet()
         {
             // Create the configuration object.
@@ -208,16 +207,16 @@ namespace FiftyOne.Pipeline.Core.Tests.FlowElements
             _maxErrors = 1;
 
             // Pass the configuration to the builder to create the pipeline.
-            var pipeline = _builder.BuildFromConfiguration(opts);
+            Assert.ThrowsExactly<PipelineConfigurationException>(() =>
+                _builder.BuildFromConfiguration(opts));
         }
 
         /// <summary>
         /// Test that the Pipeline builder throws the expected exception
-        /// when the mandatory parameter value cannot be parsed to the 
+        /// when the mandatory parameter value cannot be parsed to the
         /// expected type
         /// </summary>
         [TestMethod]
-        [ExpectedException(typeof(PipelineConfigurationException))]
         public void PipelineBuilder_BuildFromConfiguration_MandatoryParameterWrongType()
         {
             var element = new ElementOptions()
@@ -235,7 +234,8 @@ namespace FiftyOne.Pipeline.Core.Tests.FlowElements
             _maxErrors = 1;
 
             // Pass the configuration to the builder to create the pipeline.
-            var pipeline = _builder.BuildFromConfiguration(opts);
+            Assert.ThrowsExactly<PipelineConfigurationException>(() =>
+                _builder.BuildFromConfiguration(opts));
         }
 
         /// <summary>
@@ -243,7 +243,6 @@ namespace FiftyOne.Pipeline.Core.Tests.FlowElements
         /// when the specified builder does not exist
         /// </summary>
         [TestMethod]
-        [ExpectedException(typeof(PipelineConfigurationException))]
         public void PipelineBuilder_BuildFromConfiguration_NoBuilder()
         {
             var element = new ElementOptions()
@@ -260,7 +259,8 @@ namespace FiftyOne.Pipeline.Core.Tests.FlowElements
             _maxErrors = 1;
 
             // Pass the configuration to the builder to create the pipeline.
-            var pipeline = _builder.BuildFromConfiguration(opts);
+            Assert.ThrowsExactly<PipelineConfigurationException>(() =>
+                _builder.BuildFromConfiguration(opts));
         }
 
         /// <summary>
@@ -325,7 +325,6 @@ namespace FiftyOne.Pipeline.Core.Tests.FlowElements
         /// IFlowElements
         /// </summary>
         [TestMethod]
-        [ExpectedException(typeof(PipelineConfigurationException))]
         public void PipelineBuilder_BuildFromConfiguration_WrongBuilder()
         {
             // Create the configuration object.
@@ -340,7 +339,8 @@ namespace FiftyOne.Pipeline.Core.Tests.FlowElements
             _maxErrors = 1;
 
             // Pass the configuration to the builder to create the pipeline.
-            var pipeline = _builder.BuildFromConfiguration(opts);
+            Assert.ThrowsExactly<PipelineConfigurationException>(() =>
+                _builder.BuildFromConfiguration(opts));
         }
 
         /// <summary>
@@ -438,7 +438,6 @@ namespace FiftyOne.Pipeline.Core.Tests.FlowElements
         /// optional parameter method name does not exist.
         /// </summary>
         [TestMethod]
-        [ExpectedException(typeof(PipelineConfigurationException))]
         public void PipelineBuilder_BuildFromConfiguration_OptionalMethodMissing()
         {
             var element = new ElementOptions()
@@ -455,7 +454,8 @@ namespace FiftyOne.Pipeline.Core.Tests.FlowElements
             };
             _maxErrors = 1;
 
-            VerifyListSplitterElementPipeline(opts, SplitOption.Comma);
+            Assert.ThrowsExactly<PipelineConfigurationException>(() =>
+                VerifyListSplitterElementPipeline(opts, SplitOption.Comma));
         }
 
         /// <summary>
@@ -487,7 +487,6 @@ namespace FiftyOne.Pipeline.Core.Tests.FlowElements
         /// that cannot be parsed
         /// </summary>
         [TestMethod]
-        [ExpectedException(typeof(PipelineConfigurationException))]
         public void PipelineBuilder_BuildFromConfiguration_OptionalMethodWrongType()
         {
             var element = new ElementOptions()
@@ -504,7 +503,8 @@ namespace FiftyOne.Pipeline.Core.Tests.FlowElements
             };
             _maxErrors = 1;
 
-            VerifyListSplitterElementPipeline(opts, SplitOption.Comma);
+            Assert.ThrowsExactly<PipelineConfigurationException>(() =>
+                VerifyListSplitterElementPipeline(opts, SplitOption.Comma));
         }  
         
         /// <summary>
@@ -645,7 +645,6 @@ namespace FiftyOne.Pipeline.Core.Tests.FlowElements
         /// is not available in the service collection.
         /// </summary>
         [TestMethod]
-        [ExpectedException(typeof(PipelineConfigurationException))]
         public void PipelineBuilder_BuildFromConfiguration_NotInServiceCollection()
         {
             var element = new ElementOptions()
@@ -668,8 +667,9 @@ namespace FiftyOne.Pipeline.Core.Tests.FlowElements
                 .Returns(null);
 
             // Pass the configuration to the builder to create the pipeline.
-            var pipeline = new PipelineBuilder(_loggerFactory, services.Object)
-                .BuildFromConfiguration(opts);
+            Assert.ThrowsExactly<PipelineConfigurationException>(() =>
+                new PipelineBuilder(_loggerFactory, services.Object)
+                    .BuildFromConfiguration(opts));
         }
 
         [TestMethod]
