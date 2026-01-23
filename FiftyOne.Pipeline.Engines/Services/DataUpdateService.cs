@@ -39,6 +39,10 @@ using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 
+#if !NET8_0_OR_GREATER
+using ICSharpCode.SharpZipLib.GZip;
+#endif
+
 namespace FiftyOne.Pipeline.Engines.Services
 {
     /// <summary>
@@ -1314,8 +1318,16 @@ namespace FiftyOne.Pipeline.Engines.Services
 		{
 			AutoUpdateStatus status = AutoUpdateStatus.AUTO_UPDATE_IN_PROGRESS;
 			compressedDataStream.Position = 0;
+#if !NET8_0_OR_GREATER
+			using (var fis = new GZipInputStream(
+				compressedDataStream)
+			{
+                IsStreamOwner = false,
+            })
+#else
 			using (var fis = new GZipStream(
 				compressedDataStream, CompressionMode.Decompress, true))
+#endif
 			{
 				fis.CopyTo(uncompressedDataStream);
             }
