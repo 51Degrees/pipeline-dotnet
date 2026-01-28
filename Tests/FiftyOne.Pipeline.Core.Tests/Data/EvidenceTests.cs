@@ -66,8 +66,8 @@ namespace FiftyOne.Pipeline.Core.Tests.Data
             _logger = new Mock<ILogger<Evidence>>();
         }
 
-        [DataTestMethod]
-        [DynamicData(nameof(Evidence_Maps_TestCases), DynamicDataSourceType.Method)]
+        [TestMethod]
+        [DynamicData(nameof(Evidence_Maps_TestCases))]
         public void Evidence_Maps(Dictionary<string, object> map)
         {
             var evidence = new Evidence(_logger.Object);
@@ -79,8 +79,8 @@ namespace FiftyOne.Pipeline.Core.Tests.Data
             }
         }
 
-        [DataTestMethod]
-        [DynamicData(nameof(Evidence_Maps_TestCases), DynamicDataSourceType.Method)]
+        [TestMethod]
+        [DynamicData(nameof(Evidence_Maps_TestCases))]
         public void Evidence_Maps_Replace(Dictionary<string, object> map)
         {
             const string newValue = "Value";
@@ -88,7 +88,7 @@ namespace FiftyOne.Pipeline.Core.Tests.Data
             evidence.PopulateFrom(map);
             var first = map.First();
             evidence[first.Key] = newValue;
-            Assert.AreEqual(evidence[first.Key], newValue);
+            Assert.AreEqual(newValue, evidence[first.Key]);
         }
 
         /// <summary>

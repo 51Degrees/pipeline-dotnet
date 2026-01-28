@@ -65,7 +65,7 @@ namespace FiftyOne.Pipeline.Engines.Tests.Configuration
             var result = _configBuilder.Build("test", true);
 
             // Both features should now be disabled.
-            Assert.AreEqual(0, result.DataUpdateLicenseKeys.Count);
+            Assert.IsEmpty(result.DataUpdateLicenseKeys);
             Assert.IsFalse(result.AutomaticUpdatesEnabled,
                 "Auto updates should be disabled");
             Assert.IsFalse(result.UpdateOnStartup,

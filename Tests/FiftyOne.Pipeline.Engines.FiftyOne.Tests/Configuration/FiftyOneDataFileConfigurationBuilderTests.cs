@@ -46,7 +46,7 @@ namespace FiftyOne.Pipeline.Engines.FiftyOne.Tests.Configuration
             var config2 = builder2.Build("some file", false);
 
             // Assert
-            Assert.AreEqual(0, config2.DataUpdateLicenseKeys.Count);
+            Assert.IsEmpty(config2.DataUpdateLicenseKeys);
         }
     }
 }

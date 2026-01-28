@@ -254,7 +254,7 @@ namespace FiftyOne.Pipeline.Core.Tests.Data
 
             var result = _flowData.ElementDataAsDictionary();
 
-            Assert.AreEqual(1, result.Count);
+            Assert.HasCount(1, result);
             Assert.AreSame(data, result[key]);
         }
 
@@ -702,9 +702,8 @@ namespace FiftyOne.Pipeline.Core.Tests.Data
             _flowData.Process();
             foreach (var value in _flowData.GetWhere(i => i.Available))
             {
-                Assert.IsNotNull(value);
                 Assert.IsNotNull(value.Key);
-                Assert.IsTrue(value.Key.StartsWith("element1."));
+                Assert.StartsWith("element1.", value.Key);
                 Assert.IsNotNull(value.Value);
                 Assert.AreEqual(_flowData.Get("element1")[value.Key.Split(".")[1]], value.Value);
             }
@@ -724,7 +723,6 @@ namespace FiftyOne.Pipeline.Core.Tests.Data
             _flowData.Process();
             foreach (var value in _flowData.GetWhere(i => i.Category == "category"))
             {
-                Assert.IsNotNull(value);
                 Assert.IsNotNull(value.Key);
                 Assert.IsTrue(
                     value.Key.Equals("element1.available") ||
@@ -748,9 +746,8 @@ namespace FiftyOne.Pipeline.Core.Tests.Data
             _flowData.Process();
             foreach (var value in _flowData.GetWhere(i => true))
             {
-                Assert.IsNotNull(value);
                 Assert.IsNotNull(value.Key);
-                Assert.IsTrue(value.Key.StartsWith("element1."));
+                Assert.StartsWith("element1.", value.Key);
                 Assert.AreNotEqual("element1.unavailable", value.Key);
                 Assert.IsNotNull(value.Value);
                 Assert.AreEqual(_flowData.Get("element1")[value.Key.Split(".")[1]], value.Value);
@@ -770,9 +767,8 @@ namespace FiftyOne.Pipeline.Core.Tests.Data
             _flowData.Process();
             foreach (var value in _flowData.GetWhere(i => true))
             {
-                Assert.IsNotNull(value);
                 Assert.IsNotNull(value.Key);
-                Assert.IsTrue(value.Key.StartsWith("element1."));
+                Assert.StartsWith("element1.", value.Key);
                 Assert.AreNotEqual("element1.unavailable", value.Key);
                 Assert.AreNotEqual("element1.throws", value.Key);
                 Assert.IsNotNull(value.Value);
@@ -798,7 +794,6 @@ namespace FiftyOne.Pipeline.Core.Tests.Data
 
         public interface IDisposableData : IElementData, IDisposable
         {
-
         }
 
         /// <summary>

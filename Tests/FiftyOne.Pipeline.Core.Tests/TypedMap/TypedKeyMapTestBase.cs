@@ -74,10 +74,10 @@ namespace FiftyOne.Pipeline.Core.Tests.TypedMap
 
             var result = _map.Get(key);
 
-            Assert.AreEqual(3, result.Count);
-            Assert.IsTrue(result.Contains("a"));
-            Assert.IsTrue(result.Contains("b"));
-            Assert.IsTrue(result.Contains("c"));
+            Assert.HasCount(3, result);
+            Assert.Contains("a", result);
+            Assert.Contains("b", result);
+            Assert.Contains("c", result);
         }
 
         /// <summary>
@@ -214,7 +214,7 @@ namespace FiftyOne.Pipeline.Core.Tests.TypedMap
 
             var result = _map.Get<IReadOnlyList<string>>();
 
-            Assert.AreEqual(1, result.Count);
+            Assert.HasCount(1, result);
         }
 
         /// <summary>
@@ -250,7 +250,7 @@ namespace FiftyOne.Pipeline.Core.Tests.TypedMap
             var result = _map.TryGetValue(key2, out value);
 
             Assert.IsFalse(result);
-            Assert.AreEqual(null, value);
+            Assert.IsNull(value);
         }
 
         /// <summary>
@@ -326,7 +326,7 @@ namespace FiftyOne.Pipeline.Core.Tests.TypedMap
             var result = _map.TryGetValue(key2, out value);
 
             Assert.IsFalse(result);
-            Assert.AreEqual(null, value);
+            Assert.IsNull(value);
         }
 
         /// <summary>
@@ -345,7 +345,7 @@ namespace FiftyOne.Pipeline.Core.Tests.TypedMap
             var result = _map.TryGetValue(key2, out value);
 
             Assert.IsFalse(result);
-            Assert.AreEqual(null, value);
+            Assert.IsNull(value);
         }
     }
 }
