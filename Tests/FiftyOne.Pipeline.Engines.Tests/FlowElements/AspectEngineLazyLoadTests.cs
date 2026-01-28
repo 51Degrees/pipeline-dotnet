@@ -339,7 +339,7 @@ namespace FiftyOne.Pipeline.Engines.Tests.FlowElements
             {
                 Assert.IsTrue(e is AggregateException);
                 Assert.IsNotNull(((AggregateException)e).InnerExceptions);
-                Assert.AreEqual(2, ((AggregateException)e).InnerExceptions.Count);
+                Assert.HasCount(2, ((AggregateException)e).InnerExceptions);
                 Assert.AreEqual(
                     $"One or more errors occurred. ({exceptionMessage})",
                     ((AggregateException)e).InnerExceptions[0].Message);
@@ -406,8 +406,8 @@ namespace FiftyOne.Pipeline.Engines.Tests.FlowElements
                 try
                 {
                     logsEvents.Add(() => Trace.WriteLine($"Process complete in {processTimeMs} ms"));
-                    Assert.IsTrue(processTimeMs < processCostMs,
-                        $"Process time should have been less than " +
+                    Assert.IsLessThan(processCostMs,
+processTimeMs, $"Process time should have been less than " +
                         $"{processCostMs} ms but it took {processTimeMs} ms.");
 
                     // Assert
@@ -433,23 +433,23 @@ namespace FiftyOne.Pipeline.Engines.Tests.FlowElements
                     }
                 }
 
-                Assert.IsTrue(
-                    processStartedTimeMs >= 0,
-                    $"{nameof(processStartedTimeMs)} should be non-negative, got {processStartedTimeMs}");
-                Assert.IsTrue(
-                    processStartedTimeMs < processCostMs,
-                    $"{nameof(processStartedTimeMs)} is not within {nameof(processCostMs)}: {processStartedTimeMs} vs {processCostMs}");
+                Assert.IsGreaterThanOrEqualTo(
+0,
+                    processStartedTimeMs, $"{nameof(processStartedTimeMs)} should be non-negative, got {processStartedTimeMs}");
+                Assert.IsLessThan(
+processCostMs,
+                    processStartedTimeMs, $"{nameof(processStartedTimeMs)} is not within {nameof(processCostMs)}: {processStartedTimeMs} vs {processCostMs}");
 
-                Assert.IsTrue(valueOneTimeMs < processCostMs,
-                    $"Accessing value one should have taken less than " +
+                Assert.IsLessThan(processCostMs,
+valueOneTimeMs, $"Accessing value one should have taken less than " +
                     $"{processCostMs} ms from the time the Process method" +
                     $"was called but it took {valueOneTimeMs} ms.");   
 
                 // Note - this should really take at least 'processCostMs'
                 // but the accuracy of the timer seems to cause issues
                 // if we are being that exact.
-                Assert.IsTrue(valueTwoTimeMs >= processCostMs / 2,
-                    $"Accessing value two should have taken at least " +
+                Assert.IsGreaterThanOrEqualTo(processCostMs / 2,
+valueTwoTimeMs, $"Accessing value two should have taken at least " +
                     $"{processCostMs / 2} ms from the time the Process method" +
                     $"was called but it only took {valueTwoTimeMs} ms.");
             }
@@ -494,8 +494,8 @@ namespace FiftyOne.Pipeline.Engines.Tests.FlowElements
                 // Note - this should really take at least 'processCostMs'
                 // but the accuracy of the timer seems to cause issues
                 // if we are being that exact.
-                Assert.IsTrue(dictTimeMs > processCostMs / 2,
-                    $"Accessing the dictionary should have taken at least " +
+                Assert.IsGreaterThan(processCostMs / 2,
+dictTimeMs, $"Accessing the dictionary should have taken at least " +
                     $"{processCostMs / 2} ms from the time the Process method" +
                     $"was called but it only took {dictTimeMs} ms.");
             }

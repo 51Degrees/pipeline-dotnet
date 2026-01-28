@@ -286,10 +286,12 @@ namespace FiftyOne.Pipeline.Core.Tests
         [TestMethod]
         public void ExponentialBackoffRecoveryStrategyShouldUseConstants()
         {
-            // Test that constants are properly set
+            // Test that constants are properly set in the constants
+#pragma warning disable MSTEST0032 // Assertion condition is always true
             Assert.AreEqual(2.0, INITIAL_DELAY_SECONDS_DEFAULT);
             Assert.AreEqual(300.0, MAX_DELAY_SECONDS_DEFAULT);
             Assert.AreEqual(2.0, MULTIPLIER_DEFAULT);
+#pragma warning restore MSTEST0032 // Assertion condition is always true
 
             // Test default constructor uses constants
             var strategy = new ExponentialBackoffRecoveryStrategy(

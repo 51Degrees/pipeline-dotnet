@@ -363,7 +363,7 @@ namespace FiftyOne.Pipeline.Engines.Tests.Services
         /// Check that enabling the FileSystemWatcher will create a watcher
         /// and assign it to the configuration object as expected.
         /// </summary>
-        [DataTestMethod]
+        [TestMethod]
         [DataRow(true)]
         [DataRow(false)]
         public void DataUpdateService_Register_FileSystemWatcher(bool autoUpdateEnabled)
@@ -1187,7 +1187,7 @@ namespace FiftyOne.Pipeline.Engines.Tests.Services
         /// The test should result in the same behavior regardless of
         /// whether auto updates and enabled or disabled.
         /// </remarks>
-        [DataTestMethod]
+        [TestMethod]
         [DataRow(true, false)]
         [DataRow(false, false)]
         [DataRow(true, true)]
@@ -1308,7 +1308,7 @@ namespace FiftyOne.Pipeline.Engines.Tests.Services
         /// The update service should download the latest file and
         /// use it to refresh the engine.
         /// </summary>
-        [DataTestMethod]
+        [TestMethod]
         [DataRow(true)]
         [DataRow(false)]
         public void DataUpdateService_Register_UpdateOnStartup_InMemory(
@@ -1427,7 +1427,7 @@ namespace FiftyOne.Pipeline.Engines.Tests.Services
         /// In this scenario, confirm that the timer is configured so that
         /// the service will check again in the future.
         /// </summary>
-        [DataTestMethod]
+        [TestMethod]
         [DataRow(true, false)]
         [DataRow(false, false)]
         [DataRow(true, true)]

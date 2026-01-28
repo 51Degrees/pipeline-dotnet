@@ -307,10 +307,10 @@ public class FlowDataExtendedGetWhereTests
         flowData.Process();
 
         // Act
-        var elements = flowData.GetWhere(i => i == i);
+        var elements = flowData.GetWhere(i => true);
 
         // Assert
-        Assert.IsTrue(elements.Count() == 0);
+        Assert.AreEqual(0, elements.Count());
         Assert.AreEqual(pipeline.FlowElements.Count, elements.Count());
     }
     
@@ -362,7 +362,7 @@ public class FlowDataExtendedGetWhereTests
         // Assert
         // assert that the amount of elements returned is the same 
         // as the amount added
-        Assert.AreEqual(5, elements.Count);
+        Assert.HasCount(5, elements);
         CollectionAssert.AreEquivalent(listOfTestedElements,
             elements.ToArray());
     }

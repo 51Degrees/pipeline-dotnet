@@ -39,7 +39,7 @@ public class WktStringTests
         new[] { WktPolygon, },
     };
     
-    [DataTestMethod]
+    [TestMethod]
     [DynamicData(nameof(RawStrings))]
     public void WktString_Value_NewImplicit(string rawString)
     {
@@ -47,7 +47,7 @@ public class WktStringTests
         Assert.AreEqual(rawString, wktString.Value);
     }
     
-    [DataTestMethod]
+    [TestMethod]
     [DynamicData(nameof(RawStrings))]
     public void WktString_Value_NewExplicit(string rawString)
     {
@@ -55,7 +55,7 @@ public class WktStringTests
         Assert.AreEqual(rawString, wktString.Value);
     }
     
-    [DataTestMethod]
+    [TestMethod]
     [DynamicData(nameof(RawStrings))]
     public void WktString_GetHashCode(string rawString)
     {
@@ -63,7 +63,7 @@ public class WktStringTests
         Assert.AreEqual(rawString.GetHashCode(), wktString.GetHashCode());
     }
     
-    [DataTestMethod]
+    [TestMethod]
     [DynamicData(nameof(RawStrings))]
     public void WktString_ToString_Method(string rawString)
     {
@@ -72,7 +72,7 @@ public class WktStringTests
         Assert.AreEqual(rawString, theString);
     }
     
-    [DataTestMethod]
+    [TestMethod]
     [DynamicData(nameof(RawStrings))]
     public void WktString_ToString_Implicit(string rawString)
     {
@@ -81,7 +81,7 @@ public class WktStringTests
         Assert.AreEqual(rawString, theString);
     }
     
-    [DataTestMethod]
+    [TestMethod]
     [DynamicData(nameof(RawStrings))]
     public void WktString_ToString_Equals_WktExplicit(string rawString)
     {
@@ -91,7 +91,7 @@ public class WktStringTests
         Assert.IsTrue(wktString2.Equals(wktString));
     }
     
-    [DataTestMethod]
+    [TestMethod]
     [DynamicData(nameof(RawStrings))]
     public void WktString_ToString_Equals_StringExplicit(string rawString)
     {
@@ -107,7 +107,7 @@ public class WktStringTests
         [new WktString(WktPolygon), typeof(WktString), false],
     ];
     
-    [DataTestMethod]
+    [TestMethod]
     [DynamicData(nameof(EqualityTestData))]
     public void WktString_ToString_Equals_ObjectMethod(object obj, Type type, bool expected)
     {

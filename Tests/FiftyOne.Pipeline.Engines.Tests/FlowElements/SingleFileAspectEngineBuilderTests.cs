@@ -67,7 +67,7 @@ namespace FiftyOne.Pipeline.Engines.Tests.FlowElements
         /// <param name="updateOnStartup"></param>
         /// <param name="fileWatcher"></param>
         /// <param name="expectRegistration"></param>
-        [DataTestMethod]
+        [TestMethod]
         [DataRow(false, false, false, false)]
         [DataRow(true, false, false, true)]
         [DataRow(false, true, false, true)]

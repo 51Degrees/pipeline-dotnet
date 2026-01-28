@@ -91,8 +91,8 @@ namespace FiftyOne.Pipeline.Engines.FiftyOne.Tests.Performance
 
             double msOverheadPerCall =
                 end.Subtract(start).TotalMilliseconds / iterations;
-            Assert.IsTrue(msOverheadPerCall < 0.1,
-                $"Pipeline with share usage overhead per Process call was " +
+            Assert.IsLessThan(0.1,
+msOverheadPerCall, $"Pipeline with share usage overhead per Process call was " +
                 $"{msOverheadPerCall}ms. Maximum permitted is 0.1ms");
         }
 
@@ -128,8 +128,8 @@ namespace FiftyOne.Pipeline.Engines.FiftyOne.Tests.Performance
 
             double msOverheadPerCall =
                 end.Subtract(start).TotalMilliseconds / iterations;
-            Assert.IsTrue(msOverheadPerCall < 10,
-                $"Pipeline with share usage overhead per Process call was " +
+            Assert.IsLessThan(10,
+msOverheadPerCall, $"Pipeline with share usage overhead per Process call was " +
                 $"{msOverheadPerCall}ms. Maximum permitted is 10ms");
         }
 

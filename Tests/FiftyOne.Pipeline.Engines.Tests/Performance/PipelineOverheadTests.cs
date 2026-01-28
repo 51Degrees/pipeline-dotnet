@@ -86,8 +86,8 @@ namespace FiftyOne.Pipeline.Engines.Tests.Performance
 
             double msOverheadPerCall =
                 stopwatch.ElapsedMilliseconds / (double)iterations;
-            Assert.IsTrue(msOverheadPerCall < 0.1,
-                $"Pipeline overhead per Process call was " +
+            Assert.IsLessThan(0.1,
+msOverheadPerCall, $"Pipeline overhead per Process call was " +
                 $"{msOverheadPerCall}ms. Maximum permitted is 0.1ms");
         }
 
@@ -122,8 +122,8 @@ namespace FiftyOne.Pipeline.Engines.Tests.Performance
 
             double msOverheadPerCall =
                 end.Subtract(start).TotalMilliseconds / (double)iterations;
-            Assert.IsTrue(msOverheadPerCall < 0.1,
-                $"Pipeline overhead per Process call was " +
+            Assert.IsLessThan(0.1,
+msOverheadPerCall, $"Pipeline overhead per Process call was " +
                 $"{msOverheadPerCall}ms. Maximum permitted is 0.1ms");
         }
 

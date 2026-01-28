@@ -94,7 +94,7 @@ namespace FiftyOne.Pipeline.Engines.FiftyOne.Tests.Trackers
 				if (_shareUsageTracker.Track(_data.Object))
 					trackedEvents++;
 			}
-			Assert.IsTrue(trackedEvents == 1);
+			Assert.AreEqual(1, trackedEvents);
 		}
 
 		/// <summary>
@@ -113,7 +113,7 @@ namespace FiftyOne.Pipeline.Engines.FiftyOne.Tests.Trackers
                 // Wait some time equal to the interval to elapse.
 				Thread.Sleep(_interval);
 			}
-			Assert.IsTrue(trackedEvents == 2);
+			Assert.AreEqual(2, trackedEvents);
 		}
 
 		/// <summary>
@@ -151,7 +151,7 @@ namespace FiftyOne.Pipeline.Engines.FiftyOne.Tests.Trackers
 
 			}
 
-			Assert.IsTrue(trackedEvents == 2);
+			Assert.AreEqual(2, trackedEvents);
 		}
 
 		/// <summary>
@@ -189,10 +189,10 @@ namespace FiftyOne.Pipeline.Engines.FiftyOne.Tests.Trackers
 					trackedEvents++;
 
 			}
-			Assert.IsTrue(trackedEvents == 1);
+			Assert.AreEqual(1, trackedEvents);
 		}
 
-		public DataKey GenerateKey(IEvidenceKeyFilter filter, Dictionary<string, object> evidence)
+        public DataKey GenerateKey(IEvidenceKeyFilter filter, Dictionary<string, object> evidence)
 		{
 			DataKeyBuilder result = new DataKeyBuilder();
 			foreach (var entry in evidence)

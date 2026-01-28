@@ -191,7 +191,7 @@ namespace FiftyOne.Pipeline.Engines.FiftyOne.Tests.FlowElements
             // Assert
             // Check that one and only one HTTP message was sent
             _httpHandler.VerifySendCalled(1);
-            Assert.AreEqual(1, _xmlContent.Count);
+            Assert.HasCount(1, _xmlContent);
 
             // Validate that the XML is well formed by passing it through a reader
             using (XmlReader xr = XmlReader.Create(new StringReader(_xmlContent[0])))
@@ -199,11 +199,11 @@ namespace FiftyOne.Pipeline.Engines.FiftyOne.Tests.FlowElements
                 while (xr.Read()) { }
             }
             // Check that the expected values are populated.
-            Assert.IsTrue(_xmlContent[0].Contains("<ClientIP>1.2.3.4</ClientIP>"));
-            Assert.IsTrue(_xmlContent[0].Contains("<header Name=\"x-forwarded-for\"><![CDATA[5.6.7.8]]></header>"));
-            Assert.IsTrue(_xmlContent[0].Contains("<header Name=\"forwarded-for\"><![CDATA[2001::]]></header>"));
-            Assert.IsTrue(_xmlContent[0].Contains($"<cookie Name=\"{Engines.Constants.FIFTYONE_COOKIE_PREFIX}Profile\"><![CDATA[123456]]></cookie>"));
-            Assert.IsFalse(_xmlContent[0].Contains("<cookie Name=\"RemoveMe\">"));
+            Assert.Contains("<ClientIP>1.2.3.4</ClientIP>", _xmlContent[0]);
+            Assert.Contains("<header Name=\"x-forwarded-for\"><![CDATA[5.6.7.8]]></header>", _xmlContent[0]);
+            Assert.Contains("<header Name=\"forwarded-for\"><![CDATA[2001::]]></header>", _xmlContent[0]);
+            Assert.Contains($"<cookie Name=\"{Engines.Constants.FIFTYONE_COOKIE_PREFIX}Profile\"><![CDATA[123456]]></cookie>", _xmlContent[0]);
+            Assert.DoesNotContain("<cookie Name=\"RemoveMe\">", _xmlContent[0]);
         }
 
         /// <summary>
@@ -258,7 +258,7 @@ namespace FiftyOne.Pipeline.Engines.FiftyOne.Tests.FlowElements
             // Assert
             // Check that one and only one HTTP message was sent.
             _httpHandler.VerifySendCalled(1);
-            Assert.AreEqual(1, _xmlContent.Count);
+            Assert.HasCount(1, _xmlContent);
 
             // Validate that the XML is well formed by passing it through a reader
             using (XmlReader xr = XmlReader.Create(new StringReader(_xmlContent[0])))
@@ -306,7 +306,7 @@ namespace FiftyOne.Pipeline.Engines.FiftyOne.Tests.FlowElements
             // Assert
             // Check that one and only one HTTP message was sent.
             _httpHandler.VerifySendCalled(1);
-            Assert.AreEqual(1, _xmlContent.Count);
+            Assert.HasCount(1, _xmlContent);
 
             // Validate that the XML is well formed by passing it through a reader
             using (XmlReader xr = XmlReader.Create(new StringReader(_xmlContent[0])))
@@ -314,10 +314,10 @@ namespace FiftyOne.Pipeline.Engines.FiftyOne.Tests.FlowElements
                 while (xr.Read()) { }
             }
             // Check that the expected values are populated.
-            Assert.IsTrue(_xmlContent[0].Contains("<ClientIP>1.2.3.4</ClientIP>"));
-            Assert.IsTrue(_xmlContent[0].Contains($"<header Name=\"user-agent\"><![CDATA[{useragent}]]></header>"));
-            Assert.IsFalse(_xmlContent[0].Contains("<header Name=\"x-forwarded-for\">"));
-            Assert.IsFalse(_xmlContent[0].Contains("<header Name=\"forwarded-for\">"));
+            Assert.Contains("<ClientIP>1.2.3.4</ClientIP>", _xmlContent[0]);
+            Assert.Contains($"<header Name=\"user-agent\"><![CDATA[{useragent}]]></header>", _xmlContent[0]);
+            Assert.DoesNotContain("<header Name=\"x-forwarded-for\">", _xmlContent[0]);
+            Assert.DoesNotContain("<header Name=\"forwarded-for\">", _xmlContent[0]);
         }
 
         /// <summary>
@@ -356,13 +356,13 @@ namespace FiftyOne.Pipeline.Engines.FiftyOne.Tests.FlowElements
             // significantly. We only want to catch any gross errors so just
             // make sure the value is of the expected order of magnitude.
             Console.WriteLine($"requiredEvents = {requiredEvents}");
-            Assert.IsTrue(requiredEvents > 10000, $"Expected the number of required " +
+            Assert.IsGreaterThan(10000, requiredEvents, $"Expected the number of required " +
                 $"events to be at least 10,000, but was actually '{requiredEvents}'");
-            Assert.IsTrue(requiredEvents < 1000000, $"Expected the number of required " +
+            Assert.IsLessThan(1000000, requiredEvents, $"Expected the number of required " +
                 $"events to be less than 1,000,000, but was actually '{requiredEvents}'");
             // Check that one and only one HTTP message was sent.
             _httpHandler.VerifySendCalled(1);
-            Assert.AreEqual(1, _xmlContent.Count);
+            Assert.HasCount(1, _xmlContent);
         }
 
         /// <summary>
@@ -429,7 +429,7 @@ namespace FiftyOne.Pipeline.Engines.FiftyOne.Tests.FlowElements
             // Assert
             // Check that a warning was logged.
             Assert.AreEqual(1, _logger.WarningEntries.Count());
-            Assert.IsTrue(_logger.WarningEntries.First().StartsWith("Failure sending usage data"));
+            Assert.StartsWith("Failure sending usage data", _logger.WarningEntries.First());
             Console.WriteLine(_logger.WarningEntries.First());
         }
 
@@ -491,7 +491,7 @@ namespace FiftyOne.Pipeline.Engines.FiftyOne.Tests.FlowElements
             // Assert
             // Check that one and only one HTTP message was sent.
             _httpHandler.VerifySendCalled(1);
-            Assert.AreEqual(1, _xmlContent.Count);
+            Assert.HasCount(1, _xmlContent);
 
             // Validate that the XML is well formed by passing it through a reader
             using (XmlReader xr = XmlReader.Create(new StringReader(_xmlContent[0])))
@@ -499,8 +499,8 @@ namespace FiftyOne.Pipeline.Engines.FiftyOne.Tests.FlowElements
                 while (xr.Read()) { }
             }
             // Check that the expected values are populated.
-            Assert.IsTrue(_xmlContent[0].Contains(@"iPhone\x0018"));
-            Assert.IsTrue(_xmlContent[0].Contains("<BadSchema>true</BadSchema>"));
+            Assert.Contains(@"iPhone\x0018", _xmlContent[0]);
+            Assert.Contains("<BadSchema>true</BadSchema>", _xmlContent[0]);
 
         }
 
@@ -508,7 +508,7 @@ namespace FiftyOne.Pipeline.Engines.FiftyOne.Tests.FlowElements
         /// Test that the share usage build can handle invalid configuration for
         /// the ignoreDataEvidenceFilter.
         /// </summary>
-        [DataTestMethod]
+        [TestMethod]
         [DataRow("user-agent=iPhone")]
         [DataRow("user-agent,iPhone")]
         [DataRow("test,iPhone,block")]
@@ -523,14 +523,14 @@ namespace FiftyOne.Pipeline.Engines.FiftyOne.Tests.FlowElements
                 .SetIgnoreFlowDataEvidenceFilter(config)
                 .Build();
 
-            Assert.IsTrue(logger.WarningEntries.Count() > 0);
-            Assert.IsTrue(logger.ErrorEntries.Count() == 0);
+            Assert.IsGreaterThan(0, logger.WarningEntries.Count());
+            Assert.AreEqual(0, logger.ErrorEntries.Count());
         }
 
         /// <summary>
         /// Test valid configuration for the ignoreDataEvidenceFilter.
         /// </summary>
-        [DataTestMethod]
+        [TestMethod]
         [DataRow("user-agent:iPhone")]
         [DataRow("user-agent:iPhone,host:bacon.com")]
         [DataRow("user-agent:iPhone,host:bacon.com,license:ABCDEF")]
@@ -545,8 +545,8 @@ namespace FiftyOne.Pipeline.Engines.FiftyOne.Tests.FlowElements
                 .SetIgnoreFlowDataEvidenceFilter(config)
                 .Build();
 
-            Assert.IsTrue(logger.WarningEntries.Count() == 0);
-            Assert.IsTrue(logger.ErrorEntries.Count() == 0);
+            Assert.AreEqual(0, logger.WarningEntries.Count());
+            Assert.AreEqual(0, logger.ErrorEntries.Count());
         }
 
         /// <summary>
@@ -577,7 +577,7 @@ namespace FiftyOne.Pipeline.Engines.FiftyOne.Tests.FlowElements
             // Assert
             // Check that one and only one HTTP message was sent
             _httpHandler.VerifySendCalled(1);
-            Assert.AreEqual(1, _xmlContent.Count);
+            Assert.HasCount(1, _xmlContent);
 
             // Validate that the XML is well formed by passing it through a reader
             using (XmlReader xr = XmlReader.Create(new StringReader(_xmlContent[0])))
@@ -586,8 +586,8 @@ namespace FiftyOne.Pipeline.Engines.FiftyOne.Tests.FlowElements
             }
 
             // Check that the expected values are populated.
-            Assert.IsTrue(_xmlContent[0].Contains("<SessionId>"));
-            Assert.IsTrue(_xmlContent[0].Contains("<Sequence>1</Sequence>"));
+            Assert.Contains("<SessionId>", _xmlContent[0]);
+            Assert.Contains("<Sequence>1</Sequence>", _xmlContent[0]);
             Assert.IsTrue(data.GetEvidence().AsDictionary().ContainsKey(Constants.EVIDENCE_SESSIONID));
             Assert.IsTrue(data.GetEvidence().AsDictionary().ContainsKey(Constants.EVIDENCE_SEQUENCE));
         }
@@ -623,7 +623,7 @@ namespace FiftyOne.Pipeline.Engines.FiftyOne.Tests.FlowElements
             // Assert
             // Check that one and only one HTTP message was sent
             _httpHandler.VerifySendCalled(1);
-            Assert.AreEqual(1, _xmlContent.Count);
+            Assert.HasCount(1, _xmlContent);
 
             // Validate that the XML is well formed by passing it through a reader
             using (XmlReader xr = XmlReader.Create(new StringReader(_xmlContent[0])))
@@ -632,8 +632,8 @@ namespace FiftyOne.Pipeline.Engines.FiftyOne.Tests.FlowElements
             }
 
             // Check that the expected values are populated.
-            Assert.IsTrue(_xmlContent[0].Contains("<SessionId>abcdefg-hijklmn-opqrst-uvwyxz</SessionId>"));
-            Assert.IsTrue(_xmlContent[0].Contains("<Sequence>3</Sequence>"));
+            Assert.Contains("<SessionId>abcdefg-hijklmn-opqrst-uvwyxz</SessionId>", _xmlContent[0]);
+            Assert.Contains("<Sequence>3</Sequence>", _xmlContent[0]);
             Assert.IsTrue(data.GetEvidence().AsDictionary().ContainsKey(Constants.EVIDENCE_SESSIONID));
             Assert.IsTrue(data.GetEvidence().AsDictionary().ContainsKey(Constants.EVIDENCE_SEQUENCE));
         }
@@ -667,7 +667,7 @@ namespace FiftyOne.Pipeline.Engines.FiftyOne.Tests.FlowElements
             // Assert
             // Check that one and only one HTTP message was sent
             _httpHandler.VerifySendCalled(1);
-            Assert.AreEqual(1, _xmlContent.Count);
+            Assert.HasCount(1, _xmlContent);
 
             // Validate that the XML is well formed by passing it through a reader
             using (XmlReader xr = XmlReader.Create(new StringReader(_xmlContent[0])))
@@ -675,10 +675,10 @@ namespace FiftyOne.Pipeline.Engines.FiftyOne.Tests.FlowElements
                 while (xr.Read()) { }
             }
             // Check that the expected values are populated.
-            Assert.IsTrue(_xmlContent[0].Contains("<header Name=\"notblocked\"><![CDATA[abc]]></header>"));
-            Assert.IsTrue(_xmlContent[0].Contains("<query Name=\"somevalue\"><![CDATA[123]]></query>"));
-            Assert.IsTrue(_xmlContent[0].Contains("<cookie Name=\"mycookie\"><![CDATA[zyx]]></cookie>"));
-            Assert.IsTrue(_xmlContent[0].Contains("<someprefix Name=\"anothervalue\"><![CDATA[987]]></someprefix>"));
+            Assert.Contains("<header Name=\"notblocked\"><![CDATA[abc]]></header>", _xmlContent[0]);
+            Assert.Contains("<query Name=\"somevalue\"><![CDATA[123]]></query>", _xmlContent[0]);
+            Assert.Contains("<cookie Name=\"mycookie\"><![CDATA[zyx]]></cookie>", _xmlContent[0]);
+            Assert.Contains("<someprefix Name=\"anothervalue\"><![CDATA[987]]></someprefix>", _xmlContent[0]);
         }
 
         /// <summary>
@@ -708,7 +708,7 @@ namespace FiftyOne.Pipeline.Engines.FiftyOne.Tests.FlowElements
             // Assert
             // Check that one and only one HTTP message was sent
             _httpHandler.VerifySendCalled(1);
-            Assert.AreEqual(1, _xmlContent.Count);
+            Assert.HasCount(1, _xmlContent);
 
             // Validate that the XML is well formed by passing it through a reader
             using (XmlReader xr = XmlReader.Create(new StringReader(_xmlContent[0])))
@@ -716,7 +716,7 @@ namespace FiftyOne.Pipeline.Engines.FiftyOne.Tests.FlowElements
                 while (xr.Read()) { }
             }
             // Check that the expected values are populated.
-            Assert.IsTrue(_xmlContent[0].Contains("<query Name=\"somevalue\"><![CDATA[123]]></query>"));
+            Assert.Contains("<query Name=\"somevalue\"><![CDATA[123]]></query>", _xmlContent[0]);
         }
 
         /// <summary>
