@@ -136,10 +136,10 @@ namespace FiftyOne.Pipeline.Engines.FiftyOne.Tests.Data
 
             var url1 = file1.FormattedUri.AbsoluteUri;
             var url2 = file2.FormattedUri.AbsoluteUri;
-            Assert.IsTrue(url1.Contains("license1"));
-            Assert.IsFalse(url1.Contains("license2"));
-            Assert.IsTrue(url2.Contains("license2"));
-            Assert.IsFalse(url2.Contains("license1"));
+            Assert.Contains("license1", url1);
+            Assert.DoesNotContain("license2", url1);
+            Assert.Contains("license2", url2);
+            Assert.DoesNotContain("license1", url2);
         }
 
         /// <summary>

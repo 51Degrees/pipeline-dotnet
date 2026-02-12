@@ -70,7 +70,7 @@ namespace FiftyOne.Pipeline.Engines.Tests.FlowElements
         /// <param name="updateOnStartup"></param>
         /// <param name="fileWatcher"></param>
         /// <param name="expectRegistration"></param>
-        [DataTestMethod]
+        [TestMethod]
         [DataRow(false, false, false, false)]
         [DataRow(true, false, false, true)]
         [DataRow(false, true, false, true)]
@@ -119,7 +119,7 @@ namespace FiftyOne.Pipeline.Engines.Tests.FlowElements
         /// Test that exceptions are thrown in various scenarios where
         /// the configuration is not as required.
         /// </summary>
-        [DataTestMethod]
+        [TestMethod]
         // Updates enabled and license key is supplied so should 
         // be fine.
         [DataRow(true, true, true, true, "ABC", false)]
@@ -187,7 +187,7 @@ namespace FiftyOne.Pipeline.Engines.Tests.FlowElements
         /// certain features have been requests but a data update service
         /// has not been supplied.
         /// </summary>
-        [DataTestMethod]
+        [TestMethod]
         // If update service is supplied then there should be 
         // no exception thrown
         [DataRow(true, true, true, true, false)]

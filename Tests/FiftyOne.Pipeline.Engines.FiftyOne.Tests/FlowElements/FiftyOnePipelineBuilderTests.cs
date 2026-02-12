@@ -38,7 +38,7 @@ namespace FiftyOne.Pipeline.Engines.FiftyOne.Tests.FlowElements
         /// to be added or not added based on the value passed to it.
         /// </summary>
         /// <param name="shareUsageEnabled"></param>
-        [DataTestMethod]
+        [TestMethod]
         [DataRow(true)]
         [DataRow(false)]
         public void TestShareUsageOption(bool shareUsageEnabled)
@@ -56,7 +56,7 @@ namespace FiftyOne.Pipeline.Engines.FiftyOne.Tests.FlowElements
         /// from configuration.
         /// </summary>
         /// <param name="shareUsageEnabled"></param>
-        [DataTestMethod]
+        [TestMethod]
         [DataRow(true)]
         [DataRow(false)]
         public void TestShareUsageOption_BuildFromConfig(bool shareUsageEnabled)
@@ -76,7 +76,7 @@ namespace FiftyOne.Pipeline.Engines.FiftyOne.Tests.FlowElements
         /// regardless of the pipeline level 'ShareUsage' setting.
         /// </summary>
         /// <param name="shareUsageEnabled"></param>
-        [DataTestMethod]
+        [TestMethod]
         [DataRow(true)]
         [DataRow(false)]
         public void TestShareUsageConfigOverridesOption(bool shareUsageEnabled)

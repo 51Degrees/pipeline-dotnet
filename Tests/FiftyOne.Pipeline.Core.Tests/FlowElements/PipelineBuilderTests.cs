@@ -536,7 +536,7 @@ namespace FiftyOne.Pipeline.Core.Tests.FlowElements
             var pipeline = _builder.BuildFromConfiguration(opts);
             var retreivedElement = pipeline.GetElement<EnumPerfProfileElement>();
 
-            Assert.IsTrue(retreivedElement.PerfProfile == expected);
+            Assert.AreEqual(expected, retreivedElement.PerfProfile);
         }
 
 
@@ -992,7 +992,7 @@ namespace FiftyOne.Pipeline.Core.Tests.FlowElements
 
             var element = pipeline.GetElement<ListSplitterElement>();
             // Check we've got the expected number of evidence keys.
-            Assert.AreEqual(1, element.EvidenceKeys.Count);
+            Assert.HasCount(1, element.EvidenceKeys);
 
             // Create, populate and process flow data.
             using (var flowData = pipeline.CreateFlowData())
@@ -1044,7 +1044,7 @@ namespace FiftyOne.Pipeline.Core.Tests.FlowElements
             var element = pipeline.GetElement<MultiplyByElement>();
 
             // Check we've got the expected number of evidence keys.
-            Assert.AreEqual(1, element.EvidenceKeys.Count);
+            Assert.HasCount(1, element.EvidenceKeys);
 
             // Create, populate and process flow data.
             using (var flowData = pipeline.CreateFlowData())
