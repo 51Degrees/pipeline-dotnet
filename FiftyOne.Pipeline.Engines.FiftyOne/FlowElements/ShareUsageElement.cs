@@ -21,7 +21,6 @@
  * ********************************************************************* */
 
 using FiftyOne.Pipeline.Core.FailHandling.Facade;
-using FiftyOne.Pipeline.Core.FailHandling.Recovery;
 using FiftyOne.Pipeline.Engines.Trackers;
 using Microsoft.Extensions.Logging;
 using System;
