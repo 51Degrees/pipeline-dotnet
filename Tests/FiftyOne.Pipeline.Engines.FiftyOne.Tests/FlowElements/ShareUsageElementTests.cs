@@ -720,6 +720,198 @@ namespace FiftyOne.Pipeline.Engines.FiftyOne.Tests.FlowElements
         }
 
         /// <summary>
+        /// Helper to create a share usage instance with explicit queue size control.
+        /// </summary>
+        private void CreateShareUsage(double sharePercentage,
+            int minimumEntriesPerMessage,
+            int maximumQueueSize,
+            int interval,
+            List<string> blockedHeaders,
+            List<string> includedQueryStringParams,
+            List<KeyValuePair<string, string>> ignoreDataEvidenceFiler)
+        {
+            _sequenceElement = new SequenceElement(new Mock<ILogger<SequenceElement>>().Object);
+            _sequenceElement.AddPipeline(_pipeline.Object);
+            _shareUsageElement = new ShareUsageElement(
+                _logger,
+                _httpClient,
+                sharePercentage,
+                minimumEntriesPerMessage,
+                maximumQueueSize,
+                100,
+                100,
+                interval,
+                true,
+                "http://51Degrees.com/test",
+                blockedHeaders,
+                includedQueryStringParams,
+                ignoreDataEvidenceFiler,
+                Engines.Constants.DEFAULT_ASP_COOKIE_NAME,
+                _tracker.Object,
+                false);
+            _shareUsageElement.AddPipeline(_pipeline.Object);
+        }
+
+        /// <summary>
+        /// Test that when the queue fills up, data is dropped but the queue
+        /// eventually drains and recovers to accept new data.
+        /// Uses a small queue (20) with batch size 10 and a slow HTTP
+        /// endpoint to force the queue to fill up.
+        /// </summary>
+        [TestMethod]
+        public void ShareUsageElement_QueueFullRecovery()
+        {
+            // Arrange
+            // Small queue of 20, batch size 10, so each send drains up to 20 items.
+            // Add a delay to the HTTP handler to simulate a slow endpoint,
+            // causing the queue to fill up while a send is in progress.
+            int sendCount = 0;
+            _httpHandler.SetupResponse(request =>
+            {
+                Interlocked.Increment(ref sendCount);
+                // Simulate slow endpoint on first call to let queue fill up
+                if (sendCount == 1)
+                {
+                    Thread.Sleep(500);
+                }
+                StoreRequestXml(request);
+                return new HttpResponseMessage(System.Net.HttpStatusCode.OK)
+                {
+                    Content = new StringContent("<empty />", Encoding.UTF8, "application/xml"),
+                };
+            });
+
+            CreateShareUsage(
+                sharePercentage: 1,
+                minimumEntriesPerMessage: 10,
+                maximumQueueSize: 20,
+                interval: 1,
+                blockedHeaders: new List<string>(),
+                includedQueryStringParams: new List<string>(),
+                ignoreDataEvidenceFiler: new List<KeyValuePair<string, string>>());
+
+            // Act - flood with 50 unique requests (more than queue capacity)
+            int totalProcessed = 0;
+            for (int i = 0; i < 50; i++)
+            {
+                var evidenceData = new Dictionary<string, object>()
+                {
+                    { Core.Constants.EVIDENCE_CLIENTIP_KEY, $"1.2.3.{i % 256}" },
+                    { Core.Constants.EVIDENCE_HEADER_USERAGENT_KEY, $"TestAgent/{i}" },
+                };
+                var data = MockFlowData.CreateFromEvidence(evidenceData, false);
+                _shareUsageElement.Process(data.Object);
+                totalProcessed++;
+            }
+
+            // Wait for any in-progress send to complete
+            if (_shareUsageElement.SendDataTask != null)
+            {
+                _shareUsageElement.SendDataTask.Wait(10000);
+            }
+
+            // Now send more data - queue should have drained and accept new entries
+            _xmlContent.Clear();
+            for (int i = 50; i < 70; i++)
+            {
+                var evidenceData = new Dictionary<string, object>()
+                {
+                    { Core.Constants.EVIDENCE_CLIENTIP_KEY, $"1.2.3.{i % 256}" },
+                    { Core.Constants.EVIDENCE_HEADER_USERAGENT_KEY, $"TestAgent/{i}" },
+                };
+                var data = MockFlowData.CreateFromEvidence(evidenceData, false);
+                _shareUsageElement.Process(data.Object);
+            }
+
+            // Wait for the final send to complete
+            if (_shareUsageElement.SendDataTask != null)
+            {
+                _shareUsageElement.SendDataTask.Wait(10000);
+            }
+
+            // Assert
+            // The key assertion: HTTP sends happened (queue was drained)
+            Assert.IsTrue(sendCount >= 2,
+                $"Expected at least 2 HTTP sends (initial + recovery), but got {sendCount}");
+
+            // After recovery, new data was accepted and sent
+            Assert.IsTrue(_xmlContent.Count > 0,
+                "Expected data to be sent after queue recovery, but no XML content was captured");
+
+            Console.WriteLine($"Total HTTP sends: {sendCount}");
+            Console.WriteLine($"XML batches after recovery: {_xmlContent.Count}");
+        }
+
+        /// <summary>
+        /// Test that when the HTTP endpoint fails, the queue still drains
+        /// on subsequent requests and eventually recovers when the endpoint
+        /// comes back.
+        /// </summary>
+        [TestMethod]
+        public void ShareUsageElement_HttpFailureRecovery()
+        {
+            // Arrange
+            // First N calls fail, then succeed
+            int callCount = 0;
+            int failUntil = 3;
+            _httpHandler.SetupResponse(request =>
+            {
+                var count = Interlocked.Increment(ref callCount);
+                if (count <= failUntil)
+                {
+                    throw new HttpRequestException("Simulated network failure");
+                }
+                StoreRequestXml(request);
+                return new HttpResponseMessage(System.Net.HttpStatusCode.OK)
+                {
+                    Content = new StringContent("<empty />", Encoding.UTF8, "application/xml"),
+                };
+            });
+
+            CreateShareUsage(
+                sharePercentage: 1,
+                minimumEntriesPerMessage: 5,
+                maximumQueueSize: 20,
+                interval: 1,
+                blockedHeaders: new List<string>(),
+                includedQueryStringParams: new List<string>(),
+                ignoreDataEvidenceFiler: new List<KeyValuePair<string, string>>());
+
+            // Act - send enough data to trigger multiple send attempts
+            for (int batch = 0; batch < 10; batch++)
+            {
+                for (int i = 0; i < 5; i++)
+                {
+                    int idx = batch * 5 + i;
+                    var evidenceData = new Dictionary<string, object>()
+                    {
+                        { Core.Constants.EVIDENCE_CLIENTIP_KEY, $"10.0.{idx / 256}.{idx % 256}" },
+                        { Core.Constants.EVIDENCE_HEADER_USERAGENT_KEY, $"TestAgent/{idx}" },
+                    };
+                    var data = MockFlowData.CreateFromEvidence(evidenceData, false);
+                    _shareUsageElement.Process(data.Object);
+                }
+
+                // Wait for send task to complete between batches
+                if (_shareUsageElement.SendDataTask != null)
+                {
+                    _shareUsageElement.SendDataTask.Wait(10000);
+                }
+            }
+
+            // Assert
+            // Some calls failed but eventually sends succeeded
+            Assert.IsTrue(callCount > failUntil,
+                $"Expected more than {failUntil} HTTP attempts, got {callCount}");
+            Assert.IsTrue(_xmlContent.Count > 0,
+                $"Expected successful sends after recovery, but got {_xmlContent.Count} XML batches");
+
+            Console.WriteLine($"Total HTTP attempts: {callCount}");
+            Console.WriteLine($"Failed attempts: {Math.Min(callCount, failUntil)}");
+            Console.WriteLine($"Successful XML batches: {_xmlContent.Count}");
+        }
+
+        /// <summary>
         /// Helper method used to extract the XML data from an
         /// HTTP request.
         /// </summary>
