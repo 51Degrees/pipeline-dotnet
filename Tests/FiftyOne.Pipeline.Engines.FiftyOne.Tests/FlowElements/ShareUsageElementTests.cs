@@ -838,6 +838,11 @@ namespace FiftyOne.Pipeline.Engines.FiftyOne.Tests.FlowElements
             Assert.IsTrue(_xmlContent.Count > 0,
                 "Expected data to be sent after queue recovery, but no XML content was captured");
 
+            // Verify no errors or warnings were logged (the original complaint
+            // was log flooding with overflow messages).
+            _logger.AssertMaxErrors(0);
+            _logger.AssertMaxWarnings(0);
+
             Console.WriteLine($"Total HTTP sends: {sendCount}");
             Console.WriteLine($"XML batches after recovery: {_xmlContent.Count}");
         }
