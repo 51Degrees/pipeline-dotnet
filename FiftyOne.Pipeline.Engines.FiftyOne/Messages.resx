@@ -156,10 +156,4 @@
   <data name="MessageShareUsageUnexpectedFailure" xml:space="preserve">
     <value>Unexpected failure while sharing usage data. Please see exception message for details.</value>
   </data>
-  <data name="PropertyKeyedMissingValue" xml:space="preserve">
-    <value>The value '{0}' was not found in the index for property '{1}'.</value>
-  </data>
-  <data name="PropertyKeyedCacheNotSupported" xml:space="preserve">
-    <value>Caching is not supported by property keyed engines.</value>
-  </data>
 </root>
