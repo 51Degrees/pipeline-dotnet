@@ -37,8 +37,8 @@ namespace FiftyOne.Pipeline.Engines.FiftyOne.FlowElements
     /// <summary>
     /// Base class for engines that use an index of property values to 
     /// profile ids to populate one or more profile instances if a valid
-    /// value for the property is provided in the evidence with a 'query' 
-    /// prefix.
+    /// value for a specific configured property is provided in the evidence.
+    /// The specific property to look for is determined by <see cref="GetKeyPropertyName()"/>.
     /// </summary>
     /// <typeparam name="TData">
     /// The type of multi-profile data returned by the engine. Must 
@@ -152,8 +152,8 @@ namespace FiftyOne.Pipeline.Engines.FiftyOne.FlowElements
         }
 
         /// <summary>
-        /// If there is a valid query in the flow data evidence then see if 
-        /// there are related values in the index. If so then add the 
+        /// If there is valid evidence for the specific configured property 
+        /// then see if there are related values in the index. If so then add the 
         /// profile(s) to the aspectData.
         /// </summary>
         /// <param name="data"></param>
