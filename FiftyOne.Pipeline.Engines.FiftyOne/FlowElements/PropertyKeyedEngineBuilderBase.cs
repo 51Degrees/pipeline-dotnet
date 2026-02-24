@@ -67,35 +67,41 @@ namespace FiftyOne.Pipeline.Engines.FiftyOne.FlowElements
 
         /// <summary>
         /// Cache is not supported by property keyed engines.
+        /// This setting is ignored.
         /// </summary>
         /// <param name="cacheSize"></param>
         /// <returns></returns>
         public override TBuilder SetCacheSize(int cacheSize)
         {
-            throw new NotSupportedException(
-                Messages.PropertyKeyedCacheNotSupported);
+            _loggerFactory.CreateLogger<PropertyKeyedEngineBuilderBase<TBuilder, TEngine>>()
+                .LogWarning(Messages.PropertyKeyedCacheNotSupported);
+            return (TBuilder)this;
         }
 
         /// <summary>
         /// Cache is not supported by property keyed engines.
+        /// This setting is ignored.
         /// </summary>
         /// <param name="cacheHitOrMiss"></param>
         /// <returns></returns>
         public override TBuilder SetCacheHitOrMiss(bool cacheHitOrMiss)
         {
-            throw new NotSupportedException(
-                Messages.PropertyKeyedCacheNotSupported);
+            _loggerFactory.CreateLogger<PropertyKeyedEngineBuilderBase<TBuilder, TEngine>>()
+                .LogWarning(Messages.PropertyKeyedCacheNotSupported);
+            return (TBuilder)this;
         }
 
         /// <summary>
         /// Cache is not supported by property keyed engines.
+        /// This setting is ignored.
         /// </summary>
         /// <param name="cacheConfig"></param>
         /// <returns></returns>
         public override TBuilder SetCache(CacheConfiguration cacheConfig)
         {
-            throw new NotSupportedException(
-                Messages.PropertyKeyedCacheNotSupported);
+            _loggerFactory.CreateLogger<PropertyKeyedEngineBuilderBase<TBuilder, TEngine>>()
+                .LogWarning(Messages.PropertyKeyedCacheNotSupported);
+            return (TBuilder)this;
         }
 
         /// <summary>

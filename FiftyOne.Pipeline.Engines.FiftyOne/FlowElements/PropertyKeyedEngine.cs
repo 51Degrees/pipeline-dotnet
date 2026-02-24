@@ -54,32 +54,12 @@ namespace FiftyOne.Pipeline.Engines.FiftyOne.FlowElements
         where TData : IMultiProfileData<TProfile>
         where TProfile : IAspectData
     {
-        /// <summary>
-        /// Functions used to convert values from the inner engine that will
-        /// form indexes into strings.
-        /// </summary>
-        public static readonly Func<IAspectPropertyValue, IEnumerable<string>>[]
-            ValueConverters = 
-            {
-                GetValues<string>,
-                GetValues<bool>,
-                GetValues<byte>,
-                GetValues<short>,
-                GetValues<ushort>,
-                GetValues<int>,
-                GetValues<uint>,
-                GetValues<long>,
-                GetValues<ulong>,
-                GetValues<float>,
-                GetValues<double>,
-            };
-
         /// <inheritdoc/>
         public override string DataSourceTier => 
             DataSet.DataSourceTier;
 
         /// <inheritdoc/>
-        public override string ElementDataKey => DataSet.ElementDataKey;
+        public override abstract string ElementDataKey { get; }
 
         /// <inheritdoc/>
         public override IEvidenceKeyFilter EvidenceKeyFilter =>
@@ -106,7 +86,7 @@ namespace FiftyOne.Pipeline.Engines.FiftyOne.FlowElements
         /// <summary>
         /// The properties in the data file to index.
         /// </summary>
-        private readonly IReadOnlyList<string> _indexedProperties;
+        protected IReadOnlyList<string> IndexedProperties { get; }
 
         /// <summary>
         /// Constructs a new instance of 
@@ -125,7 +105,7 @@ namespace FiftyOne.Pipeline.Engines.FiftyOne.FlowElements
             null)
         {
             LoggerFactory = loggerFactory;
-            _indexedProperties = indexedProperties;
+            IndexedProperties = indexedProperties;
         }
 
         /// <summary>
@@ -139,27 +119,23 @@ namespace FiftyOne.Pipeline.Engines.FiftyOne.FlowElements
         }
 
         /// <summary>
-        /// Gets property and values from the flow data evidence. The 
-        /// implementation is responsible for updating the flow data error 
-        /// collection if an invalid value is provided.
+        /// Gets the property name by which the lookups will be done.
+        /// This is provided by the inheriting class.
         /// </summary>
-        /// <param name="data"></param>
-        /// <returns></returns>
-        protected virtual IEnumerable<KeyValuePair<PropertyKeyedIndex, string>>
-            GetQueryValues(IFlowData data)
+        /// <returns>The string name of the property to key on.</returns>
+        protected abstract string GetKeyPropertyName();
+
+        /// <summary>
+        /// Validates the value of the key property.
+        /// The inheriting class should implement validation logic here and add any
+        /// relevant errors to the flow data.
+        /// </summary>
+        /// <param name="keyPropertyValue">The value to validate.</param>
+        /// <param name="data">The flow data to add errors to.</param>
+        /// <returns>True if the value is valid, false otherwise.</returns>
+        protected virtual bool Validate(string keyPropertyValue, IFlowData data)
         {
-            foreach (var property in DataSet.PropertyIndexes)
-            {
-                foreach (var key in property.EvidenceKeys)
-                {
-                    if (data.TryGetEvidence(key, out string value))
-                    {
-                        yield return new KeyValuePair<PropertyKeyedIndex, string>(
-                            property,
-                            value);
-                    }
-                }
-            }
+            return true;
         }
 
         /// <summary>
@@ -186,25 +162,37 @@ namespace FiftyOne.Pipeline.Engines.FiftyOne.FlowElements
             IFlowData data, 
             TData aspectData)
         {
-            foreach (var query in GetQueryValues(data))
+            string keyProperty = GetKeyPropertyName();
+            var propertyIndex = DataSet.PropertyIndexes.FirstOrDefault(
+                i => i.MetaData.Name.Equals(keyProperty, StringComparison.OrdinalIgnoreCase));
+
+            if (propertyIndex == null) return;
+
+            foreach (var key in propertyIndex.EvidenceKeys)
             {
-                if (query.Key.ValueData.TryGetValue(
-                    query.Value,
-                    out var results))
+                if (data.TryGetEvidence(key, out string value))
                 {
-                    foreach (var result in results)
+                    if (Validate(value, data))
                     {
-                        ProcessProfileMatch(data, aspectData, result);
+                        if (propertyIndex.ValueData.TryGetValue(
+                            value,
+                            out var results))
+                        {
+                            foreach (var result in results)
+                            {
+                                ProcessProfileMatch(data, aspectData, result);
+                            }
+                        }
+                        else
+                        {
+                            data.AddError(
+                                new ArgumentException(String.Format(
+                                    Messages.PropertyKeyedMissingValue,
+                                    value,
+                                    propertyIndex.MetaData.Name)),
+                                this);
+                        }
                     }
-                }
-                else
-                {
-                    data.AddError(
-                        new ArgumentException(String.Format(
-                            Messages.PropertyKeyedMissingValue,
-                            query.Value,
-                            query.Key.MetaData.Name)),
-                        this);
                 }
             }
         }
@@ -252,232 +240,23 @@ namespace FiftyOne.Pipeline.Engines.FiftyOne.FlowElements
         }
 
         /// <summary>
-        /// Creates the inner engine from a data file path.
-        /// The returned engine must support profile iteration and 
-        /// provide property metadata.
-        /// </summary>
-        /// <param name="dataFilePath">Path to the data file.</param>
-        /// <returns>
-        /// A tuple of: the inner engine (as IFiftyOneAspectEngine),
-        /// the pipeline wrapping it, the profiles enumerable,
-        /// the evidence key for profile id lookups, and the properties.
-        /// </returns>
-        protected abstract InnerEngineContext CreateInnerEngine(
-            string dataFilePath);
-
-        /// <summary>
-        /// Creates the inner engine from a data stream.
-        /// </summary>
-        /// <param name="data">Data stream.</param>
-        /// <returns>Same as <see cref="CreateInnerEngine(string)"/>.</returns>
-        protected abstract InnerEngineContext CreateInnerEngine(
-            Stream data);
-
-        /// <summary>
-        /// Gets the values of the indexed properties from a profile 
-        /// resolved by the inner engine.
-        /// </summary>
-        /// <param name="data">
-        /// The aspect data for a single profile.
-        /// </param>
-        /// <param name="property">The property to read.</param>
-        /// <returns>String representations of the property values.</returns>
-        protected abstract IEnumerable<string> GetProfilePropertyValues(
-            IElementData data,
-            IFiftyOneAspectPropertyMetaData property);
-
-        /// <summary>
-        /// Builds the list of result properties from the key properties 
-        /// and inner engine. Subclasses can override to customise which
-        /// properties appear in results.
-        /// </summary>
-        /// <param name="keyProperties">The indexed key properties.</param>
-        /// <param name="engine">The property keyed engine.</param>
-        /// <returns>The list of properties.</returns>
-        protected abstract IList<IFiftyOneAspectPropertyMetaData> 
-            BuildResultProperties(
-                IList<IFiftyOneAspectPropertyMetaData> keyProperties,
-                IFlowElement engine);
-
-        /// <summary>
-        /// Creates a new <see cref="PropertyKeyedIndex"/> for a property.
-        /// Subclasses can override to use custom property metadata types.
-        /// </summary>
-        /// <param name="source">
-        /// The source property metadata from the inner engine.
-        /// </param>
-        /// <returns>A new property index.</returns>
-        protected abstract PropertyKeyedIndex CreatePropertyIndex(
-            IFiftyOneAspectPropertyMetaData source);
-
-        /// <summary>
         /// Builds the data set which contains properties and indexes that
-        /// will be consumed by the engine during processing.
+        /// will be consumed by the engine during processing. Implementations
+        /// are responsible for creating the indexes and populating them
+        /// from their data source.
         /// </summary>
         /// <param name="dataFilePath">Path to the data file.</param>
         /// <returns>A new <see cref="PropertyKeyedDataSet"/>.</returns>
-        private PropertyKeyedDataSet BuildDataSet(string dataFilePath)
-        {
-            var context = CreateInnerEngine(dataFilePath);
-            return BuildDataSetFromContext(context);
-        }
+        protected abstract PropertyKeyedDataSet BuildDataSet(string dataFilePath);
 
         /// <summary>
-        /// Builds the data set from a stream.
+        /// Builds the data set from a stream. Implementations
+        /// are responsible for creating the indexes and populating them
+        /// from their data source.
         /// </summary>
         /// <param name="data">The data stream.</param>
         /// <returns>A new <see cref="PropertyKeyedDataSet"/>.</returns>
-        private PropertyKeyedDataSet BuildDataSet(Stream data)
-        {
-            var context = CreateInnerEngine(data);
-            return BuildDataSetFromContext(context);
-        }
+        protected abstract PropertyKeyedDataSet BuildDataSet(Stream data);
 
-        /// <summary>
-        /// Builds the data set from an inner engine context.
-        /// </summary>
-        /// <param name="context">The inner engine context.</param>
-        /// <returns>A new <see cref="PropertyKeyedDataSet"/>.</returns>
-        private PropertyKeyedDataSet BuildDataSetFromContext(
-            InnerEngineContext context)
-        {
-            var propertyIndexes = context.Properties
-                .Where(i => _indexedProperties.Contains(i.Name))
-                .Select(i => CreatePropertyIndex(i))
-                .ToList();
-
-            Parallel.ForEach(
-                context.Profiles,
-                profile =>
-                {
-                    using (var data = context.Pipeline.CreateFlowData())
-                    {
-                        data.AddEvidence(
-                            context.ProfileIdEvidenceKey,
-                            profile.ProfileId.ToString());
-                        data.Process();
-                        var profileData = data.Get(context.InnerEngineDataKey);
-                        foreach (var index in propertyIndexes)
-                        {
-                            foreach (var value in GetProfilePropertyValues(
-                                profileData, index.MetaData))
-                            {
-                                index.Add(value, profile.ProfileId);
-                            }
-                        }
-                    }
-                });
-
-            if (Logger.IsEnabled(LogLevel.Information))
-            {
-                Logger.LogInformation(
-                    "Indexed '{0}' properties",
-                    propertyIndexes.Count);
-                foreach (var property in propertyIndexes)
-                {
-                    Logger.LogInformation(
-                        "Indexed '{0}' values and '{1}' profiles for '{2}'",
-                        property.ValueData.Count,
-                        property.ValueData.SelectMany(i =>
-                            i.Value).Distinct().Count(),
-                        property.MetaData.Name);
-                }
-            }
-
-            return new PropertyKeyedDataSet(
-                context.Pipeline,
-                context.ElementDataKey,
-                context.DataSourceTier,
-                this,
-                propertyIndexes,
-                BuildResultProperties);
-        }
-
-        /// <summary>
-        /// Tries the value converters and returns the values from the 
-        /// first one that matches.
-        /// </summary>
-        /// <param name="value">The aspect property value.</param>
-        /// <returns>String representations.</returns>
-        protected static IEnumerable<string> ConvertValues(
-            IAspectPropertyValue value)
-        {
-            if (value.HasValue)
-            {
-                foreach (var convert in ValueConverters)
-                {
-                    var matched = false;
-                    foreach (var item in convert(value))
-                    {
-                        yield return item;
-                        matched = true;
-                    }
-                    if (matched)
-                    {
-                        break;
-                    }
-                }
-            }
-        }
-
-        private static IEnumerable<string> GetValues<T>(
-            IAspectPropertyValue value)
-        {
-            if (value is IAspectPropertyValue<IReadOnlyList<T>>)
-            {
-                foreach(var item in 
-                    ((IAspectPropertyValue<IReadOnlyList<T>>)value).Value)
-                {
-                    yield return item.ToString();
-                }
-            }
-            else if (value is IAspectPropertyValue<T>)
-            {
-                yield return ((IAspectPropertyValue<T>)value).Value.ToString();
-            }
-        }
-    }
-
-    /// <summary>
-    /// Context returned by 
-    /// <see cref="PropertyKeyedEngine{TData, TProfile}.CreateInnerEngine(string)"/>
-    /// containing all information needed to build the data set.
-    /// </summary>
-    public class InnerEngineContext
-    {
-        /// <summary>
-        /// The pipeline wrapping the inner engine.
-        /// </summary>
-        public IPipeline Pipeline { get; set; }
-
-        /// <summary>
-        /// The element data key for the inner engine.
-        /// </summary>
-        public string InnerEngineDataKey { get; set; }
-
-        /// <summary>
-        /// The element data key for constructing the data set's key.
-        /// </summary>
-        public string ElementDataKey { get; set; }
-
-        /// <summary>
-        /// The data source tier from the inner engine.
-        /// </summary>
-        public string DataSourceTier { get; set; }
-
-        /// <summary>
-        /// The profiles from the inner engine to iterate over.
-        /// </summary>
-        public IEnumerable<IProfileMetaData> Profiles { get; set; }
-
-        /// <summary>
-        /// The evidence key to use when looking up a profile by id.
-        /// </summary>
-        public string ProfileIdEvidenceKey { get; set; }
-
-        /// <summary>
-        /// The properties from the inner engine.
-        /// </summary>
-        public IList<IFiftyOneAspectPropertyMetaData> Properties { get; set; }
     }
 }

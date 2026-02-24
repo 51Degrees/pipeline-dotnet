@@ -145,8 +145,7 @@ namespace FiftyOne.Pipeline.Engines.FiftyOne.FlowElements
         /// <summary>
         /// Dispose of managed resources.
         /// </summary>
-        /// <param name="disposing"></param>
-        protected virtual void Dispose(bool disposing)
+        public void Dispose()
         {
             if (!_disposedValue)
             {
@@ -154,26 +153,9 @@ namespace FiftyOne.Pipeline.Engines.FiftyOne.FlowElements
                 PropertyIndexes = null;
                 KeyProperties = null;
                 Properties = null;
-                Pipeline.Dispose();
+                Pipeline?.Dispose();
                 _disposedValue = true;
             }
-        }
-
-        /// <summary>
-        /// Finalizer.
-        /// </summary>
-        ~PropertyKeyedDataSet()
-        {
-            Dispose(disposing: false);
-        }
-
-        /// <summary>
-        /// Dispose of resources.
-        /// </summary>
-        public void Dispose()
-        {
-            Dispose(disposing: true);
-            GC.SuppressFinalize(this);
         }
     }
 }
