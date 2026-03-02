@@ -97,25 +97,17 @@ namespace FiftyOne.Pipeline.Engines.FiftyOne.FlowElements
         /// The properties in the associated data file that should be 
         /// indexed.
         /// </param>
-        protected PropertyKeyedEngine(
+        private PropertyKeyedEngine(
             ILoggerFactory loggerFactory,
             IReadOnlyList<string> indexedProperties) : base(
             loggerFactory.CreateLogger<PropertyKeyedEngine<TData, TProfile>>(),
-            null,
-            null)
+			// Aspect data factory is not used by property keyed engines
+            aspectDataFactory: null, 
+			// Temp data is not used by property keyed engines
+            tempDataFilePath: null) 
         {
             LoggerFactory = loggerFactory;
             IndexedProperties = indexedProperties;
-        }
-
-        /// <summary>
-        /// Ensure the data set and the associated pipeline and engine are
-        /// disposed.
-        /// </summary>
-        protected override void ManagedResourcesCleanup()
-        {
-            DataSet.Dispose();
-            base.ManagedResourcesCleanup();
         }
 
         /// <summary>
@@ -133,9 +125,48 @@ namespace FiftyOne.Pipeline.Engines.FiftyOne.FlowElements
         /// <param name="keyPropertyValue">The value to validate.</param>
         /// <param name="data">The flow data to add errors to.</param>
         /// <returns>True if the value is valid, false otherwise.</returns>
-        protected virtual bool Validate(string keyPropertyValue, IFlowData data)
+        protected abstract bool Validate(string keyPropertyValue, IFlowData data);
+
+        /// <summary>
+        /// Called for each profile id that matches the query. Subclasses
+        /// must implement this to convert the profile id into profile data
+        /// and add it to the aspect data.
+        /// </summary>
+        /// <param name="data">The flow data.</param>
+        /// <param name="aspectData">The aspect data to add results to.</param>
+        /// <param name="profileId">The matched profile id.</param>
+        protected abstract void ProcessProfileMatch(
+            IFlowData data,
+            TData aspectData,
+            uint profileId);
+
+        /// <summary>
+        /// Builds the data set which contains properties and indexes that
+        /// will be consumed by the engine during processing. Implementations
+        /// are responsible for creating the indexes and populating them
+        /// from their data source.
+        /// </summary>
+        /// <param name="dataFilePath">Path to the data file.</param>
+        /// <returns>A new <see cref="PropertyKeyedDataSet"/>.</returns>
+        protected abstract PropertyKeyedDataSet BuildDataSet(string dataFilePath);
+
+        /// <summary>
+        /// Builds the data set from a stream. Implementations
+        /// are responsible for creating the indexes and populating them
+        /// from their data source.
+        /// </summary>
+        /// <param name="data">The data stream.</param>
+        /// <returns>A new <see cref="PropertyKeyedDataSet"/>.</returns>
+        protected abstract PropertyKeyedDataSet BuildDataSet(Stream data);
+
+        /// <summary>
+        /// Ensure the data set and the associated pipeline and engine are
+        /// disposed.
+        /// </summary>
+        protected override void ManagedResourcesCleanup()
         {
-            return true;
+            DataSet.Dispose();
+            base.ManagedResourcesCleanup();
         }
 
         /// <summary>
@@ -145,7 +176,7 @@ namespace FiftyOne.Pipeline.Engines.FiftyOne.FlowElements
         public override void Process(IFlowData data)
         {
             if (DataSet.EvidenceKeyFilter.Whitelist.Any(i =>
-                data.TryGetEvidence(i.Key, out string _)))
+                data.GetEvidence().AsDictionary().ContainsKey(i.Key)))
             {
                 base.Process(data);
             }
@@ -197,24 +228,13 @@ namespace FiftyOne.Pipeline.Engines.FiftyOne.FlowElements
             }
         }
 
-        /// <summary>
-        /// Called for each profile id that matches the query. Subclasses
-        /// must implement this to convert the profile id into profile data
-        /// and add it to the aspect data.
-        /// </summary>
-        /// <param name="data">The flow data.</param>
-        /// <param name="aspectData">The aspect data to add results to.</param>
-        /// <param name="profileId">The matched profile id.</param>
-        protected abstract void ProcessProfileMatch(
-            IFlowData data,
-            TData aspectData,
-            uint profileId);
-
         /// <inheritdoc/>
         public override void RefreshData(string dataFileIdentifier)
         {
             if (DataSet != null)
             {
+                // Property keyed engines do not support data refresh.
+                // An exception is thrown since DataSet is already initialized.
                 throw new Exception("Data can not be refreshed");
             }
             DataSet = BuildDataSet(
@@ -228,6 +248,8 @@ namespace FiftyOne.Pipeline.Engines.FiftyOne.FlowElements
         {
             if (DataSet != null)
             {
+                // Property keyed engines do not support data refresh.
+                // An exception is thrown since DataSet is already initialized.
                 throw new Exception("Data can not be refreshed");
             }
             DataSet = BuildDataSet(data);
@@ -238,25 +260,5 @@ namespace FiftyOne.Pipeline.Engines.FiftyOne.FlowElements
         {
             // No unmanaged resources to clean up.
         }
-
-        /// <summary>
-        /// Builds the data set which contains properties and indexes that
-        /// will be consumed by the engine during processing. Implementations
-        /// are responsible for creating the indexes and populating them
-        /// from their data source.
-        /// </summary>
-        /// <param name="dataFilePath">Path to the data file.</param>
-        /// <returns>A new <see cref="PropertyKeyedDataSet"/>.</returns>
-        protected abstract PropertyKeyedDataSet BuildDataSet(string dataFilePath);
-
-        /// <summary>
-        /// Builds the data set from a stream. Implementations
-        /// are responsible for creating the indexes and populating them
-        /// from their data source.
-        /// </summary>
-        /// <param name="data">The data stream.</param>
-        /// <returns>A new <see cref="PropertyKeyedDataSet"/>.</returns>
-        protected abstract PropertyKeyedDataSet BuildDataSet(Stream data);
-
     }
 }

@@ -52,6 +52,11 @@ namespace FiftyOne.Pipeline.Engines.FiftyOne.FlowElements
         protected readonly ILoggerFactory _loggerFactory;
 
         /// <summary>
+        /// Logger for the builder base class.
+        /// </summary>
+        protected readonly ILogger<PropertyKeyedEngineBuilderBase<TBuilder, TEngine>> _logger;
+
+        /// <summary>
         /// Constructs a new instance of 
         /// <see cref="PropertyKeyedEngineBuilderBase{TBuilder, TEngine}"/>.
         /// </summary>
@@ -63,7 +68,18 @@ namespace FiftyOne.Pipeline.Engines.FiftyOne.FlowElements
             : base(dataUpdateService)
         {
             _loggerFactory = loggerFactory;
+            _logger = _loggerFactory.CreateLogger<PropertyKeyedEngineBuilderBase<TBuilder, TEngine>>();
         }
+
+        /// <summary>
+        /// Creates a new instance of the engine for the given properties.
+        /// Subclasses must implement this to construct the concrete engine.
+        /// </summary>
+        /// <param name="properties">
+        /// The properties to index on.
+        /// </param>
+        /// <returns>A new engine instance.</returns>
+        protected abstract TEngine CreateEngine(List<string> properties);
 
         /// <summary>
         /// Cache is not supported by property keyed engines.
@@ -73,8 +89,7 @@ namespace FiftyOne.Pipeline.Engines.FiftyOne.FlowElements
         /// <returns></returns>
         public override TBuilder SetCacheSize(int cacheSize)
         {
-            _loggerFactory.CreateLogger<PropertyKeyedEngineBuilderBase<TBuilder, TEngine>>()
-                .LogWarning(Messages.PropertyKeyedCacheNotSupported);
+            _logger.LogWarning(Messages.PropertyKeyedCacheNotSupported);
             return (TBuilder)this;
         }
 
@@ -86,8 +101,7 @@ namespace FiftyOne.Pipeline.Engines.FiftyOne.FlowElements
         /// <returns></returns>
         public override TBuilder SetCacheHitOrMiss(bool cacheHitOrMiss)
         {
-            _loggerFactory.CreateLogger<PropertyKeyedEngineBuilderBase<TBuilder, TEngine>>()
-                .LogWarning(Messages.PropertyKeyedCacheNotSupported);
+            _logger.LogWarning(Messages.PropertyKeyedCacheNotSupported);
             return (TBuilder)this;
         }
 
@@ -99,8 +113,7 @@ namespace FiftyOne.Pipeline.Engines.FiftyOne.FlowElements
         /// <returns></returns>
         public override TBuilder SetCache(CacheConfiguration cacheConfig)
         {
-            _loggerFactory.CreateLogger<PropertyKeyedEngineBuilderBase<TBuilder, TEngine>>()
-                .LogWarning(Messages.PropertyKeyedCacheNotSupported);
+            _logger.LogWarning(Messages.PropertyKeyedCacheNotSupported);
             return (TBuilder)this;
         }
 
@@ -122,15 +135,5 @@ namespace FiftyOne.Pipeline.Engines.FiftyOne.FlowElements
             }
             return CreateEngine(properties);
         }
-
-        /// <summary>
-        /// Creates a new instance of the engine for the given properties.
-        /// Subclasses must implement this to construct the concrete engine.
-        /// </summary>
-        /// <param name="properties">
-        /// The properties to index on.
-        /// </param>
-        /// <returns>A new engine instance.</returns>
-        protected abstract TEngine CreateEngine(List<string> properties);
     }
 }
