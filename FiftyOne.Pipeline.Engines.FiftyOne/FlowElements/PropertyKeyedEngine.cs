@@ -76,7 +76,7 @@ namespace FiftyOne.Pipeline.Engines.FiftyOne.FlowElements
         /// The values and associated profile data for each of the 
         /// properties supported by the engine.
         /// </summary>
-        public PropertyKeyedDataSet DataSet { get; private set; }
+        public PropertyKeyedDataSet DataSet { get; protected set; }
 
         /// <summary>
         /// Logger factory used to create loggers and inner engines.
@@ -97,7 +97,7 @@ namespace FiftyOne.Pipeline.Engines.FiftyOne.FlowElements
         /// The properties in the associated data file that should be 
         /// indexed.
         /// </param>
-        private PropertyKeyedEngine(
+        protected PropertyKeyedEngine(
             ILoggerFactory loggerFactory,
             IReadOnlyList<string> indexedProperties) : base(
             loggerFactory.CreateLogger<PropertyKeyedEngine<TData, TProfile>>(),
