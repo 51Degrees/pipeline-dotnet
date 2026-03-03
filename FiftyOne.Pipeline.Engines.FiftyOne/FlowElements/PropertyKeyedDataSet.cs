@@ -145,17 +145,30 @@ namespace FiftyOne.Pipeline.Engines.FiftyOne.FlowElements
         /// <summary>
         /// Dispose of managed resources.
         /// </summary>
-        public void Dispose()
+        protected virtual void Dispose(bool disposing)
         {
             if (!_disposedValue)
             {
-                EvidenceKeyFilter = null;
-                PropertyIndexes = null;
-                KeyProperties = null;
-                Properties = null;
-                Pipeline?.Dispose();
+                if (disposing)
+                {
+                    EvidenceKeyFilter = null;
+                    PropertyIndexes = null;
+                    KeyProperties = null;
+                    Properties = null;
+                    Pipeline?.Dispose();
+                }
+
                 _disposedValue = true;
             }
+        }
+
+        /// <summary>
+        /// Dispose of managed resources.
+        /// </summary>
+        public void Dispose()
+        {
+            Dispose(disposing: true);
+            GC.SuppressFinalize(this);
         }
     }
 }

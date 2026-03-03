@@ -79,24 +79,17 @@ namespace FiftyOne.Pipeline.Engines.FiftyOne.FlowElements
         /// <summary>
         /// Adds the value and profile id to the property index.
         /// </summary>
-        /// <param name="value"></param>
-        /// <param name="profileId"></param>
+        /// <param name="value">The value to add to the property index.</param>
+        /// <param name="profileId">The profile id to add.</param>
         public void Add(string value, uint profileId)
         {
-            var existing = true;
             var list = _valueData.GetOrAdd(
                 value,
-                k =>
-                {
-                    existing = false;
-                    return new List<uint>() { profileId };
-                });
-            if (existing)
+                k => new List<uint>());
+
+            lock (list)
             {
-                lock(list)
-                {
-                    list.Add(profileId);
-                }
+                list.Add(profileId);
             }
         }
 
