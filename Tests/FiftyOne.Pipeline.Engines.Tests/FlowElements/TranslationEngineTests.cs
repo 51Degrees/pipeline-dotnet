@@ -107,8 +107,8 @@ namespace FiftyOne.Pipeline.Engines.Tests.FlowElements
         [TestMethod]
         public void WritesTranslatedStringToDestinationProperty_EnGb()
         {
-            var tempDir = CreateTempDirectory();
-            var enGb = CreateTranslationFile(
+            var tempDir = Helpers.CreateTempDirectory(_tempPaths);
+            var enGb = Helpers.CreateTranslationFile(
                 tempDir,
                 "en_GB.yaml",
                 new Dictionary<string, string>()
@@ -129,7 +129,7 @@ namespace FiftyOne.Pipeline.Engines.Tests.FlowElements
                 pipeline.Object);
             sourceData["country"] = new AspectPropertyValue<string>("Spain");
 
-            ConfigureSourceData(flowData, sourceData);
+            Helpers.ConfigureSourceData(flowData, sourceData);
 
             var translationData = new TranslationEngineData(
                 _loggerFactory.CreateLogger<TranslationEngineData>(),
@@ -142,7 +142,8 @@ namespace FiftyOne.Pipeline.Engines.Tests.FlowElements
 
             engine.Process(flowData.Object);
 
-            var translated = (IAspectPropertyValue<string>)translationData["countrytranslated"];
+            var translated = (IAspectPropertyValue<string>)
+                translationData["countrytranslated"];
             Assert.AreEqual("Spain-GB", translated.Value);
             Assert.IsFalse(translationData.AsDictionary().ContainsKey("country"));
         }
@@ -153,15 +154,15 @@ namespace FiftyOne.Pipeline.Engines.Tests.FlowElements
         [TestMethod]
         public void UsesFirstMatchingLanguageEvidenceKey()
         {
-            var tempDir = CreateTempDirectory();
-            var enGb = CreateTranslationFile(
+            var tempDir = Helpers.CreateTempDirectory(_tempPaths);
+            var enGb = Helpers.CreateTranslationFile(
                 tempDir,
                 "en_GB.yaml",
                 new Dictionary<string, string>()
                 {
                     { "Spain", "Spain-GB" }
                 });
-            var enEs = CreateTranslationFile(
+            var enEs = Helpers.CreateTranslationFile(
                 tempDir,
                 "en_ES.yaml",
                 new Dictionary<string, string>()
@@ -183,7 +184,7 @@ namespace FiftyOne.Pipeline.Engines.Tests.FlowElements
                 pipeline.Object);
             sourceData["country"] = new AspectPropertyValue<string>("Spain");
 
-            ConfigureSourceData(flowData, sourceData);
+            Helpers.ConfigureSourceData(flowData, sourceData);
 
             var translationData = new TranslationEngineData(
                 _loggerFactory.CreateLogger<TranslationEngineData>(),
@@ -196,7 +197,8 @@ namespace FiftyOne.Pipeline.Engines.Tests.FlowElements
 
             engine.Process(flowData.Object);
 
-            var translated = (IAspectPropertyValue<string>)translationData["countrytranslated"];
+            var translated = (IAspectPropertyValue<string>)
+                translationData["countrytranslated"];
             Assert.AreEqual("Spain-GB", translated.Value);
         }
 
@@ -206,8 +208,8 @@ namespace FiftyOne.Pipeline.Engines.Tests.FlowElements
         [TestMethod]
         public void UsesHeaderAcceptLanguageWhenQueryMissing()
         {
-            var tempDir = CreateTempDirectory();
-            var enEs = CreateTranslationFile(
+            var tempDir = Helpers.CreateTempDirectory(_tempPaths);
+            var enEs = Helpers.CreateTranslationFile(
                 tempDir,
                 "en_ES.yaml",
                 new Dictionary<string, string>()
@@ -228,7 +230,7 @@ namespace FiftyOne.Pipeline.Engines.Tests.FlowElements
                 pipeline.Object);
             sourceData["country"] = new AspectPropertyValue<string>("Spain");
 
-            ConfigureSourceData(flowData, sourceData);
+            Helpers.ConfigureSourceData(flowData, sourceData);
 
             var translationData = new TranslationEngineData(
                 _loggerFactory.CreateLogger<TranslationEngineData>(),
@@ -241,7 +243,8 @@ namespace FiftyOne.Pipeline.Engines.Tests.FlowElements
 
             engine.Process(flowData.Object);
 
-            var translated = (IAspectPropertyValue<string>)translationData["countrytranslated"];
+            var translated = (IAspectPropertyValue<string>)
+                translationData["countrytranslated"];
             Assert.AreEqual("Espana", translated.Value);
         }
 
@@ -252,8 +255,8 @@ namespace FiftyOne.Pipeline.Engines.Tests.FlowElements
         [TestMethod]
         public void TranslatesStringListProperty_WithFallback()
         {
-            var tempDir = CreateTempDirectory();
-            var enEs = CreateTranslationFile(
+            var tempDir = Helpers.CreateTempDirectory(_tempPaths);
+            var enEs = Helpers.CreateTranslationFile(
                 tempDir,
                 "en_ES.yaml",
                 new Dictionary<string, string>()
@@ -273,10 +276,11 @@ namespace FiftyOne.Pipeline.Engines.Tests.FlowElements
             var sourceData = new SourceData(
                 _loggerFactory.CreateLogger<ElementDataBase>(),
                 pipeline.Object);
-            sourceData["countries"] = new AspectPropertyValue<IReadOnlyList<string>>(
+            sourceData["countries"] = 
+                new AspectPropertyValue<IReadOnlyList<string>>(
                 ["Spain", "Italy"]);
 
-            ConfigureSourceData(flowData, sourceData);
+            Helpers.ConfigureSourceData(flowData, sourceData);
 
             var translationData = new TranslationEngineData(
                 _loggerFactory.CreateLogger<TranslationEngineData>(),
@@ -289,7 +293,8 @@ namespace FiftyOne.Pipeline.Engines.Tests.FlowElements
 
             engine.Process(flowData.Object);
 
-            var translated = (IAspectPropertyValue<List<string>>)translationData["countriestranslated"];
+            var translated = (IAspectPropertyValue<List<string>>)
+                translationData["countriestranslated"];
             CollectionAssert.AreEqual(
                 new[] { "Espana", "Italy" },
                 translated.Value.ToArray());
@@ -302,8 +307,8 @@ namespace FiftyOne.Pipeline.Engines.Tests.FlowElements
         [TestMethod]
         public void TranslatesWeightedStringListProperty_WithFallback()
         {
-            var tempDir = CreateTempDirectory();
-            var enGb = CreateTranslationFile(
+            var tempDir = Helpers.CreateTempDirectory(_tempPaths);
+            var enGb = Helpers.CreateTranslationFile(
                 tempDir,
                 "en_GB.yaml",
                 new Dictionary<string, string>()
@@ -329,7 +334,7 @@ namespace FiftyOne.Pipeline.Engines.Tests.FlowElements
                     new WeightedValue<string>(50, "Italy")
                 });
 
-            ConfigureSourceData(flowData, sourceData);
+            Helpers.ConfigureSourceData(flowData, sourceData);
 
             var translationData = new TranslationEngineData(
                 _loggerFactory.CreateLogger<TranslationEngineData>(),
@@ -337,7 +342,9 @@ namespace FiftyOne.Pipeline.Engines.Tests.FlowElements
             ConfigureTranslationData(flowData, translationData);
 
             var engine = CreateEngine(
-                [new Translation("countriesWeighted", "countriesWeightedTranslated")],
+                [new Translation(
+                    "countriesWeighted", 
+                    "countriesWeightedTranslated")],
                 [enGb]);
 
             engine.Process(flowData.Object);
@@ -357,8 +364,8 @@ namespace FiftyOne.Pipeline.Engines.Tests.FlowElements
         [TestMethod]
         public void NoLanguageEvidence_SkipsTranslation()
         {
-            var tempDir = CreateTempDirectory();
-            var enGb = CreateTranslationFile(
+            var tempDir = Helpers.CreateTempDirectory(_tempPaths);
+            var enGb = Helpers.CreateTranslationFile(
                 tempDir,
                 "en_GB.yaml",
                 new Dictionary<string, string>()
@@ -376,7 +383,7 @@ namespace FiftyOne.Pipeline.Engines.Tests.FlowElements
                 pipeline.Object);
             sourceData["country"] = new AspectPropertyValue<string>("Spain");
 
-            ConfigureSourceData(flowData, sourceData);
+            Helpers.ConfigureSourceData(flowData, sourceData);
 
             var translationData = new TranslationEngineData(
                 _loggerFactory.CreateLogger<TranslationEngineData>(),
@@ -389,7 +396,9 @@ namespace FiftyOne.Pipeline.Engines.Tests.FlowElements
 
             engine.Process(flowData.Object);
 
-            Assert.IsFalse(translationData.AsDictionary().ContainsKey("countrytranslated"));
+            Assert.IsFalse(translationData
+                .AsDictionary()
+                .ContainsKey("countrytranslated"));
         }
 
         /// <summary>
@@ -403,7 +412,10 @@ namespace FiftyOne.Pipeline.Engines.Tests.FlowElements
                 SourceElementDataKey,
                 translations,
                 sources,
-                _loggerFactory.CreateLogger<FlowElementBase<ITranslationEngineData, IElementPropertyMetaData>>(),
+                _loggerFactory.CreateLogger<
+                    FlowElementBase<
+                        ITranslationEngineData, 
+                        IElementPropertyMetaData>>(),
                 (pipeline, element) => new TranslationEngineData(
                     _loggerFactory.CreateLogger<TranslationEngineData>(),
                     pipeline));
@@ -412,7 +424,8 @@ namespace FiftyOne.Pipeline.Engines.Tests.FlowElements
         /// <summary>
         /// Configure base pipeline and flow data mocks.
         /// </summary>
-        private static Mock<IPipeline> ConfigurePipeline(Mock<IFlowData> flowData)
+        private static Mock<IPipeline> ConfigurePipeline(
+            Mock<IFlowData> flowData)
         {
             var pipeline = new Mock<IPipeline>();
             flowData.SetupGet(d => d.Pipeline).Returns(pipeline.Object);
@@ -430,38 +443,6 @@ namespace FiftyOne.Pipeline.Engines.Tests.FlowElements
                     It.IsAny<ITypedKey<ITranslationEngineData>>(),
                     It.IsAny<Func<IPipeline, ITranslationEngineData>>()))
                 .Returns(translationData);
-        }
-
-        private static void ConfigureSourceData(
-            Mock<IFlowData> flowData,
-            IElementData sourceData)
-        {
-            IElementData sourceDataOut = sourceData;
-            flowData.Setup(d => d.TryGetValue<IElementData>(
-                    It.IsAny<ITypedKey<IElementData>>(),
-                    out sourceDataOut))
-                .Returns(true);
-        }
-        private string CreateTempDirectory()
-        {
-            var path = Path.Combine(
-                Path.GetTempPath(),
-                "translation-engine-tests",
-                Guid.NewGuid().ToString("N"));
-            Directory.CreateDirectory(path);
-            _tempPaths.Add(path);
-            return path;
-        }
-
-        private static FileInfo CreateTranslationFile(
-            string directory,
-            string fileName,
-            IDictionary<string, string> translations)
-        {
-            var path = Path.Combine(directory, fileName);
-            var lines = translations.Select(kvp => $"{kvp.Key}: {kvp.Value}");
-            File.WriteAllLines(path, lines);
-            return new FileInfo(path);
         }
     }
 }

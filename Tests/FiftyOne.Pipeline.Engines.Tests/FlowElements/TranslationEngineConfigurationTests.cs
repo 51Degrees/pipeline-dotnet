@@ -194,7 +194,7 @@ namespace FiftyOne.Pipeline.Engines.Tests.FlowElements
 
             foreach (var mapping in translations)
             {
-                var parts = mapping.Split(new[] { ':' }, 2);
+                var parts = mapping.Split([':'], 2);
                 if (parts.Length != 2 ||
                     string.IsNullOrWhiteSpace(parts[0]) ||
                     string.IsNullOrWhiteSpace(parts[1]))
@@ -270,10 +270,10 @@ namespace FiftyOne.Pipeline.Engines.Tests.FlowElements
         /// from a source element using file-based translation sources.
         /// </summary>
         [TestMethod]
-        public void PipelineFromConfiguration_TranslationEngine_TranslatesFromSourceElement()
+        public void FromConfiguration_TranslatesFromSourceElement()
         {
-            var tempDir = CreateTempDirectory();
-            var enGb = CreateTranslationFile(
+            var tempDir = Helpers.CreateTempDirectory(_tempPaths);
+            var enGb = Helpers.CreateTranslationFile(
                 tempDir,
                 "en_GB.yaml",
                 new Dictionary<string, string>()
@@ -317,28 +317,6 @@ namespace FiftyOne.Pipeline.Engines.Tests.FlowElements
                     Assert.AreEqual("Spain-GB", translated.Value);
                 }
             }
-        }
-
-        private string CreateTempDirectory()
-        {
-            var path = Path.Combine(
-                Path.GetTempPath(),
-                "translation-engine-config-tests",
-                Guid.NewGuid().ToString("N"));
-            Directory.CreateDirectory(path);
-            _tempPaths.Add(path);
-            return path;
-        }
-
-        private static FileInfo CreateTranslationFile(
-            string directory,
-            string fileName,
-            IDictionary<string, string> translations)
-        {
-            var path = Path.Combine(directory, fileName);
-            var lines = translations.Select(kvp => $"{kvp.Key}: {kvp.Value}");
-            File.WriteAllLines(path, lines);
-            return new FileInfo(path);
         }
     }
 }
