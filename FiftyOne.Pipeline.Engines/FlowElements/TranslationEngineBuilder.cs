@@ -20,9 +20,16 @@
  * such notice(s) shall fulfill the requirements of that article.
  * ********************************************************************* */
 
+using FiftyOne.Pipeline.Core.Data;
+using FiftyOne.Pipeline.Core.FlowElements;
+using FiftyOne.Pipeline.Engines.Data;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 using System;
 using System.Collections.Generic;
+using System.IO;
+using System.Linq;
+using System.Security.Cryptography.X509Certificates;
 
 namespace FiftyOne.Pipeline.Engines.FlowElements
 {
@@ -33,69 +40,53 @@ namespace FiftyOne.Pipeline.Engines.FlowElements
     {
         private readonly ILoggerFactory _loggerFactory;
         private readonly List<ITranslation> _translations;
-        private string _elementDataKey;
+        private string _sourceElementDataKey;
+        private List<FileInfo> _sources;
+        private readonly ILogger<TranslationEngineData> _dataLogger;
 
         /// <summary>
         /// Constructor.
         /// </summary>
-        /// <param name="loggerFactory">
-        /// Logger factory used when creating engine instances.
-        /// </param>
         public TranslationEngineBuilder(ILoggerFactory loggerFactory)
         {
             _loggerFactory = loggerFactory 
                 ?? throw new ArgumentNullException(nameof(loggerFactory));
             _translations = new List<ITranslation>();
+            _sources = new List<FileInfo>();
+            _dataLogger = _loggerFactory.CreateLogger<TranslationEngineData>();
         }
 
         /// <summary>
-        /// Set the element data key for the built engine.
+        /// Set source element data key.
         /// </summary>
-        /// <param name="elementDataKey">
-        /// Element data key.
-        /// </param>
-        /// <returns>
-        /// This builder instance.
-        /// </returns>
-        public TranslationEngineBuilder SetElementDataKey(
-            string elementDataKey)
+        public TranslationEngineBuilder SetSourceElementDataKey(
+            string sourceElementDataKey)
         {
-            _elementDataKey = elementDataKey;
+            _sourceElementDataKey = sourceElementDataKey;
             return this;
         }
 
         /// <summary>
-        /// Add a translation to the engine.
+        /// Add a translation.
         /// </summary>
-        /// <param name="translation">
-        /// Translation implementation.
-        /// </param>
-        /// <returns>
-        /// This builder instance.
-        /// </returns>
         public TranslationEngineBuilder AddTranslation(
-            ITranslation translation)
+            string source, 
+            string destination)
         {
-            if (translation == null)
+            if (source == null || destination == null)
             {
-                throw new ArgumentNullException(nameof(translation));
+                throw new ArgumentNullException();
             }
 
-            _translations.Add(translation);
+            _translations.Add(new Translation(source, destination));
             return this;
         }
 
         /// <summary>
-        /// Add multiple translations to the engine.
+        /// Add multiple translation.
         /// </summary>
-        /// <param name="translations">
-        /// Translation implementations.
-        /// </param>
-        /// <returns>
-        /// This builder instance.
-        /// </returns>
         public TranslationEngineBuilder AddTranslations(
-            IEnumerable<ITranslation> translations)
+            IReadOnlyDictionary<string,string> translations)
         {
             if (translations == null)
             {
@@ -104,22 +95,78 @@ namespace FiftyOne.Pipeline.Engines.FlowElements
 
             foreach (var translation in translations)
             {
-                AddTranslation(translation);
+                AddTranslation(translation.Key, translation.Value);
             }
             return this;
         }
 
         /// <summary>
+        /// Add a source.
+        /// </summary>
+        public TranslationEngineBuilder AddSource(string source)
+        {
+            if (source == null)
+            {
+                throw new ArgumentNullException(nameof(source));
+            }
+
+            _sources.Add(new FileInfo(source));
+            return this;
+        }
+
+
+        /// <summary>
+        /// Add multiple sources.
+        /// </summary>
+        public TranslationEngineBuilder AddSources(IEnumerable<string> sources)
+        {
+            if (sources == null)
+            {
+                throw new ArgumentNullException(nameof(sources));
+            }
+
+            foreach (var source in sources)
+            {
+                AddSource(source);
+            }
+            return this;
+        }
+
+        /// <summary>
+        /// Creates an instance of ElementData
+        /// </summary>
+        /// <param name="pipeline"></param>
+        /// <param name="flowElement"></param>
+        /// <returns></returns>
+        private ITranslationEngineData CreateData(
+            IPipeline pipeline,
+            FlowElementBase<
+                ITranslationEngineData, 
+                IElementPropertyMetaData> flowElement)
+        {
+            return new TranslationEngineData(
+                _dataLogger,
+                pipeline);
+        }
+
+        /// <summary>
         /// Build a translation engine.
         /// </summary>
-        /// <returns>
-        /// A new <see cref="TranslationEngine"/> instance.
-        /// </returns>
         public TranslationEngine Build()
         {
+            if (string.IsNullOrWhiteSpace(_sourceElementDataKey))
+            {
+                throw new ArgumentException(
+                    "Source element data key must be supplied.",
+                    nameof(_sourceElementDataKey));
+            }
+
             return new TranslationEngine(
+                _sourceElementDataKey,
                 _translations,
-                _loggerFactory.CreateLogger<TranslationEngine>());
+                _sources,
+                _loggerFactory.CreateLogger<TranslationEngine>(),
+                CreateData);
         }
     }
 }

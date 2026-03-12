@@ -20,21 +20,40 @@
  * such notice(s) shall fulfill the requirements of that article.
  * ********************************************************************* */
 
-namespace FiftyOne.Pipeline.Engines.FlowElements
+using FiftyOne.Pipeline.Core.Data;
+using FiftyOne.Pipeline.Core.FlowElements;
+using Microsoft.Extensions.Logging;
+using System.Collections.Generic;
+
+namespace FiftyOne.Pipeline.Engines.Data
 {
     /// <summary>
-    /// Defines a translation for one source property.
+    /// Data object populated by
+    /// <see cref="FlowElements.TranslationEngine"/>.
     /// </summary>
-    public interface ITranslation
+    public class TranslationEngineData :
+        ElementDataBase,
+        ITranslationEngineData
     {
         /// <summary>
-        /// Source property name on the source element data.
+        /// Create a new instance.
         /// </summary>
-        string SourceProperty { get; }
+        public TranslationEngineData(
+            ILogger<TranslationEngineData> logger,
+            IPipeline pipeline)
+            : base(logger, pipeline)
+        {
+        }
 
         /// <summary>
-        /// Destination property name on translation engine data.
+        /// Create a new instance using an existing dictionary.
         /// </summary>
-        string DestinationProperty { get; }
+        public TranslationEngineData(
+            ILogger<ElementDataBase> logger,
+            IPipeline pipeline,
+            IDictionary<string, object> dictionary)
+            : base(logger, pipeline, dictionary)
+        {
+        }
     }
 }

@@ -22,19 +22,19 @@
 
 using FiftyOne.Pipeline.Core.Data;
 using FiftyOne.Pipeline.Core.FlowElements;
-using System.Collections.Generic;
+using FiftyOne.Pipeline.Engines.Data;
 
 namespace FiftyOne.Pipeline.Engines.FlowElements
 {
     /// <summary>
-    /// Marker interface for translation engines.
+    /// Public contract for translation engines.
     /// </summary>
     public interface ITranslationEngine :
-        IFlowElement<IElementData, IElementPropertyMetaData>
+        IFlowElement<ITranslationEngineData, IElementPropertyMetaData>
     {
         /// <summary>
-        /// Translations executed by this engine.
+        /// Element data key of the source flow element.
         /// </summary>
-        IReadOnlyList<ITranslation> Translations { get; }
+        string SourceElementDataKey { get; }
     }
 }
