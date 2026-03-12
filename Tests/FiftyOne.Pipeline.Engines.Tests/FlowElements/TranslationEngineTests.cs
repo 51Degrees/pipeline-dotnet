@@ -1,4 +1,4 @@
-﻿/* *********************************************************************
+/* *********************************************************************
  * This Original Work is copyright of 51 Degrees Mobile Experts Limited.
  * Copyright 2026 51 Degrees Mobile Experts Limited, Davidson House,
  * Forbury Square, Reading, Berkshire, United Kingdom RG1 3EU.
@@ -23,6 +23,7 @@
 using FiftyOne.Common.TestHelpers;
 using FiftyOne.Pipeline.Core.Data;
 using FiftyOne.Pipeline.Core.FlowElements;
+using FiftyOne.Pipeline.Core.TypedMap;
 using FiftyOne.Pipeline.Engines.Data;
 using FiftyOne.Pipeline.Engines.FlowElements;
 using FiftyOne.Pipeline.Engines.TestHelpers;
@@ -31,235 +32,442 @@ using Microsoft.VisualStudio.TestTools.UnitTesting;
 using Moq;
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 
-namespace FiftyOne.Pipeline.Engines.Tests.FlowElements;
-
-/// <summary>
-/// Tests for <see cref="TranslationEngine"/> behavior.
-/// </summary>
-[TestClass]
-public class TranslationEngineTests
+namespace FiftyOne.Pipeline.Engines.Tests.FlowElements
 {
     /// <summary>
-    /// Simple destination data
+    /// Tests for <see cref="TranslationEngine"/>.
     /// </summary>
-    private class DestinationData(
-        ILogger<ElementDataBase> logger,
-        IPipeline pipeline) : ElementDataBase(logger, pipeline)
+    [TestClass]
+    public class TranslationEngineTests
     {
-    }
-
-    /// <summary>
-    /// In memory translation map
-    /// </summary>
-    private class TestTranslation(
-        string sourceProperty,
-        string destinationProperty,
-        IReadOnlyDictionary<string, string> map,
-        IEnumerable<string> evidenceKeys = null) : ITranslation
-    {
-        private readonly IEnumerable<string> _evidenceKeys =
-            evidenceKeys ?? [];
-
-        public string SourceProperty { get; } = sourceProperty;
-
-        public string DestinationProperty { get; } = destinationProperty;
-
-        public IEnumerable<string> EvidenceKeys 
-            { get { return _evidenceKeys; } }
-
-        public bool TryTranslate(
-            IFlowData data,
-            IAspectPropertyValue<string> value,
-            out IAspectPropertyValue<string> translatedValue)
+        /// <summary>
+        /// Simple source element data for tests.
+        /// </summary>
+        private class SourceData : ElementDataBase
         {
-            translatedValue = null;
-            if (value == null || value.HasValue == false)
+            /// <summary>
+            /// Creates source data.
+            /// </summary>
+            public SourceData(
+                ILogger<ElementDataBase> logger,
+                IPipeline pipeline)
+                : base(logger, pipeline)
             {
-                return false;
+            }
+        }
+
+        private const string SourceElementDataKey = "source-element";
+        private TestLoggerFactory _loggerFactory;
+        private List<string> _tempPaths;
+
+        /// <summary>
+        /// Set up logger factory for each test.
+        /// </summary>
+        [TestInitialize]
+        public void Initialize()
+        {
+            _loggerFactory = new TestLoggerFactory();
+            _tempPaths = new List<string>();
+        }
+
+        /// <summary>
+        /// Assert no warnings or errors were emitted.
+        /// </summary>
+        [TestCleanup]
+        public void Cleanup()
+        {
+            foreach (var tempPath in _tempPaths)
+            {
+                try
+                {
+                    if (Directory.Exists(tempPath))
+                    {
+                        Directory.Delete(tempPath, true);
+                    }
+                }
+                catch
+                {
+                }
             }
 
-            if (map.TryGetValue(value.Value, out string mapped))
+            foreach (var logger in _loggerFactory.Loggers)
             {
-                translatedValue = new AspectPropertyValue<string>(mapped);
-                return true;
+                logger.AssertMaxErrors(0);
+                logger.AssertMaxWarnings(0);
             }
-
-            return false;
         }
-    }
 
-    private const string DestinationDataKey = "destination";
-    private TestLoggerFactory _loggerFactory;
-
-    [TestInitialize]
-    public void Initialize()
-    {
-        _loggerFactory = new TestLoggerFactory();
-    }
-
-    [TestCleanup]
-    public void Cleanup()
-    {
-        foreach (var logger in _loggerFactory.Loggers)
+        /// <summary>
+        /// Verifies source and destination mapping is respected and output is
+        /// written to destination property using en_GB language format.
+        /// </summary>
+        [TestMethod]
+        public void WritesTranslatedStringToDestinationProperty_EnGb()
         {
-            logger.AssertMaxErrors(0);
-            logger.AssertMaxWarnings(0);
-        }
-    }
+            var tempDir = CreateTempDirectory();
+            var enGb = CreateTranslationFile(
+                tempDir,
+                "en_GB.yaml",
+                new Dictionary<string, string>()
+                {
+                    { "Spain", "Spain-GB" }
+                });
 
-    /// <summary>
-    /// Verifies translation using a source value taken from evidence.
-    /// </summary>
-    [TestMethod]
-    public void TranslateFromPropertyValue()
-    {
-        var translation = new TestTranslation(
-            "country",
-            "countrytranslated",
-            new Dictionary<string, string>()
-            {
-                { "United Kingdom", "Royaume-Uni" }
-            });
-        var engine = CreateEngine(translation);
+            var flowData = MockFlowData.CreateFromEvidence(
+                new Dictionary<string, object>()
+                {
+                    { "query.translation", "en_GB" }
+                },
+                false);
+            var pipeline = ConfigurePipeline(flowData);
 
-        var flowData = MockFlowData.CreateFromEvidence(
-            [],
-            false);
-        ConfigurePipelineForDestination(flowData);
-        var destinationData = CreateDestinationData(flowData);
-        flowData.Setup(d => d.Get(DestinationDataKey))
-            .Returns(destinationData);
-        flowData.Setup(d => d.GetWhere(
-            It.IsAny<Func<IElementPropertyMetaData, bool>>()))
-            .Returns(
-            [
-                new KeyValuePair<string, object>(
-                    "countryaspect.country", "United Kingdom")
-            ]);
+            var sourceData = new SourceData(
+                _loggerFactory.CreateLogger<ElementDataBase>(),
+                pipeline.Object);
+            sourceData["country"] = new AspectPropertyValue<string>("Spain");
 
-        engine.Process(flowData.Object);
+            ConfigureSourceData(flowData, sourceData);
 
-        var translated = destinationData["countrytranslated"] 
-            as IAspectPropertyValue<string>;
-        Assert.AreEqual("Royaume-Uni", translated.Value);
-    }
+            var translationData = new TranslationEngineData(
+                _loggerFactory.CreateLogger<TranslationEngineData>(),
+                pipeline.Object);
+            ConfigureTranslationData(flowData, translationData);
 
-    /// <summary>
-    /// Verifies translation when the destination property is fully qualified.
-    /// </summary>
-    [TestMethod]
-    public void TranslateFromEvidenceValue()
-    {
-        var translation = new TestTranslation(
-            "country",
-            "countrytranslated",
-            new Dictionary<string, string>()
-            {
-                { "Spain", "Espana" }
-            });
-        var engine = CreateEngine(translation);
+            var engine = CreateEngine(
+                [new Translation("country", "countrytranslated")],
+                [enGb]);
 
-        var flowData = MockFlowData.CreateFromEvidence(
-            [],
-            false);
-        ConfigurePipelineForDestination(flowData);
-        var destinationData = CreateDestinationData(flowData);
-        flowData.Setup(d => d.Get(DestinationDataKey))
-            .Returns(destinationData);
-        flowData.Setup(d => d.GetWhere(
-            It.IsAny<Func<IElementPropertyMetaData, bool>>()))
-            .Returns([]);
-        object evidenceValue = "Spain";
-        flowData.Setup(d => d.TryGetEvidence("country", out evidenceValue))
-            .Returns(true);
-
-        engine.Process(flowData.Object);
-
-        var translated = destinationData["countrytranslated"]
-            as IAspectPropertyValue<string>;
-        Assert.AreEqual("Espana", translated.Value);
-    }
-
-    /// <summary>
-    /// Verifies that ambiguous source property matches result in an exception.
-    /// </summary>
-    [TestMethod]
-    public void MultipleMatches_Throws()
-    {
-        var translation = new TestTranslation(
-            "country",
-            "countrytranslated",
-            new Dictionary<string, string>());
-        var engine = CreateEngine(translation);
-
-        var flowData = MockFlowData.CreateFromEvidence(
-            [],
-            false);
-        flowData.Setup(d => d.GetWhere(
-            It.IsAny<Func<IElementPropertyMetaData, bool>>()))
-            .Returns(
-            [
-                new KeyValuePair<string, object>("device.country", "France"),
-                new KeyValuePair<string, object>("profile.country", "France")
-            ]);
-
-        Assert.ThrowsExactly<InvalidOperationException>(() =>
-        {
             engine.Process(flowData.Object);
-        });
-    }
 
-    /// <summary>
-    /// Creates a tranlation engine for testing.
-    /// </summary>
-    /// <param name="translation"></param>
-    /// <returns></returns>
-    private TranslationEngine CreateEngine(ITranslation translation)
-    {
-        return new TranslationEngine(
-            new List<ITranslation>() { translation },
-            _loggerFactory.CreateLogger<TranslationEngine>());
-    }
+            var translated = (IAspectPropertyValue<string>)translationData["countrytranslated"];
+            Assert.AreEqual("Spain-GB", translated.Value);
+            Assert.IsFalse(translationData.AsDictionary().ContainsKey("country"));
+        }
 
-    /// <summary>
-    /// Create the destination / translated data. 
-    /// </summary>
-    /// <param name="flowData"></param>
-    /// <returns></returns>
-    private DestinationData CreateDestinationData(Mock<IFlowData> flowData)
-    {
-        return new DestinationData(
-            _loggerFactory.CreateLogger<ElementDataBase>(),
-            flowData.Object.Pipeline);
-    }
+        /// <summary>
+        /// Verifies language evidence keys are used in order.
+        /// </summary>
+        [TestMethod]
+        public void UsesFirstMatchingLanguageEvidenceKey()
+        {
+            var tempDir = CreateTempDirectory();
+            var enGb = CreateTranslationFile(
+                tempDir,
+                "en_GB.yaml",
+                new Dictionary<string, string>()
+                {
+                    { "Spain", "Spain-GB" }
+                });
+            var enEs = CreateTranslationFile(
+                tempDir,
+                "en_ES.yaml",
+                new Dictionary<string, string>()
+                {
+                    { "Spain", "Espana" }
+                });
 
-    /// <summary>
-    /// Configure pipeline metadata.
-    /// </summary>
-    private static void ConfigurePipelineForDestination(
-        Mock<IFlowData> flowData)
-    {
-        var pipeline = new Mock<IPipeline>();
-        var destinationProperties =
-            new Dictionary<string, IElementPropertyMetaData>(
-                StringComparer.OrdinalIgnoreCase)
-            {
-                { "countrytranslated", null }
-            };
-        var availableProperties =
-            new Dictionary<string,
-            IReadOnlyDictionary<
-                string, 
-                IElementPropertyMetaData>>(
-                StringComparer.OrdinalIgnoreCase)
-            {
-                { DestinationDataKey, destinationProperties }
-            };
-        pipeline.SetupGet(p => p.ElementAvailableProperties)
-            .Returns(availableProperties);
-        flowData.SetupGet(d => d.Pipeline)
-            .Returns(pipeline.Object);
+            var flowData = MockFlowData.CreateFromEvidence(
+                new Dictionary<string, object>()
+                {
+                    { "query.translation", "en_GB" },
+                    { "header.accept-language", "en_ES,en;q=0.8" }
+                },
+                false);
+            var pipeline = ConfigurePipeline(flowData);
+
+            var sourceData = new SourceData(
+                _loggerFactory.CreateLogger<ElementDataBase>(),
+                pipeline.Object);
+            sourceData["country"] = new AspectPropertyValue<string>("Spain");
+
+            ConfigureSourceData(flowData, sourceData);
+
+            var translationData = new TranslationEngineData(
+                _loggerFactory.CreateLogger<TranslationEngineData>(),
+                pipeline.Object);
+            ConfigureTranslationData(flowData, translationData);
+
+            var engine = CreateEngine(
+                [new Translation("country", "countrytranslated")],
+                [enGb, enEs]);
+
+            engine.Process(flowData.Object);
+
+            var translated = (IAspectPropertyValue<string>)translationData["countrytranslated"];
+            Assert.AreEqual("Spain-GB", translated.Value);
+        }
+
+        /// <summary>
+        /// Verifies header evidence is used when query evidence is missing.
+        /// </summary>
+        [TestMethod]
+        public void UsesHeaderAcceptLanguageWhenQueryMissing()
+        {
+            var tempDir = CreateTempDirectory();
+            var enEs = CreateTranslationFile(
+                tempDir,
+                "en_ES.yaml",
+                new Dictionary<string, string>()
+                {
+                    { "Spain", "Espana" }
+                });
+
+            var flowData = MockFlowData.CreateFromEvidence(
+                new Dictionary<string, object>()
+                {
+                    { "header.accept-language", "en_ES,en;q=0.8" }
+                },
+                false);
+            var pipeline = ConfigurePipeline(flowData);
+
+            var sourceData = new SourceData(
+                _loggerFactory.CreateLogger<ElementDataBase>(),
+                pipeline.Object);
+            sourceData["country"] = new AspectPropertyValue<string>("Spain");
+
+            ConfigureSourceData(flowData, sourceData);
+
+            var translationData = new TranslationEngineData(
+                _loggerFactory.CreateLogger<TranslationEngineData>(),
+                pipeline.Object);
+            ConfigureTranslationData(flowData, translationData);
+
+            var engine = CreateEngine(
+                [new Translation("country", "countrytranslated")],
+                [enEs]);
+
+            engine.Process(flowData.Object);
+
+            var translated = (IAspectPropertyValue<string>)translationData["countrytranslated"];
+            Assert.AreEqual("Espana", translated.Value);
+        }
+
+        /// <summary>
+        /// Verifies list properties are translated element-by-element and
+        /// fall back to original values when no translation exists.
+        /// </summary>
+        [TestMethod]
+        public void TranslatesStringListProperty_WithFallback()
+        {
+            var tempDir = CreateTempDirectory();
+            var enEs = CreateTranslationFile(
+                tempDir,
+                "en_ES.yaml",
+                new Dictionary<string, string>()
+                {
+                    { "Spain", "Espana" },
+                    { "Germany", "Alemania" }
+                });
+
+            var flowData = MockFlowData.CreateFromEvidence(
+                new Dictionary<string, object>()
+                {
+                    { "query.translation", "en_ES" }
+                },
+                false);
+            var pipeline = ConfigurePipeline(flowData);
+
+            var sourceData = new SourceData(
+                _loggerFactory.CreateLogger<ElementDataBase>(),
+                pipeline.Object);
+            sourceData["countries"] = new AspectPropertyValue<IReadOnlyList<string>>(
+                ["Spain", "Italy"]);
+
+            ConfigureSourceData(flowData, sourceData);
+
+            var translationData = new TranslationEngineData(
+                _loggerFactory.CreateLogger<TranslationEngineData>(),
+                pipeline.Object);
+            ConfigureTranslationData(flowData, translationData);
+
+            var engine = CreateEngine(
+                [new Translation("countries", "countriestranslated")],
+                [enEs]);
+
+            engine.Process(flowData.Object);
+
+            var translated = (IAspectPropertyValue<List<string>>)translationData["countriestranslated"];
+            CollectionAssert.AreEqual(
+                new[] { "Espana", "Italy" },
+                translated.Value.ToArray());
+        }
+
+        /// <summary>
+        /// Verifies weighted list properties are translated element-by-element
+        /// and fall back to original values when no translation exists.
+        /// </summary>
+        [TestMethod]
+        public void TranslatesWeightedStringListProperty_WithFallback()
+        {
+            var tempDir = CreateTempDirectory();
+            var enGb = CreateTranslationFile(
+                tempDir,
+                "en_GB.yaml",
+                new Dictionary<string, string>()
+                {
+                    { "Spain", "Spain-GB" }
+                });
+
+            var flowData = MockFlowData.CreateFromEvidence(
+                new Dictionary<string, object>()
+                {
+                    { "query.translation", "en_GB" }
+                },
+                false);
+            var pipeline = ConfigurePipeline(flowData);
+
+            var sourceData = new SourceData(
+                _loggerFactory.CreateLogger<ElementDataBase>(),
+                pipeline.Object);
+            sourceData["countriesWeighted"] = new AspectPropertyValue<IReadOnlyList<IWeightedValue<string>>>(
+                new List<IWeightedValue<string>>()
+                {
+                    new WeightedValue<string>(100, "Spain"),
+                    new WeightedValue<string>(50, "Italy")
+                });
+
+            ConfigureSourceData(flowData, sourceData);
+
+            var translationData = new TranslationEngineData(
+                _loggerFactory.CreateLogger<TranslationEngineData>(),
+                pipeline.Object);
+            ConfigureTranslationData(flowData, translationData);
+
+            var engine = CreateEngine(
+                [new Translation("countriesWeighted", "countriesWeightedTranslated")],
+                [enGb]);
+
+            engine.Process(flowData.Object);
+
+            var translated = (IAspectPropertyValue<List<WeightedValue<string>>>)
+                translationData["countriesWeightedTranslated"];
+            Assert.AreEqual(2, translated.Value.Count);
+            Assert.AreEqual((ushort)100, translated.Value[0].RawWeighting);
+            Assert.AreEqual("Spain-GB", translated.Value[0].Value);
+            Assert.AreEqual((ushort)50, translated.Value[1].RawWeighting);
+            Assert.AreEqual("Italy", translated.Value[1].Value);
+        }
+
+        /// <summary>
+        /// Verifies no output is set when language evidence is missing.
+        /// </summary>
+        [TestMethod]
+        public void NoLanguageEvidence_SkipsTranslation()
+        {
+            var tempDir = CreateTempDirectory();
+            var enGb = CreateTranslationFile(
+                tempDir,
+                "en_GB.yaml",
+                new Dictionary<string, string>()
+                {
+                    { "Spain", "Spain-GB" }
+                });
+
+            var flowData = MockFlowData.CreateFromEvidence(
+                new Dictionary<string, object>(),
+                false);
+            var pipeline = ConfigurePipeline(flowData);
+
+            var sourceData = new SourceData(
+                _loggerFactory.CreateLogger<ElementDataBase>(),
+                pipeline.Object);
+            sourceData["country"] = new AspectPropertyValue<string>("Spain");
+
+            ConfigureSourceData(flowData, sourceData);
+
+            var translationData = new TranslationEngineData(
+                _loggerFactory.CreateLogger<TranslationEngineData>(),
+                pipeline.Object);
+            ConfigureTranslationData(flowData, translationData);
+
+            var engine = CreateEngine(
+                [new Translation("country", "countrytranslated")],
+                [enGb]);
+
+            engine.Process(flowData.Object);
+
+            Assert.IsFalse(translationData.AsDictionary().ContainsKey("countrytranslated"));
+        }
+
+        /// <summary>
+        /// Create a translation engine for tests.
+        /// </summary>
+        private TranslationEngine CreateEngine(
+            IEnumerable<ITranslation> translations,
+            IEnumerable<FileInfo> sources)
+        {
+            return new TranslationEngine(
+                SourceElementDataKey,
+                translations,
+                sources,
+                _loggerFactory.CreateLogger<FlowElementBase<ITranslationEngineData, IElementPropertyMetaData>>(),
+                (pipeline, element) => new TranslationEngineData(
+                    _loggerFactory.CreateLogger<TranslationEngineData>(),
+                    pipeline));
+        }
+
+        /// <summary>
+        /// Configure base pipeline and flow data mocks.
+        /// </summary>
+        private static Mock<IPipeline> ConfigurePipeline(Mock<IFlowData> flowData)
+        {
+            var pipeline = new Mock<IPipeline>();
+            flowData.SetupGet(d => d.Pipeline).Returns(pipeline.Object);
+            return pipeline;
+        }
+
+        /// <summary>
+        /// Configure flow data to return translation output data.
+        /// </summary>
+        private static void ConfigureTranslationData(
+            Mock<IFlowData> flowData,
+            TranslationEngineData translationData)
+        {
+            flowData.Setup(d => d.GetOrAdd(
+                    It.IsAny<ITypedKey<ITranslationEngineData>>(),
+                    It.IsAny<Func<IPipeline, ITranslationEngineData>>()))
+                .Returns(translationData);
+        }
+
+        private static void ConfigureSourceData(
+            Mock<IFlowData> flowData,
+            IElementData sourceData)
+        {
+            IElementData sourceDataOut = sourceData;
+            flowData.Setup(d => d.TryGetValue<IElementData>(
+                    It.IsAny<ITypedKey<IElementData>>(),
+                    out sourceDataOut))
+                .Returns(true);
+        }
+        private string CreateTempDirectory()
+        {
+            var path = Path.Combine(
+                Path.GetTempPath(),
+                "translation-engine-tests",
+                Guid.NewGuid().ToString("N"));
+            Directory.CreateDirectory(path);
+            _tempPaths.Add(path);
+            return path;
+        }
+
+        private static FileInfo CreateTranslationFile(
+            string directory,
+            string fileName,
+            IDictionary<string, string> translations)
+        {
+            var path = Path.Combine(directory, fileName);
+            var lines = translations.Select(kvp => $"{kvp.Key}: {kvp.Value}");
+            File.WriteAllLines(path, lines);
+            return new FileInfo(path);
+        }
     }
 }
+
+
+
+
+
+
