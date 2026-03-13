@@ -58,7 +58,7 @@ namespace FiftyOne.Pipeline.Core.Tests.Data
 
             var result = _filter.Whitelist;
 
-            Assert.AreEqual(2, result.Count);
+            Assert.HasCount(2, result);
             Assert.IsTrue(result.Keys.Contains("key1"));
             Assert.IsTrue(result.Keys.Contains("key2"));
         }

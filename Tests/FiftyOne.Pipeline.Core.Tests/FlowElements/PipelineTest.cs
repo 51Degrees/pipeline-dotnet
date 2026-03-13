@@ -90,8 +90,8 @@ namespace FiftyOne.Pipeline.Core.Tests.FlowElements
             // Assert
             Assert.IsTrue(data.Errors == null || data.Errors.Count == 0, "Expected no errors");
             // Check that the resulting data has the expected values
-            Assert.IsTrue(data.GetDataKeys().Contains("element1"), "data from element 1 is missing in the result");
-            Assert.IsTrue(data.GetDataKeys().Contains("element2"), "data from element 2 is missing in the result");
+            Assert.Contains("element1", data.GetDataKeys(), "data from element 1 is missing in the result");
+            Assert.Contains("element2", data.GetDataKeys(), "data from element 2 is missing in the result");
             Assert.AreEqual("done", data.Get("element1")["key"].ToString());
             Assert.AreEqual("done", data.Get("element2")["key"].ToString());
             // Check that element 1 was called before element 2.
@@ -197,20 +197,20 @@ namespace FiftyOne.Pipeline.Core.Tests.FlowElements
             // Read properties manually, but still throw `PropertiesNotYetLoadedException`
             var pipelineProps1 = pipeline.ElementAvailableProperties;
             Assert.AreEqual(2, propertyCalls[0]);
-            Assert.AreEqual(1, pipelineProps1.Count);
+            Assert.HasCount(1, pipelineProps1);
             Assert.IsTrue(pipelineProps1["stable"]["stable_property"].Available);
 
             // Read without throwing `PropertiesNotYetLoadedException`
             var pipelineProps2 = pipeline.ElementAvailableProperties;
             Assert.AreEqual(3, propertyCalls[0]);
-            Assert.AreEqual(2, pipelineProps2.Count);
+            Assert.HasCount(2, pipelineProps2);
             Assert.IsTrue(pipelineProps2["stable"]["stable_property"].Available);
             Assert.IsTrue(pipelineProps2["unstable"]["unstable_property"].Available);
 
             // Read one last time, the result should be already cached
             var pipelineProps3 = pipeline.ElementAvailableProperties;
             Assert.AreEqual(3, propertyCalls[0]);
-            Assert.AreEqual(2, pipelineProps3.Count);
+            Assert.HasCount(2, pipelineProps3);
             Assert.IsTrue(pipelineProps3["stable"]["stable_property"].Available);
             Assert.IsTrue(pipelineProps3["unstable"]["unstable_property"].Available);
         }
@@ -282,9 +282,9 @@ namespace FiftyOne.Pipeline.Core.Tests.FlowElements
                 typeof(AggregateException),
                 $"An exception of type '{exception.GetType()}' was thrown, " +
                 $"the type should have been '{typeof(AggregateException)}'.");
-            Assert.AreEqual(
+            Assert.HasCount(
                 1,
-                ((AggregateException)exception).InnerExceptions.Count,
+                ((AggregateException)exception).InnerExceptions,
                 "The incorrect number of inner exceptions were added.");
             Assert.AreEqual(
                 "TEST",
