@@ -20,21 +20,14 @@
  * such notice(s) shall fulfill the requirements of that article.
  * ********************************************************************* */
 
-namespace FiftyOne.Pipeline.Engines.FlowElements
-{
-    /// <summary>
-    /// Defines a translation for one source property.
-    /// </summary>
-    public interface ITranslation
-    {
-        /// <summary>
-        /// Source property name on the source element data.
-        /// </summary>
-        string SourceProperty { get; }
+using FiftyOne.Pipeline.Core.Data;
 
-        /// <summary>
-        /// Destination property name on translation engine data.
-        /// </summary>
-        string DestinationProperty { get; }
-    }
+namespace FiftyOne.Pipeline.Elements.Translation.Data;
+
+/// <summary>
+/// Element data marker interface for
+/// <see cref="TranslationEngine"/>.
+/// </summary>
+public interface ITranslationData : IElementData
+{
 }

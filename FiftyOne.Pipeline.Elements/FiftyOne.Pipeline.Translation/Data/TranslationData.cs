@@ -22,19 +22,38 @@
 
 using FiftyOne.Pipeline.Core.Data;
 using FiftyOne.Pipeline.Core.FlowElements;
-using FiftyOne.Pipeline.Engines.Data;
+using Microsoft.Extensions.Logging;
+using System.Collections.Generic;
 
-namespace FiftyOne.Pipeline.Engines.FlowElements
+namespace FiftyOne.Pipeline.Elements.Translation.Data
 {
     /// <summary>
-    /// Public contract for translation engines.
+    /// Data object populated by
+    /// <see cref="FlowElements.TranslationEngine"/>.
     /// </summary>
-    public interface ITranslationEngine :
-        IFlowElement<ITranslationEngineData, IElementPropertyMetaData>
+    public class TranslationData :
+        ElementDataBase,
+        ITranslationData
     {
         /// <summary>
-        /// Element data key of the source flow element.
+        /// Create a new instance.
         /// </summary>
-        string SourceElementDataKey { get; }
+        public TranslationData(
+            ILogger<TranslationData> logger,
+            IPipeline pipeline)
+            : base(logger, pipeline)
+        {
+        }
+
+        /// <summary>
+        /// Create a new instance using an existing dictionary.
+        /// </summary>
+        public TranslationData(
+            ILogger<ElementDataBase> logger,
+            IPipeline pipeline,
+            IDictionary<string, object> dictionary)
+            : base(logger, pipeline, dictionary)
+        {
+        }
     }
 }

@@ -20,40 +20,32 @@
  * such notice(s) shall fulfill the requirements of that article.
  * ********************************************************************* */
 
-using FiftyOne.Pipeline.Core.Data;
-using FiftyOne.Pipeline.Core.FlowElements;
-using Microsoft.Extensions.Logging;
-using System.Collections.Generic;
+namespace FiftyOne.Pipeline.Translation.Data;
 
-namespace FiftyOne.Pipeline.Engines.Data
+/// <summary>
+/// Defines a translation from one property to another. 
+/// </summary>
+public class TranslationProperty
 {
     /// <summary>
-    /// Data object populated by
-    /// <see cref="FlowElements.TranslationEngine"/>.
+    /// Constructor
     /// </summary>
-    public class TranslationEngineData :
-        ElementDataBase,
-        ITranslationEngineData
+    /// <param name="source"></param>
+    /// <param name="destination"></param>
+    public TranslationProperty(string source, string destination)
     {
-        /// <summary>
-        /// Create a new instance.
-        /// </summary>
-        public TranslationEngineData(
-            ILogger<TranslationEngineData> logger,
-            IPipeline pipeline)
-            : base(logger, pipeline)
-        {
-        }
-
-        /// <summary>
-        /// Create a new instance using an existing dictionary.
-        /// </summary>
-        public TranslationEngineData(
-            ILogger<ElementDataBase> logger,
-            IPipeline pipeline,
-            IDictionary<string, object> dictionary)
-            : base(logger, pipeline, dictionary)
-        {
-        }
+        SourceProperty = source;
+        DestinationProperty = destination;
     }
+
+
+    /// <summary>
+    /// Source property name on the source element data.
+    /// </summary>
+    public string SourceProperty { get; set; }
+
+    /// <summary>
+    /// Destination property name on translation engine data.
+    /// </summary>
+    public string DestinationProperty { get; set; }
 }
