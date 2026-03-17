@@ -44,7 +44,7 @@ namespace FiftyOne.Pipeline.Translation.FlowElements
     /// Translations are provided in YAML format files, where the naming defines
     /// the language contained in the file. See <see cref="TranslationEngineBuilder.AddSource(string)"/>.
     /// 
-    /// The language to translate to is deteined by looking through the evidence
+    /// The language to translate to is defined by looking through the evidence
     /// for a key containing a locale code. The keys checked are defined in
     /// <see cref="EvidenceKeyFilter"/>. If a fixed language is provided in the
     /// builder, this will be used instead, regardless of the evidence.
@@ -60,9 +60,9 @@ namespace FiftyOne.Pipeline.Translation.FlowElements
     /// IList string, IAspectPropertyValue string, etc. and the type of the output
     /// property will match the input.
     /// 
-    /// The behaviour of the engine when a translation is missing for a value can be
-    /// configured using the <see cref="MissingTranslationBehaviour"/> enum.
-    /// See <see cref="TranslationEngineBuilder.SetMissingTranslationBehaviour(MissingTranslationBehaviour)"/>.
+    /// The behavior of the engine when a translation is missing for a value can be
+    /// configured using the <see cref="MissingTranslationBehavior"/> enum.
+    /// See <see cref="TranslationEngineBuilder.SetMissingTranslationBehaviour(MissingTranslationBehavior)"/>.
     /// </summary>
     public class TranslationEngine :
         FlowElementBase<ITranslationData, IElementPropertyMetaData>,
@@ -97,10 +97,10 @@ namespace FiftyOne.Pipeline.Translation.FlowElements
         private string _sourceElementDataKey;
 
         /// <summary>
-        /// Defines the behaviour when there is no translation available for a
+        /// Defines the behavior when there is no translation available for a
         /// value.
         /// </summary>
-        private readonly MissingTranslationBehaviour _behaviour;
+        private readonly MissingTranslationBehavior _behaviour;
 
         /// <summary>
         /// Input and output property names to translate.
@@ -160,8 +160,8 @@ namespace FiftyOne.Pipeline.Translation.FlowElements
         /// translate to this language. Otherwise (null or empty) the engine will
         /// get the language from the evidence.
         /// </param>
-        /// <param name="behaviour">
-        /// The behaviour of the translation engine when a translation is missing
+        /// <param name="behavior">
+        /// The behavior of the translation engine when a translation is missing
         /// for a value.
         /// </param>
         /// <param name="logger">
@@ -175,7 +175,7 @@ namespace FiftyOne.Pipeline.Translation.FlowElements
             IEnumerable<TranslationProperty> translations,
             IEnumerable<FileInfo> sources,
             string fixedLanguage,
-            MissingTranslationBehaviour behaviour,
+            MissingTranslationBehavior behavior,
             ILogger<FlowElementBase<ITranslationData, IElementPropertyMetaData>> logger,
             Func<IPipeline,
                 FlowElementBase<ITranslationData,
@@ -203,8 +203,8 @@ namespace FiftyOne.Pipeline.Translation.FlowElements
             }
 
             _sourceElementDataKey = sourceElementDataKey.Trim();
-            _behaviour = behaviour;
-            _emptyTranslator = new Translator(behaviour);
+            _behaviour = behavior;
+            _emptyTranslator = new Translator(behavior);
             _fixedLanguage = fixedLanguage != null ? ValidateLocale(fixedLanguage) : null;
             Languages = ParseSources(sources, _behaviour);
 
@@ -246,7 +246,7 @@ namespace FiftyOne.Pipeline.Translation.FlowElements
                 data,
                 out string language) == false)
             {
-                if (_behaviour == MissingTranslationBehaviour.FlowError)
+                if (_behaviour == MissingTranslationBehavior.FlowError)
                 {
                     data.AddError(
                         new KeyNotFoundException($"The evidence did not contain a " +
@@ -265,7 +265,7 @@ namespace FiftyOne.Pipeline.Translation.FlowElements
                 language,
                 out var translations) == false)
             {
-                if (_behaviour == MissingTranslationBehaviour.FlowError)
+                if (_behaviour == MissingTranslationBehavior.FlowError)
                 {
                     data.AddError(new KeyNotFoundException($"There was no translator " +
                         $"configured for the language '{language}'."),
@@ -297,11 +297,11 @@ namespace FiftyOne.Pipeline.Translation.FlowElements
         /// a Translator for each file.
         /// </summary>
         /// <param name="sources"></param>
-        /// <param name="behaviour"></param>
+        /// <param name="behavior"></param>
         /// <returns></returns>
         private static Languages ParseSources(
             IEnumerable<FileInfo> sources,
-            MissingTranslationBehaviour behaviour)
+            MissingTranslationBehavior behavior)
         {
             var languages = new Languages();
 
@@ -326,7 +326,7 @@ namespace FiftyOne.Pipeline.Translation.FlowElements
                         $"translation lookup.");
                 }
 
-                languages.AddLanguage(language, new Translator(translations, behaviour));
+                languages.AddLanguage(language, new Translator(translations, behavior));
             }
 
             return languages;
@@ -377,7 +377,7 @@ namespace FiftyOne.Pipeline.Translation.FlowElements
         }
 
         /// <summary>
-        /// Gets the source value from the sourcedata
+        /// Gets the source value from the sourceData
         /// </summary>
         /// <param name="sourceData"></param>
         /// <param name="sourceProperty"></param>

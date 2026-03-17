@@ -43,24 +43,24 @@
             <param name="translator"></param>
             <returns></returns>
         </member>
-        <member name="T:FiftyOne.Pipeline.Translation.Data.MissingTranslationBehaviour">
+        <member name="T:FiftyOne.Pipeline.Translation.Data.MissingTranslationBehavior">
             <summary>
-            Defines the behaviour of the translation engine when a translation is
+            Defines the behavior of the translation engine when a translation is
             missing for a value.
             </summary>
         </member>
-        <member name="F:FiftyOne.Pipeline.Translation.Data.MissingTranslationBehaviour.Original">
+        <member name="F:FiftyOne.Pipeline.Translation.Data.MissingTranslationBehavior.Original">
             <summary>
             Use the original value if there is no translation for it.
-            This is the default behaviour.
+            This is the default behavior.
             </summary>
         </member>
-        <member name="F:FiftyOne.Pipeline.Translation.Data.MissingTranslationBehaviour.EmptyString">
+        <member name="F:FiftyOne.Pipeline.Translation.Data.MissingTranslationBehavior.EmptyString">
             <summary>
             Use an empty string if there is no translation for the value.
             </summary>
         </member>
-        <member name="F:FiftyOne.Pipeline.Translation.Data.MissingTranslationBehaviour.FlowError">
+        <member name="F:FiftyOne.Pipeline.Translation.Data.MissingTranslationBehavior.FlowError">
             <summary>
             Add a flow error if there is no translation for the value. The error
             contains the reason there was no translation.
@@ -117,21 +117,21 @@
             Internal translation dictionary.
             </summary>
         </member>
-        <member name="F:FiftyOne.Pipeline.Translation.Data.Translator._behaviour">
+        <member name="F:FiftyOne.Pipeline.Translation.Data.Translator._behavior">
             <summary>
-            The behaviour to use when a translation is missing.
+            The behavior to use when a translation is missing.
             </summary>
         </member>
-        <member name="M:FiftyOne.Pipeline.Translation.Data.Translator.#ctor(FiftyOne.Pipeline.Translation.Data.MissingTranslationBehaviour)">
+        <member name="M:FiftyOne.Pipeline.Translation.Data.Translator.#ctor(FiftyOne.Pipeline.Translation.Data.MissingTranslationBehavior)">
             <summary>
             Default constructor. Initializes the translator with an empty set of
             translations.
             </summary>
-            <param name="behaviour">
-            The behaviour to use when a translation is missing.
+            <param name="behavior">
+            The behavior to use when a translation is missing.
             </param>
         </member>
-        <member name="M:FiftyOne.Pipeline.Translation.Data.Translator.#ctor(System.Collections.Generic.IDictionary{System.String,System.String},FiftyOne.Pipeline.Translation.Data.MissingTranslationBehaviour)">
+        <member name="M:FiftyOne.Pipeline.Translation.Data.Translator.#ctor(System.Collections.Generic.IDictionary{System.String,System.String},FiftyOne.Pipeline.Translation.Data.MissingTranslationBehavior)">
             <summary>
             Constructor.
             </summary>
@@ -139,8 +139,8 @@
             The translations to use for translation. The key is the source
             value and the value is the translated value.
             </param>
-            <param name="behaviour">
-            The behaviour to use when a translation is missing.
+            <param name="behavior">
+            The behavior to use when a translation is missing.
             </param>
             <exception cref="T:System.ArgumentNullException"></exception>
         </member>
@@ -234,7 +234,7 @@
             Translations are provided in YAML format files, where the naming defines
             the language contained in the file. See <see cref="M:FiftyOne.Pipeline.Translation.FlowElements.TranslationEngineBuilder.AddSource(System.String)"/>.
             
-            The language to translate to is deteined by looking through the evidence
+            The language to translate to is defined by looking through the evidence
             for a key containing a locale code. The keys checked are defined in
             <see cref="P:FiftyOne.Pipeline.Translation.FlowElements.TranslationEngine.EvidenceKeyFilter"/>. If a fixed language is provided in the
             builder, this will be used instead, regardless of the evidence.
@@ -250,9 +250,9 @@
             IList string, IAspectPropertyValue string, etc. and the type of the output
             property will match the input.
             
-            The behaviour of the engine when a translation is missing for a value can be
-            configured using the <see cref="T:FiftyOne.Pipeline.Translation.Data.MissingTranslationBehaviour"/> enum.
-            See <see cref="M:FiftyOne.Pipeline.Translation.FlowElements.TranslationEngineBuilder.SetMissingTranslationBehaviour(FiftyOne.Pipeline.Translation.Data.MissingTranslationBehaviour)"/>.
+            The behavior of the engine when a translation is missing for a value can be
+            configured using the <see cref="T:FiftyOne.Pipeline.Translation.Data.MissingTranslationBehavior"/> enum.
+            See <see cref="M:FiftyOne.Pipeline.Translation.FlowElements.TranslationEngineBuilder.SetMissingTranslationBehaviour(FiftyOne.Pipeline.Translation.Data.MissingTranslationBehavior)"/>.
             </summary>
         </member>
         <member name="F:FiftyOne.Pipeline.Translation.FlowElements.TranslationEngine._emptyTranslator">
@@ -285,7 +285,7 @@
         </member>
         <member name="F:FiftyOne.Pipeline.Translation.FlowElements.TranslationEngine._behaviour">
             <summary>
-            Defines the behaviour when there is no translation available for a
+            Defines the behavior when there is no translation available for a
             value.
             </summary>
         </member>
@@ -322,7 +322,7 @@
         <member name="P:FiftyOne.Pipeline.Translation.FlowElements.TranslationEngine.Properties">
             <inheritdoc/>
         </member>
-        <member name="M:FiftyOne.Pipeline.Translation.FlowElements.TranslationEngine.#ctor(System.String,System.Collections.Generic.IEnumerable{FiftyOne.Pipeline.Translation.Data.TranslationProperty},System.Collections.Generic.IEnumerable{System.IO.FileInfo},System.String,FiftyOne.Pipeline.Translation.Data.MissingTranslationBehaviour,Microsoft.Extensions.Logging.ILogger{FiftyOne.Pipeline.Core.FlowElements.FlowElementBase{FiftyOne.Pipeline.Translation.Data.ITranslationData,FiftyOne.Pipeline.Core.Data.IElementPropertyMetaData}},System.Func{FiftyOne.Pipeline.Core.FlowElements.IPipeline,FiftyOne.Pipeline.Core.FlowElements.FlowElementBase{FiftyOne.Pipeline.Translation.Data.ITranslationData,FiftyOne.Pipeline.Core.Data.IElementPropertyMetaData},FiftyOne.Pipeline.Translation.Data.ITranslationData})">
+        <member name="M:FiftyOne.Pipeline.Translation.FlowElements.TranslationEngine.#ctor(System.String,System.Collections.Generic.IEnumerable{FiftyOne.Pipeline.Translation.Data.TranslationProperty},System.Collections.Generic.IEnumerable{System.IO.FileInfo},System.String,FiftyOne.Pipeline.Translation.Data.MissingTranslationBehavior,Microsoft.Extensions.Logging.ILogger{FiftyOne.Pipeline.Core.FlowElements.FlowElementBase{FiftyOne.Pipeline.Translation.Data.ITranslationData,FiftyOne.Pipeline.Core.Data.IElementPropertyMetaData}},System.Func{FiftyOne.Pipeline.Core.FlowElements.IPipeline,FiftyOne.Pipeline.Core.FlowElements.FlowElementBase{FiftyOne.Pipeline.Translation.Data.ITranslationData,FiftyOne.Pipeline.Core.Data.IElementPropertyMetaData},FiftyOne.Pipeline.Translation.Data.ITranslationData})">
             <summary>
             Create a new translationLookupKey engine.
             </summary>
@@ -340,8 +340,8 @@
             translate to this language. Otherwise (null or empty) the engine will
             get the language from the evidence.
             </param>
-            <param name="behaviour">
-            The behaviour of the translation engine when a translation is missing
+            <param name="behavior">
+            The behavior of the translation engine when a translation is missing
             for a value.
             </param>
             <param name="logger">
@@ -360,13 +360,13 @@
         <member name="M:FiftyOne.Pipeline.Translation.FlowElements.TranslationEngine.UnmanagedResourcesCleanup">
             <inheritdoc/>
         </member>
-        <member name="M:FiftyOne.Pipeline.Translation.FlowElements.TranslationEngine.ParseSources(System.Collections.Generic.IEnumerable{System.IO.FileInfo},FiftyOne.Pipeline.Translation.Data.MissingTranslationBehaviour)">
+        <member name="M:FiftyOne.Pipeline.Translation.FlowElements.TranslationEngine.ParseSources(System.Collections.Generic.IEnumerable{System.IO.FileInfo},FiftyOne.Pipeline.Translation.Data.MissingTranslationBehavior)">
             <summary>
             Unpacks and parses source files into a Languages instance containing
             a Translator for each file.
             </summary>
             <param name="sources"></param>
-            <param name="behaviour"></param>
+            <param name="behavior"></param>
             <returns></returns>
         </member>
         <member name="M:FiftyOne.Pipeline.Translation.FlowElements.TranslationEngine.GetLanguageName(System.String)">
@@ -387,7 +387,7 @@
         </member>
         <member name="M:FiftyOne.Pipeline.Translation.FlowElements.TranslationEngine.TryGetSourceValue(FiftyOne.Pipeline.Core.Data.IElementData,System.String,System.Object@)">
             <summary>
-            Gets the source value from the sourcedata
+            Gets the source value from the sourceData
             </summary>
             <param name="sourceData"></param>
             <param name="sourceProperty"></param>
@@ -440,16 +440,27 @@
         <member name="F:FiftyOne.Pipeline.Translation.FlowElements.TranslationEngineBuilder._sources">
             <summary>
             Source files containing translations. These follow the naming convention
-            'abc.en_GB.yml' where 'abc' can be any idenitifier, 'en_GB' is the
+            'abc.en_GB.yml' where 'abc' can be any identifier, 'en_GB' is the
             locale code, and 'yml' is the file extension. The locale code is used 
             to determine which language is contained in the translation files.
             Files must be in YAML format.
             </summary>
         </member>
-        <member name="F:FiftyOne.Pipeline.Translation.FlowElements.TranslationEngineBuilder._behaviour">
+        <member name="F:FiftyOne.Pipeline.Translation.FlowElements.TranslationEngineBuilder._behavior">
             <summary>
-            The behaviour of the translation engine when a translation is missing
+            The behavior of the translation engine when a translation is missing
             for a value.
+            </summary>
+        </member>
+        <member name="F:FiftyOne.Pipeline.Translation.FlowElements.TranslationEngineBuilder._fixedLanguage">
+            <summary>
+            Optional fixed language for the translation engine to translate to.
+            </summary>
+        </member>
+        <member name="F:FiftyOne.Pipeline.Translation.FlowElements.TranslationEngineBuilder._dataLogger">
+            <summary>
+            Logger passed to the <see cref="T:FiftyOne.Pipeline.Translation.Data.TranslationData"/> instances
+            created by the translation engine.
             </summary>
         </member>
         <member name="M:FiftyOne.Pipeline.Translation.FlowElements.TranslationEngineBuilder.#ctor(Microsoft.Extensions.Logging.ILoggerFactory)">
@@ -477,18 +488,18 @@
             this language.
             </summary>
             <param name="language">
-            Language to transate to.
+            Language to translate to.
             </param>
             <returns>
             This builder.
             </returns>
         </member>
-        <member name="M:FiftyOne.Pipeline.Translation.FlowElements.TranslationEngineBuilder.SetMissingTranslationBehaviour(FiftyOne.Pipeline.Translation.Data.MissingTranslationBehaviour)">
+        <member name="M:FiftyOne.Pipeline.Translation.FlowElements.TranslationEngineBuilder.SetMissingTranslationBehaviour(FiftyOne.Pipeline.Translation.Data.MissingTranslationBehavior)">
             <summary>
-            Set the behaviour of the translation engine when a translation is
+            Set the behavior of the translation engine when a translation is
             missing for a value.
             </summary>
-            <param name="behaviour"></param>
+            <param name="behavior"></param>
             <returns>
             This builder.
             </returns>
@@ -510,14 +521,19 @@
         </member>
         <member name="M:FiftyOne.Pipeline.Translation.FlowElements.TranslationEngineBuilder.AddSource(System.String)">
             <summary>
-            Add a source file containing translations. These follow the naming convention
-            'abc.en_GB.yml' where 'abc' can be any idenitifier, 'en_GB' is the
-            locale code, and 'yml' is the file extension. The locale code is used 
-            to determine which language is contained in the translation files.
+            Add a source file containing translations. These follow the naming
+            convention 'abc.en_GB.yml' where 'abc' can be any identifier, 
+            'en_GB' is the locale code, and 'yml' is the file extension. The 
+            locale code is used to determine which language is contained in the
+            translation files.
             Files must be in YAML format.
             The source can contain a wildcard to add multiple files e.g.
             'abc.*.yml' to add all languages for the 'abc' identifier.
             </summary>
+            <param name="filePath">
+            The path to the source file where a wildcard can be used for the
+            language component of the filename.
+            </param>
             <returns>
             This builder.
             </returns>

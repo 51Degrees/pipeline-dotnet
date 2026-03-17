@@ -42,19 +42,19 @@ namespace FiftyOne.Pipeline.Translation.Data
         private readonly IReadOnlyDictionary<string, string> _translations;
 
         /// <summary>
-        /// The behaviour to use when a translation is missing.
+        /// The behavior to use when a translation is missing.
         /// </summary>
-        private readonly MissingTranslationBehaviour _behaviour;
+        private readonly MissingTranslationBehavior _behavior;
 
         /// <summary>
         /// Default constructor. Initializes the translator with an empty set of
         /// translations.
         /// </summary>
-        /// <param name="behaviour">
-        /// The behaviour to use when a translation is missing.
+        /// <param name="behavior">
+        /// The behavior to use when a translation is missing.
         /// </param>
-        public Translator(MissingTranslationBehaviour behaviour)
-            : this(new Dictionary<string, string>(), behaviour)
+        public Translator(MissingTranslationBehavior behavior)
+            : this(new Dictionary<string, string>(), behavior)
         { }
 
         /// <summary>
@@ -64,13 +64,13 @@ namespace FiftyOne.Pipeline.Translation.Data
         /// The translations to use for translation. The key is the source
         /// value and the value is the translated value.
         /// </param>
-        /// <param name="behaviour">
-        /// The behaviour to use when a translation is missing.
+        /// <param name="behavior">
+        /// The behavior to use when a translation is missing.
         /// </param>
         /// <exception cref="ArgumentNullException"></exception>
         public Translator(
             IDictionary<string, string> translations,
-            MissingTranslationBehaviour behaviour)
+            MissingTranslationBehavior behavior)
         {
             if (translations == null)
             {
@@ -79,7 +79,7 @@ namespace FiftyOne.Pipeline.Translation.Data
             _translations = new Dictionary<string, string>(
                 translations,
                 StringComparer.InvariantCultureIgnoreCase);
-            _behaviour = behaviour;
+            _behavior = behavior;
         }
 
         /// <summary>
@@ -151,16 +151,16 @@ namespace FiftyOne.Pipeline.Translation.Data
             }
             else
             {
-                switch (_behaviour)
+                switch (_behavior)
                 {
-                    case MissingTranslationBehaviour.EmptyString:
+                    case MissingTranslationBehavior.EmptyString:
                         return string.Empty;
-                    case MissingTranslationBehaviour.FlowError:
+                    case MissingTranslationBehavior.FlowError:
                         errors.Add(new KeyNotFoundException(
                             $"There was no translation found for " +
                             $"the value '{value}'."));
                         return null;
-                    case MissingTranslationBehaviour.Original:
+                    case MissingTranslationBehavior.Original:
                     default:
                         return value;
                 }

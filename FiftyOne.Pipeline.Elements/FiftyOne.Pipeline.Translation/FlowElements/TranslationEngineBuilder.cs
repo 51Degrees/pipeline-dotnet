@@ -31,6 +31,7 @@ using System.Linq;
 
 namespace FiftyOne.Pipeline.Translation.FlowElements
 {
+
     /// <summary>
     /// Fluent builder for <see cref="TranslationEngine"/>.
     /// </summary>
@@ -51,7 +52,7 @@ namespace FiftyOne.Pipeline.Translation.FlowElements
 
         /// <summary>
         /// Source files containing translations. These follow the naming convention
-        /// 'abc.en_GB.yml' where 'abc' can be any idenitifier, 'en_GB' is the
+        /// 'abc.en_GB.yml' where 'abc' can be any identifier, 'en_GB' is the
         /// locale code, and 'yml' is the file extension. The locale code is used 
         /// to determine which language is contained in the translation files.
         /// Files must be in YAML format.
@@ -59,10 +60,10 @@ namespace FiftyOne.Pipeline.Translation.FlowElements
         private List<FileInfo> _sources;
 
         /// <summary>
-        /// The behaviour of the translation engine when a translation is missing
+        /// The behavior of the translation engine when a translation is missing
         /// for a value.
         /// </summary>
-        private MissingTranslationBehaviour _behaviour;
+        private MissingTranslationBehavior _behavior;
 
         /// <summary>
         /// Optional fixed language for the translation engine to translate to.
@@ -86,7 +87,7 @@ namespace FiftyOne.Pipeline.Translation.FlowElements
             _sources = new List<FileInfo>();
             _dataLogger = _loggerFactory.CreateLogger<TranslationData>();
             _fixedLanguage = null;
-            _behaviour = MissingTranslationBehaviour.Original;
+            _behavior = MissingTranslationBehavior.Original;
         }
 
         /// <summary>
@@ -113,7 +114,7 @@ namespace FiftyOne.Pipeline.Translation.FlowElements
         /// this language.
         /// </summary>
         /// <param name="language">
-        /// Language to transate to.
+        /// Language to translate to.
         /// </param>
         /// <returns>
         /// This builder.
@@ -126,17 +127,17 @@ namespace FiftyOne.Pipeline.Translation.FlowElements
         }
 
         /// <summary>
-        /// Set the behaviour of the translation engine when a translation is
+        /// Set the behavior of the translation engine when a translation is
         /// missing for a value.
         /// </summary>
-        /// <param name="behaviour"></param>
+        /// <param name="behavior"></param>
         /// <returns>
         /// This builder.
         /// </returns>
         public TranslationEngineBuilder SetMissingTranslationBehaviour(
-        MissingTranslationBehaviour behaviour)
+            MissingTranslationBehavior behavior)
         {
-            _behaviour = behaviour;
+            _behavior = behavior;
             return this;
         }
 
@@ -167,39 +168,44 @@ namespace FiftyOne.Pipeline.Translation.FlowElements
         }
 
         /// <summary>
-        /// Add a source file containing translations. These follow the naming convention
-        /// 'abc.en_GB.yml' where 'abc' can be any idenitifier, 'en_GB' is the
-        /// locale code, and 'yml' is the file extension. The locale code is used 
-        /// to determine which language is contained in the translation files.
+        /// Add a source file containing translations. These follow the naming
+        /// convention 'abc.en_GB.yml' where 'abc' can be any identifier, 
+        /// 'en_GB' is the locale code, and 'yml' is the file extension. The 
+        /// locale code is used to determine which language is contained in the
+        /// translation files.
         /// Files must be in YAML format.
         /// The source can contain a wildcard to add multiple files e.g.
         /// 'abc.*.yml' to add all languages for the 'abc' identifier.
         /// </summary>
+        /// <param name="filePath">
+        /// The path to the source file where a wildcard can be used for the
+        /// language component of the filename.
+        /// </param>
         /// <returns>
         /// This builder.
         /// </returns>
-        public TranslationEngineBuilder AddSource(string source)
+        public TranslationEngineBuilder AddSource(string filePath)
         {
-            if (source == null)
+            if (filePath == null)
             {
-                throw new ArgumentNullException(nameof(source));
+                throw new ArgumentNullException(nameof(filePath));
             }
-            if (source.Contains('*'))
+            if (filePath.Contains('*'))
             {
                 // The source is a wildcard, so get the directory and file name
                 // and find all matching files.
-                var directory = Path.GetDirectoryName(source);
+                var directory = Path.GetDirectoryName(filePath);
                 if (string.IsNullOrWhiteSpace(directory))
                 {
                     directory = Directory.GetCurrentDirectory();
                 }
-                var fileName = Path.GetFileName(source);
+                var fileName = Path.GetFileName(filePath);
                 var files = Directory.GetFiles(directory, fileName);
                 _sources.AddRange(files.Select(f => new FileInfo(f)));
             }
             else
             {
-                _sources.Add(new FileInfo(source));
+                _sources.Add(new FileInfo(filePath));
             }
             return this;
         }
@@ -231,7 +237,7 @@ namespace FiftyOne.Pipeline.Translation.FlowElements
                 _translationProperties,
                 _sources,
                 _fixedLanguage,
-                _behaviour,
+                _behavior,
                 _loggerFactory.CreateLogger<TranslationEngine>(),
                 CreateData);
         }
