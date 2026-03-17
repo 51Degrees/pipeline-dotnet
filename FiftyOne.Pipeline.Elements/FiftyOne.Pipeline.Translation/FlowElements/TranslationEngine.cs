@@ -41,7 +41,7 @@ namespace FiftyOne.Pipeline.Translation.FlowElements
             IReadOnlyCollection<TranslationProperty> translations,
             IReadOnlyDictionary<string, string> sources,
             string fixedLanguage,
-            MissingTranslationBehaviour behaviour,
+            MissingTranslationBehavior behavior,
             ILogger<FlowElementBase<ITranslationData, IElementPropertyMetaData>> logger,
             Func<IPipeline,
                 FlowElementBase<ITranslationData,
@@ -52,7 +52,7 @@ namespace FiftyOne.Pipeline.Translation.FlowElements
                   translations,
                   sources,
                   fixedLanguage,
-                  behaviour,
+                  behavior,
                   logger,
                   elementDataFactory)
         {

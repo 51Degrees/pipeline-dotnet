@@ -23,14 +23,14 @@
 namespace FiftyOne.Pipeline.Translation.Data
 {
     /// <summary>
-    /// Defines the behaviour of the translation engine when a translation is
+    /// Defines the behavior of the translation engine when a translation is
     /// missing for a value.
     /// </summary>
-    public enum MissingTranslationBehaviour
+    public enum MissingTranslationBehavior
     {
         /// <summary>
         /// Use the original value if there is no translation for it.
-        /// This is the default behaviour.
+        /// This is the default behavior.
         /// </summary>
         Original,
 

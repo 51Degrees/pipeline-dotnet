@@ -38,7 +38,6 @@ namespace FiftyOne.Pipeline.Translation.Data
             DestinationProperty = destination;
         }
 
-
         /// <summary>
         /// Source property name on the source element data.
         /// </summary>
