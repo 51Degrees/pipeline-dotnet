@@ -22,7 +22,7 @@
 
 using FiftyOne.Pipeline.Core.Data;
 
-namespace FiftyOne.Pipeline.Elements.Translation.Data;
+namespace FiftyOne.Pipeline.Translation.Data;
 
 /// <summary>
 /// Element data marker interface for

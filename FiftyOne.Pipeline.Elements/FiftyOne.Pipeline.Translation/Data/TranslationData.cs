@@ -25,7 +25,7 @@ using FiftyOne.Pipeline.Core.FlowElements;
 using Microsoft.Extensions.Logging;
 using System.Collections.Generic;
 
-namespace FiftyOne.Pipeline.Elements.Translation.Data
+namespace FiftyOne.Pipeline.Translation.Data
 {
     /// <summary>
     /// Data object populated by

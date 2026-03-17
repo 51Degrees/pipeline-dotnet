@@ -23,7 +23,6 @@
 using FiftyOne.Pipeline.Core.Data;
 using FiftyOne.Pipeline.Core.FlowElements;
 using FiftyOne.Pipeline.Core.TypedMap;
-using FiftyOne.Pipeline.Elements.Translation.Data;
 using FiftyOne.Pipeline.Engines.Data;
 using FiftyOne.Pipeline.Translation.Data;
 using Microsoft.Extensions.Logging;
@@ -34,11 +33,10 @@ using System.IO;
 using System.Linq;
 using System.Runtime.CompilerServices;
 using System.Text.RegularExpressions;
-using System.Xml.Linq;
 using YamlDotNet.Serialization;
 
-[assembly: InternalsVisibleTo("FiftyOne.Pipeline.Elements.Translation.Tests")]
-namespace FiftyOne.Pipeline.Elements.Translation.FlowElements;
+[assembly: InternalsVisibleTo("FiftyOne.Pipeline.TranslationTests")]
+namespace FiftyOne.Pipeline.Translation.FlowElements;
 
 /// <summary>
 /// Flow element that translates values from a single source element and
@@ -127,13 +125,23 @@ public class TranslationEngine :
             ITranslationData> elementDataFactory)
         : base(logger, elementDataFactory)
     {
-        if (translations == null)
+        if (translations == null || translations.Count() == 0)
         {
-            throw new ArgumentNullException(nameof(translations));
+            throw new ArgumentNullException(
+                nameof(translations),
+                "At least one property translation must be configured.");
         }
-        if (sources == null)
+        if (sources == null || sources.Count() == 0)
         {
-            throw new ArgumentNullException(nameof(sources));
+            throw new ArgumentNullException(
+                nameof(sources),
+                "At least one source file must be configured.");
+        }
+        if (string.IsNullOrWhiteSpace(sourceElementDataKey))
+        {
+            throw new ArgumentNullException(
+                nameof(sourceElementDataKey),
+                "The source element key must be configured.");
         }
 
         _sourceElementDataKey = sourceElementDataKey.Trim();
@@ -326,6 +334,14 @@ public class TranslationEngine :
         return sourceValue != null;
     }
 
+    /// <summary>
+    /// Populates the translation data wither all configured translations using
+    /// the provided translator.
+    /// </summary>
+    /// <param name="sourceData"></param>
+    /// <param name="translator"></param>
+    /// <param name="translationData"></param>
+    /// <param name="flowData"></param>
     private void Populate(
         IElementData sourceData,
         Translator translator,

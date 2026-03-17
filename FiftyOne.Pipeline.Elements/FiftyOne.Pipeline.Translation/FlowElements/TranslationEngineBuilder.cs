@@ -1,6 +1,5 @@
 ﻿using FiftyOne.Pipeline.Core.Data;
 using FiftyOne.Pipeline.Core.FlowElements;
-using FiftyOne.Pipeline.Elements.Translation.Data;
 using FiftyOne.Pipeline.Translation.Data;
 using Microsoft.Extensions.Logging;
 using System;
@@ -8,7 +7,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 
-namespace FiftyOne.Pipeline.Elements.Translation.FlowElements;
+namespace FiftyOne.Pipeline.Translation.FlowElements;
 
 /// <summary>
 /// Fluent builder for <see cref="TranslationEngine"/>.
@@ -195,13 +194,6 @@ public class TranslationEngineBuilder
     /// </summary>
     public TranslationEngine Build()
     {
-        if (string.IsNullOrWhiteSpace(_sourceElementDataKey))
-        {
-            throw new ArgumentException(
-                "Source element data key must be supplied.",
-                nameof(_sourceElementDataKey));
-        }
-
         return new TranslationEngine(
             _sourceElementDataKey,
             _translationProperties,

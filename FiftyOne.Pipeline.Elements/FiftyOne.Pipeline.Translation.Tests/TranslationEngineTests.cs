@@ -1,10 +1,9 @@
 
 using FiftyOne.Pipeline.Core.Data;
 using FiftyOne.Pipeline.Core.FlowElements;
-using FiftyOne.Pipeline.Elements.Translation.Data;
-using FiftyOne.Pipeline.Elements.Translation.FlowElements;
-using FiftyOne.Pipeline.Engines.Data;
 using FiftyOne.Pipeline.Translation.Data;
+using FiftyOne.Pipeline.Translation.FlowElements;
+using FiftyOne.Pipeline.Engines.Data;
 using Microsoft.Extensions.Logging;
 
 namespace FiftyOne.Pipeline.Translation.Tests;
@@ -51,6 +50,53 @@ public class TranslationEngineTests
 
         Assert.IsNotNull(translation);
         Assert.AreEqual("chien", translation);
+    }
+
+    /// <summary>
+    /// Test that an exception is thrown when building the engine if no
+    /// sources are provided. It's important that this happens when building,
+    /// way before processing happens.
+    /// </summary>
+    [TestMethod]
+    public void NoSouces()
+    {
+        var builder = new TranslationEngineBuilder(_loggerFactory)
+            .AddTranslation("Animal", "AnimalTranslated")
+            .SetSourceElementDataKey("somekey");
+
+        Assert.ThrowsException<ArgumentNullException>(builder.Build);
+    }
+
+    /// <summary>
+    /// Test that an exception is thrown when building the engine if no
+    /// translations are provided. It's important that this happens when building,
+    /// way before processing happens.
+    /// </summary>
+    [TestMethod]
+    public void NoTranslations()
+    {
+        using var file = CreateFile("animals.fr_FR.yml", new Dictionary<string, string>());
+        var builder = new TranslationEngineBuilder(_loggerFactory)
+            .AddSource(file.File.FullName)
+            .SetSourceElementDataKey("somekey");
+
+        Assert.ThrowsException<ArgumentNullException>(builder.Build);
+    }
+
+    /// <summary>
+    /// Test that an exception is thrown when building the engine if no element
+    /// source key is provided. It's important that this happens when building,
+    /// way before processing happens.
+    /// </summary>
+    [TestMethod]
+    public void NoSourceKey()
+    {
+        using var file = CreateFile("animals.fr_FR.yml", new Dictionary<string, string>());
+        var builder = new TranslationEngineBuilder(_loggerFactory)
+            .AddSource(file.File.FullName)
+            .AddTranslation("Animal", "TranslatedAnimal");
+
+        Assert.ThrowsException<ArgumentNullException>(builder.Build);
     }
 
     /// <summary>

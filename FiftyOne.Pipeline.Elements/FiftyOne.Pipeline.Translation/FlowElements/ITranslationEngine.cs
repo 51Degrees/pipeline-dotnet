@@ -22,9 +22,9 @@
 
 using FiftyOne.Pipeline.Core.Data;
 using FiftyOne.Pipeline.Core.FlowElements;
-using FiftyOne.Pipeline.Elements.Translation.Data;
+using FiftyOne.Pipeline.Translation.Data;
 
-namespace FiftyOne.Pipeline.Elements.Translation.FlowElements;
+namespace FiftyOne.Pipeline.Translation.FlowElements;
 
 /// <summary>
 /// Flow element that translates values from a single source element and
