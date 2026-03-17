@@ -55,8 +55,9 @@ namespace FiftyOne.Pipeline.Translation.FlowElements
         /// locale code, and 'yml' is the file extension. The locale code is used 
         /// to determine which language is contained in the translation files.
         /// Files must be in YAML format.
+        /// Key is the name of the source file, value is the file contents.
         /// </summary>
-        private List<FileInfo> _sources;
+        private Dictionary<string, string> _sources;
 
         /// <summary>
         /// The behaviour of the translation engine when a translation is missing
@@ -83,7 +84,7 @@ namespace FiftyOne.Pipeline.Translation.FlowElements
             _loggerFactory = loggerFactory
                 ?? throw new ArgumentNullException(nameof(loggerFactory));
             _translationProperties = new List<TranslationProperty>();
-            _sources = new List<FileInfo>();
+            _sources = new Dictionary<string, string>();
             _dataLogger = _loggerFactory.CreateLogger<TranslationData>();
             _fixedLanguage = null;
             _behaviour = MissingTranslationBehaviour.Original;
@@ -178,29 +179,58 @@ namespace FiftyOne.Pipeline.Translation.FlowElements
         /// <returns>
         /// This builder.
         /// </returns>
-        public TranslationEngineBuilder AddSource(string source)
+        public TranslationEngineBuilder AddSource(string sourceFilePath)
         {
-            if (source == null)
+            if (sourceFilePath == null)
             {
-                throw new ArgumentNullException(nameof(source));
+                throw new ArgumentNullException(nameof(sourceFilePath));
             }
-            if (source.Contains('*'))
+            if (sourceFilePath.Contains('*'))
             {
                 // The source is a wildcard, so get the directory and file name
                 // and find all matching files.
-                var directory = Path.GetDirectoryName(source);
+                var directory = Path.GetDirectoryName(sourceFilePath);
                 if (string.IsNullOrWhiteSpace(directory))
                 {
                     directory = Directory.GetCurrentDirectory();
                 }
-                var fileName = Path.GetFileName(source);
+                var fileName = Path.GetFileName(sourceFilePath);
                 var files = Directory.GetFiles(directory, fileName);
-                _sources.AddRange(files.Select(f => new FileInfo(f)));
+                foreach (var file in files.Select(i => new FileInfo(i)))
+                {
+                    AddSource(file.Name, File.ReadAllText(file.FullName));
+                }
             }
             else
             {
-                _sources.Add(new FileInfo(source));
+                var file = new FileInfo(sourceFilePath);
+                AddSource(file.Name, File.ReadAllText(file.FullName));
+
             }
+            return this;
+        }
+
+        /// <summary>
+        /// Add a source file containing translations. These follow the naming convention
+        /// 'abc.en_GB.yml' where 'abc' can be any idenitifier, 'en_GB' is the
+        /// locale code, and 'yml' is the file extension. The locale code is used 
+        /// to determine which language is contained in the translation files.
+        /// Files must be in YAML format.
+        /// The source can contain a wildcard to add multiple files e.g.
+        /// 'abc.*.yml' to add all languages for the 'abc' identifier.
+        /// </summary>
+        /// <param name="name">
+        /// Name of the file.
+        /// </param>
+        /// <param name="source">
+        /// Contents of the file.
+        /// </param>
+        /// <returns>
+        /// This builder.
+        /// </returns>
+        public TranslationEngineBuilder AddSource(string name, string source)
+        {
+            _sources.Add(name, source);
             return this;
         }
 

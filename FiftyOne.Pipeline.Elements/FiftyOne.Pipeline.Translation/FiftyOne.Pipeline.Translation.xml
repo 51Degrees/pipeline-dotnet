@@ -227,6 +227,12 @@
             </summary>
         </member>
         <member name="T:FiftyOne.Pipeline.Translation.FlowElements.TranslationEngine">
+            <inheritdoc/>
+        </member>
+        <member name="M:FiftyOne.Pipeline.Translation.FlowElements.TranslationEngine.#ctor(System.String,System.Collections.Generic.IReadOnlyCollection{FiftyOne.Pipeline.Translation.Data.TranslationProperty},System.Collections.Generic.IReadOnlyDictionary{System.String,System.String},System.String,FiftyOne.Pipeline.Translation.Data.MissingTranslationBehaviour,Microsoft.Extensions.Logging.ILogger{FiftyOne.Pipeline.Core.FlowElements.FlowElementBase{FiftyOne.Pipeline.Translation.Data.ITranslationData,FiftyOne.Pipeline.Core.Data.IElementPropertyMetaData}},System.Func{FiftyOne.Pipeline.Core.FlowElements.IPipeline,FiftyOne.Pipeline.Core.FlowElements.FlowElementBase{FiftyOne.Pipeline.Translation.Data.ITranslationData,FiftyOne.Pipeline.Core.Data.IElementPropertyMetaData},FiftyOne.Pipeline.Translation.Data.ITranslationData})">
+            <inheritdoc/>
+        </member>
+        <member name="T:FiftyOne.Pipeline.Translation.FlowElements.TranslationEngineBase`1">
             <summary>
             Flow element that translates values from a single source element and
             stores translated values under its own element data key.
@@ -236,7 +242,7 @@
             
             The language to translate to is deteined by looking through the evidence
             for a key containing a locale code. The keys checked are defined in
-            <see cref="P:FiftyOne.Pipeline.Translation.FlowElements.TranslationEngine.EvidenceKeyFilter"/>. If a fixed language is provided in the
+            <see cref="P:FiftyOne.Pipeline.Translation.FlowElements.TranslationEngineBase`1.EvidenceKeyFilter"/>. If a fixed language is provided in the
             builder, this will be used instead, regardless of the evidence.
             
             The properties to be translated are configured in the builder by supplying
@@ -255,7 +261,7 @@
             See <see cref="M:FiftyOne.Pipeline.Translation.FlowElements.TranslationEngineBuilder.SetMissingTranslationBehaviour(FiftyOne.Pipeline.Translation.Data.MissingTranslationBehaviour)"/>.
             </summary>
         </member>
-        <member name="F:FiftyOne.Pipeline.Translation.FlowElements.TranslationEngine._emptyTranslator">
+        <member name="F:FiftyOne.Pipeline.Translation.FlowElements.TranslationEngineBase`1._emptyTranslator">
             <summary>
             Translator with no translations configured. Used to populate translations
             when there is no target language or translator available, to ensure the
@@ -263,68 +269,68 @@
             is just an error message.
             </summary>
         </member>
-        <member name="F:FiftyOne.Pipeline.Translation.FlowElements.TranslationEngine._fixedLanguage">
+        <member name="F:FiftyOne.Pipeline.Translation.FlowElements.TranslationEngineBase`1._fixedLanguage">
             <summary>
             Locale code of the fixed translation language, if provided.
             </summary>
         </member>
-        <member name="F:FiftyOne.Pipeline.Translation.FlowElements.TranslationEngine._evidenceKeyFilter">
+        <member name="F:FiftyOne.Pipeline.Translation.FlowElements.TranslationEngineBase`1._evidenceKeyFilter">
             <summary>
-            <see cref="P:FiftyOne.Pipeline.Translation.FlowElements.TranslationEngine.EvidenceKeyFilter"/>.
+            <see cref="P:FiftyOne.Pipeline.Translation.FlowElements.TranslationEngineBase`1.EvidenceKeyFilter"/>.
             </summary>
         </member>
-        <member name="F:FiftyOne.Pipeline.Translation.FlowElements.TranslationEngine._properties">
+        <member name="F:FiftyOne.Pipeline.Translation.FlowElements.TranslationEngineBase`1._properties">
             <summary>
-            <see cref="P:FiftyOne.Pipeline.Translation.FlowElements.TranslationEngine.Properties"/>.
+            <see cref="P:FiftyOne.Pipeline.Translation.FlowElements.TranslationEngineBase`1.Properties"/>.
             </summary>
         </member>
-        <member name="F:FiftyOne.Pipeline.Translation.FlowElements.TranslationEngine._sourceElementDataKey">
+        <member name="F:FiftyOne.Pipeline.Translation.FlowElements.TranslationEngineBase`1._sourceElementDataKey">
             <summary>
-            <see cref="P:FiftyOne.Pipeline.Translation.FlowElements.TranslationEngine.SourceElementDataKey"/>.
+            <see cref="P:FiftyOne.Pipeline.Translation.FlowElements.TranslationEngineBase`1.SourceElementDataKey"/>.
             </summary>
         </member>
-        <member name="F:FiftyOne.Pipeline.Translation.FlowElements.TranslationEngine._behaviour">
+        <member name="F:FiftyOne.Pipeline.Translation.FlowElements.TranslationEngineBase`1._behaviour">
             <summary>
             Defines the behaviour when there is no translation available for a
             value.
             </summary>
         </member>
-        <member name="F:FiftyOne.Pipeline.Translation.FlowElements.TranslationEngine._translationProperties">
+        <member name="F:FiftyOne.Pipeline.Translation.FlowElements.TranslationEngineBase`1._translationProperties">
             <summary>
             Input and output property names to translate.
             </summary>
         </member>
-        <member name="F:FiftyOne.Pipeline.Translation.FlowElements.TranslationEngine._evidenceKeyWhiteListValues">
+        <member name="F:FiftyOne.Pipeline.Translation.FlowElements.TranslationEngineBase`1._evidenceKeyWhiteListValues">
             <summary>
             The keys which should be used to get the locale code for the language
             to translate to.
             </summary>
         </member>
-        <member name="F:FiftyOne.Pipeline.Translation.FlowElements.TranslationEngine._localeRegex">
+        <member name="F:FiftyOne.Pipeline.Translation.FlowElements.TranslationEngineBase`1._localeRegex">
             <summary>
             Regex used to identify language locale codes in evidence
             </summary>
         </member>
-        <member name="F:FiftyOne.Pipeline.Translation.FlowElements.TranslationEngine.Languages">
+        <member name="F:FiftyOne.Pipeline.Translation.FlowElements.TranslationEngineBase`1.Languages">
             <summary>
             Translation lookups
             </summary>
         </member>
-        <member name="P:FiftyOne.Pipeline.Translation.FlowElements.TranslationEngine.ElementDataKey">
+        <member name="P:FiftyOne.Pipeline.Translation.FlowElements.TranslationEngineBase`1.ElementDataKey">
             <inheritdoc/>
         </member>
-        <member name="P:FiftyOne.Pipeline.Translation.FlowElements.TranslationEngine.SourceElementDataKey">
+        <member name="P:FiftyOne.Pipeline.Translation.FlowElements.TranslationEngineBase`1.SourceElementDataKey">
             <inheritdoc/>
         </member>
-        <member name="P:FiftyOne.Pipeline.Translation.FlowElements.TranslationEngine.EvidenceKeyFilter">
+        <member name="P:FiftyOne.Pipeline.Translation.FlowElements.TranslationEngineBase`1.EvidenceKeyFilter">
             <inheritdoc/>
         </member>
-        <member name="P:FiftyOne.Pipeline.Translation.FlowElements.TranslationEngine.Properties">
+        <member name="P:FiftyOne.Pipeline.Translation.FlowElements.TranslationEngineBase`1.Properties">
             <inheritdoc/>
         </member>
-        <member name="M:FiftyOne.Pipeline.Translation.FlowElements.TranslationEngine.#ctor(System.String,System.Collections.Generic.IEnumerable{FiftyOne.Pipeline.Translation.Data.TranslationProperty},System.Collections.Generic.IEnumerable{System.IO.FileInfo},System.String,FiftyOne.Pipeline.Translation.Data.MissingTranslationBehaviour,Microsoft.Extensions.Logging.ILogger{FiftyOne.Pipeline.Core.FlowElements.FlowElementBase{FiftyOne.Pipeline.Translation.Data.ITranslationData,FiftyOne.Pipeline.Core.Data.IElementPropertyMetaData}},System.Func{FiftyOne.Pipeline.Core.FlowElements.IPipeline,FiftyOne.Pipeline.Core.FlowElements.FlowElementBase{FiftyOne.Pipeline.Translation.Data.ITranslationData,FiftyOne.Pipeline.Core.Data.IElementPropertyMetaData},FiftyOne.Pipeline.Translation.Data.ITranslationData})">
+        <member name="M:FiftyOne.Pipeline.Translation.FlowElements.TranslationEngineBase`1.#ctor(System.String,System.Collections.Generic.IReadOnlyCollection{FiftyOne.Pipeline.Translation.Data.TranslationProperty},System.Collections.Generic.IReadOnlyDictionary{System.String,System.String},System.String,FiftyOne.Pipeline.Translation.Data.MissingTranslationBehaviour,Microsoft.Extensions.Logging.ILogger{FiftyOne.Pipeline.Core.FlowElements.FlowElementBase{`0,FiftyOne.Pipeline.Core.Data.IElementPropertyMetaData}},System.Func{FiftyOne.Pipeline.Core.FlowElements.IPipeline,FiftyOne.Pipeline.Core.FlowElements.FlowElementBase{`0,FiftyOne.Pipeline.Core.Data.IElementPropertyMetaData},`0})">
             <summary>
-            Create a new translationLookupKey engine.
+            Create a new translation engine.
             </summary>
             <param name="sourceElementDataKey">
             Element data key of the source flow element.
@@ -333,7 +339,8 @@
             Translations to execute, keyed by source property name.
             </param>
             <param name="sources">
-            sources used to perform translations. 
+            Sources used to perform translations. YAML format strings keyed on
+            file name.
             </param>
             <param name="fixedLanguage">
             Fixed language to translate to. If this is set, the engine will always
@@ -351,16 +358,16 @@
             Optional element data factory override.
             </param>
         </member>
-        <member name="M:FiftyOne.Pipeline.Translation.FlowElements.TranslationEngine.ProcessInternal(FiftyOne.Pipeline.Core.Data.IFlowData)">
+        <member name="M:FiftyOne.Pipeline.Translation.FlowElements.TranslationEngineBase`1.ProcessInternal(FiftyOne.Pipeline.Core.Data.IFlowData)">
             <inheritdoc/>
         </member>
-        <member name="M:FiftyOne.Pipeline.Translation.FlowElements.TranslationEngine.ManagedResourcesCleanup">
+        <member name="M:FiftyOne.Pipeline.Translation.FlowElements.TranslationEngineBase`1.ManagedResourcesCleanup">
             <inheritdoc/>
         </member>
-        <member name="M:FiftyOne.Pipeline.Translation.FlowElements.TranslationEngine.UnmanagedResourcesCleanup">
+        <member name="M:FiftyOne.Pipeline.Translation.FlowElements.TranslationEngineBase`1.UnmanagedResourcesCleanup">
             <inheritdoc/>
         </member>
-        <member name="M:FiftyOne.Pipeline.Translation.FlowElements.TranslationEngine.ParseSources(System.Collections.Generic.IEnumerable{System.IO.FileInfo},FiftyOne.Pipeline.Translation.Data.MissingTranslationBehaviour)">
+        <member name="M:FiftyOne.Pipeline.Translation.FlowElements.TranslationEngineBase`1.ParseSources(System.Collections.Generic.IReadOnlyDictionary{System.String,System.String},FiftyOne.Pipeline.Translation.Data.MissingTranslationBehaviour)">
             <summary>
             Unpacks and parses source files into a Languages instance containing
             a Translator for each file.
@@ -369,7 +376,7 @@
             <param name="behaviour"></param>
             <returns></returns>
         </member>
-        <member name="M:FiftyOne.Pipeline.Translation.FlowElements.TranslationEngine.GetLanguageName(System.String)">
+        <member name="M:FiftyOne.Pipeline.Translation.FlowElements.TranslationEngineBase`1.GetLanguageName(System.String)">
             <summary>
             Get the language locale code from the source file name.
             </summary>
@@ -378,14 +385,14 @@
             <exception cref="T:System.ArgumentException"></exception>
             <exception cref="T:System.IO.InvalidDataException"></exception>
         </member>
-        <member name="M:FiftyOne.Pipeline.Translation.FlowElements.TranslationEngine.ValidateLocale(System.String)">
+        <member name="M:FiftyOne.Pipeline.Translation.FlowElements.TranslationEngineBase`1.ValidateLocale(System.String)">
             <summary>
             Get the validated locale code.
             </summary>
             <param name="locale">Code to validate</param>
             <returns>Valid locale code, or null</returns>
         </member>
-        <member name="M:FiftyOne.Pipeline.Translation.FlowElements.TranslationEngine.TryGetSourceValue(FiftyOne.Pipeline.Core.Data.IElementData,System.String,System.Object@)">
+        <member name="M:FiftyOne.Pipeline.Translation.FlowElements.TranslationEngineBase`1.TryGetSourceValue(FiftyOne.Pipeline.Core.Data.IElementData,System.String,System.Object@)">
             <summary>
             Gets the source value from the sourcedata
             </summary>
@@ -394,7 +401,7 @@
             <param name="sourceValue"></param>
             <returns></returns>
         </member>
-        <member name="M:FiftyOne.Pipeline.Translation.FlowElements.TranslationEngine.Populate(FiftyOne.Pipeline.Core.Data.IElementData,FiftyOne.Pipeline.Translation.Data.Translator,FiftyOne.Pipeline.Translation.Data.ITranslationData,FiftyOne.Pipeline.Core.Data.IFlowData)">
+        <member name="M:FiftyOne.Pipeline.Translation.FlowElements.TranslationEngineBase`1.Populate(FiftyOne.Pipeline.Core.Data.IElementData,FiftyOne.Pipeline.Translation.Data.Translator,`0,FiftyOne.Pipeline.Core.Data.IFlowData)">
             <summary>
             Populates the translation data wither all configured translations using
             the provided translator.
@@ -404,7 +411,7 @@
             <param name="translationData"></param>
             <param name="flowData"></param>
         </member>
-        <member name="M:FiftyOne.Pipeline.Translation.FlowElements.TranslationEngine.TryGetTargetLanguage(FiftyOne.Pipeline.Core.Data.IFlowData,System.String@)">
+        <member name="M:FiftyOne.Pipeline.Translation.FlowElements.TranslationEngineBase`1.TryGetTargetLanguage(FiftyOne.Pipeline.Core.Data.IFlowData,System.String@)">
             <summary>
             Goes through the Evidence in the FlowData to find the highest 
             precidence evidence key and sets the target language.
@@ -413,7 +420,7 @@
             <param name="language"></param>
             <returns></returns>
         </member>
-        <member name="M:FiftyOne.Pipeline.Translation.FlowElements.TranslationEngine.TryGetSourceData(FiftyOne.Pipeline.Core.Data.IFlowData,FiftyOne.Pipeline.Core.Data.IElementData@)">
+        <member name="M:FiftyOne.Pipeline.Translation.FlowElements.TranslationEngineBase`1.TryGetSourceData(FiftyOne.Pipeline.Core.Data.IFlowData,FiftyOne.Pipeline.Core.Data.IElementData@)">
             <summary>
             Retrieves the source value data from the FlowData. 
             </summary>
@@ -444,12 +451,24 @@
             locale code, and 'yml' is the file extension. The locale code is used 
             to determine which language is contained in the translation files.
             Files must be in YAML format.
+            Key is the name of the source file, value is the file contents.
             </summary>
         </member>
         <member name="F:FiftyOne.Pipeline.Translation.FlowElements.TranslationEngineBuilder._behaviour">
             <summary>
             The behaviour of the translation engine when a translation is missing
             for a value.
+            </summary>
+        </member>
+        <member name="F:FiftyOne.Pipeline.Translation.FlowElements.TranslationEngineBuilder._fixedLanguage">
+            <summary>
+            Optional fixed language for the translation engine to translate to.
+            </summary>
+        </member>
+        <member name="F:FiftyOne.Pipeline.Translation.FlowElements.TranslationEngineBuilder._dataLogger">
+            <summary>
+            Logger passed to the <see cref="T:FiftyOne.Pipeline.Translation.Data.TranslationData"/> instances
+            created by the translation engine.
             </summary>
         </member>
         <member name="M:FiftyOne.Pipeline.Translation.FlowElements.TranslationEngineBuilder.#ctor(Microsoft.Extensions.Logging.ILoggerFactory)">
@@ -518,6 +537,26 @@
             The source can contain a wildcard to add multiple files e.g.
             'abc.*.yml' to add all languages for the 'abc' identifier.
             </summary>
+            <returns>
+            This builder.
+            </returns>
+        </member>
+        <member name="M:FiftyOne.Pipeline.Translation.FlowElements.TranslationEngineBuilder.AddSource(System.String,System.String)">
+            <summary>
+            Add a source file containing translations. These follow the naming convention
+            'abc.en_GB.yml' where 'abc' can be any idenitifier, 'en_GB' is the
+            locale code, and 'yml' is the file extension. The locale code is used 
+            to determine which language is contained in the translation files.
+            Files must be in YAML format.
+            The source can contain a wildcard to add multiple files e.g.
+            'abc.*.yml' to add all languages for the 'abc' identifier.
+            </summary>
+            <param name="name">
+            Name of the file.
+            </param>
+            <param name="source">
+            Contents of the file.
+            </param>
             <returns>
             This builder.
             </returns>

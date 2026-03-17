@@ -104,6 +104,42 @@ public class TranslationEngineTests
     }
 
     /// <summary>
+    /// Test that the engine can be built from a string source instead of a file,
+    /// and that it correctly translates values based on that source.
+    /// This is important to test as the string source is designed to be used
+    /// with embedded resources, which are not passed as files.
+    /// </summary>
+    [TestMethod]
+    public void BuildFromString()
+    {
+        var source =
+            "cat: chat\ndog: chien";
+
+        var engine = new TranslationEngineBuilder(_loggerFactory)
+            .SetSourceElementDataKey("evidencecopy")
+            .AddSource("animals.fr_FR.yml", source)
+            .AddTranslation("Animal", "AnimalTranslated")
+            .Build();
+        using var pipeline = new PipelineBuilder(_loggerFactory)
+            .AddFlowElement(new EvidenceCopyElement(_loggerFactory.CreateLogger<EvidenceCopyElement>()))
+            .AddFlowElement(engine)
+            .SetSuppressProcessExceptions(true)
+            .Build();
+
+        using var flowData = pipeline.CreateFlowData();
+
+        flowData.AddEvidence("header.accept-language", "fr_FR");
+        flowData.AddEvidence("Animal", "dog");
+        flowData.Process();
+
+        var result = flowData.Get<ITranslationData>();
+        var translation = result["AnimalTranslated"];
+
+        Assert.IsNotNull(translation);
+        Assert.AreEqual("chien", translation);
+    }
+
+    /// <summary>
     /// Test that a list of strings is correctly translated.
     /// </summary>
     [TestMethod]
