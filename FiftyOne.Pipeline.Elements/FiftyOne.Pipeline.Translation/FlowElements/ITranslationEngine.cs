@@ -29,6 +29,7 @@ namespace FiftyOne.Pipeline.Translation.FlowElements;
 /// <summary>
 /// Flow element that translates values from a single source element and
 /// stores translated values under its own element data key.
+/// See <see cref="TranslationEngine"/> for implementation details.
 /// </summary>
 public interface ITranslationEngine :
     IFlowElement<ITranslationData, IElementPropertyMetaData>

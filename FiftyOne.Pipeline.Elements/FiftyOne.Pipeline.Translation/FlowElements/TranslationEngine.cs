@@ -41,18 +41,77 @@ namespace FiftyOne.Pipeline.Translation.FlowElements;
 /// <summary>
 /// Flow element that translates values from a single source element and
 /// stores translated values under its own element data key.
+/// 
+/// Translations are provided in YAML format files, where the naming defines
+/// the language contained in the file. See <see cref="TranslationEngineBuilder.AddSource(string)"/>.
+/// 
+/// The language to translate to is deteined by looking through the evidence
+/// for a key containing a locale code. The keys checked are defined in
+/// <see cref="EvidenceKeyFilter"/>. If a fixed language is provided in the
+/// builder, this will be used instead, regardless of the evidence.
+/// 
+/// The properties to be translated are configured in the builder by supplying
+/// the name of the input property, and the name of the output property. See
+/// <see cref="TranslationEngineBuilder.AddTranslation(string, string)"/>.
+/// 
+/// The element that the input properties are fetched from is configured by
+/// supplying the element data key. See <see cref="TranslationEngineBuilder.SetSourceElementDataKey(string)"/>.
+/// 
+/// Only string based types are supported for translation e.g. string,
+/// IList<string>, IAspectPropertyValue<string>, etc. and the type of the output
+/// property will match the input.
+/// 
+/// The behaviour of the engine when a translation is missing for a value can be
+/// configured using the <see cref="MissingTranslationBehaviour"/> enum.
+/// See <see cref="TranslationEngineBuilder.SetMissingTranslationBehaviour(MissingTranslationBehaviour)"/>.
 /// </summary>
 public class TranslationEngine :
     FlowElementBase<ITranslationData, IElementPropertyMetaData>,
     ITranslationEngine
 {
+    /// <summary>
+    /// Translator with no translations configured. Used to populate translations
+    /// when there is no target language or translator available, to ensure the
+    /// output properties are always populated with a value, even if that value
+    /// is just an error message.
+    /// </summary>
     private readonly Translator _emptyTranslator;
+
+    /// <summary>
+    /// Locale code of the fixed translation language, if provided.
+    /// </summary>
     private readonly string _fixedLanguage;
+
+    /// <summary>
+    /// <see cref="EvidenceKeyFilter"/>.
+    /// </summary>
     private readonly IEvidenceKeyFilter _evidenceKeyFilter;
+
+    /// <summary>
+    /// <see cref="Properties"/>.
+    /// </summary>
     private readonly IList<IElementPropertyMetaData> _properties;
+
+    /// <summary>
+    /// <see cref="SourceElementDataKey"/>.
+    /// </summary>
     private string _sourceElementDataKey;
+
+    /// <summary>
+    /// Defines the behaviour when there is no translation available for a
+    /// value.
+    /// </summary>
     private readonly MissingTranslationBehaviour _behaviour;
+
+    /// <summary>
+    /// Input and output property names to translate.
+    /// </summary>
     private TranslationProperty[] _translationProperties;
+
+    /// <summary>
+    /// The keys which should be used to get the locale code for the language
+    /// to translate to.
+    /// </summary>
     private static readonly List<string> _evidenceKeyWhiteListValues = 
         new List<string>()
     {
@@ -235,7 +294,8 @@ public class TranslationEngine :
     }
 
     /// <summary>
-    /// Unpacks and parses each source into a translationLookupKey lookup.
+    /// Unpacks and parses source files into a Languages instance containing
+    /// a Translator for each file.
     /// </summary>
     /// <param name="sources"></param>
     /// <param name="behaviour"></param>
@@ -273,6 +333,13 @@ public class TranslationEngine :
         return languages;
     }
 
+    /// <summary>
+    /// Get the language locale code from the source file name.
+    /// </summary>
+    /// <param name="name"></param>
+    /// <returns></returns>
+    /// <exception cref="ArgumentException"></exception>
+    /// <exception cref="InvalidDataException"></exception>
     private static string GetLanguageName(string name)
     {
         if (string.IsNullOrWhiteSpace(name))
@@ -381,8 +448,8 @@ public class TranslationEngine :
     }
 
     /// <summary>
-    ///  Goes through the Evidence in the flowdata to find the highest 
-    ///  precidence evidence key and sets the target language.
+    /// Goes through the Evidence in the FlowData to find the highest 
+    /// precidence evidence key and sets the target language.
     /// </summary>
     /// <param name="data"></param>
     /// <param name="language"></param>
@@ -423,7 +490,7 @@ public class TranslationEngine :
     }
 
     /// <summary>
-    /// Retrieves the source value data from the flowdata. 
+    /// Retrieves the source value data from the FlowData. 
     /// </summary>
     /// <param name="data"></param>
     /// <param name="sourceData"></param>
