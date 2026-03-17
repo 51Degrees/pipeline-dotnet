@@ -2,7 +2,7 @@
 using FiftyOne.Pipeline.Core.FlowElements;
 using Microsoft.Extensions.Logging;
 
-namespace FiftyOne.Pipeline.Elements.Translation.Tests;
+namespace FiftyOne.Pipeline.Translation.Tests;
 
 /// <summary>
 /// Data type for the <see cref="EvidenceCopyElement"/>.

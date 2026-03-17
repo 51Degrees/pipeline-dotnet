@@ -7,7 +7,7 @@ using FiftyOne.Pipeline.Engines.Data;
 using FiftyOne.Pipeline.Translation.Data;
 using Microsoft.Extensions.Logging;
 
-namespace FiftyOne.Pipeline.Elements.Translation.Tests;
+namespace FiftyOne.Pipeline.Translation.Tests;
 
 [TestClass]
 public class TranslationEngineTests
