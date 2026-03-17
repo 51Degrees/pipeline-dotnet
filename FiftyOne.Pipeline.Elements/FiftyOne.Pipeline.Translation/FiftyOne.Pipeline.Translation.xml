@@ -1,0 +1,582 @@
+<?xml version="1.0"?>
+<doc>
+    <assembly>
+        <name>FiftyOne.Pipeline.Translation</name>
+    </assembly>
+    <members>
+        <member name="T:FiftyOne.Pipeline.Translation.Data.ITranslationData">
+            <summary>
+            Element data marker interface for
+            <see cref="T:FiftyOne.Pipeline.Translation.FlowElements.TranslationEngine"/>.
+            </summary>
+        </member>
+        <member name="T:FiftyOne.Pipeline.Translation.Data.Languages">
+            <summary>
+            Set of translators for one or more languages.
+            Keys are the locale code e.g. "en_GB", "fr_FR", etc. and values are the
+            translators for those languages.
+            </summary>
+        </member>
+        <member name="F:FiftyOne.Pipeline.Translation.Data.Languages._translators">
+            <summary>
+            Internal dictionary of translators.
+            </summary>
+        </member>
+        <member name="M:FiftyOne.Pipeline.Translation.Data.Languages.AddLanguage(System.String,FiftyOne.Pipeline.Translation.Data.Translator)">
+            <summary>
+            Add a language and its translator to the set of languages.
+            </summary>
+            <param name="language">
+            Locale code for the language e.g. "en_GB", "fr_FR", etc.
+            </param>
+            <param name="translator">
+            Translator for the language.
+            </param>
+            <exception cref="T:System.ArgumentNullException"></exception>
+        </member>
+        <member name="M:FiftyOne.Pipeline.Translation.Data.Languages.TryGetTranslator(System.String,FiftyOne.Pipeline.Translation.Data.Translator@)">
+            <summary>
+            Gets the translator for the specified language if it exists.
+            Returns true if it does, otherwise false.
+            </summary>
+            <param name="language"></param>
+            <param name="translator"></param>
+            <returns></returns>
+        </member>
+        <member name="T:FiftyOne.Pipeline.Translation.Data.MissingTranslationBehavior">
+            <summary>
+            Defines the behavior of the translation engine when a translation is
+            missing for a value.
+            </summary>
+        </member>
+        <member name="F:FiftyOne.Pipeline.Translation.Data.MissingTranslationBehavior.Original">
+            <summary>
+            Use the original value if there is no translation for it.
+            This is the default behavior.
+            </summary>
+        </member>
+        <member name="F:FiftyOne.Pipeline.Translation.Data.MissingTranslationBehavior.EmptyString">
+            <summary>
+            Use an empty string if there is no translation for the value.
+            </summary>
+        </member>
+        <member name="F:FiftyOne.Pipeline.Translation.Data.MissingTranslationBehavior.FlowError">
+            <summary>
+            Add a flow error if there is no translation for the value. The error
+            contains the reason there was no translation.
+            </summary>
+        </member>
+        <member name="T:FiftyOne.Pipeline.Translation.Data.TranslationData">
+            <summary>
+            Data object populated by
+            <see cref="T:FiftyOne.Pipeline.Translation.FlowElements.TranslationEngine"/>.
+            </summary>
+        </member>
+        <member name="M:FiftyOne.Pipeline.Translation.Data.TranslationData.#ctor(Microsoft.Extensions.Logging.ILogger{FiftyOne.Pipeline.Translation.Data.TranslationData},FiftyOne.Pipeline.Core.FlowElements.IPipeline)">
+            <summary>
+            Create a new instance.
+            </summary>
+        </member>
+        <member name="M:FiftyOne.Pipeline.Translation.Data.TranslationData.#ctor(Microsoft.Extensions.Logging.ILogger{FiftyOne.Pipeline.Core.Data.ElementDataBase},FiftyOne.Pipeline.Core.FlowElements.IPipeline,System.Collections.Generic.IDictionary{System.String,System.Object})">
+            <summary>
+            Create a new instance using an existing dictionary.
+            </summary>
+        </member>
+        <member name="T:FiftyOne.Pipeline.Translation.Data.TranslationProperty">
+            <summary>
+            Defines a translation from one property to another. 
+            </summary>
+        </member>
+        <member name="M:FiftyOne.Pipeline.Translation.Data.TranslationProperty.#ctor(System.String,System.String)">
+            <summary>
+            Constructor
+            </summary>
+            <param name="source"></param>
+            <param name="destination"></param>
+        </member>
+        <member name="P:FiftyOne.Pipeline.Translation.Data.TranslationProperty.SourceProperty">
+            <summary>
+            Source property name on the source element data.
+            </summary>
+        </member>
+        <member name="P:FiftyOne.Pipeline.Translation.Data.TranslationProperty.DestinationProperty">
+            <summary>
+            Destination property name on translation engine data.
+            </summary>
+        </member>
+        <member name="T:FiftyOne.Pipeline.Translation.Data.Translator">
+            <summary>
+            Translator used to translate values based on a set of translations.
+            The translator supports translating various string types. The result is
+            the same type as the source e.g. a string will be translated to a
+            string, a list of strings will be translated to a list of strings, etc.
+            </summary>
+        </member>
+        <member name="F:FiftyOne.Pipeline.Translation.Data.Translator._translations">
+            <summary>
+            Internal translation dictionary.
+            </summary>
+        </member>
+        <member name="F:FiftyOne.Pipeline.Translation.Data.Translator._behavior">
+            <summary>
+            The behavior to use when a translation is missing.
+            </summary>
+        </member>
+        <member name="M:FiftyOne.Pipeline.Translation.Data.Translator.#ctor(FiftyOne.Pipeline.Translation.Data.MissingTranslationBehavior)">
+            <summary>
+            Default constructor. Initializes the translator with an empty set of
+            translations.
+            </summary>
+            <param name="behavior">
+            The behavior to use when a translation is missing.
+            </param>
+        </member>
+        <member name="M:FiftyOne.Pipeline.Translation.Data.Translator.#ctor(System.Collections.Generic.IDictionary{System.String,System.String},FiftyOne.Pipeline.Translation.Data.MissingTranslationBehavior)">
+            <summary>
+            Constructor.
+            </summary>
+            <param name="translations">
+            The translations to use for translation. The key is the source
+            value and the value is the translated value.
+            </param>
+            <param name="behavior">
+            The behavior to use when a translation is missing.
+            </param>
+            <exception cref="T:System.ArgumentNullException"></exception>
+        </member>
+        <member name="M:FiftyOne.Pipeline.Translation.Data.Translator.Translate(System.Object,System.Collections.Generic.IList{System.Exception})">
+            <summary>
+            Translate the object to the language this translator is configured
+            for. The translator supports translating various string types.
+            The result is the same type as the source e.g. a string will be
+            translated to a string, a list of strings will be translated to a
+            list of strings, etc.
+            For AspectPropertyValue types, if the value has no value, then the
+            no value message will be copied to the result.
+            </summary>
+            <param name="value">
+            Value to translate.
+            </param>
+            <param name="errors">
+            List of errors to add to if any errors are encountered during
+            translation.
+            </param>
+            <returns></returns>
+            <exception cref="T:System.NotSupportedException"></exception>
+        </member>
+        <member name="M:FiftyOne.Pipeline.Translation.Data.Translator.TranslateTyped(System.String,System.Collections.Generic.IList{System.Exception})">
+            <summary>
+            String type.
+            This is the base type for translation, so the other types will
+            call this method.
+            </summary>
+            <param name="value"></param>
+            <param name="errors"></param>
+            <returns></returns>
+        </member>
+        <member name="M:FiftyOne.Pipeline.Translation.Data.Translator.TranslateTyped(System.Collections.Generic.IReadOnlyList{System.String},System.Collections.Generic.IList{System.Exception})">
+            <summary>
+            String list type.
+            </summary>
+            <param name="values"></param>
+            <param name="errors"></param>
+            <returns></returns>
+        </member>
+        <member name="M:FiftyOne.Pipeline.Translation.Data.Translator.TranslateTyped(FiftyOne.Pipeline.Engines.Data.IAspectPropertyValue{System.String},System.Collections.Generic.IList{System.Exception})">
+            <summary>
+            Aspect property value string type.
+            </summary>
+            <param name="value"></param>
+            <param name="errors"></param>
+            <returns></returns>
+        </member>
+        <member name="M:FiftyOne.Pipeline.Translation.Data.Translator.TranslateTyped(FiftyOne.Pipeline.Engines.Data.IAspectPropertyValue{System.Collections.Generic.IReadOnlyList{System.String}},System.Collections.Generic.IList{System.Exception})">
+            <summary>
+            Aspect property value string list type.
+            </summary>
+            <param name="values"></param>
+            <param name="errors"></param>
+            <returns></returns>
+        </member>
+        <member name="M:FiftyOne.Pipeline.Translation.Data.Translator.TranslateTyped(FiftyOne.Pipeline.Engines.Data.IAspectPropertyValue{System.Collections.Generic.IReadOnlyList{FiftyOne.Pipeline.Core.Data.IWeightedValue{System.String}}},System.Collections.Generic.IList{System.Exception})">
+            <summary>
+            Aspect property value weighted strings type.
+            </summary>
+            <param name="values"></param>
+            <param name="errors"></param>
+            <returns></returns>
+        </member>
+        <member name="M:FiftyOne.Pipeline.Translation.Data.Translator.CopyNoValue``1(FiftyOne.Pipeline.Engines.Data.IAspectPropertyValue{``0})">
+            <summary>
+            Copy the no value message from the source value to the destination.
+            </summary>
+            <typeparam name="T"></typeparam>
+            <param name="value"></param>
+            <returns></returns>
+        </member>
+        <member name="T:FiftyOne.Pipeline.Translation.FlowElements.ITranslationEngine">
+            <summary>
+            Flow element that translates values from a single source element and
+            stores translated values under its own element data key.
+            See <see cref="T:FiftyOne.Pipeline.Translation.FlowElements.TranslationEngine"/> for implementation details.
+            </summary>
+        </member>
+        <member name="P:FiftyOne.Pipeline.Translation.FlowElements.ITranslationEngine.SourceElementDataKey">
+            <summary>
+            Element data key of the source flow element.
+            </summary>
+        </member>
+        <member name="T:FiftyOne.Pipeline.Translation.FlowElements.TranslationEngine">
+            <inheritdoc/>
+        </member>
+        <member name="M:FiftyOne.Pipeline.Translation.FlowElements.TranslationEngine.#ctor(System.String,System.Collections.Generic.IReadOnlyCollection{FiftyOne.Pipeline.Translation.Data.TranslationProperty},System.Collections.Generic.IReadOnlyDictionary{System.String,System.String},System.String,FiftyOne.Pipeline.Translation.Data.MissingTranslationBehavior,Microsoft.Extensions.Logging.ILogger{FiftyOne.Pipeline.Core.FlowElements.FlowElementBase{FiftyOne.Pipeline.Translation.Data.ITranslationData,FiftyOne.Pipeline.Core.Data.IElementPropertyMetaData}},System.Func{FiftyOne.Pipeline.Core.FlowElements.IPipeline,FiftyOne.Pipeline.Core.FlowElements.FlowElementBase{FiftyOne.Pipeline.Translation.Data.ITranslationData,FiftyOne.Pipeline.Core.Data.IElementPropertyMetaData},FiftyOne.Pipeline.Translation.Data.ITranslationData})">
+            <inheritdoc/>
+        </member>
+        <member name="T:FiftyOne.Pipeline.Translation.FlowElements.TranslationEngineBase`1">
+            <summary>
+            Flow element that translates values from a single source element and
+            stores translated values under its own element data key.
+            
+            Translations are provided in YAML format files, where the naming defines
+            the language contained in the file. See <see cref="M:FiftyOne.Pipeline.Translation.FlowElements.TranslationEngineBuilder.AddSource(System.String)"/>.
+            
+            The language to translate to is defined by looking through the evidence
+            for a key containing a locale code. The keys checked are defined in
+            <see cref="P:FiftyOne.Pipeline.Translation.FlowElements.TranslationEngineBase`1.EvidenceKeyFilter"/>. If a fixed language is provided in the
+            builder, this will be used instead, regardless of the evidence.
+            
+            The properties to be translated are configured in the builder by supplying
+            the name of the input property, and the name of the output property. See
+            <see cref="M:FiftyOne.Pipeline.Translation.FlowElements.TranslationEngineBuilder.AddTranslation(System.String,System.String)"/>.
+            
+            The element that the input properties are fetched from is configured by
+            supplying the element data key. See <see cref="M:FiftyOne.Pipeline.Translation.FlowElements.TranslationEngineBuilder.SetSourceElementDataKey(System.String)"/>.
+            
+            Only string based types are supported for translation e.g. string,
+            IList string, IAspectPropertyValue string, etc. and the type of the output
+            property will match the input.
+            
+            The behavior of the engine when a translation is missing for a value can be
+            configured using the <see cref="T:FiftyOne.Pipeline.Translation.Data.MissingTranslationBehavior"/> enum.
+            See <see cref="M:FiftyOne.Pipeline.Translation.FlowElements.TranslationEngineBuilder.SetMissingTranslationBehavior(FiftyOne.Pipeline.Translation.Data.MissingTranslationBehavior)"/>.
+            </summary>
+        </member>
+        <member name="F:FiftyOne.Pipeline.Translation.FlowElements.TranslationEngineBase`1._emptyTranslator">
+            <summary>
+            Translator with no translations configured. Used to populate translations
+            when there is no target language or translator available, to ensure the
+            output properties are always populated with a value, even if that value
+            is just an error message.
+            </summary>
+        </member>
+        <member name="F:FiftyOne.Pipeline.Translation.FlowElements.TranslationEngineBase`1._fixedLanguage">
+            <summary>
+            Locale code of the fixed translation language, if provided.
+            </summary>
+        </member>
+        <member name="F:FiftyOne.Pipeline.Translation.FlowElements.TranslationEngineBase`1._evidenceKeyFilter">
+            <summary>
+            <see cref="P:FiftyOne.Pipeline.Translation.FlowElements.TranslationEngineBase`1.EvidenceKeyFilter"/>.
+            </summary>
+        </member>
+        <member name="F:FiftyOne.Pipeline.Translation.FlowElements.TranslationEngineBase`1._properties">
+            <summary>
+            <see cref="P:FiftyOne.Pipeline.Translation.FlowElements.TranslationEngineBase`1.Properties"/>.
+            </summary>
+        </member>
+        <member name="F:FiftyOne.Pipeline.Translation.FlowElements.TranslationEngineBase`1._sourceElementDataKey">
+            <summary>
+            <see cref="P:FiftyOne.Pipeline.Translation.FlowElements.TranslationEngineBase`1.SourceElementDataKey"/>.
+            </summary>
+        </member>
+        <member name="F:FiftyOne.Pipeline.Translation.FlowElements.TranslationEngineBase`1._behavior">
+            <summary>
+            Defines the behavior when there is no translation available for a
+            value.
+            </summary>
+        </member>
+        <member name="F:FiftyOne.Pipeline.Translation.FlowElements.TranslationEngineBase`1._translationProperties">
+            <summary>
+            Input and output property names to translate.
+            </summary>
+        </member>
+        <member name="F:FiftyOne.Pipeline.Translation.FlowElements.TranslationEngineBase`1._evidenceKeyWhiteListValues">
+            <summary>
+            The keys which should be used to get the locale code for the language
+            to translate to.
+            </summary>
+        </member>
+        <member name="F:FiftyOne.Pipeline.Translation.FlowElements.TranslationEngineBase`1._localeRegex">
+            <summary>
+            Regex used to identify language locale codes in evidence
+            </summary>
+        </member>
+        <member name="F:FiftyOne.Pipeline.Translation.FlowElements.TranslationEngineBase`1.Languages">
+            <summary>
+            Translation lookups
+            </summary>
+        </member>
+        <member name="P:FiftyOne.Pipeline.Translation.FlowElements.TranslationEngineBase`1.ElementDataKey">
+            <inheritdoc/>
+        </member>
+        <member name="P:FiftyOne.Pipeline.Translation.FlowElements.TranslationEngineBase`1.SourceElementDataKey">
+            <inheritdoc/>
+        </member>
+        <member name="P:FiftyOne.Pipeline.Translation.FlowElements.TranslationEngineBase`1.EvidenceKeyFilter">
+            <inheritdoc/>
+        </member>
+        <member name="P:FiftyOne.Pipeline.Translation.FlowElements.TranslationEngineBase`1.Properties">
+            <inheritdoc/>
+        </member>
+        <member name="M:FiftyOne.Pipeline.Translation.FlowElements.TranslationEngineBase`1.#ctor(System.String,System.Collections.Generic.IReadOnlyCollection{FiftyOne.Pipeline.Translation.Data.TranslationProperty},System.Collections.Generic.IReadOnlyDictionary{System.String,System.String},System.String,FiftyOne.Pipeline.Translation.Data.MissingTranslationBehavior,Microsoft.Extensions.Logging.ILogger{FiftyOne.Pipeline.Core.FlowElements.FlowElementBase{`0,FiftyOne.Pipeline.Core.Data.IElementPropertyMetaData}},System.Func{FiftyOne.Pipeline.Core.FlowElements.IPipeline,FiftyOne.Pipeline.Core.FlowElements.FlowElementBase{`0,FiftyOne.Pipeline.Core.Data.IElementPropertyMetaData},`0})">
+            <summary>
+            Create a new translation engine.
+            </summary>
+            <param name="sourceElementDataKey">
+            Element data key of the source flow element.
+            </param>
+            <param name="translations">
+            Translations to execute, keyed by source property name.
+            </param>
+            <param name="sources">
+            Sources used to perform translations. YAML format strings keyed on
+            file name.
+            </param>
+            <param name="fixedLanguage">
+            Fixed language to translate to. If this is set, the engine will always
+            translate to this language. Otherwise (null or empty) the engine will
+            get the language from the evidence.
+            </param>
+            <param name="behavior">
+            The behavior of the translation engine when a translation is missing
+            for a value.
+            </param>
+            <param name="logger">
+            Logger instance.
+            </param>
+            <param name="elementDataFactory">
+            Optional element data factory override.
+            </param>
+        </member>
+        <member name="M:FiftyOne.Pipeline.Translation.FlowElements.TranslationEngineBase`1.ProcessInternal(FiftyOne.Pipeline.Core.Data.IFlowData)">
+            <inheritdoc/>
+        </member>
+        <member name="M:FiftyOne.Pipeline.Translation.FlowElements.TranslationEngineBase`1.ManagedResourcesCleanup">
+            <inheritdoc/>
+        </member>
+        <member name="M:FiftyOne.Pipeline.Translation.FlowElements.TranslationEngineBase`1.UnmanagedResourcesCleanup">
+            <inheritdoc/>
+        </member>
+        <member name="M:FiftyOne.Pipeline.Translation.FlowElements.TranslationEngineBase`1.ParseSources(System.Collections.Generic.IReadOnlyDictionary{System.String,System.String},FiftyOne.Pipeline.Translation.Data.MissingTranslationBehavior)">
+            <summary>
+            Unpacks and parses source files into a Languages instance containing
+            a Translator for each file.
+            </summary>
+            <param name="sources"></param>
+            <param name="behavior"></param>
+            <returns></returns>
+        </member>
+        <member name="M:FiftyOne.Pipeline.Translation.FlowElements.TranslationEngineBase`1.GetLanguageName(System.String)">
+            <summary>
+            Get the language locale code from the source file name.
+            </summary>
+            <param name="name"></param>
+            <returns></returns>
+            <exception cref="T:System.ArgumentException"></exception>
+            <exception cref="T:System.IO.InvalidDataException"></exception>
+        </member>
+        <member name="M:FiftyOne.Pipeline.Translation.FlowElements.TranslationEngineBase`1.ValidateLocale(System.String)">
+            <summary>
+            Get the validated locale code.
+            </summary>
+            <param name="locale">Code to validate</param>
+            <returns>Valid locale code, or null</returns>
+        </member>
+        <member name="M:FiftyOne.Pipeline.Translation.FlowElements.TranslationEngineBase`1.TryGetSourceValue(FiftyOne.Pipeline.Core.Data.IElementData,System.String,System.Object@)">
+            <summary>
+            Gets the source value from the sourceData
+            </summary>
+            <param name="sourceData"></param>
+            <param name="sourceProperty"></param>
+            <param name="sourceValue"></param>
+            <returns></returns>
+        </member>
+        <member name="M:FiftyOne.Pipeline.Translation.FlowElements.TranslationEngineBase`1.Populate(FiftyOne.Pipeline.Core.Data.IElementData,FiftyOne.Pipeline.Translation.Data.Translator,`0,FiftyOne.Pipeline.Core.Data.IFlowData)">
+            <summary>
+            Populates the translation data wither all configured translations using
+            the provided translator.
+            </summary>
+            <param name="sourceData"></param>
+            <param name="translator"></param>
+            <param name="translationData"></param>
+            <param name="flowData"></param>
+        </member>
+        <member name="M:FiftyOne.Pipeline.Translation.FlowElements.TranslationEngineBase`1.TryGetTargetLanguage(FiftyOne.Pipeline.Core.Data.IFlowData,System.String@)">
+            <summary>
+            Goes through the Evidence in the FlowData to find the highest 
+            precidence evidence key and sets the target language.
+            </summary>
+            <param name="data"></param>
+            <param name="language"></param>
+            <returns></returns>
+        </member>
+        <member name="M:FiftyOne.Pipeline.Translation.FlowElements.TranslationEngineBase`1.TryGetSourceData(FiftyOne.Pipeline.Core.Data.IFlowData,FiftyOne.Pipeline.Core.Data.IElementData@)">
+            <summary>
+            Retrieves the source value data from the FlowData. 
+            </summary>
+            <param name="data"></param>
+            <param name="sourceData"></param>
+            <returns></returns>
+        </member>
+        <member name="T:FiftyOne.Pipeline.Translation.FlowElements.TranslationEngineBuilder">
+            <summary>
+            Fluent builder for <see cref="T:FiftyOne.Pipeline.Translation.FlowElements.TranslationEngine"/>.
+            </summary>
+        </member>
+        <member name="F:FiftyOne.Pipeline.Translation.FlowElements.TranslationEngineBuilder._translationProperties">
+            <summary>
+            List of properties to translate.
+            </summary>
+        </member>
+        <member name="F:FiftyOne.Pipeline.Translation.FlowElements.TranslationEngineBuilder._sourceElementDataKey">
+            <summary>
+            Key to the source element which the translation engine will read from.
+            This is where the values to be translated come from.
+            </summary>
+        </member>
+        <member name="F:FiftyOne.Pipeline.Translation.FlowElements.TranslationEngineBuilder._sources">
+            <summary>
+            Source files containing translations. These follow the naming convention
+            'abc.en_GB.yml' where 'abc' can be any identifier, 'en_GB' is the
+            locale code, and 'yml' is the file extension. The locale code is used 
+            to determine which language is contained in the translation files.
+            Files must be in YAML format.
+            Key is the name of the source file, value is the file contents.
+            </summary>
+        </member>
+        <member name="F:FiftyOne.Pipeline.Translation.FlowElements.TranslationEngineBuilder._behavior">
+            <summary>
+            The behavior of the translation engine when a translation is missing
+            for a value.
+            </summary>
+        </member>
+        <member name="F:FiftyOne.Pipeline.Translation.FlowElements.TranslationEngineBuilder._fixedLanguage">
+            <summary>
+            Optional fixed language for the translation engine to translate to.
+            </summary>
+        </member>
+        <member name="F:FiftyOne.Pipeline.Translation.FlowElements.TranslationEngineBuilder._dataLogger">
+            <summary>
+            Logger passed to the <see cref="T:FiftyOne.Pipeline.Translation.Data.TranslationData"/> instances
+            created by the translation engine.
+            </summary>
+        </member>
+        <member name="M:FiftyOne.Pipeline.Translation.FlowElements.TranslationEngineBuilder.#ctor(Microsoft.Extensions.Logging.ILoggerFactory)">
+            <summary>
+            Constructor.
+            </summary>
+        </member>
+        <member name="M:FiftyOne.Pipeline.Translation.FlowElements.TranslationEngineBuilder.SetSourceElementDataKey(System.String)">
+            <summary>
+            Set source element data key.
+            </summary>
+            <param name="sourceElementDataKey">
+            Key to the source element which the translation engine will read from.
+            This is where the values to be translated come from.
+            </param>
+            <returns>
+            This builder.
+            </returns>
+        </member>
+        <member name="M:FiftyOne.Pipeline.Translation.FlowElements.TranslationEngineBuilder.SetFixedLanguage(System.String)">
+            <summary>
+            Set a fixed language for the translation engine to translate to.
+            If this is set, the engine will not determine the language to translate
+            to from the source element data, it will instead always translate to
+            this language.
+            </summary>
+            <param name="language">
+            Language to translate to.
+            </param>
+            <returns>
+            This builder.
+            </returns>
+        </member>
+        <member name="M:FiftyOne.Pipeline.Translation.FlowElements.TranslationEngineBuilder.SetMissingTranslationBehavior(FiftyOne.Pipeline.Translation.Data.MissingTranslationBehavior)">
+            <summary>
+            Set the behavior of the translation engine when a translation is
+            missing for a value.
+            </summary>
+            <param name="behavior"></param>
+            <returns>
+            This builder.
+            </returns>
+        </member>
+        <member name="M:FiftyOne.Pipeline.Translation.FlowElements.TranslationEngineBuilder.AddTranslation(System.String,System.String)">
+            <summary>
+            Add translated property. This defines a translation from one property
+            to another.
+            </summary>
+            <param name="source">
+            The key for the source property to translate.
+            </param>
+            <param name="destination">
+            The key to store the translated value under on the translation engine data.
+            </param>
+            <returns>
+            This builder.
+            </returns>
+        </member>
+        <member name="M:FiftyOne.Pipeline.Translation.FlowElements.TranslationEngineBuilder.AddSource(System.String)">
+            <summary>
+            Add a source file containing translations. These follow the naming
+            convention 'abc.en_GB.yml' where 'abc' can be any idenitifier,
+            'en_GB' is the locale code, and 'yml' is the file extension. The
+            locale code is used to determine which language is contained in the
+            translation files. Files must be in YAML format.
+            The source can contain a wildcard to add multiple files e.g.
+            'abc.*.yml' to add all languages for the 'abc' identifier.
+            </summary>
+            <param name="filePath">
+            The path to the source file where a wildcard can be used for the
+            language component of the filename.
+            </param>
+            <returns>
+            This builder.
+            </returns>
+        </member>
+        <member name="M:FiftyOne.Pipeline.Translation.FlowElements.TranslationEngineBuilder.AddSource(System.String,System.String)">
+            <summary>
+            Add a source file containing translations. These follow the naming
+            convention 'abc.en_GB.yml' where 'abc' can be any idenitifier,
+            'en_GB' is the locale code, and 'yml' is the file extension. The
+            locale code is used to determine which language is contained in the
+            translation files. Files must be in YAML format.
+            The source can contain a wildcard to add multiple files e.g.
+            'abc.*.yml' to add all languages for the 'abc' identifier.
+            </summary>
+            <param name="name">
+            Name of the file.
+            </param>
+            <param name="source">
+            Contents of the file.
+            </param>
+            <returns>
+            This builder.
+            </returns>
+        </member>
+        <member name="M:FiftyOne.Pipeline.Translation.FlowElements.TranslationEngineBuilder.CreateData(FiftyOne.Pipeline.Core.FlowElements.IPipeline,FiftyOne.Pipeline.Core.FlowElements.FlowElementBase{FiftyOne.Pipeline.Translation.Data.ITranslationData,FiftyOne.Pipeline.Core.Data.IElementPropertyMetaData})">
+            <summary>
+            Creates an instance of ElementData
+            </summary>
+            <param name="pipeline"></param>
+            <param name="flowElement"></param>
+            <returns></returns>
+        </member>
+        <member name="M:FiftyOne.Pipeline.Translation.FlowElements.TranslationEngineBuilder.Build">
+            <summary>
+            Build a translation engine.
+            </summary>
+        </member>
+    </members>
+</doc>
