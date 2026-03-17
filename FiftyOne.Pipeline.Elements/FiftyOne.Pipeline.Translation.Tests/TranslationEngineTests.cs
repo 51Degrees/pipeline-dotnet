@@ -241,16 +241,16 @@ public class TranslationEngineTests
     /// <summary>
     /// Test that the translation engine behaves as expected when the language
     /// provided in the evidence is missing from the translation files. Each
-    /// behaviour is tested here.
+    /// behavior is tested here.
     /// </summary>
-    /// <param name="behaviour"></param>
+    /// <param name="behavior"></param>
     [TestMethod]
     [DataRow(MissingTranslationBehavior.Original)]
     [DataRow(MissingTranslationBehavior.EmptyString)]
     [DataRow(MissingTranslationBehavior.FlowError)]
-    public void MissingLanguage(MissingTranslationBehavior behaviour)
+    public void MissingLanguage(MissingTranslationBehavior behavior)
     {
-        var flowData = SetupFrenchAnimals(behaviour: behaviour);
+        var flowData = SetupFrenchAnimals(behavior: behavior);
         flowData.AddEvidence("header.accept-language", "de_DE");
         flowData.AddEvidence("Animal", "cat");
         flowData.Process();
@@ -259,17 +259,17 @@ public class TranslationEngineTests
 
         var translation = result["AnimalTranslated"];
 
-        if (behaviour == MissingTranslationBehavior.Original)
+        if (behavior == MissingTranslationBehavior.Original)
         {
             Assert.IsNotNull(translation);
             Assert.AreEqual(translation, "cat");
         }
-        else if (behaviour == MissingTranslationBehavior.EmptyString)
+        else if (behavior == MissingTranslationBehavior.EmptyString)
         {
             Assert.IsNotNull(translation);
             Assert.AreEqual(translation, string.Empty);
         }
-        else if (behaviour == MissingTranslationBehavior.FlowError)
+        else if (behavior == MissingTranslationBehavior.FlowError)
         {
             Assert.AreEqual(1, flowData.Errors.Count);
             Assert.IsInstanceOfType(flowData.Errors[0].ExceptionData, typeof(KeyNotFoundException));
@@ -297,17 +297,17 @@ public class TranslationEngineTests
 
     /// <summary>
     /// Test that the translation engine behaves as expected when the language
-    /// provided in the evidence is in an invalid format. Each behaviour is
+    /// provided in the evidence is in an invalid format. Each behavior is
     /// tested here.
     /// </summary>
-    /// <param name="behaviour"></param>
+    /// <param name="behavior"></param>
     [TestMethod]
     [DataRow(MissingTranslationBehavior.Original)]
     [DataRow(MissingTranslationBehavior.EmptyString)]
     [DataRow(MissingTranslationBehavior.FlowError)]
-    public void InvalidLanguage(MissingTranslationBehavior behaviour)
+    public void InvalidLanguage(MissingTranslationBehavior behavior)
     {
-        var flowData = SetupFrenchAnimals(behaviour: behaviour);
+        var flowData = SetupFrenchAnimals(behavior: behavior);
         flowData.AddEvidence("header.accept-language", "mm_llk");
         flowData.AddEvidence("Animal", "cat");
         flowData.Process();
@@ -316,17 +316,17 @@ public class TranslationEngineTests
 
         var translation = result["AnimalTranslated"];
 
-        if (behaviour == MissingTranslationBehavior.Original)
+        if (behavior == MissingTranslationBehavior.Original)
         {
             Assert.IsNotNull(translation);
             Assert.AreEqual(translation, "cat");
         }
-        else if (behaviour == MissingTranslationBehavior.EmptyString)
+        else if (behavior == MissingTranslationBehavior.EmptyString)
         {
             Assert.IsNotNull(translation);
             Assert.AreEqual(translation, string.Empty);
         }
-        else if (behaviour == MissingTranslationBehavior.FlowError)
+        else if (behavior == MissingTranslationBehavior.FlowError)
         {
             Assert.AreEqual(1, flowData.Errors.Count);
             Assert.IsInstanceOfType(flowData.Errors[0].ExceptionData, typeof(KeyNotFoundException));
@@ -336,17 +336,17 @@ public class TranslationEngineTests
 
     /// <summary>
     /// Test that the translation engine behaves as expected when there is no
-    /// translation for the word provided in the evidence. Each behaviour is
+    /// translation for the word provided in the evidence. Each behavior is
     /// tested here.
     /// </summary>
-    /// <param name="behaviour"></param>
+    /// <param name="behavior"></param>
     [TestMethod]
     [DataRow(MissingTranslationBehavior.Original)]
     [DataRow(MissingTranslationBehavior.EmptyString)]
     [DataRow(MissingTranslationBehavior.FlowError)]
-    public void NoTranslation(MissingTranslationBehavior behaviour)
+    public void NoTranslation(MissingTranslationBehavior behavior)
     {
-        var flowData = SetupFrenchAnimals(behaviour: behaviour);
+        var flowData = SetupFrenchAnimals(behavior: behavior);
         flowData.AddEvidence("header.accept-language", "fr_FR");
         flowData.AddEvidence("Animal", "buffalo");
         flowData.Process();
@@ -355,17 +355,17 @@ public class TranslationEngineTests
 
         var translation = result["AnimalTranslated"];
 
-        if (behaviour == MissingTranslationBehavior.Original)
+        if (behavior == MissingTranslationBehavior.Original)
         {
             Assert.IsNotNull(translation);
             Assert.AreEqual(translation, "buffalo");
         }
-        else if (behaviour == MissingTranslationBehavior.EmptyString)
+        else if (behavior == MissingTranslationBehavior.EmptyString)
         {
             Assert.IsNotNull(translation);
             Assert.AreEqual(translation, string.Empty);
         }
-        else if (behaviour == MissingTranslationBehavior.FlowError)
+        else if (behavior == MissingTranslationBehavior.FlowError)
         {
             Assert.AreEqual(1, flowData.Errors.Count);
             Assert.IsInstanceOfType(flowData.Errors[0].ExceptionData, typeof(KeyNotFoundException));
@@ -378,15 +378,15 @@ public class TranslationEngineTests
     /// as no translation being present at all. This makes it easier to see in
     /// the source files which words have not been translated yet.
     /// </summary>
-    /// <param name="behaviour"></param>
+    /// <param name="behavior"></param>
     [TestMethod]
     [DataRow(MissingTranslationBehavior.Original)]
     [DataRow(MissingTranslationBehavior.EmptyString)]
     [DataRow(MissingTranslationBehavior.FlowError)]
-    public void EmptyTranslation(MissingTranslationBehavior behaviour)
+    public void EmptyTranslation(MissingTranslationBehavior behavior)
     {
         var flowData = SetupFrenchAnimals(
-            behaviour: behaviour,
+            behavior: behavior,
             additionalAnimals: new Dictionary<string, string>()
                 {
                     { "buffalo", "" }
@@ -399,17 +399,17 @@ public class TranslationEngineTests
 
         var translation = result["AnimalTranslated"];
 
-        if (behaviour == MissingTranslationBehavior.Original)
+        if (behavior == MissingTranslationBehavior.Original)
         {
             Assert.IsNotNull(translation);
             Assert.AreEqual(translation, "buffalo");
         }
-        else if (behaviour == MissingTranslationBehavior.EmptyString)
+        else if (behavior == MissingTranslationBehavior.EmptyString)
         {
             Assert.IsNotNull(translation);
             Assert.AreEqual(translation, string.Empty);
         }
-        else if (behaviour == MissingTranslationBehavior.FlowError)
+        else if (behavior == MissingTranslationBehavior.FlowError)
         {
             Assert.AreEqual(1, flowData.Errors.Count);
             Assert.IsInstanceOfType(flowData.Errors[0].ExceptionData, typeof(KeyNotFoundException));
@@ -583,11 +583,11 @@ public class TranslationEngineTests
     /// Sets up a basic test pipeline with french translations for "cat" and 
     /// "dog".
     /// </summary>
-    /// <param name="behaviour"></param>
+    /// <param name="behavior"></param>
     /// <param name="additionalAnimals"></param>
     /// <returns></returns>
     private IFlowData SetupFrenchAnimals(
-        MissingTranslationBehavior behaviour = MissingTranslationBehavior.Original,
+        MissingTranslationBehavior behavior = MissingTranslationBehavior.Original,
         Dictionary<string, string> additionalAnimals = null)
     {
         var expected = new Dictionary<string, string>()
@@ -606,7 +606,7 @@ public class TranslationEngineTests
 
         var engine = new TranslationEngineBuilder(_loggerFactory)
             .SetSourceElementDataKey("evidencecopy")
-            .SetMissingTranslationBehaviour(behaviour)
+            .SetMissingTranslationBehavior(behavior)
             .AddSource(file.File.FullName)
             .AddTranslation("Animal", "AnimalTranslated")
             .Build();
