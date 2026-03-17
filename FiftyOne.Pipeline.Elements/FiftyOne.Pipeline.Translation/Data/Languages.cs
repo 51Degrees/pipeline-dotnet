@@ -23,55 +23,56 @@
 using System;
 using System.Collections.Generic;
 
-namespace FiftyOne.Pipeline.Translation.Data;
-
-/// <summary>
-/// Set of translators for one or more languages.
-/// Keys are the locale code e.g. "en_GB", "fr_FR", etc. and values are the
-/// translators for those languages.
-/// </summary>
-internal class Languages
+namespace FiftyOne.Pipeline.Translation.Data
 {
     /// <summary>
-    /// Internal dictionary of translators.
+    /// Set of translators for one or more languages.
+    /// Keys are the locale code e.g. "en_GB", "fr_FR", etc. and values are the
+    /// translators for those languages.
     /// </summary>
-    private readonly IDictionary<string, Translator> _translators;
-
-    public Languages()
+    internal class Languages
     {
-        _translators = new Dictionary<string, Translator>(
-            StringComparer.InvariantCultureIgnoreCase);
-    }
+        /// <summary>
+        /// Internal dictionary of translators.
+        /// </summary>
+        private readonly IDictionary<string, Translator> _translators;
 
-    /// <summary>
-    /// Add a language and its translator to the set of languages.
-    /// </summary>
-    /// <param name="language">
-    /// Locale code for the language e.g. "en_GB", "fr_FR", etc.
-    /// </param>
-    /// <param name="translator">
-    /// Translator for the language.
-    /// </param>
-    /// <exception cref="ArgumentNullException"></exception>
-    public void AddLanguage(string language, Translator translator)
-    {
-        if (language == null || translator == null)
+        public Languages()
         {
-            throw new ArgumentNullException();
+            _translators = new Dictionary<string, Translator>(
+                StringComparer.InvariantCultureIgnoreCase);
         }
 
-        _translators[language] = translator;
-    }
+        /// <summary>
+        /// Add a language and its translator to the set of languages.
+        /// </summary>
+        /// <param name="language">
+        /// Locale code for the language e.g. "en_GB", "fr_FR", etc.
+        /// </param>
+        /// <param name="translator">
+        /// Translator for the language.
+        /// </param>
+        /// <exception cref="ArgumentNullException"></exception>
+        public void AddLanguage(string language, Translator translator)
+        {
+            if (language == null || translator == null)
+            {
+                throw new ArgumentNullException();
+            }
 
-    /// <summary>
-    /// Gets the translator for the specified language if it exists.
-    /// Returns true if it does, otherwise false.
-    /// </summary>
-    /// <param name="language"></param>
-    /// <param name="translator"></param>
-    /// <returns></returns>
-    public bool TryGetTranslator(string language, out Translator translator)
-    {
-        return _translators.TryGetValue(language, out translator);
+            _translators[language] = translator;
+        }
+
+        /// <summary>
+        /// Gets the translator for the specified language if it exists.
+        /// Returns true if it does, otherwise false.
+        /// </summary>
+        /// <param name="language"></param>
+        /// <param name="translator"></param>
+        /// <returns></returns>
+        public bool TryGetTranslator(string language, out Translator translator)
+        {
+            return _translators.TryGetValue(language, out translator);
+        }
     }
 }

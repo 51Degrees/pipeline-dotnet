@@ -24,18 +24,19 @@ using FiftyOne.Pipeline.Core.Data;
 using FiftyOne.Pipeline.Core.FlowElements;
 using FiftyOne.Pipeline.Translation.Data;
 
-namespace FiftyOne.Pipeline.Translation.FlowElements;
-
-/// <summary>
-/// Flow element that translates values from a single source element and
-/// stores translated values under its own element data key.
-/// See <see cref="TranslationEngine"/> for implementation details.
-/// </summary>
-public interface ITranslationEngine :
-    IFlowElement<ITranslationData, IElementPropertyMetaData>
+namespace FiftyOne.Pipeline.Translation.FlowElements
 {
     /// <summary>
-    /// Element data key of the source flow element.
+    /// Flow element that translates values from a single source element and
+    /// stores translated values under its own element data key.
+    /// See <see cref="TranslationEngine"/> for implementation details.
     /// </summary>
-    string SourceElementDataKey { get; }
+    public interface ITranslationEngine :
+        IFlowElement<ITranslationData, IElementPropertyMetaData>
+    {
+        /// <summary>
+        /// Element data key of the source flow element.
+        /// </summary>
+        string SourceElementDataKey { get; }
+    }
 }

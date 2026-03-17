@@ -20,32 +20,33 @@
  * such notice(s) shall fulfill the requirements of that article.
  * ********************************************************************* */
 
-namespace FiftyOne.Pipeline.Translation.Data;
-
-/// <summary>
-/// Defines a translation from one property to another. 
-/// </summary>
-public class TranslationProperty
+namespace FiftyOne.Pipeline.Translation.Data
 {
     /// <summary>
-    /// Constructor
+    /// Defines a translation from one property to another. 
     /// </summary>
-    /// <param name="source"></param>
-    /// <param name="destination"></param>
-    public TranslationProperty(string source, string destination)
+    public class TranslationProperty
     {
-        SourceProperty = source;
-        DestinationProperty = destination;
+        /// <summary>
+        /// Constructor
+        /// </summary>
+        /// <param name="source"></param>
+        /// <param name="destination"></param>
+        public TranslationProperty(string source, string destination)
+        {
+            SourceProperty = source;
+            DestinationProperty = destination;
+        }
+
+
+        /// <summary>
+        /// Source property name on the source element data.
+        /// </summary>
+        public string SourceProperty { get; set; }
+
+        /// <summary>
+        /// Destination property name on translation engine data.
+        /// </summary>
+        public string DestinationProperty { get; set; }
     }
-
-
-    /// <summary>
-    /// Source property name on the source element data.
-    /// </summary>
-    public string SourceProperty { get; set; }
-
-    /// <summary>
-    /// Destination property name on translation engine data.
-    /// </summary>
-    public string DestinationProperty { get; set; }
 }

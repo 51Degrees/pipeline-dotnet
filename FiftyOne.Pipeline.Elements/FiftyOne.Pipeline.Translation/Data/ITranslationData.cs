@@ -22,12 +22,13 @@
 
 using FiftyOne.Pipeline.Core.Data;
 
-namespace FiftyOne.Pipeline.Translation.Data;
-
-/// <summary>
-/// Element data marker interface for
-/// <see cref="TranslationEngine"/>.
-/// </summary>
-public interface ITranslationData : IElementData
+namespace FiftyOne.Pipeline.Translation.Data
 {
+    /// <summary>
+    /// Element data marker interface for
+    /// <see cref="FlowElements.TranslationEngine"/>.
+    /// </summary>
+    public interface ITranslationData : IElementData
+    {
+    }
 }
