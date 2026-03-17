@@ -34,6 +34,7 @@ using System.IO;
 using System.Linq;
 using System.Runtime.CompilerServices;
 using System.Text.RegularExpressions;
+using System.Xml.Linq;
 using YamlDotNet.Serialization;
 
 [assembly: InternalsVisibleTo("FiftyOne.Pipeline.Elements.Translation.Tests")]
@@ -48,6 +49,7 @@ public class TranslationEngine :
     ITranslationEngine
 {
     private readonly Translator _emptyTranslator;
+    private readonly string _fixedLanguage;
     private readonly IEvidenceKeyFilter _evidenceKeyFilter;
     private readonly IList<IElementPropertyMetaData> _properties;
     private string _sourceElementDataKey;
@@ -62,9 +64,28 @@ public class TranslationEngine :
     };
 
     /// <summary>
+    /// Regex used to identify language locale codes in evidence
+    /// </summary>
+    private static Regex _localeRegex = new Regex(
+        @"[a-z]{2}_[A-Z]{2}",
+        RegexOptions.Compiled);
+
+    /// <summary>
     /// Translation lookups
     /// </summary>
     internal readonly Languages Languages;
+
+    /// <inheritdoc/>
+    public override string ElementDataKey => "translation";
+
+    /// <inheritdoc/>
+    public string SourceElementDataKey => _sourceElementDataKey;
+
+    /// <inheritdoc/>
+    public override IEvidenceKeyFilter EvidenceKeyFilter => _evidenceKeyFilter;
+
+    /// <inheritdoc/>
+    public override IList<IElementPropertyMetaData> Properties => _properties;
 
     /// <summary>
     /// Create a new translationLookupKey engine.
@@ -77,6 +98,11 @@ public class TranslationEngine :
     /// </param>
     /// <param name="sources">
     /// sources used to perform translations. 
+    /// </param>
+    /// <param name="fixedLanguage">
+    /// Fixed language to translate to. If this is set, the engine will always
+    /// translate to this language. Otherwise (null or empty) the engine will
+    /// get the language from the evidence.
     /// </param>
     /// <param name="behaviour">
     /// The behaviour of the translation engine when a translation is missing
@@ -92,6 +118,7 @@ public class TranslationEngine :
         string sourceElementDataKey,
         IEnumerable<TranslationProperty> translations,
         IEnumerable<FileInfo> sources,
+        string fixedLanguage,
         MissingTranslationBehaviour behaviour,
         ILogger<FlowElementBase<ITranslationData, IElementPropertyMetaData>> logger,
         Func<IPipeline,
@@ -112,7 +139,7 @@ public class TranslationEngine :
         _sourceElementDataKey = sourceElementDataKey.Trim();
         _behaviour = behaviour;
         _emptyTranslator = new Translator(behaviour);
-
+        _fixedLanguage = fixedLanguage != null ? ValidateLocale(fixedLanguage) : null;
         Languages = ParseSources(sources, _behaviour);
 
         _evidenceKeyFilter = 
@@ -129,86 +156,6 @@ public class TranslationEngine :
                     true))
             .ToList();
     }
-
-    /// <summary>
-    /// Unpacks and parses each source into a translationLookupKey lookup.
-    /// </summary>
-    /// <param name="sources"></param>
-    /// <param name="behaviour"></param>
-    /// <returns></returns>
-    private Languages ParseSources(
-        IEnumerable<FileInfo> sources,
-        MissingTranslationBehaviour behaviour)
-    {
-        var languages = new Languages();
-
-        var deserializer = new DeserializerBuilder()
-            .IgnoreUnmatchedProperties()
-            .Build();
-
-        foreach (var source in sources)
-        {
-            var language = GetLanguageName(source.Name);
-
-            Dictionary<string, string> translations;
-            using (var reader = source.OpenText())
-            {
-                translations = deserializer
-                    .Deserialize<Dictionary<string, string>>(reader);
-            }
-            if (translations == null)
-            {
-                throw new InvalidDataException($"The source for file " +
-                    $"{source.Name} could not be parsed into a valid " +
-                    $"translation lookup.");
-            }
-
-            languages.AddLanguage(language, new Translator(translations, behaviour));
-        }
-
-        return languages;
-    }
-
-    private string GetLanguageName(string name)
-    {
-        if (string.IsNullOrWhiteSpace(name))
-        {
-            throw new ArgumentException(
-                "Source name cannot be null or whitespace.",
-                nameof(name));
-        }
-
-        var parts = name.Split('.');
-        if (parts.Length < 3)
-        {
-            throw new InvalidDataException(
-                $"Source name '{name}' does not have the correct format " +
-                $"name. It should be 'somename.locale.yml' " +
-                $"e.g. 'countries.en_GB.yml'.");
-        }
-        var locale = parts[parts.Length - 2];
-
-        var match = _localeRegex.Match(name);
-        if (match.Success)
-        {
-            return match.Value;
-        }
-
-        throw new InvalidDataException(
-            $"Source name '{name}' does not contain a valid locale code.");
-    }
-
-    /// <inheritdoc/>
-    public override string ElementDataKey => "translation";
-
-    /// <inheritdoc/>
-    public string SourceElementDataKey => _sourceElementDataKey;
-
-    /// <inheritdoc/>
-    public override IEvidenceKeyFilter EvidenceKeyFilter => _evidenceKeyFilter;
-
-    /// <inheritdoc/>
-    public override IList<IElementPropertyMetaData> Properties => _properties;
 
     /// <inheritdoc/>
     protected override void ProcessInternal(IFlowData data)
@@ -249,7 +196,7 @@ public class TranslationEngine :
 
         // Get the translator from the languages configured for this engine.
         if (Languages.TryGetTranslator(
-            language, 
+            language,
             out var translations) == false)
         {
             if (_behaviour == MissingTranslationBehaviour.FlowError)
@@ -280,11 +227,104 @@ public class TranslationEngine :
     }
 
     /// <summary>
-    /// Regex used to identify language locale codes in evidence
+    /// Unpacks and parses each source into a translationLookupKey lookup.
     /// </summary>
-    private Regex _localeRegex = new Regex(
-        @"[a-z]{2}_[A-Z]{2}", 
-        RegexOptions.Compiled);
+    /// <param name="sources"></param>
+    /// <param name="behaviour"></param>
+    /// <returns></returns>
+    private static Languages ParseSources(
+        IEnumerable<FileInfo> sources,
+        MissingTranslationBehaviour behaviour)
+    {
+        var languages = new Languages();
+
+        var deserializer = new DeserializerBuilder()
+            .IgnoreUnmatchedProperties()
+            .Build();
+
+        foreach (var source in sources)
+        {
+            var language = GetLanguageName(source.Name);
+
+            Dictionary<string, string> translations;
+            using (var reader = source.OpenText())
+            {
+                translations = deserializer
+                    .Deserialize<Dictionary<string, string>>(reader);
+            }
+            if (translations == null)
+            {
+                throw new InvalidDataException($"The source for file " +
+                    $"{source.Name} could not be parsed into a valid " +
+                    $"translation lookup.");
+            }
+
+            languages.AddLanguage(language, new Translator(translations, behaviour));
+        }
+
+        return languages;
+    }
+
+    private static string GetLanguageName(string name)
+    {
+        if (string.IsNullOrWhiteSpace(name))
+        {
+            throw new ArgumentException(
+                "Source name cannot be null or whitespace.",
+                nameof(name));
+        }
+
+        var parts = name.Split('.');
+        if (parts.Length < 3)
+        {
+            throw new InvalidDataException(
+                $"Source name '{name}' does not have the correct format " +
+                $"name. It should be 'somename.locale.yml' " +
+                $"e.g. 'countries.en_GB.yml'.");
+        }
+        var locale = ValidateLocale(parts[parts.Length - 2]);
+        if (locale == null)
+        {
+            throw new InvalidDataException(
+                $"Source name '{name}' does not contain a valid locale code.");
+        }
+        return locale;
+    }
+
+    /// <summary>
+    /// Get the validated locale code.
+    /// </summary>
+    /// <param name="locale">Code to validate</param>
+    /// <returns>Valid locale code, or null</returns>
+    private static string ValidateLocale(string locale)
+    {
+        var match = _localeRegex.Match(locale);
+        return match.Success ? match.Value : null;
+    }
+
+    /// <summary>
+    /// Gets the source value from the sourcedata
+    /// </summary>
+    /// <param name="sourceData"></param>
+    /// <param name="sourceProperty"></param>
+    /// <param name="sourceValue"></param>
+    /// <returns></returns>
+    private static bool TryGetSourceValue(
+        IElementData sourceData,
+        string sourceProperty,
+        out object sourceValue)
+    {
+        sourceValue = null;
+
+        if (sourceData == null ||
+            string.IsNullOrWhiteSpace(sourceProperty))
+        {
+            return false;
+        }
+
+        sourceValue = sourceData[sourceProperty];
+        return sourceValue != null;
+    }
 
     private void Populate(
         IElementData sourceData,
@@ -337,6 +377,13 @@ public class TranslationEngine :
     {
         language = null;
 
+        if (_fixedLanguage != null)
+        {
+            // Check for a fixed language first.
+            language = _fixedLanguage;
+            return true;
+        }
+
         if (data == null)
         {
             return false;
@@ -377,33 +424,4 @@ public class TranslationEngine :
         var key = new TypedKey<IElementData>(SourceElementDataKey);
         return data.TryGetValue(key, out sourceData);
     }
-
-    /// <summary>
-    /// Gets the source value from the sourcedata
-    /// </summary>
-    /// <param name="sourceData"></param>
-    /// <param name="sourceProperty"></param>
-    /// <param name="sourceValue"></param>
-    /// <returns></returns>
-    private static bool TryGetSourceValue(
-        IElementData sourceData,
-        string sourceProperty,
-        out object sourceValue)
-    {
-        sourceValue = null;
-
-        if (sourceData == null ||
-            string.IsNullOrWhiteSpace(sourceProperty))
-        {
-            return false;
-        }
-
-        sourceValue = sourceData[sourceProperty];
-        return sourceValue != null;
-    }
 }
-
-
-
-
-

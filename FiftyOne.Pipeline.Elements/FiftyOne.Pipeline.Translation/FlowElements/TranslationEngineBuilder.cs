@@ -42,7 +42,7 @@ public class TranslationEngineBuilder
     /// for a value.
     /// </summary>
     private MissingTranslationBehaviour _behaviour;
-
+    private string _fixedLanguage = null;
     private readonly ILogger<TranslationData> _dataLogger;
 
     /// <summary>
@@ -65,6 +65,9 @@ public class TranslationEngineBuilder
     /// Key to the source element which the translation engine will read from.
     /// This is where the values to be translated come from.
     /// </param>
+    /// <returns>
+    /// This builder.
+    /// </returns>
     public TranslationEngineBuilder SetSourceElementDataKey(
         string sourceElementDataKey)
     {
@@ -73,13 +76,34 @@ public class TranslationEngineBuilder
     }
 
     /// <summary>
+    /// Set a fixed language for the translation engine to translate to.
+    /// If this is set, the engine will not determine the language to translate
+    /// to from the source element data, it will instead always translate to
+    /// this language.
+    /// </summary>
+    /// <param name="language">
+    /// Language to transate to.
+    /// </param>
+    /// <returns>
+    /// This builder.
+    /// </returns>
+    public TranslationEngineBuilder SetFixedLanguage(
+        string language)
+    {
+        _fixedLanguage = language;
+        return this;
+    }
+
+    /// <summary>
     /// Set the behaviour of the translation engine when a translation is
     /// missing for a value.
     /// </summary>
     /// <param name="behaviour"></param>
-    /// <returns></returns>
+    /// <returns>
+    /// This builder.
+    /// </returns>
     public TranslationEngineBuilder SetMissingTranslationBehaviour(
-        MissingTranslationBehaviour behaviour)
+    MissingTranslationBehaviour behaviour)
     {
         _behaviour = behaviour;
         return this;
@@ -95,6 +119,9 @@ public class TranslationEngineBuilder
     /// <param name="destination">
     /// The key to store the translated value under on the translation engine data.
     /// </param>
+    /// <returns>
+    /// This builder.
+    /// </returns>
     public TranslationEngineBuilder AddTranslation(
         string source, 
         string destination)
@@ -117,6 +144,9 @@ public class TranslationEngineBuilder
     /// The source can contain a wildcard to add multiple files e.g.
     /// 'abc.*.yml' to add all languages for the 'abc' identifier.
     /// </summary>
+    /// <returns>
+    /// This builder.
+    /// </returns>
     public TranslationEngineBuilder AddSource(string source)
     {
         if (source == null)
@@ -176,6 +206,7 @@ public class TranslationEngineBuilder
             _sourceElementDataKey,
             _translationProperties,
             _sources,
+            _fixedLanguage,
             _behaviour,
             _loggerFactory.CreateLogger<TranslationEngine>(),
             CreateData);

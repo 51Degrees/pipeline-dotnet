@@ -391,6 +391,109 @@ public class TranslationEngineTests
     }
 
     /// <summary>
+    /// Test that the translation engine correctly translates values when a
+    /// fixed language is set. This test does not add a target language to the
+    /// evidence, so will not work unless the language is taken from the fixed
+    /// option.
+    /// </summary>
+    [TestMethod]
+    public void FixedLanguage()
+    {
+        var expected = new Dictionary<string, string>()
+        {
+            { "cat", "chat" },
+            { "dog", "chien" }
+        };
+        using var file = CreateFile("animals.fr_FR.yml", expected);
+
+        var engine = new TranslationEngineBuilder(_loggerFactory)
+            .SetSourceElementDataKey("evidencecopy")
+            .AddSource(file.File.FullName)
+            .SetFixedLanguage("fr_FR")
+            .AddTranslation("Animal", "AnimalTranslated")
+            .Build();
+        using var pipeline = new PipelineBuilder(_loggerFactory)
+            .AddFlowElement(new EvidenceCopyElement(_loggerFactory.CreateLogger<EvidenceCopyElement>()))
+            .AddFlowElement(engine)
+            .SetSuppressProcessExceptions(true)
+            .Build();
+
+        using var flowData = pipeline.CreateFlowData();
+
+        flowData.AddEvidence("Animal", "cat");
+        flowData.Process();
+
+        var result = flowData.Get<ITranslationData>();
+        var translation = result["AnimalTranslated"];
+
+        Assert.IsNotNull(translation);
+        Assert.IsInstanceOfType(translation, typeof(string));
+        var value = translation as string;
+        Assert.AreEqual("chat", value);
+    }
+
+    /// <summary>
+    /// Test that 2 translations can be chained. This test uses an example of
+    /// translating a country code to the English country name, then to the
+    /// target language country name.
+    /// </summary>
+    [TestMethod]
+    public void TestChained()
+    {
+        var codes = new Dictionary<string, string>()
+        {
+            { "GB", "United Kingdom" }
+        };
+        var countries = new Dictionary<string, string>()
+        {
+            { "United Kingdom", "Royaume-Uni" }
+        };
+        using var codesFile = CreateFile("codes.en_GB.yml", codes);
+        using var countriesFile = CreateFile("countries.fr_FR.yml", countries);
+
+        var codesEngine = new TranslationEngineBuilder(_loggerFactory)
+            .SetSourceElementDataKey("evidencecopy")
+            .AddSource(codesFile.File.FullName)
+            .SetFixedLanguage("en_GB")
+            .AddTranslation("CountryCode", "Country")
+            .Build();
+        var countriesEngine = new TranslationEngineBuilder(_loggerFactory)
+            .SetSourceElementDataKey(codesEngine.ElementDataKey)
+            .AddSource(countriesFile.File.FullName)
+            .AddTranslation("Country", "CountryTranslated")
+            .Build();
+        using var pipeline = new PipelineBuilder(_loggerFactory)
+            .AddFlowElement(new EvidenceCopyElement(_loggerFactory.CreateLogger<EvidenceCopyElement>()))
+            .AddFlowElement(codesEngine)
+            .AddFlowElement(countriesEngine)
+            .SetSuppressProcessExceptions(true)
+            .Build();
+
+        using var flowData = pipeline.CreateFlowData();
+
+        flowData.AddEvidence("CountryCode", "GB");
+        flowData.AddEvidence("header.accept-language", "fr_FR");
+        flowData.Process();
+
+        var result = flowData.Get<ITranslationData>();
+        var country = result["Country"];
+        var countryTranslated = result["CountryTranslated"];
+
+        Assert.IsNotNull(country);
+        Assert.IsNotNull(countryTranslated);
+        Assert.IsInstanceOfType(country, typeof(string));
+        Assert.IsInstanceOfType(countryTranslated, typeof(string));
+        Assert.AreEqual("United Kingdom", country as string);
+        Assert.AreEqual("Royaume-Uni", countryTranslated as string);
+        Assert.AreEqual(
+            1,
+            flowData.ElementDataAsEnumerable()
+            .Where(i => i is ITranslationData)
+            .Count());
+        Assert.IsTrue(flowData.Errors == null || flowData.Errors.Count == 0);
+    }
+
+    /// <summary>
     /// Sets up a basic test pipeline with french translations for "cat" and 
     /// "dog".
     /// </summary>
