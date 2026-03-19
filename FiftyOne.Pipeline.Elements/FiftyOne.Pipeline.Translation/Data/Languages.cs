@@ -1,4 +1,4 @@
-﻿/* *********************************************************************
+/* *********************************************************************
  * This Original Work is copyright of 51 Degrees Mobile Experts Limited.
  * Copyright 2026 51 Degrees Mobile Experts Limited, Davidson House,
  * Forbury Square, Reading, Berkshire, United Kingdom RG1 3EU.
@@ -24,22 +24,24 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Net.Http.Headers;
-using YamlDotNet.Core.Tokens;
 
 namespace FiftyOne.Pipeline.Translation.Data
 {
     /// <summary>
-    /// Set of translators for one or more languages.
-    /// Keys are the locale code e.g. "en_GB", "fr_FR", etc. and values are the
-    /// translators for those languages.
+    /// Set of translators for one or more languages, with static utility
+    /// methods for parsing Accept-Language headers and resolving language
+    /// tags against available locales.
     /// </summary>
-    internal class Languages
+    public class Languages
     {
         /// <summary>
         /// Internal dictionary of translators.
         /// </summary>
         private readonly IDictionary<string, Translator> _translators;
 
+        /// <summary>
+        /// Constructor.
+        /// </summary>
         public Languages()
         {
             _translators = new Dictionary<string, Translator>(
@@ -56,7 +58,7 @@ namespace FiftyOne.Pipeline.Translation.Data
         /// Translator for the language.
         /// </param>
         /// <exception cref="ArgumentNullException"></exception>
-        public void AddLanguage(string language, Translator translator)
+        internal void AddLanguage(string language, Translator translator)
         {
             if (language == null || translator == null)
             {
@@ -70,43 +72,133 @@ namespace FiftyOne.Pipeline.Translation.Data
         /// Gets the translator for the specified language if it exists.
         /// Returns true if it does, otherwise false.
         /// </summary>
-        /// <param name="language"></param>
-        /// <param name="translator"></param>
+        /// <param name="language">
+        /// A locale code (e.g. "fr_FR") or a full Accept-Language header
+        /// value (e.g. "es,de-DE;q=0.8,en;q=0.5").
+        /// </param>
+        /// <param name="translator">
+        /// The translator for the matched language, or null if not found.
+        /// </param>
         /// <returns></returns>
-        public bool TryGetTranslator(string language, out Translator translator)
+        internal bool TryGetTranslator(
+            string language, out Translator translator)
+        {
+            return TryGetTranslator(language, out translator, out _);
+        }
+
+        /// <summary>
+        /// Gets the translator and matched locale for the specified language
+        /// if it exists. Returns true if it does, otherwise false.
+        /// </summary>
+        /// <param name="language">
+        /// A locale code (e.g. "fr_FR") or a full Accept-Language header
+        /// value (e.g. "es,de-DE;q=0.8,en;q=0.5").
+        /// </param>
+        /// <param name="translator">
+        /// The translator for the matched language, or null if not found.
+        /// </param>
+        /// <param name="matchedLocale">
+        /// The locale key that was matched (e.g. "fr_FR", "es_ES"), or
+        /// null if no match was found.
+        /// </param>
+        /// <returns></returns>
+        internal bool TryGetTranslator(
+            string language,
+            out Translator translator,
+            out string matchedLocale)
         {
             translator = null;
+            matchedLocale = null;
 
-            var candidates =
-                // There could be multiple languages in the header, e.g.
-                // "en-GB,en;q=0.9,fr;q=0.8" so split the value.
-                language.Split(',')
-                // Parse the language and quality values, e.g. "en-GB;q=0.9"
-                // and order so the prefered language is first.
+            if (TryResolveLocale(
+                language, _translators.Keys, out var locale) &&
+                _translators.TryGetValue(locale, out translator))
+            {
+                matchedLocale = locale;
+                return true;
+            }
+
+            return false;
+        }
+
+        /// <summary>
+        /// Parses an Accept-Language header value (e.g.
+        /// "es,de-DE;q=0.8,en;q=0.5") into an ordered list of normalized
+        /// language tags. Tags are ordered by quality (descending), with
+        /// dashes replaced by underscores (e.g. "en-GB" becomes "en_GB").
+        /// </summary>
+        /// <param name="acceptLanguage">
+        /// The raw Accept-Language header value.
+        /// </param>
+        /// <returns>
+        /// An ordered enumerable of normalized language tags, highest
+        /// preference first.
+        /// </returns>
+        public static IEnumerable<string> ParseAcceptLanguage(
+            string acceptLanguage)
+        {
+            if (string.IsNullOrWhiteSpace(acceptLanguage))
+            {
+                return Enumerable.Empty<string>();
+            }
+
+            return acceptLanguage.Split(',')
                 .Select(StringWithQualityHeaderValue.Parse)
                 .OrderByDescending(i => i.Quality ?? 1)
-                // Replace dash with an underscore to match the format of the
-                // keys in the _translators dictionary, e.g. "en-GB" becomes
-                // "en_GB".
-                .Select(i => i.Value.ToString().Trim().Replace('-', '_'));
+                .Select(i => i.Value.ToString().Trim().Replace('-', '_'))
+                .Where(s => !string.IsNullOrEmpty(s));
+        }
 
-            foreach (var candidate in candidates)
+        /// <summary>
+        /// Resolves an Accept-Language header value against a set of
+        /// available locale keys, returning the best matching locale.
+        /// Handles both exact locale matches (e.g. "fr_FR") and 2-char
+        /// language code fallbacks (e.g. "fr" matching "fr_FR").
+        /// </summary>
+        /// <param name="acceptLanguage">
+        /// The raw Accept-Language header value.
+        /// </param>
+        /// <param name="availableLocales">
+        /// The set of available locale keys (e.g. "fr_FR", "de_DE").
+        /// </param>
+        /// <param name="matchedLocale">
+        /// The locale key that was matched, or null if no match was found.
+        /// </param>
+        /// <returns>
+        /// True if a matching locale was found, false otherwise.
+        /// </returns>
+        public static bool TryResolveLocale(
+            string acceptLanguage,
+            IEnumerable<string> availableLocales,
+            out string matchedLocale)
+        {
+            matchedLocale = null;
+
+            var localeSet = availableLocales as ICollection<string>
+                ?? availableLocales.ToList();
+
+            foreach (var candidate in ParseAcceptLanguage(acceptLanguage))
             {
-                var key = candidate;
-                if (key.Length == 2)
+                // Try exact match.
+                var key = localeSet.FirstOrDefault(k =>
+                    k.Equals(candidate,
+                        StringComparison.InvariantCultureIgnoreCase));
+
+                // Try 2-char language code fallback.
+                if (key == null && candidate.Length == 2)
                 {
-                    // If the language is a 2 character language code, e.g. "en",
-                    // "fr", etc. then try to find a translator for the language.
-                    key = _translators.Keys
-                        .FirstOrDefault(k => k.StartsWith(
-                            candidate,
+                    key = localeSet.FirstOrDefault(k =>
+                        k.StartsWith(candidate,
                             StringComparison.InvariantCultureIgnoreCase));
                 }
-                if (key != null && _translators.TryGetValue(key, out translator))
+
+                if (key != null)
                 {
+                    matchedLocale = key;
                     return true;
                 }
             }
+
             return false;
         }
     }
