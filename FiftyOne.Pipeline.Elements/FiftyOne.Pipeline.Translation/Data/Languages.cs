@@ -22,6 +22,9 @@
 
 using System;
 using System.Collections.Generic;
+using System.Linq;
+using System.Net.Http.Headers;
+using YamlDotNet.Core.Tokens;
 
 namespace FiftyOne.Pipeline.Translation.Data
 {
@@ -72,6 +75,30 @@ namespace FiftyOne.Pipeline.Translation.Data
         /// <returns></returns>
         public bool TryGetTranslator(string language, out Translator translator)
         {
+            language =
+                // There could be multiple languages in the header, e.g.
+                // "en-GB,en;q=0.9,fr;q=0.8" so split the value.
+                language.Split(',')
+                // Parse the language and quality values, e.g. "en-GB;q=0.9"
+                // and order so the prefered language is first.
+                .Select(StringWithQualityHeaderValue.Parse)
+                .OrderByDescending(i => i.Quality ?? 1)
+                .Select(i => i.Value.ToString().Trim())
+                .FirstOrDefault()
+                // Replace dash with an underscore to match the format of the
+                // keys in the _translators dictionary, e.g. "en-GB" becomes
+                // "en_GB".
+                .Replace('-', '_');
+
+            if (language.Length == 2)
+            {
+                // If the language is a 2 character language code, e.g. "en",
+                // "fr", etc. then try to find a translator for the language.
+                language = _translators.Keys
+                    .FirstOrDefault(k => k.StartsWith(
+                        language,
+                        StringComparison.InvariantCultureIgnoreCase));
+            }
             return _translators.TryGetValue(language, out translator);
         }
     }

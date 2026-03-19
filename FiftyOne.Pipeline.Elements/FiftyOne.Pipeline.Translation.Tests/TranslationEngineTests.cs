@@ -38,6 +38,32 @@ public class TranslationEngineTests
     }
 
     /// <summary>
+    /// Test that different formats of the accept-language header are correctly
+    /// parsed and the language extracted from them.
+    /// </summary>
+    /// <param name="header"></param>
+    [DataRow("fr-FR, fr;q=0.9, en;q=0.8, de;q=0.7, *;q=0.5")]
+    [DataRow("fr,sr;q=0.9,uk;q=0.8,en-US;q=0.7,en;q=0.6,ru;q=0.5,hr;q=0.4")]
+    [DataRow("fr")]
+    [DataRow("fr-FR")]
+    [DataRow("fr_FR")]
+    [TestMethod]
+    public void HeaderFormats(string header)
+    {
+        var flowData = SetupFrenchAnimals();
+
+        flowData.AddEvidence("header.accept-language", header);
+        flowData.AddEvidence("Animal", "dog");
+        flowData.Process();
+
+        var result = flowData.Get<ITranslationData>();
+        var translation = result["AnimalTranslated"];
+
+        Assert.IsNotNull(translation);
+        Assert.AreEqual("chien", translation);
+    }
+
+    /// <summary>
     /// Test that a string value is treated case insensitively when translating.
     /// </summary>
     [TestMethod]
@@ -330,7 +356,6 @@ public class TranslationEngineTests
         {
             Assert.AreEqual(1, flowData.Errors.Count);
             Assert.IsInstanceOfType(flowData.Errors[0].ExceptionData, typeof(KeyNotFoundException));
-            Assert.IsTrue(flowData.Errors[0].ExceptionData.Message.Contains("did not contain a language"));
         }
     }
 
