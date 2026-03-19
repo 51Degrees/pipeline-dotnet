@@ -75,7 +75,9 @@ namespace FiftyOne.Pipeline.Translation.Data
         /// <returns></returns>
         public bool TryGetTranslator(string language, out Translator translator)
         {
-            language =
+            translator = null;
+
+            var candidates =
                 // There could be multiple languages in the header, e.g.
                 // "en-GB,en;q=0.9,fr;q=0.8" so split the value.
                 language.Split(',')
@@ -83,23 +85,29 @@ namespace FiftyOne.Pipeline.Translation.Data
                 // and order so the prefered language is first.
                 .Select(StringWithQualityHeaderValue.Parse)
                 .OrderByDescending(i => i.Quality ?? 1)
-                .Select(i => i.Value.ToString().Trim())
-                .FirstOrDefault()
                 // Replace dash with an underscore to match the format of the
                 // keys in the _translators dictionary, e.g. "en-GB" becomes
                 // "en_GB".
-                .Replace('-', '_');
+                .Select(i => i.Value.ToString().Trim().Replace('-', '_'));
 
-            if (language.Length == 2)
+            foreach (var candidate in candidates)
             {
-                // If the language is a 2 character language code, e.g. "en",
-                // "fr", etc. then try to find a translator for the language.
-                language = _translators.Keys
-                    .FirstOrDefault(k => k.StartsWith(
-                        language,
-                        StringComparison.InvariantCultureIgnoreCase));
+                var key = candidate;
+                if (key.Length == 2)
+                {
+                    // If the language is a 2 character language code, e.g. "en",
+                    // "fr", etc. then try to find a translator for the language.
+                    key = _translators.Keys
+                        .FirstOrDefault(k => k.StartsWith(
+                            candidate,
+                            StringComparison.InvariantCultureIgnoreCase));
+                }
+                if (key != null && _translators.TryGetValue(key, out translator))
+                {
+                    return true;
+                }
             }
-            return _translators.TryGetValue(language, out translator);
+            return false;
         }
     }
 }
