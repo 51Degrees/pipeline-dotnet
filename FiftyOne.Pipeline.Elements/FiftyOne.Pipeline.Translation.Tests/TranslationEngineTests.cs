@@ -605,6 +605,66 @@ public class TranslationEngineTests
     }
 
     /// <summary>
+    /// Test that when English is the preferred language in Accept-Language,
+    /// the base translation engine passes through values unchanged (no
+    /// translation), even when other languages with translators are present
+    /// at lower priority.
+    /// </summary>
+    [TestMethod]
+    public void EnglishPreferred_NoTranslation()
+    {
+        var flowData = SetupFrenchAnimals();
+
+        flowData.AddEvidence(
+            "header.accept-language",
+            "en-US,en;q=0.9,fr;q=0.5");
+        flowData.AddEvidence("Animal", "dog");
+        flowData.Process();
+
+        var result = flowData.Get<ITranslationData>();
+        var translation = result["AnimalTranslated"];
+
+        // Should be "dog" (English pass-through), NOT "chien" (French).
+        Assert.IsNotNull(translation);
+        Assert.AreEqual("dog", translation);
+    }
+
+    /// <summary>
+    /// Test that TryResolveLocale returns false when English is the
+    /// preferred language, preventing fallthrough to lower-priority
+    /// languages.
+    /// </summary>
+    [TestMethod]
+    public void TryResolveLocale_EnglishPreferred_ReturnsFalse()
+    {
+        var locales = new[] { "fr_FR", "de_DE" };
+        var result = Languages.TryResolveLocale(
+            "en-US,en;q=0.9,fr;q=0.5",
+            locales,
+            out var matched);
+
+        Assert.IsFalse(result);
+        Assert.IsNull(matched);
+    }
+
+    /// <summary>
+    /// Test that TryResolveLocale still finds non-English languages
+    /// when they are preferred over English.
+    /// </summary>
+    [TestMethod]
+    public void TryResolveLocale_FrenchPreferredOverEnglish()
+    {
+        var locales = new[] { "fr_FR", "de_DE" };
+        var result = Languages.TryResolveLocale(
+            "fr,en;q=0.5",
+            locales,
+            out var matched);
+
+        Assert.IsTrue(result);
+        Assert.AreEqual("fr_FR", matched);
+    }
+
+    /// <summary>
     /// Test that TryGetTranslator with locale output returns the matched
     /// locale key for an exact locale match.
     /// </summary>

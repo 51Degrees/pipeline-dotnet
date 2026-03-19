@@ -154,6 +154,12 @@ namespace FiftyOne.Pipeline.Translation.Data
         /// available locale keys, returning the best matching locale.
         /// Handles both exact locale matches (e.g. "fr_FR") and 2-char
         /// language code fallbacks (e.g. "fr" matching "fr_FR").
+        ///
+        /// If the highest-priority language matches the
+        /// <paramref name="baseLanguage"/> (default "en"), resolution
+        /// stops immediately and returns false, since the source values
+        /// are already in the base language and no translation is needed.
+        /// This prevents falling through to a lower-priority language.
         /// </summary>
         /// <param name="acceptLanguage">
         /// The raw Accept-Language header value.
@@ -164,13 +170,19 @@ namespace FiftyOne.Pipeline.Translation.Data
         /// <param name="matchedLocale">
         /// The locale key that was matched, or null if no match was found.
         /// </param>
+        /// <param name="baseLanguage">
+        /// The 2-char code of the base language that source values are
+        /// already in. Defaults to "en". If the preferred language
+        /// matches this, no translation is performed.
+        /// </param>
         /// <returns>
         /// True if a matching locale was found, false otherwise.
         /// </returns>
         public static bool TryResolveLocale(
             string acceptLanguage,
             IEnumerable<string> availableLocales,
-            out string matchedLocale)
+            out string matchedLocale,
+            string baseLanguage = "en")
         {
             matchedLocale = null;
 
@@ -179,13 +191,30 @@ namespace FiftyOne.Pipeline.Translation.Data
 
             foreach (var candidate in ParseAcceptLanguage(acceptLanguage))
             {
-                // Try exact match.
+                // Try exact match first.
                 var key = localeSet.FirstOrDefault(k =>
                     k.Equals(candidate,
                         StringComparison.InvariantCultureIgnoreCase));
 
+                if (key != null)
+                {
+                    matchedLocale = key;
+                    return true;
+                }
+
+                // No exact match. If this candidate's language is the
+                // base language (e.g. "en"), the source values are
+                // already in that language — stop and return false rather
+                // than falling through to a lower-priority language.
+                if (baseLanguage != null &&
+                    candidate.StartsWith(baseLanguage,
+                        StringComparison.InvariantCultureIgnoreCase))
+                {
+                    return false;
+                }
+
                 // Try 2-char language code fallback.
-                if (key == null && candidate.Length == 2)
+                if (candidate.Length == 2)
                 {
                     key = localeSet.FirstOrDefault(k =>
                         k.StartsWith(candidate,
