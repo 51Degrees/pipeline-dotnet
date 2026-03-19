@@ -80,7 +80,7 @@ namespace FiftyOne.Pipeline.Translation.Data
         /// The translator for the matched language, or null if not found.
         /// </param>
         /// <returns></returns>
-        internal bool TryGetTranslator(
+        public bool TryGetTranslator(
             string language, out Translator translator)
         {
             return TryGetTranslator(language, out translator, out _);
@@ -102,7 +102,7 @@ namespace FiftyOne.Pipeline.Translation.Data
         /// null if no match was found.
         /// </param>
         /// <returns></returns>
-        internal bool TryGetTranslator(
+        public bool TryGetTranslator(
             string language,
             out Translator translator,
             out string matchedLocale)

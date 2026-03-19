@@ -129,7 +129,7 @@ namespace FiftyOne.Pipeline.Translation.FlowElements
         /// <summary>
         /// Translation lookups
         /// </summary>
-        internal readonly Languages Languages;
+        protected internal readonly Languages Languages;
 
         /// <inheritdoc/>
         public override string ElementDataKey => "translation";
