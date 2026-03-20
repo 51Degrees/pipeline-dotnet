@@ -38,6 +38,32 @@ public class TranslationEngineTests
     }
 
     /// <summary>
+    /// Test that different formats of the accept-language header are correctly
+    /// parsed and the language extracted from them.
+    /// </summary>
+    /// <param name="header"></param>
+    [DataRow("fr-FR, fr;q=0.9, en;q=0.8, de;q=0.7, *;q=0.5")]
+    [DataRow("fr,sr;q=0.9,uk;q=0.8,en-US;q=0.7,en;q=0.6,ru;q=0.5,hr;q=0.4")]
+    [DataRow("fr")]
+    [DataRow("fr-FR")]
+    [DataRow("fr_FR")]
+    [TestMethod]
+    public void HeaderFormats(string header)
+    {
+        var flowData = SetupFrenchAnimals();
+
+        flowData.AddEvidence("header.accept-language", header);
+        flowData.AddEvidence("Animal", "dog");
+        flowData.Process();
+
+        var result = flowData.Get<ITranslationData>();
+        var translation = result["AnimalTranslated"];
+
+        Assert.IsNotNull(translation);
+        Assert.AreEqual("chien", translation);
+    }
+
+    /// <summary>
     /// Test that a string value is treated case insensitively when translating.
     /// </summary>
     [TestMethod]
@@ -330,7 +356,6 @@ public class TranslationEngineTests
         {
             Assert.AreEqual(1, flowData.Errors.Count);
             Assert.IsInstanceOfType(flowData.Errors[0].ExceptionData, typeof(KeyNotFoundException));
-            Assert.IsTrue(flowData.Errors[0].ExceptionData.Message.Contains("did not contain a language"));
         }
     }
 
@@ -580,7 +605,246 @@ public class TranslationEngineTests
     }
 
     /// <summary>
-    /// Sets up a basic test pipeline with french translations for "cat" and 
+    /// Test that when English is the preferred language in Accept-Language,
+    /// the base translation engine passes through values unchanged (no
+    /// translation), even when other languages with translators are present
+    /// at lower priority.
+    /// </summary>
+    [TestMethod]
+    public void EnglishPreferred_NoTranslation()
+    {
+        var flowData = SetupFrenchAnimals();
+
+        flowData.AddEvidence(
+            "header.accept-language",
+            "en-US,en;q=0.9,fr;q=0.5");
+        flowData.AddEvidence("Animal", "dog");
+        flowData.Process();
+
+        var result = flowData.Get<ITranslationData>();
+        var translation = result["AnimalTranslated"];
+
+        // Should be "dog" (English pass-through), NOT "chien" (French).
+        Assert.IsNotNull(translation);
+        Assert.AreEqual("dog", translation);
+    }
+
+    /// <summary>
+    /// Test that TryResolveLocale returns false when English is the
+    /// preferred language, preventing fallthrough to lower-priority
+    /// languages.
+    /// </summary>
+    [TestMethod]
+    public void TryResolveLocale_EnglishPreferred_ReturnsFalse()
+    {
+        var locales = new[] { "fr_FR", "de_DE" };
+        var result = Languages.TryResolveLocale(
+            "en-US,en;q=0.9,fr;q=0.5",
+            locales,
+            out var matched);
+
+        Assert.IsFalse(result);
+        Assert.IsNull(matched);
+    }
+
+    /// <summary>
+    /// Test that TryResolveLocale still finds non-English languages
+    /// when they are preferred over English.
+    /// </summary>
+    [TestMethod]
+    public void TryResolveLocale_FrenchPreferredOverEnglish()
+    {
+        var locales = new[] { "fr_FR", "de_DE" };
+        var result = Languages.TryResolveLocale(
+            "fr,en;q=0.5",
+            locales,
+            out var matched);
+
+        Assert.IsTrue(result);
+        Assert.AreEqual("fr_FR", matched);
+    }
+
+    /// <summary>
+    /// Test that TryGetTranslator with locale output returns the matched
+    /// locale key for an exact locale match.
+    /// </summary>
+    [TestMethod]
+    public void TryGetTranslator_ReturnsMatchedLocale_ExactMatch()
+    {
+        var french = new Dictionary<string, string>()
+        {
+            { "cat", "chat" }
+        };
+        using var file = CreateFile("animals.fr_FR.yml", french);
+
+        var engine = new TranslationEngineBuilder(_loggerFactory)
+            .SetSourceElementDataKey("evidencecopy")
+            .AddSource(file.File.FullName)
+            .AddTranslation("Animal", "AnimalTranslated")
+            .Build();
+
+        var found = engine.Languages.TryGetTranslator(
+            "fr_FR", out var translator, out var matchedLocale);
+
+        Assert.IsTrue(found);
+        Assert.IsNotNull(translator);
+        Assert.AreEqual("fr_FR", matchedLocale);
+    }
+
+    /// <summary>
+    /// Test that TryGetTranslator with locale output returns the matched
+    /// locale key when only a 2-char language code is provided.
+    /// </summary>
+    [TestMethod]
+    public void TryGetTranslator_ReturnsMatchedLocale_TwoCharCode()
+    {
+        var french = new Dictionary<string, string>()
+        {
+            { "cat", "chat" }
+        };
+        using var file = CreateFile("animals.fr_FR.yml", french);
+
+        var engine = new TranslationEngineBuilder(_loggerFactory)
+            .SetSourceElementDataKey("evidencecopy")
+            .AddSource(file.File.FullName)
+            .AddTranslation("Animal", "AnimalTranslated")
+            .Build();
+
+        var found = engine.Languages.TryGetTranslator(
+            "fr", out var translator, out var matchedLocale);
+
+        Assert.IsTrue(found);
+        Assert.IsNotNull(translator);
+        Assert.AreEqual("fr_FR", matchedLocale);
+    }
+
+    /// <summary>
+    /// Test that TryGetTranslator picks the highest-priority language
+    /// from an Accept-Language header and returns its locale.
+    /// </summary>
+    [TestMethod]
+    public void TryGetTranslator_ReturnsMatchedLocale_AcceptLanguageHeader()
+    {
+        var french = new Dictionary<string, string>()
+        {
+            { "cat", "chat" }
+        };
+        var german = new Dictionary<string, string>()
+        {
+            { "cat", "katze" }
+        };
+        using var frFile = CreateFile("animals.fr_FR.yml", french);
+        using var deFile = CreateFile("animals.de_DE.yml", german);
+
+        var engine = new TranslationEngineBuilder(_loggerFactory)
+            .SetSourceElementDataKey("evidencecopy")
+            .AddSource(frFile.File.Directory.FullName +
+                Path.DirectorySeparatorChar + "animals.*.yml")
+            .AddTranslation("Animal", "AnimalTranslated")
+            .Build();
+
+        // French is preferred (higher quality), should match fr_FR.
+        var found = engine.Languages.TryGetTranslator(
+            "fr,de-DE;q=0.5",
+            out var translator,
+            out var matchedLocale);
+
+        Assert.IsTrue(found);
+        Assert.IsNotNull(translator);
+        Assert.AreEqual("fr_FR", matchedLocale);
+    }
+
+    /// <summary>
+    /// Test that TryGetTranslator respects preference order and picks the
+    /// preferred language even when a lower-priority language has an exact
+    /// locale match in the header.
+    /// </summary>
+    [TestMethod]
+    public void TryGetTranslator_PrefersHigherPriority_OverExactLocale()
+    {
+        var french = new Dictionary<string, string>()
+        {
+            { "cat", "chat" }
+        };
+        var german = new Dictionary<string, string>()
+        {
+            { "cat", "katze" }
+        };
+        using var frFile = CreateFile("animals.fr_FR.yml", french);
+        using var deFile = CreateFile("animals.de_DE.yml", german);
+
+        var engine = new TranslationEngineBuilder(_loggerFactory)
+            .SetSourceElementDataKey("evidencecopy")
+            .AddSource(frFile.File.Directory.FullName +
+                Path.DirectorySeparatorChar + "animals.*.yml")
+            .AddTranslation("Animal", "AnimalTranslated")
+            .Build();
+
+        // "fr" (2-char, no locale) is preferred over "de-DE" (exact locale).
+        var found = engine.Languages.TryGetTranslator(
+            "fr,de-DE;q=0.5",
+            out var translator,
+            out var matchedLocale);
+
+        Assert.IsTrue(found);
+        Assert.AreEqual("fr_FR", matchedLocale);
+    }
+
+    /// <summary>
+    /// Test that TryGetTranslator returns false and null locale when no
+    /// matching language is found.
+    /// </summary>
+    [TestMethod]
+    public void TryGetTranslator_NoMatch_ReturnsNullLocale()
+    {
+        var french = new Dictionary<string, string>()
+        {
+            { "cat", "chat" }
+        };
+        using var file = CreateFile("animals.fr_FR.yml", french);
+
+        var engine = new TranslationEngineBuilder(_loggerFactory)
+            .SetSourceElementDataKey("evidencecopy")
+            .AddSource(file.File.FullName)
+            .AddTranslation("Animal", "AnimalTranslated")
+            .Build();
+
+        var found = engine.Languages.TryGetTranslator(
+            "ja_JP", out var translator, out var matchedLocale);
+
+        Assert.IsFalse(found);
+        Assert.IsNull(translator);
+        Assert.IsNull(matchedLocale);
+    }
+
+    /// <summary>
+    /// Test that the original TryGetTranslator overload (without locale)
+    /// still works correctly after the refactoring.
+    /// </summary>
+    [TestMethod]
+    public void TryGetTranslator_OriginalOverload_StillWorks()
+    {
+        var french = new Dictionary<string, string>()
+        {
+            { "cat", "chat" }
+        };
+        using var file = CreateFile("animals.fr_FR.yml", french);
+
+        var engine = new TranslationEngineBuilder(_loggerFactory)
+            .SetSourceElementDataKey("evidencecopy")
+            .AddSource(file.File.FullName)
+            .AddTranslation("Animal", "AnimalTranslated")
+            .Build();
+
+        var found = engine.Languages.TryGetTranslator(
+            "fr_FR", out var translator);
+
+        Assert.IsTrue(found);
+        Assert.IsNotNull(translator);
+    }
+
+    /// <summary>
+    /// Sets up a basic test pipeline with french translations for "cat" and
     /// "dog".
     /// </summary>
     /// <param name="behavior"></param>

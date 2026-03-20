@@ -129,7 +129,7 @@ namespace FiftyOne.Pipeline.Translation.FlowElements
         /// <summary>
         /// Translation lookups
         /// </summary>
-        internal readonly Languages Languages;
+        protected internal readonly Languages Languages;
 
         /// <inheritdoc/>
         public override string ElementDataKey => "translation";
@@ -475,10 +475,9 @@ namespace FiftyOne.Pipeline.Translation.FlowElements
             {
                 var value = evidence[key] as string;
 
-                if (value != null && _localeRegex.IsMatch(value))
+                if (string.IsNullOrWhiteSpace(value) == false)
                 {
-                    var match = _localeRegex.Match(value);
-                    language = match.Value;
+                    language = value;
                     return true;
                 }
             }

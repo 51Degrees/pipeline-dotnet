@@ -12,14 +12,19 @@
         </member>
         <member name="T:FiftyOne.Pipeline.Translation.Data.Languages">
             <summary>
-            Set of translators for one or more languages.
-            Keys are the locale code e.g. "en_GB", "fr_FR", etc. and values are the
-            translators for those languages.
+            Set of translators for one or more languages, with static utility
+            methods for parsing Accept-Language headers and resolving language
+            tags against available locales.
             </summary>
         </member>
         <member name="F:FiftyOne.Pipeline.Translation.Data.Languages._translators">
             <summary>
             Internal dictionary of translators.
+            </summary>
+        </member>
+        <member name="M:FiftyOne.Pipeline.Translation.Data.Languages.#ctor">
+            <summary>
+            Constructor.
             </summary>
         </member>
         <member name="M:FiftyOne.Pipeline.Translation.Data.Languages.AddLanguage(System.String,FiftyOne.Pipeline.Translation.Data.Translator)">
@@ -39,9 +44,67 @@
             Gets the translator for the specified language if it exists.
             Returns true if it does, otherwise false.
             </summary>
-            <param name="language"></param>
-            <param name="translator"></param>
+            <param name="language">
+            A locale code (e.g. "fr_FR") or a full Accept-Language header
+            value (e.g. "es,de-DE;q=0.8,en;q=0.5").
+            </param>
+            <param name="translator">
+            The translator for the matched language, or null if not found.
+            </param>
             <returns></returns>
+        </member>
+        <member name="M:FiftyOne.Pipeline.Translation.Data.Languages.TryGetTranslator(System.String,FiftyOne.Pipeline.Translation.Data.Translator@,System.String@)">
+            <summary>
+            Gets the translator and matched locale for the specified language
+            if it exists. Returns true if it does, otherwise false.
+            </summary>
+            <param name="language">
+            A locale code (e.g. "fr_FR") or a full Accept-Language header
+            value (e.g. "es,de-DE;q=0.8,en;q=0.5").
+            </param>
+            <param name="translator">
+            The translator for the matched language, or null if not found.
+            </param>
+            <param name="matchedLocale">
+            The locale key that was matched (e.g. "fr_FR", "es_ES"), or
+            null if no match was found.
+            </param>
+            <returns></returns>
+        </member>
+        <member name="M:FiftyOne.Pipeline.Translation.Data.Languages.ParseAcceptLanguage(System.String)">
+            <summary>
+            Parses an Accept-Language header value (e.g.
+            "es,de-DE;q=0.8,en;q=0.5") into an ordered list of normalized
+            language tags. Tags are ordered by quality (descending), with
+            dashes replaced by underscores (e.g. "en-GB" becomes "en_GB").
+            </summary>
+            <param name="acceptLanguage">
+            The raw Accept-Language header value.
+            </param>
+            <returns>
+            An ordered enumerable of normalized language tags, highest
+            preference first.
+            </returns>
+        </member>
+        <member name="M:FiftyOne.Pipeline.Translation.Data.Languages.TryResolveLocale(System.String,System.Collections.Generic.IEnumerable{System.String},System.String@)">
+            <summary>
+            Resolves an Accept-Language header value against a set of
+            available locale keys, returning the best matching locale.
+            Handles both exact locale matches (e.g. "fr_FR") and 2-char
+            language code fallbacks (e.g. "fr" matching "fr_FR").
+            </summary>
+            <param name="acceptLanguage">
+            The raw Accept-Language header value.
+            </param>
+            <param name="availableLocales">
+            The set of available locale keys (e.g. "fr_FR", "de_DE").
+            </param>
+            <param name="matchedLocale">
+            The locale key that was matched, or null if no match was found.
+            </param>
+            <returns>
+            True if a matching locale was found, false otherwise.
+            </returns>
         </member>
         <member name="T:FiftyOne.Pipeline.Translation.Data.MissingTranslationBehavior">
             <summary>

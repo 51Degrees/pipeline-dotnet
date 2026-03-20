@@ -34,7 +34,7 @@ namespace FiftyOne.Pipeline.Translation.Data
     /// the same type as the source e.g. a string will be translated to a
     /// string, a list of strings will be translated to a list of strings, etc.
     /// </summary>
-    internal class Translator
+    public class Translator
     {
         /// <summary>
         /// Internal translation dictionary.
