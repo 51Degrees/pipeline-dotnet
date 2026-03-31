@@ -20,7 +20,6 @@
  * such notice(s) shall fulfill the requirements of that article.
  * ********************************************************************* */
 
-using FiftyOne.Pipeline.Core.Exceptions;
 using FiftyOne.Pipeline.Engines.Configuration;
 using FiftyOne.Pipeline.Engines.FlowElements;
 using FiftyOne.Pipeline.Engines.Services;
@@ -73,10 +72,13 @@ namespace FiftyOne.Pipeline.Engines.FiftyOne.FlowElements
 
         /// <summary>
         /// Creates a new instance of the engine for the given properties.
-        /// Subclasses must implement this to construct the concrete engine.
+        /// Subclasses must implement this to construct the concrete engine
+        /// and perform any required validation.
         /// </summary>
         /// <param name="properties">
-        /// The properties to index on.
+        /// The properties the engine should populate in results, as
+        /// configured via SetProperty/SetProperties. An empty list
+        /// means all properties are included.
         /// </param>
         /// <returns>A new engine instance.</returns>
         protected abstract TEngine CreateEngine(List<string> properties);
@@ -118,21 +120,19 @@ namespace FiftyOne.Pipeline.Engines.FiftyOne.FlowElements
         }
 
         /// <summary>
-        /// Creates a new instance of the engine. Properties must have 
-        /// been set using SetProperty before calling Build.
+        /// Creates a new instance of the engine. The properties list
+        /// retains its base-class meaning (properties to return in
+        /// results). An empty list means all properties are included.
+        /// Concrete implementations of <see cref="CreateEngine"/> are
+        /// responsible for their own validation if needed.
         /// </summary>
-        /// <param name="properties"></param>
-        /// <returns></returns>
-        /// <exception cref="PipelineConfigurationException"></exception>
+        /// <param name="properties">
+        /// The properties the engine should populate in results.
+        /// An empty list means all properties are included.
+        /// </param>
+        /// <returns>A new engine instance.</returns>
         protected override TEngine NewEngine(List<string> properties)
         {
-            if (properties == null || properties.Count < 1)
-            {
-                throw new PipelineConfigurationException(
-                    $"The '{GetType().Name}' needs to know " +
-                    "which properties to key on. Call the 'SetProperties' " +
-                    "method on the builder to configure this.");
-            }
             return CreateEngine(properties);
         }
     }
