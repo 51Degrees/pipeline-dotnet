@@ -164,6 +164,21 @@ namespace FiftyOne.Pipeline.Core.Data
 #pragma warning restore CA1716 // Identifiers should not match keywords
 
         /// <summary>
+        /// Try to get the <see cref="IElementData"/> instance containing data
+        /// populated by the element with the specified data key.
+        /// </summary>
+        /// <param name="elementDataKey">
+        /// The element data key of the element to get data from.
+        /// </param>
+        /// <param name="elementData">
+        /// The <see cref="IElementData"/> instance, or null if not present.
+        /// </param>
+        /// <returns>
+        /// True if data for the specified key exists, false otherwise.
+        /// </returns>
+        bool TryGet(string elementDataKey, out IElementData elementData);
+
+        /// <summary>
         /// Get the <see cref="IElementData"/> instance containing data
         /// populated by the specified element.
         /// </summary>

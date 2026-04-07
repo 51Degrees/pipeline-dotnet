@@ -150,8 +150,14 @@ namespace FiftyOne.Pipeline.Engines.FiftyOne.FlowElements
             // Iterate through 'SetHeader*' properties
             foreach(var property in config.SetHeaderProperties)
             {
-                // Get the value for this property.
-                var elementData = data.Get(property.Value.PropertyMetaData.Element.ElementDataKey);
+                // Get the value for this property. The element may not have run
+                // (e.g. when only a subset of properties was requested), so use
+                // TryGet rather than Get to avoid a KeyNotFoundException.
+                if (data.TryGet(property.Value.PropertyMetaData.Element.ElementDataKey,
+                        out var elementData) == false)
+                {
+                    continue;
+                }
                 object propertyValue = null;
                 try
                 {
