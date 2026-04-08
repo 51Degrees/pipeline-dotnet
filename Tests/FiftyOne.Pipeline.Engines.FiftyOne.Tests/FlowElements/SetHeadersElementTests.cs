@@ -53,7 +53,7 @@ namespace FiftyOne.Pipeline.Engines.FiftyOne.Tests.FlowElements
             public ActivePropertySourceElement(
                 ILogger<FlowElementBase<SetHeadersSourceData, IElementPropertyMetaData>> logger,
                 Func<IPipeline, FlowElementBase<SetHeadersSourceData, IElementPropertyMetaData>, SetHeadersSourceData> elementDataFactory,
-                Dictionary<string, object> propertyNameValuesToReturn) 
+                Dictionary<string, object> propertyNameValuesToReturn)
                 : base(logger, elementDataFactory)
             {
                 _propertyNameValuesToReturn = propertyNameValuesToReturn;
@@ -76,6 +76,47 @@ namespace FiftyOne.Pipeline.Engines.FiftyOne.Tests.FlowElements
             {
                 var sourceData = data.GetOrAdd(ElementDataKey, p => CreateElementData(p));
                 sourceData.PopulateFrom(_propertyNameValuesToReturn);
+            }
+
+            protected override void UnmanagedResourcesCleanup()
+            {
+            }
+        }
+
+        /// <summary>
+        /// Simulates an engine that declares SetHeader* properties but skips adding
+        /// element data to IFlowData (e.g. CloudDeviceDetectionHashEngine when no
+        /// device properties are requested via the 'values' query parameter).
+        /// </summary>
+        private class PassivePropertySourceElement : FlowElementBase<SetHeadersSourceData, IElementPropertyMetaData>
+        {
+            private List<string> _propertyNames;
+
+            public PassivePropertySourceElement(
+                ILogger<FlowElementBase<SetHeadersSourceData, IElementPropertyMetaData>> logger,
+                Func<IPipeline, FlowElementBase<SetHeadersSourceData, IElementPropertyMetaData>, SetHeadersSourceData> elementDataFactory,
+                List<string> propertyNames)
+                : base(logger, elementDataFactory)
+            {
+                _propertyNames = propertyNames;
+            }
+
+            public override string ElementDataKey => "passivesourceelement";
+
+            public override IEvidenceKeyFilter EvidenceKeyFilter => new EvidenceKeyFilterWhitelist(new List<string>());
+
+            public override IList<IElementPropertyMetaData> Properties => _propertyNames
+                .Select(p => new ElementPropertyMetaData(this, p, typeof(object), true))
+                .Cast<IElementPropertyMetaData>()
+                .ToList();
+
+            protected override void ManagedResourcesCleanup()
+            {
+            }
+
+            protected override void ProcessInternal(IFlowData data)
+            {
+                // Intentionally does not add element data to flow data.
             }
 
             protected override void UnmanagedResourcesCleanup()
@@ -300,6 +341,83 @@ namespace FiftyOne.Pipeline.Engines.FiftyOne.Tests.FlowElements
             Assert.IsTrue(typedOutput.ResponseHeaderDictionary.ContainsKey("Accept-CH"));
             Assert.AreEqual("Sec-CH-UA,Sec-CH-UA-Model,Sec-CH-UA-Mobile",
                 typedOutput.ResponseHeaderDictionary["Accept-CH"]);
+        }
+
+        /// <summary>
+        /// Source element declares a SetHeader* property but skips adding its element data
+        /// to IFlowData (simulating e.g. DeviceDetectionHashEngine when no device
+        /// properties are requested). SetHeadersElement should produce an empty dictionary
+        /// rather than throwing a KeyNotFoundException.
+        /// </summary>
+        [TestMethod]
+        public void SetHeadersElement_SourceElementSkipped_EmptyDictionary()
+        {
+            var passiveElement = new PassivePropertySourceElement(
+                _loggerFactory.CreateLogger<PassivePropertySourceElement>(),
+                (pipeline, element) => new SetHeadersSourceData(
+                    _loggerFactory.CreateLogger<SetHeadersSourceData>(), pipeline),
+                ["SetHeaderBrowserAccept-CH"]);
+
+            _element = new SetHeadersElement(
+                _loggerFactory.CreateLogger<SetHeadersElement>(),
+                (pipeline, element) => new SetHeadersData(
+                    _loggerFactory.CreateLogger<SetHeadersData>(), pipeline));
+
+            _pipeline = new PipelineBuilder(_loggerFactory)
+                .AddFlowElement(passiveElement)
+                .AddFlowElement(_element)
+                .Build();
+
+            var data = _pipeline.CreateFlowData();
+            // Should not throw even though the source element added no element data.
+            data.Process();
+
+            var typedOutput = GetFromFlowData(data);
+            Assert.IsEmpty(typedOutput.ResponseHeaderDictionary);
+        }
+
+        /// <summary>
+        /// One source element is active (adds element data with a SetHeader* property)
+        /// and one is passive (skips adding element data). SetHeadersElement should
+        /// include the header from the active element and silently skip the passive one.
+        /// </summary>
+        [TestMethod]
+        public void SetHeadersElement_OneSourceElementSkipped_PartialDictionary()
+        {
+            var activeElement = new ActivePropertySourceElement(
+                _loggerFactory.CreateLogger<ActivePropertySourceElement>(),
+                (pipeline, element) => new SetHeadersSourceData(
+                    _loggerFactory.CreateLogger<SetHeadersSourceData>(), pipeline),
+                new Dictionary<string, object>
+                {
+                    { "SetHeaderBrowserAccept-CH", "Sec-CH-UA" }
+                });
+
+            var passiveElement = new PassivePropertySourceElement(
+                _loggerFactory.CreateLogger<PassivePropertySourceElement>(),
+                (pipeline, _) => new SetHeadersSourceData(
+                    _loggerFactory.CreateLogger<SetHeadersSourceData>(), pipeline),
+                ["SetHeaderHardwareCritical-CH"]);
+
+            _element = new SetHeadersElement(
+                _loggerFactory.CreateLogger<SetHeadersElement>(),
+                (pipeline, _) => new SetHeadersData(
+                    _loggerFactory.CreateLogger<SetHeadersData>(), pipeline));
+
+            _pipeline = new PipelineBuilder(_loggerFactory)
+                .AddFlowElement(activeElement)
+                .AddFlowElement(passiveElement)
+                .AddFlowElement(_element)
+                .Build();
+
+            var data = _pipeline.CreateFlowData();
+            data.Process();
+
+            var typedOutput = GetFromFlowData(data);
+            Assert.HasCount(1, typedOutput.ResponseHeaderDictionary);
+            Assert.IsTrue(typedOutput.ResponseHeaderDictionary.ContainsKey("Accept-CH"));
+            Assert.AreEqual("Sec-CH-UA", typedOutput.ResponseHeaderDictionary["Accept-CH"]);
+            Assert.IsFalse(typedOutput.ResponseHeaderDictionary.ContainsKey("Critical-CH"));
         }
 
         private SetHeadersData GetFromFlowData(IFlowData data)
