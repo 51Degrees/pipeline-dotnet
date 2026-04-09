@@ -21,7 +21,6 @@
  * ********************************************************************* */
 
 using FiftyOne.Pipeline.Core.Data;
-using FiftyOne.Pipeline.Core.FlowElements;
 using FiftyOne.Pipeline.Engines.Data;
 using FiftyOne.Pipeline.Engines.FiftyOne.Data;
 using FiftyOne.Pipeline.Engines.FlowElements;
@@ -36,7 +35,8 @@ namespace FiftyOne.Pipeline.Engines.FiftyOne.FlowElements
     /// Base class for engines that use an index of property values to 
     /// profile ids to populate one or more profile instances if a valid
     /// value for a specific configured property is provided in the evidence.
-    /// The specific property to look for is determined by <see cref="GetKeyPropertyName()"/>.
+    /// The specific property to look for is determined by
+    /// <see cref="GetKeyPropertyName()"/>.
     /// </summary>
     /// <typeparam name="TData">
     /// The type of multi-profile data returned by the engine. Must 
@@ -102,6 +102,12 @@ namespace FiftyOne.Pipeline.Engines.FiftyOne.FlowElements
                 // CreateElementData is overridden by concrete subclasses.
                 aspectDataFactory: null)
         {
+            if (indexedProperties == null || indexedProperties.Count == 0)
+            {
+                throw new ArgumentException(
+                    "At least one property must be indexed.",
+                    nameof(indexedProperties));
+            }
             LoggerFactory = loggerFactory;
             IndexedProperties = indexedProperties;
         }
