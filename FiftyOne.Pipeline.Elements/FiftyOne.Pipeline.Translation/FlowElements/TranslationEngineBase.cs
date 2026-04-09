@@ -399,7 +399,7 @@ namespace FiftyOne.Pipeline.Translation.FlowElements
         }
 
         /// <summary>
-        /// Populates the translation data wither all configured translations using
+        /// Populates the translation data with all configured translations using
         /// the provided translator.
         /// </summary>
         /// <param name="sourceData"></param>
