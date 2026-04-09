@@ -111,6 +111,12 @@ namespace FiftyOne.Pipeline.Core.Data
             }
         }
 
+        /// <inheritdoc/>
+        public bool TryGet(string key, out object value)
+        {
+            return _data.TryGetValue(key, out value);
+        }
+
         /// <summary>
         /// Get the data contained in this instance as an 
         /// <see cref="IReadOnlyDictionary{TKey, TValue}"/>.
@@ -150,6 +156,7 @@ namespace FiftyOne.Pipeline.Core.Data
                 this[value.Key] = value.Value;
             }
         }
+
         /// <summary>
         /// Deprecated. Use PopulateFrom method.
         /// Use the values in the specified dictionary to populate
