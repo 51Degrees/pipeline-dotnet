@@ -145,57 +145,60 @@ namespace FiftyOne.Pipeline.Engines.FiftyOne.FlowElements
         private Dictionary<string, string> BuildResponseHeaderDictionary(
             IFlowData data, PipelineConfig config)
         {
-            Dictionary<string, HashSet<string>> result = new Dictionary<string, HashSet<string>>();
+            var result = new Dictionary<string, HashSet<string>>();
 
             // Iterate through 'SetHeader*' properties
             foreach(var property in config.SetHeaderProperties)
             {
-                // Get the value for this property. The element may not have run
-                // (e.g. when only a subset of properties was requested), so use
-                // TryGet rather than Get to avoid a KeyNotFoundException.
-                if (data.TryGet(property.Value.PropertyMetaData.Element.ElementDataKey,
-                        out var elementData) == false)
+
+                // Get the element data for this property's element data key.
+                // The element may not have run (e.g. when only a subset of
+                // properties was requested), so use TryGet rather than Get to
+                // avoid a KeyNotFoundException.
+                if (data.TryGet(
+                    property.Value.PropertyMetaData.Element.ElementDataKey,
+                    out var elementData) == false)
                 {
                     continue;
                 }
-                object propertyValue = null;
-                try
-                {
-                    propertyValue = elementData[property.Key];
-                }
-                catch (PropertyMissingException e)
-                {
-                    Logger.LogWarning($"Property '${property.Key}' was missing. " +
-                        $"Not adding SetHeader value. Error was: ${e.Message}");
-                }
-                if (propertyValue != null)
-                {
-                    // Extract the string value.
-                    var headerValue = GetHeaderValue(propertyValue);
 
-                    // If value is not blank, null or 'unknown' then
-                    // add it to the complete value for the associated
-                    // header.
-                    if (string.IsNullOrEmpty(headerValue) == false &&
-                        headerValue.Equals("Unknown", StringComparison.OrdinalIgnoreCase) == false)
+                // Use TryGet method rather than Get to obtain the property
+                // value from the element data to avoid a KeyNotFoundException.
+                if (elementData.TryGet(
+                    property.Key, 
+                    out var propertyValue) == false)
+                {
+                    Logger.LogWarning(
+                        $"Property '${property.Key}' missing value. " +
+                        "Not adding SetHeader value.");
+                    continue;
+                }
+
+                // Extract the string value.
+                var headerValue = GetHeaderValue(propertyValue);
+
+                // If value is not blank, null or 'unknown' then
+                // add it to the complete value for the associated
+                // header.
+                if (string.IsNullOrEmpty(headerValue) == false &&
+                    headerValue.Equals("Unknown", StringComparison.OrdinalIgnoreCase) == false)
+                {
+                    HashSet<string> values;
+                    if (result.TryGetValue(property.Value.ResponseHeaderName, out values) == false)
                     {
-                        HashSet<string> values;
-                        if (result.TryGetValue(property.Value.ResponseHeaderName, out values) == false)
+                        // No entry for this header name so create it.
+                        values = new HashSet<string>();
+                        result.Add(property.Value.ResponseHeaderName, values);
+                    }
+                    // Get the individual entries from the comma-separated value for this
+                    // property. If each entry is not already in the list of values for this 
+                    // header then add it.
+                    foreach (var value in headerValue.Split(',')
+                        .Select(v => v.Trim()))
+                    {
+                        if (values.Contains(value) == false)
                         {
-                            // No entry for this header name so create it.
-                            values = new HashSet<string>();
-                            result.Add(property.Value.ResponseHeaderName, values);
-                        }
-                        // Get the individual entries from the comma-separated value for this
-                        // property. If each entry is not already in the list of values for this 
-                        // header then add it.
-                        foreach (var value in headerValue.Split(',')
-                            .Select(v => v.Trim()))
-                        {
-                            if (values.Contains(value) == false)
-                            {
-                                values.Add(value);
-                            }
+                            values.Add(value);
                         }
                     }
                 }
