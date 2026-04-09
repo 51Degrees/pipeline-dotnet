@@ -48,23 +48,39 @@ namespace FiftyOne.Pipeline.Engines.FiftyOne.Tests.FlowElements
 
         private class ActivePropertySourceElement : FlowElementBase<SetHeadersSourceData, IElementPropertyMetaData>
         {
-            private Dictionary<string, object> _propertyNameValuesToReturn;
+            private Dictionary<string, object> _propertyValuesToReturn;
+            private IReadOnlyCollection<string> _properties;
 
+            /// <summary>
+            /// Test source element
+            /// </summary>
+            /// <param name="logger"></param>
+            /// <param name="elementDataFactory"></param>
+            /// <param name="propertyValuesToReturn">
+            /// The properties and values that the test element will return.
+            /// </param>
+            /// <param name="properties">
+            /// The properties that should be returned from the element. Might
+            /// be different to the keys in propertyValuesToReturn for some
+            /// tests.
+            /// </param>
             public ActivePropertySourceElement(
                 ILogger<FlowElementBase<SetHeadersSourceData, IElementPropertyMetaData>> logger,
                 Func<IPipeline, FlowElementBase<SetHeadersSourceData, IElementPropertyMetaData>, SetHeadersSourceData> elementDataFactory,
-                Dictionary<string, object> propertyNameValuesToReturn) 
+                Dictionary<string, object> propertyValuesToReturn,
+                IReadOnlyCollection<string> properties)
                 : base(logger, elementDataFactory)
             {
-                _propertyNameValuesToReturn = propertyNameValuesToReturn;
+                _propertyValuesToReturn = propertyValuesToReturn;
+                _properties = properties;
             }
 
             public override string ElementDataKey => "setheaderssourceelement";
 
             public override IEvidenceKeyFilter EvidenceKeyFilter => new EvidenceKeyFilterWhitelist(new List<string>());
 
-            public override IList<IElementPropertyMetaData> Properties => _propertyNameValuesToReturn
-                .Select(p => new ElementPropertyMetaData(this, p.Key, typeof(object), true))
+            public override IList<IElementPropertyMetaData> Properties => _properties
+                .Select(p => new ElementPropertyMetaData(this, p, typeof(object), true))
                 .Cast<IElementPropertyMetaData>()
                 .ToList();
 
@@ -75,7 +91,48 @@ namespace FiftyOne.Pipeline.Engines.FiftyOne.Tests.FlowElements
             protected override void ProcessInternal(IFlowData data)
             {
                 var sourceData = data.GetOrAdd(ElementDataKey, p => CreateElementData(p));
-                sourceData.PopulateFrom(_propertyNameValuesToReturn);
+                sourceData.PopulateFrom(_propertyValuesToReturn);
+            }
+
+            protected override void UnmanagedResourcesCleanup()
+            {
+            }
+        }
+
+        /// <summary>
+        /// Simulates an engine that declares SetHeader* properties but skips adding
+        /// element data to IFlowData (e.g. CloudDeviceDetectionHashEngine when no
+        /// device properties are requested via the 'values' query parameter).
+        /// </summary>
+        private class PassivePropertySourceElement : FlowElementBase<SetHeadersSourceData, IElementPropertyMetaData>
+        {
+            private List<string> _propertyNames;
+
+            public PassivePropertySourceElement(
+                ILogger<FlowElementBase<SetHeadersSourceData, IElementPropertyMetaData>> logger,
+                Func<IPipeline, FlowElementBase<SetHeadersSourceData, IElementPropertyMetaData>, SetHeadersSourceData> elementDataFactory,
+                List<string> propertyNames)
+                : base(logger, elementDataFactory)
+            {
+                _propertyNames = propertyNames;
+            }
+
+            public override string ElementDataKey => "passivesourceelement";
+
+            public override IEvidenceKeyFilter EvidenceKeyFilter => new EvidenceKeyFilterWhitelist(new List<string>());
+
+            public override IList<IElementPropertyMetaData> Properties => _propertyNames
+                .Select(p => new ElementPropertyMetaData(this, p, typeof(object), true))
+                .Cast<IElementPropertyMetaData>()
+                .ToList();
+
+            protected override void ManagedResourcesCleanup()
+            {
+            }
+
+            protected override void ProcessInternal(IFlowData data)
+            {
+                // Intentionally does not add element data to flow data.
             }
 
             protected override void UnmanagedResourcesCleanup()
@@ -96,10 +153,15 @@ namespace FiftyOne.Pipeline.Engines.FiftyOne.Tests.FlowElements
         }
 
         /// <summary>
-        /// Helper method to create the flow elements and configure the pipeline
+        /// Helper method to create the flow elements and configure the pipeline.
         /// </summary>
+        /// <param name="propertyValues"></param>
+        /// <param name="properties">
+        /// If not provided the keys from propertyValues will be used.
+        /// </param>
         private void CreatePipeline(
-            Dictionary<string, object> propertyNameValues)
+            Dictionary<string, object> propertyValues,
+            IReadOnlyCollection<string> properties = null)
         {
             _sourceElement = new ActivePropertySourceElement(
                 _loggerFactory.CreateLogger<ActivePropertySourceElement>(),
@@ -107,15 +169,10 @@ namespace FiftyOne.Pipeline.Engines.FiftyOne.Tests.FlowElements
                 {
                     return new SetHeadersSourceData(_loggerFactory.CreateLogger<SetHeadersSourceData>(), pipeline);
                 },
-                propertyNameValues);
+                propertyValues,
+                properties ?? propertyValues.Keys);
 
-            _element = new SetHeadersElement(
-                _loggerFactory.CreateLogger<SetHeadersElement>(),
-                (IPipeline pipeline, FlowElementBase<ISetHeadersData, IElementPropertyMetaData> element) =>
-                {
-                    return new SetHeadersData(_loggerFactory.CreateLogger<SetHeadersData>(), pipeline);
-                });
-
+            _element = new SetHeadersElementBuilder(_loggerFactory).Build();
             _pipeline = new PipelineBuilder(_loggerFactory)
                 .AddFlowElement(_sourceElement)
                 .AddFlowElement(_element)
@@ -128,7 +185,7 @@ namespace FiftyOne.Pipeline.Engines.FiftyOne.Tests.FlowElements
         /// Output from SetHeadersElement should contain the expected 
         /// header value.
         /// </summary>
-        [DataTestMethod]
+        [TestMethod]
         // Output should be the same whether value is wrapped in 
         // AspectPropertyValue or not.
         [DataRow(true)]
@@ -147,12 +204,12 @@ namespace FiftyOne.Pipeline.Engines.FiftyOne.Tests.FlowElements
                 { "SetHeaderBrowserAccept-CH", value }
             };
             CreatePipeline(propertyNameValues);            
-            var data = _pipeline.CreateFlowData();
+            using var data = _pipeline.CreateFlowData();
             data.Process();
 
             // Verify the output
             var typedOutput = GetFromFlowData(data);
-            Assert.AreEqual(1, typedOutput.ResponseHeaderDictionary.Count);
+            Assert.HasCount(1, typedOutput.ResponseHeaderDictionary);
             Assert.IsTrue(typedOutput.ResponseHeaderDictionary.ContainsKey("Accept-CH"));
             Assert.AreEqual("UA-Platform", typedOutput.ResponseHeaderDictionary["Accept-CH"]);
         }
@@ -161,7 +218,7 @@ namespace FiftyOne.Pipeline.Engines.FiftyOne.Tests.FlowElements
         /// The 'SetHeaderAcceptCH' property is set to various invalid values.
         /// Output from SetHeadersElement should be an empty dictionary.
         /// </summary>
-        [DataTestMethod]
+        [TestMethod]
         [DataRow(null)]
         [DataRow(123)]
         [DataRow("Unknown")]
@@ -172,12 +229,33 @@ namespace FiftyOne.Pipeline.Engines.FiftyOne.Tests.FlowElements
                 { "SetHeaderBrowserAccept-CH", sourcePropertyValue }
             };
             CreatePipeline(propertyNameValues);
-            var data = _pipeline.CreateFlowData();
+            using var data = _pipeline.CreateFlowData();
             data.Process();
 
             // Verify the output
             var typedOutput = GetFromFlowData(data);
-            Assert.AreEqual(0, typedOutput.ResponseHeaderDictionary.Count);
+            Assert.IsEmpty(typedOutput.ResponseHeaderDictionary);
+        }
+
+        /// <summary>
+        /// Require the element to return a value for a property that is not
+        /// populated and verify that a warning is logged.
+        /// </summary>
+        [TestMethod]
+        public void SetHeadersElement_MissingProperty()
+        {
+            CreatePipeline(new(), ["SetHeaderBrowserAccept-CH"]);
+            using var data = _pipeline.CreateFlowData();
+            data.Process();
+
+            // Verify the output
+            var typedOutput = GetFromFlowData(data);
+            Assert.IsEmpty(typedOutput.ResponseHeaderDictionary);
+            Assert.HasCount(
+                1, 
+                _loggerFactory.Loggers.SelectMany(i=>i.WarningEntries),
+                "One warning should be logged to indicate that the " +
+                "SetHeaderBrowserAccept-CH property could not be found.");
         }
 
         /// <summary>
@@ -185,7 +263,7 @@ namespace FiftyOne.Pipeline.Engines.FiftyOne.Tests.FlowElements
         /// that are wrapped in an AspectPropertyValue.
         /// Output from SetHeadersElement should be an empty dictionary.
         /// </summary>
-        [DataTestMethod]
+        [TestMethod]
         [DataRow(false)]
         [DataRow(true, null)]
         public void SetHeadersElement_APV_InvalidPropertyValues(bool hasValue, string sourcePropertyValue = null)
@@ -201,19 +279,19 @@ namespace FiftyOne.Pipeline.Engines.FiftyOne.Tests.FlowElements
                 { "SetHeaderBrowserAccept-CH", value }
             };
             CreatePipeline(propertyNameValues);
-            var data = _pipeline.CreateFlowData();
+            using var data = _pipeline.CreateFlowData();
             data.Process();
 
             // Verify the output
             var typedOutput = GetFromFlowData(data);
-            Assert.AreEqual(0, typedOutput.ResponseHeaderDictionary.Count);
+            Assert.IsEmpty(typedOutput.ResponseHeaderDictionary);
         }
 
         /// <summary>
         /// Test that various invalid property names cause
         /// an exception to be thrown
         /// </summary>
-        [DataTestMethod]
+        [TestMethod]
         [DataRow("SetHeader")]
         [DataRow("SetHeaderBrowser")]
         public void SetHeadersElement_InvalidPropertyNames(string sourcePropertyName)
@@ -223,7 +301,7 @@ namespace FiftyOne.Pipeline.Engines.FiftyOne.Tests.FlowElements
                 { sourcePropertyName, "TEST" }
             };
             CreatePipeline(propertyNameValues);
-            var data = _pipeline.CreateFlowData();
+            using var data = _pipeline.CreateFlowData();
             Assert.ThrowsExactly<AggregateException>(() => data.Process());
         }
 
@@ -241,11 +319,11 @@ namespace FiftyOne.Pipeline.Engines.FiftyOne.Tests.FlowElements
                 { "SetHeaderHardwareCritical-CH", "Sec-CH-UA-Model,Sec-CH-UA-Mobile" }
             };
             CreatePipeline(propertyNameValues);
-            var data = _pipeline.CreateFlowData();
+            using var data = _pipeline.CreateFlowData();
             data.Process();
 
             var typedOutput = GetFromFlowData(data);
-            Assert.AreEqual(2, typedOutput.ResponseHeaderDictionary.Count);
+            Assert.HasCount(2, typedOutput.ResponseHeaderDictionary);
             Assert.IsTrue(typedOutput.ResponseHeaderDictionary.ContainsKey("Accept-CH"));
             Assert.IsTrue(typedOutput.ResponseHeaderDictionary.ContainsKey("Critical-CH"));
             Assert.AreEqual("Sec-CH-UA",
@@ -267,11 +345,11 @@ namespace FiftyOne.Pipeline.Engines.FiftyOne.Tests.FlowElements
                 { "SetHeaderHardwareAccept-CH", "Sec-CH-UA-Model,Sec-CH-UA-Mobile" }
             };
             CreatePipeline(propertyNameValues);
-            var data = _pipeline.CreateFlowData();
+            using var data = _pipeline.CreateFlowData();
             data.Process();
 
             var typedOutput = GetFromFlowData(data);
-            Assert.AreEqual(1, typedOutput.ResponseHeaderDictionary.Count);
+            Assert.HasCount(1, typedOutput.ResponseHeaderDictionary);
             Assert.IsTrue(typedOutput.ResponseHeaderDictionary.ContainsKey("Accept-CH"));
             Assert.AreEqual("Sec-CH-UA,Sec-CH-UA-Model,Sec-CH-UA-Mobile", 
                 typedOutput.ResponseHeaderDictionary["Accept-CH"]);
@@ -292,14 +370,92 @@ namespace FiftyOne.Pipeline.Engines.FiftyOne.Tests.FlowElements
                 { "SetHeaderHardwareAccept-CH", "Sec-CH-UA-Model,Sec-CH-UA-Mobile" }
             };
             CreatePipeline(propertyNameValues);
-            var data = _pipeline.CreateFlowData();
+            using var data = _pipeline.CreateFlowData();
             data.Process();
 
             var typedOutput = GetFromFlowData(data);
-            Assert.AreEqual(1, typedOutput.ResponseHeaderDictionary.Count);
+            Assert.HasCount(1, typedOutput.ResponseHeaderDictionary);
             Assert.IsTrue(typedOutput.ResponseHeaderDictionary.ContainsKey("Accept-CH"));
             Assert.AreEqual("Sec-CH-UA,Sec-CH-UA-Model,Sec-CH-UA-Mobile",
                 typedOutput.ResponseHeaderDictionary["Accept-CH"]);
+        }
+
+        /// <summary>
+        /// Source element declares a SetHeader* property but skips adding its element data
+        /// to IFlowData (simulating e.g. DeviceDetectionHashEngine when no device
+        /// properties are requested). SetHeadersElement should produce an empty dictionary
+        /// rather than throwing a KeyNotFoundException.
+        /// </summary>
+        [TestMethod]
+        public void SetHeadersElement_SourceElementSkipped_EmptyDictionary()
+        {
+            var passiveElement = new PassivePropertySourceElement(
+                _loggerFactory.CreateLogger<PassivePropertySourceElement>(),
+                (pipeline, element) => new SetHeadersSourceData(
+                    _loggerFactory.CreateLogger<SetHeadersSourceData>(), pipeline),
+                ["SetHeaderBrowserAccept-CH"]);
+
+            _element = new SetHeadersElement(
+                _loggerFactory.CreateLogger<SetHeadersElement>(),
+                (pipeline, element) => new SetHeadersData(
+                    _loggerFactory.CreateLogger<SetHeadersData>(), pipeline));
+
+            _pipeline = new PipelineBuilder(_loggerFactory)
+                .AddFlowElement(passiveElement)
+                .AddFlowElement(_element)
+                .Build();
+
+            using var data = _pipeline.CreateFlowData();
+            // Should not throw even though the source element added no element data.
+            data.Process();
+
+            var typedOutput = GetFromFlowData(data);
+            Assert.IsEmpty(typedOutput.ResponseHeaderDictionary);
+        }
+
+        /// <summary>
+        /// One source element is active (adds element data with a SetHeader* property)
+        /// and one is passive (skips adding element data). SetHeadersElement should
+        /// include the header from the active element and silently skip the passive one.
+        /// </summary>
+        [TestMethod]
+        public void SetHeadersElement_OneSourceElementSkipped_PartialDictionary()
+        {
+            var activeElement = new ActivePropertySourceElement(
+                _loggerFactory.CreateLogger<ActivePropertySourceElement>(),
+                (pipeline, element) => new SetHeadersSourceData(
+                    _loggerFactory.CreateLogger<SetHeadersSourceData>(), pipeline),
+                new Dictionary<string, object>
+                {
+                    { "SetHeaderBrowserAccept-CH", "Sec-CH-UA" }
+                },
+                ["SetHeaderBrowserAccept-CH"]);
+
+            var passiveElement = new PassivePropertySourceElement(
+                _loggerFactory.CreateLogger<PassivePropertySourceElement>(),
+                (pipeline, _) => new SetHeadersSourceData(
+                    _loggerFactory.CreateLogger<SetHeadersSourceData>(), pipeline),
+                ["SetHeaderHardwareCritical-CH"]);
+
+            _element = new SetHeadersElement(
+                _loggerFactory.CreateLogger<SetHeadersElement>(),
+                (pipeline, _) => new SetHeadersData(
+                    _loggerFactory.CreateLogger<SetHeadersData>(), pipeline));
+
+            _pipeline = new PipelineBuilder(_loggerFactory)
+                .AddFlowElement(activeElement)
+                .AddFlowElement(passiveElement)
+                .AddFlowElement(_element)
+                .Build();
+
+            using var data = _pipeline.CreateFlowData();
+            data.Process();
+
+            var typedOutput = GetFromFlowData(data);
+            Assert.HasCount(1, typedOutput.ResponseHeaderDictionary);
+            Assert.IsTrue(typedOutput.ResponseHeaderDictionary.ContainsKey("Accept-CH"));
+            Assert.AreEqual("Sec-CH-UA", typedOutput.ResponseHeaderDictionary["Accept-CH"]);
+            Assert.IsFalse(typedOutput.ResponseHeaderDictionary.ContainsKey("Critical-CH"));
         }
 
         private SetHeadersData GetFromFlowData(IFlowData data)

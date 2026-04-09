@@ -63,7 +63,7 @@ namespace FiftyOne.Pipeline.Engines.FiftyOne.Tests.FlowElements
         /// <param name="minEntries"></param>
         /// <param name="maxQueueSize"></param>
         /// <param name="expectedMaxQueueSize"></param>
-        [DataTestMethod]
+        [TestMethod]
         [DataRow(null, null, 1000)]
         [DataRow(10, null, 1000)]
         [DataRow(100, null, 1000)]

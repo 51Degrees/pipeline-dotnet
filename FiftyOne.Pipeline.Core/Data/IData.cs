@@ -77,6 +77,16 @@ namespace FiftyOne.Pipeline.Core.Data
         /// <returns>
         /// The property value
         /// </returns>
-        object this[string key] { get; set;  }
+        object this[string key] { get; set; }
+
+        /// <summary>
+        /// Try and get the value associated with the property key.
+        /// </summary>
+        /// <param name="key">The name of the property</param>
+        /// <param name="value">The value associated with the key</param>
+        /// <returns>
+        /// True if the property key is found, otherwise false.
+        /// </returns>
+        bool TryGet(string key, out object value);
     }
 }

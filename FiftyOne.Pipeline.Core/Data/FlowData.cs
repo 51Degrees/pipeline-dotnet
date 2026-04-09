@@ -395,6 +395,22 @@ namespace FiftyOne.Pipeline.Core.Data
             return _data.AsStringKeyDictionary()[elementDataKey] as IElementData;
         }
 
+        /// <inheritdoc/>
+        public bool TryGet(string elementDataKey, out IElementData elementData)
+        {
+            if (_processed == false)
+            {
+                throw new PipelineException(Messages.ExceptionFlowDataNotYetProcessed);
+            }
+            if (elementDataKey == null)
+            {
+                throw new ArgumentNullException(nameof(elementDataKey));
+            }
+            var result = _data.AsStringKeyDictionary().TryGetValue(elementDataKey, out var value);
+            elementData = value as IElementData;
+            return result;
+        }
+
         /// <summary>
         /// Get the <see cref="IElementData"/> instance containing data
         /// populated by the specified element.
