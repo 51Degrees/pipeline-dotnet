@@ -204,7 +204,7 @@ namespace FiftyOne.Pipeline.Engines.FiftyOne.Tests.FlowElements
                 { "SetHeaderBrowserAccept-CH", value }
             };
             CreatePipeline(propertyNameValues);            
-            var data = _pipeline.CreateFlowData();
+            using var data = _pipeline.CreateFlowData();
             data.Process();
 
             // Verify the output
@@ -229,7 +229,7 @@ namespace FiftyOne.Pipeline.Engines.FiftyOne.Tests.FlowElements
                 { "SetHeaderBrowserAccept-CH", sourcePropertyValue }
             };
             CreatePipeline(propertyNameValues);
-            var data = _pipeline.CreateFlowData();
+            using var data = _pipeline.CreateFlowData();
             data.Process();
 
             // Verify the output
@@ -245,7 +245,7 @@ namespace FiftyOne.Pipeline.Engines.FiftyOne.Tests.FlowElements
         public void SetHeadersElement_MissingProperty()
         {
             CreatePipeline(new(), ["SetHeaderBrowserAccept-CH"]);
-            var data = _pipeline.CreateFlowData();
+            using var data = _pipeline.CreateFlowData();
             data.Process();
 
             // Verify the output
@@ -279,7 +279,7 @@ namespace FiftyOne.Pipeline.Engines.FiftyOne.Tests.FlowElements
                 { "SetHeaderBrowserAccept-CH", value }
             };
             CreatePipeline(propertyNameValues);
-            var data = _pipeline.CreateFlowData();
+            using var data = _pipeline.CreateFlowData();
             data.Process();
 
             // Verify the output
@@ -301,7 +301,7 @@ namespace FiftyOne.Pipeline.Engines.FiftyOne.Tests.FlowElements
                 { sourcePropertyName, "TEST" }
             };
             CreatePipeline(propertyNameValues);
-            var data = _pipeline.CreateFlowData();
+            using var data = _pipeline.CreateFlowData();
             Assert.ThrowsExactly<AggregateException>(() => data.Process());
         }
 
@@ -319,7 +319,7 @@ namespace FiftyOne.Pipeline.Engines.FiftyOne.Tests.FlowElements
                 { "SetHeaderHardwareCritical-CH", "Sec-CH-UA-Model,Sec-CH-UA-Mobile" }
             };
             CreatePipeline(propertyNameValues);
-            var data = _pipeline.CreateFlowData();
+            using var data = _pipeline.CreateFlowData();
             data.Process();
 
             var typedOutput = GetFromFlowData(data);
@@ -345,7 +345,7 @@ namespace FiftyOne.Pipeline.Engines.FiftyOne.Tests.FlowElements
                 { "SetHeaderHardwareAccept-CH", "Sec-CH-UA-Model,Sec-CH-UA-Mobile" }
             };
             CreatePipeline(propertyNameValues);
-            var data = _pipeline.CreateFlowData();
+            using var data = _pipeline.CreateFlowData();
             data.Process();
 
             var typedOutput = GetFromFlowData(data);
@@ -370,7 +370,7 @@ namespace FiftyOne.Pipeline.Engines.FiftyOne.Tests.FlowElements
                 { "SetHeaderHardwareAccept-CH", "Sec-CH-UA-Model,Sec-CH-UA-Mobile" }
             };
             CreatePipeline(propertyNameValues);
-            var data = _pipeline.CreateFlowData();
+            using var data = _pipeline.CreateFlowData();
             data.Process();
 
             var typedOutput = GetFromFlowData(data);
@@ -405,7 +405,7 @@ namespace FiftyOne.Pipeline.Engines.FiftyOne.Tests.FlowElements
                 .AddFlowElement(_element)
                 .Build();
 
-            var data = _pipeline.CreateFlowData();
+            using var data = _pipeline.CreateFlowData();
             // Should not throw even though the source element added no element data.
             data.Process();
 
@@ -448,7 +448,7 @@ namespace FiftyOne.Pipeline.Engines.FiftyOne.Tests.FlowElements
                 .AddFlowElement(_element)
                 .Build();
 
-            var data = _pipeline.CreateFlowData();
+            using var data = _pipeline.CreateFlowData();
             data.Process();
 
             var typedOutput = GetFromFlowData(data);
