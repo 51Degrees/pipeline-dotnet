@@ -150,13 +150,7 @@ namespace FiftyOne.Pipeline.Engines.FiftyOne.Tests.FlowElements
                 },
                 propertyNameValues);
 
-            _element = new SetHeadersElement(
-                _loggerFactory.CreateLogger<SetHeadersElement>(),
-                (IPipeline pipeline, FlowElementBase<ISetHeadersData, IElementPropertyMetaData> element) =>
-                {
-                    return new SetHeadersData(_loggerFactory.CreateLogger<SetHeadersData>(), pipeline);
-                });
-
+            _element = new SetHeadersElementBuilder(_loggerFactory).Build();
             _pipeline = new PipelineBuilder(_loggerFactory)
                 .AddFlowElement(_sourceElement)
                 .AddFlowElement(_element)
