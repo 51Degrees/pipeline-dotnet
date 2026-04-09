@@ -22,9 +22,7 @@
 
 using FiftyOne.Pipeline.Engines.Configuration;
 using FiftyOne.Pipeline.Engines.FlowElements;
-using FiftyOne.Pipeline.Engines.Services;
 using Microsoft.Extensions.Logging;
-using System;
 using System.Collections.Generic;
 
 namespace FiftyOne.Pipeline.Engines.FiftyOne.FlowElements
@@ -39,10 +37,10 @@ namespace FiftyOne.Pipeline.Engines.FiftyOne.FlowElements
     /// <typeparam name="TEngine">
     /// The type of engine this builder creates.
     /// </typeparam>
-    public abstract class PropertyKeyedEngineBuilderBase<TBuilder, TEngine> 
-        : SingleFileAspectEngineBuilderBase<TBuilder, TEngine>
+    public abstract class PropertyKeyedEngineBuilderBase<TBuilder, TEngine>
+        : AspectEngineBuilderBase<TBuilder, TEngine>
         where TBuilder : PropertyKeyedEngineBuilderBase<TBuilder, TEngine>
-        where TEngine : IOnPremiseAspectEngine
+        where TEngine : IAspectEngine
     {
         /// <summary>
         /// Logger factory for the builder and any elements that are 
@@ -56,18 +54,26 @@ namespace FiftyOne.Pipeline.Engines.FiftyOne.FlowElements
         protected readonly ILogger<PropertyKeyedEngineBuilderBase<TBuilder, TEngine>> _logger;
 
         /// <summary>
-        /// Constructs a new instance of 
+        /// Constructs a new instance of
         /// <see cref="PropertyKeyedEngineBuilderBase{TBuilder, TEngine}"/>.
         /// </summary>
         /// <param name="loggerFactory"></param>
-        /// <param name="dataUpdateService"></param>
-        protected PropertyKeyedEngineBuilderBase(
-            ILoggerFactory loggerFactory,
-            IDataUpdateService dataUpdateService)
-            : base(dataUpdateService)
+        protected PropertyKeyedEngineBuilderBase(ILoggerFactory loggerFactory)
         {
             _loggerFactory = loggerFactory;
             _logger = _loggerFactory.CreateLogger<PropertyKeyedEngineBuilderBase<TBuilder, TEngine>>();
+        }
+
+        /// <summary>
+        /// Build the engine using the configured options.
+        /// Property-keyed engines do not use a data file — they resolve
+        /// their data from another engine already in the pipeline at
+        /// runtime, via the concrete subclass's AddPipeline override.
+        /// </summary>
+        /// <returns>The built engine.</returns>
+        public TEngine Build()
+        {
+            return BuildEngine();
         }
 
         /// <summary>
