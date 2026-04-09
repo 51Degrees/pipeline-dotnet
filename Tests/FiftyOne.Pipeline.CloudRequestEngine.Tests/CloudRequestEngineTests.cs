@@ -103,6 +103,96 @@ namespace FiftyOne.Pipeline.CloudRequestEngine.Tests
         }
 
         /// <summary>
+        /// Verify that nested evidence keys like 'query.id.usage' preserve
+        /// the full suffix 'id.usage' rather than just the last segment 'usage'.
+        /// </summary>
+        [TestMethod]
+        public void EvidenceNestedKey_PreservesFullSuffix()
+        {
+            string resourceKey = "resource_key";
+            string nestedKey = "query.id.usage";
+            string value = "test123";
+            string capturedContent = null;
+
+            // Set up mock to capture the request content
+            _handlerMock = new Mock<HttpMessageHandler>(MockBehavior.Strict);
+            
+            // Set up the JSON response - capture content for later assertion
+            _handlerMock
+               .Protected()
+               .Setup<Task<HttpResponseMessage>>(
+                  "SendAsync",
+                  ItExpr.Is<HttpRequestMessage>(r =>
+                      r.RequestUri.AbsolutePath.ToLower().EndsWith("json")),
+                  ItExpr.IsAny<CancellationToken>()
+               )
+               .ReturnsAsync((HttpRequestMessage req, CancellationToken ct) =>
+               {
+                   // Capture the content for assertion
+                   capturedContent = req.Content.ReadAsStringAsync().Result;
+                   return new HttpResponseMessage()
+                   {
+                       StatusCode = _jsonResponseStatus,
+                       Content = new StringContent(_jsonResponse),
+                   };
+               })
+               .Verifiable();
+
+            // Set up the evidencekeys response
+            _handlerMock
+               .Protected()
+               .Setup<Task<HttpResponseMessage>>(
+                  "SendAsync",
+                  ItExpr.Is<HttpRequestMessage>(r =>
+                      r.RequestUri.AbsolutePath.ToLower().EndsWith("evidencekeys")),
+                  ItExpr.IsAny<CancellationToken>()
+               )
+               .ReturnsAsync(() => new HttpResponseMessage()
+               {
+                   StatusCode = _evidenceKeysResponseStatus,
+                   Content = new StringContent(_evidenceKeysResponse),
+               })
+               .Verifiable();
+
+            // Set up the accessibleproperties response
+            _handlerMock
+               .Protected()
+               .Setup<Task<HttpResponseMessage>>(
+                  "SendAsync",
+                  ItExpr.Is<HttpRequestMessage>(r =>
+                      r.RequestUri.AbsolutePath.ToLower().EndsWith("accessibleproperties")),
+                  ItExpr.IsAny<CancellationToken>()
+               )
+               .ReturnsAsync(() => new HttpResponseMessage()
+               {
+                   StatusCode = _accessiblePropertiesResponseStatus,
+                   Content = new StringContent(_accessiblePropertiesResponse),
+               })
+               .Verifiable();
+
+            _httpClient = new HttpClient(_handlerMock.Object);
+
+            var engine = new CloudRequestEngineBuilder(
+                _loggerFactory,
+                _httpClient)
+                .SetResourceKey(resourceKey)
+                .Build();
+
+            using (var pipeline = new PipelineBuilder(_loggerFactory).AddFlowElement(engine).Build())
+            {
+                var data = pipeline.CreateFlowData();
+                data.AddEvidence(nestedKey, value);
+                data.Process();
+            }
+
+            // The key should be "id.usage" (everything after the first dot), not just "usage"
+            Assert.Contains(
+                "id.usage=test123",
+                capturedContent,
+                $"The nested key 'query.id.usage' should produce suffix 'id.usage', not just 'usage'.");
+        }
+
+        /// <summary>
         /// Test cloud request engine adds correct information to post request
         /// following the order of precedence when processing evidence and 
         /// returns the response in the ElementData. Evidence parameters 
