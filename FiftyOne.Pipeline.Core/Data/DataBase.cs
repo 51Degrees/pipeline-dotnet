@@ -201,9 +201,9 @@ namespace FiftyOne.Pipeline.Core.Data
                     $"property value requested for key '{key}'.");
             }
             T result = default(T);
-            if (_data.ContainsKey(key))
+            if (_data.TryGetValue(key, out var value))
             {
-                result = (T)_data[key];
+                result = (T)value;
             }
             return result;
         }
