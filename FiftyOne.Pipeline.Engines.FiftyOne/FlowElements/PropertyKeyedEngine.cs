@@ -28,9 +28,7 @@ using FiftyOne.Pipeline.Engines.FlowElements;
 using Microsoft.Extensions.Logging;
 using System;
 using System.Collections.Generic;
-using System.IO;
 using System.Linq;
-using System.Threading.Tasks;
 
 namespace FiftyOne.Pipeline.Engines.FiftyOne.FlowElements
 {
@@ -48,9 +46,8 @@ namespace FiftyOne.Pipeline.Engines.FiftyOne.FlowElements
     /// The type of profile data contained in the multi-profile result.
     /// Must implement <see cref="IAspectData"/>.
     /// </typeparam>
-    public abstract class PropertyKeyedEngine<TData, TProfile> : 
-        OnPremiseAspectEngineBase<TData, IFiftyOneAspectPropertyMetaData>, 
-        IDisposable
+    public abstract class PropertyKeyedEngine<TData, TProfile> :
+        AspectEngineBase<TData, IFiftyOneAspectPropertyMetaData>
         where TData : IMultiProfileData<TProfile>
         where TProfile : IAspectData
     {
@@ -100,11 +97,10 @@ namespace FiftyOne.Pipeline.Engines.FiftyOne.FlowElements
         protected PropertyKeyedEngine(
             ILoggerFactory loggerFactory,
             IReadOnlyList<string> indexedProperties) : base(
-            loggerFactory.CreateLogger<PropertyKeyedEngine<TData, TProfile>>(),
-			// Aspect data factory is not used by property keyed engines
-            aspectDataFactory: null, 
-			// Temp data is not used by property keyed engines
-            tempDataFilePath: null) 
+                loggerFactory.CreateLogger<PropertyKeyedEngine<TData, TProfile>>(),
+                // Aspect data factory is not used by property keyed engines.
+                // CreateElementData is overridden by concrete subclasses.
+                aspectDataFactory: null)
         {
             LoggerFactory = loggerFactory;
             IndexedProperties = indexedProperties;
@@ -141,31 +137,12 @@ namespace FiftyOne.Pipeline.Engines.FiftyOne.FlowElements
             uint profileId);
 
         /// <summary>
-        /// Builds the data set which contains properties and indexes that
-        /// will be consumed by the engine during processing. Implementations
-        /// are responsible for creating the indexes and populating them
-        /// from their data source.
-        /// </summary>
-        /// <param name="dataFilePath">Path to the data file.</param>
-        /// <returns>A new <see cref="PropertyKeyedDataSet"/>.</returns>
-        protected abstract PropertyKeyedDataSet BuildDataSet(string dataFilePath);
-
-        /// <summary>
-        /// Builds the data set from a stream. Implementations
-        /// are responsible for creating the indexes and populating them
-        /// from their data source.
-        /// </summary>
-        /// <param name="data">The data stream.</param>
-        /// <returns>A new <see cref="PropertyKeyedDataSet"/>.</returns>
-        protected abstract PropertyKeyedDataSet BuildDataSet(Stream data);
-
-        /// <summary>
         /// Ensure the data set and the associated pipeline and engine are
         /// disposed.
         /// </summary>
         protected override void ManagedResourcesCleanup()
         {
-            DataSet.Dispose();
+            DataSet?.Dispose();
             base.ManagedResourcesCleanup();
         }
 
@@ -226,33 +203,6 @@ namespace FiftyOne.Pipeline.Engines.FiftyOne.FlowElements
                     }
                 }
             }
-        }
-
-        /// <inheritdoc/>
-        public override void RefreshData(string dataFileIdentifier)
-        {
-            if (DataSet != null)
-            {
-                // Property keyed engines do not support data refresh.
-                // An exception is thrown since DataSet is already initialized.
-                throw new Exception("Data can not be refreshed");
-            }
-            DataSet = BuildDataSet(
-                DataFiles.First().DataFilePath);
-        }
-
-        /// <inheritdoc/>
-        public override void RefreshData(
-            string dataFileIdentifier, 
-            Stream data)
-        {
-            if (DataSet != null)
-            {
-                // Property keyed engines do not support data refresh.
-                // An exception is thrown since DataSet is already initialized.
-                throw new Exception("Data can not be refreshed");
-            }
-            DataSet = BuildDataSet(data);
         }
 
         /// <inheritdoc/>
