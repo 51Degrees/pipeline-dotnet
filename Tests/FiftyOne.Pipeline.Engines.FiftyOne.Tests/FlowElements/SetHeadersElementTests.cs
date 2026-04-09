@@ -48,23 +48,39 @@ namespace FiftyOne.Pipeline.Engines.FiftyOne.Tests.FlowElements
 
         private class ActivePropertySourceElement : FlowElementBase<SetHeadersSourceData, IElementPropertyMetaData>
         {
-            private Dictionary<string, object> _propertyNameValuesToReturn;
+            private Dictionary<string, object> _propertyValuesToReturn;
+            private IReadOnlyCollection<string> _properties;
 
+            /// <summary>
+            /// Test source element
+            /// </summary>
+            /// <param name="logger"></param>
+            /// <param name="elementDataFactory"></param>
+            /// <param name="propertyValuesToReturn">
+            /// The properties and values that the test element will return.
+            /// </param>
+            /// <param name="properties">
+            /// The properties that should be returned from the element. Might
+            /// be different to the keys in propertyValuesToReturn for some
+            /// tests.
+            /// </param>
             public ActivePropertySourceElement(
                 ILogger<FlowElementBase<SetHeadersSourceData, IElementPropertyMetaData>> logger,
                 Func<IPipeline, FlowElementBase<SetHeadersSourceData, IElementPropertyMetaData>, SetHeadersSourceData> elementDataFactory,
-                Dictionary<string, object> propertyNameValuesToReturn)
+                Dictionary<string, object> propertyValuesToReturn,
+                IReadOnlyCollection<string> properties)
                 : base(logger, elementDataFactory)
             {
-                _propertyNameValuesToReturn = propertyNameValuesToReturn;
+                _propertyValuesToReturn = propertyValuesToReturn;
+                _properties = properties;
             }
 
             public override string ElementDataKey => "setheaderssourceelement";
 
             public override IEvidenceKeyFilter EvidenceKeyFilter => new EvidenceKeyFilterWhitelist(new List<string>());
 
-            public override IList<IElementPropertyMetaData> Properties => _propertyNameValuesToReturn
-                .Select(p => new ElementPropertyMetaData(this, p.Key, typeof(object), true))
+            public override IList<IElementPropertyMetaData> Properties => _properties
+                .Select(p => new ElementPropertyMetaData(this, p, typeof(object), true))
                 .Cast<IElementPropertyMetaData>()
                 .ToList();
 
@@ -75,7 +91,7 @@ namespace FiftyOne.Pipeline.Engines.FiftyOne.Tests.FlowElements
             protected override void ProcessInternal(IFlowData data)
             {
                 var sourceData = data.GetOrAdd(ElementDataKey, p => CreateElementData(p));
-                sourceData.PopulateFrom(_propertyNameValuesToReturn);
+                sourceData.PopulateFrom(_propertyValuesToReturn);
             }
 
             protected override void UnmanagedResourcesCleanup()
@@ -137,10 +153,15 @@ namespace FiftyOne.Pipeline.Engines.FiftyOne.Tests.FlowElements
         }
 
         /// <summary>
-        /// Helper method to create the flow elements and configure the pipeline
+        /// Helper method to create the flow elements and configure the pipeline.
         /// </summary>
+        /// <param name="propertyValues"></param>
+        /// <param name="properties">
+        /// If not provided the keys from propertyValues will be used.
+        /// </param>
         private void CreatePipeline(
-            Dictionary<string, object> propertyNameValues)
+            Dictionary<string, object> propertyValues,
+            IReadOnlyCollection<string> properties = null)
         {
             _sourceElement = new ActivePropertySourceElement(
                 _loggerFactory.CreateLogger<ActivePropertySourceElement>(),
@@ -148,7 +169,8 @@ namespace FiftyOne.Pipeline.Engines.FiftyOne.Tests.FlowElements
                 {
                     return new SetHeadersSourceData(_loggerFactory.CreateLogger<SetHeadersSourceData>(), pipeline);
                 },
-                propertyNameValues);
+                propertyValues,
+                properties ?? propertyValues.Keys);
 
             _element = new SetHeadersElementBuilder(_loggerFactory).Build();
             _pipeline = new PipelineBuilder(_loggerFactory)
@@ -213,6 +235,27 @@ namespace FiftyOne.Pipeline.Engines.FiftyOne.Tests.FlowElements
             // Verify the output
             var typedOutput = GetFromFlowData(data);
             Assert.IsEmpty(typedOutput.ResponseHeaderDictionary);
+        }
+
+        /// <summary>
+        /// Require the element to return a value for a property that is not
+        /// populated and verify that a warning is logged.
+        /// </summary>
+        [TestMethod]
+        public void SetHeadersElement_MissingProperty()
+        {
+            CreatePipeline(new(), ["SetHeaderBrowserAccept-CH"]);
+            var data = _pipeline.CreateFlowData();
+            data.Process();
+
+            // Verify the output
+            var typedOutput = GetFromFlowData(data);
+            Assert.IsEmpty(typedOutput.ResponseHeaderDictionary);
+            Assert.HasCount(
+                1, 
+                _loggerFactory.Loggers.SelectMany(i=>i.WarningEntries),
+                "One warning should be logged to indicate that the " +
+                "SetHeaderBrowserAccept-CH property could not be found.");
         }
 
         /// <summary>
@@ -385,7 +428,8 @@ namespace FiftyOne.Pipeline.Engines.FiftyOne.Tests.FlowElements
                 new Dictionary<string, object>
                 {
                     { "SetHeaderBrowserAccept-CH", "Sec-CH-UA" }
-                });
+                },
+                ["SetHeaderBrowserAccept-CH"]);
 
             var passiveElement = new PassivePropertySourceElement(
                 _loggerFactory.CreateLogger<PassivePropertySourceElement>(),
