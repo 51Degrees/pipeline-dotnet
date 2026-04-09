@@ -169,7 +169,7 @@ namespace FiftyOne.Pipeline.Engines.FiftyOne.Tests.FlowElements
         /// Output from SetHeadersElement should contain the expected 
         /// header value.
         /// </summary>
-        [DataTestMethod]
+        [TestMethod]
         // Output should be the same whether value is wrapped in 
         // AspectPropertyValue or not.
         [DataRow(true)]
@@ -193,7 +193,7 @@ namespace FiftyOne.Pipeline.Engines.FiftyOne.Tests.FlowElements
 
             // Verify the output
             var typedOutput = GetFromFlowData(data);
-            Assert.AreEqual(1, typedOutput.ResponseHeaderDictionary.Count);
+            Assert.HasCount(1, typedOutput.ResponseHeaderDictionary);
             Assert.IsTrue(typedOutput.ResponseHeaderDictionary.ContainsKey("Accept-CH"));
             Assert.AreEqual("UA-Platform", typedOutput.ResponseHeaderDictionary["Accept-CH"]);
         }
@@ -202,7 +202,7 @@ namespace FiftyOne.Pipeline.Engines.FiftyOne.Tests.FlowElements
         /// The 'SetHeaderAcceptCH' property is set to various invalid values.
         /// Output from SetHeadersElement should be an empty dictionary.
         /// </summary>
-        [DataTestMethod]
+        [TestMethod]
         [DataRow(null)]
         [DataRow(123)]
         [DataRow("Unknown")]
@@ -218,7 +218,7 @@ namespace FiftyOne.Pipeline.Engines.FiftyOne.Tests.FlowElements
 
             // Verify the output
             var typedOutput = GetFromFlowData(data);
-            Assert.AreEqual(0, typedOutput.ResponseHeaderDictionary.Count);
+            Assert.IsEmpty(typedOutput.ResponseHeaderDictionary);
         }
 
         /// <summary>
@@ -226,7 +226,7 @@ namespace FiftyOne.Pipeline.Engines.FiftyOne.Tests.FlowElements
         /// that are wrapped in an AspectPropertyValue.
         /// Output from SetHeadersElement should be an empty dictionary.
         /// </summary>
-        [DataTestMethod]
+        [TestMethod]
         [DataRow(false)]
         [DataRow(true, null)]
         public void SetHeadersElement_APV_InvalidPropertyValues(bool hasValue, string sourcePropertyValue = null)
@@ -247,14 +247,14 @@ namespace FiftyOne.Pipeline.Engines.FiftyOne.Tests.FlowElements
 
             // Verify the output
             var typedOutput = GetFromFlowData(data);
-            Assert.AreEqual(0, typedOutput.ResponseHeaderDictionary.Count);
+            Assert.IsEmpty(typedOutput.ResponseHeaderDictionary);
         }
 
         /// <summary>
         /// Test that various invalid property names cause
         /// an exception to be thrown
         /// </summary>
-        [DataTestMethod]
+        [TestMethod]
         [DataRow("SetHeader")]
         [DataRow("SetHeaderBrowser")]
         public void SetHeadersElement_InvalidPropertyNames(string sourcePropertyName)
@@ -286,7 +286,7 @@ namespace FiftyOne.Pipeline.Engines.FiftyOne.Tests.FlowElements
             data.Process();
 
             var typedOutput = GetFromFlowData(data);
-            Assert.AreEqual(2, typedOutput.ResponseHeaderDictionary.Count);
+            Assert.HasCount(2, typedOutput.ResponseHeaderDictionary);
             Assert.IsTrue(typedOutput.ResponseHeaderDictionary.ContainsKey("Accept-CH"));
             Assert.IsTrue(typedOutput.ResponseHeaderDictionary.ContainsKey("Critical-CH"));
             Assert.AreEqual("Sec-CH-UA",
@@ -312,7 +312,7 @@ namespace FiftyOne.Pipeline.Engines.FiftyOne.Tests.FlowElements
             data.Process();
 
             var typedOutput = GetFromFlowData(data);
-            Assert.AreEqual(1, typedOutput.ResponseHeaderDictionary.Count);
+            Assert.HasCount(1, typedOutput.ResponseHeaderDictionary);
             Assert.IsTrue(typedOutput.ResponseHeaderDictionary.ContainsKey("Accept-CH"));
             Assert.AreEqual("Sec-CH-UA,Sec-CH-UA-Model,Sec-CH-UA-Mobile", 
                 typedOutput.ResponseHeaderDictionary["Accept-CH"]);
@@ -337,7 +337,7 @@ namespace FiftyOne.Pipeline.Engines.FiftyOne.Tests.FlowElements
             data.Process();
 
             var typedOutput = GetFromFlowData(data);
-            Assert.AreEqual(1, typedOutput.ResponseHeaderDictionary.Count);
+            Assert.HasCount(1, typedOutput.ResponseHeaderDictionary);
             Assert.IsTrue(typedOutput.ResponseHeaderDictionary.ContainsKey("Accept-CH"));
             Assert.AreEqual("Sec-CH-UA,Sec-CH-UA-Model,Sec-CH-UA-Mobile",
                 typedOutput.ResponseHeaderDictionary["Accept-CH"]);

@@ -92,8 +92,8 @@ namespace FiftyOne.Pipeline.Core.Tests.Data
             data[key] = new List<string>() { "a", "b" };
             var result = data[key] as List<string>;
 
-            Assert.IsTrue(result.Contains("a"));
-            Assert.IsTrue(result.Contains("b"));
+            Assert.Contains("a", result);
+            Assert.Contains("b", result);
         }
 
         /// <summary>
