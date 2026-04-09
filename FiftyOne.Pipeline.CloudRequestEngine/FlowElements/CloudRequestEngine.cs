@@ -755,7 +755,7 @@ namespace FiftyOne.Pipeline.CloudRequestEngine.FlowElements
             foreach (var item in evidence)
             {
                 // Get the key parts
-                var key = item.Key.Split(EVIDENCE_SEPARATOR_CHAR_ARRAY);
+                var key = item.Key.Split(EVIDENCE_SEPARATOR_CHAR_ARRAY, count: 2);
                 var prefix = key[0];
                 var suffix = key.Last();
 
