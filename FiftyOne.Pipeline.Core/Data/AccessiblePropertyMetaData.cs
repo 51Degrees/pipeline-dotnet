@@ -159,6 +159,9 @@ namespace FiftyOne.Pipeline.Core.Data
                 case "List`1":
                 case "IReadOnlyList`1":
                     return "Array";
+                case "AspectPropertyValue`1":
+                case "IAspectPropertyValue`1":
+                    return GetTypeName(type.GetGenericArguments()[0]);
                 default:
                     return type.Name;
             }
