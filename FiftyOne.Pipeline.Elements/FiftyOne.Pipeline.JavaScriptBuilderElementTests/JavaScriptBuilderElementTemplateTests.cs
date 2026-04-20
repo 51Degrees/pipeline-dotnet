@@ -29,6 +29,7 @@ using Microsoft.VisualStudio.TestTools.UnitTesting;
 using Moq;
 using Newtonsoft.Json.Linq;
 using OpenQA.Selenium;
+using System.IO;
 using System.Text;
 
 namespace FiftyOne.Pipeline.JavaScript.Tests
@@ -40,6 +41,15 @@ namespace FiftyOne.Pipeline.JavaScript.Tests
         private CancellationTokenSource webAppKillSwitch { get; set; }
         private JObject jsonData { get; set; } = new();
         private string fullJS { get; set; } = "";
+
+        /// <summary>
+        /// Server-side captured POST data from requests to /51dpipeline/json.
+        /// </summary>
+        private string capturedPostData { get; set; }
+        /// <summary>
+        /// Server-side flag set when /51dpipeline/completed is called.
+        /// </summary>
+        private bool capturedCompleted { get; set; }
 
         [ClassInitialize]
         public static new void ClassInit(TestContext context) => JavaScriptBuilderElementTestsBase.ClassInit(context).Wait();
@@ -72,8 +82,19 @@ namespace FiftyOne.Pipeline.JavaScript.Tests
             </html>
             """
             , "text/html"));
-            webApp.MapPost("/51dpipeline/json", () => jsonData);
-            webApp.MapPost("/51dpipeline/completed", () => Results.Empty);
+            webApp.MapPost("/51dpipeline/json", async (HttpContext ctx) =>
+            {
+                using var reader = new StreamReader(ctx.Request.Body);
+                var body = await reader.ReadToEndAsync();
+                capturedPostData = body;
+                Console.WriteLine($"[POST DATA] > {body}");
+                return Results.Json(jsonData);
+            });
+            webApp.MapPost("/51dpipeline/completed", () =>
+            {
+                capturedCompleted = true;
+                return Results.Empty;
+            });
 
             webApp.Use((ctx, next) =>
             {
@@ -110,20 +131,16 @@ namespace FiftyOne.Pipeline.JavaScript.Tests
         [Timeout(300_000)]
         public void JavaScriptBuilderTemplate_VerifyInterception()
         {
-            bool testDone = false;
-            OnRequestSent = e => {
-                var p = e.RequestPostData;
-                testDone = true;
-            };
+            capturedPostData = null;
             IJavaScriptExecutor js = Driver;
             var q = js.ExecuteScript(BuildXHRJS($"{ClientServerUrl}51dpipeline/json"));
-            while (!testDone)
+            while (capturedPostData == null)
             {
                 DumpNewLogs();
                 Thread.Sleep(1000);
             }
             DumpNewLogs();
-            Assert.IsTrue(testDone);
+            Assert.IsNotNull(capturedPostData);
         }
 
         public static IEnumerable<object[]> GetValidateSetCookieBlockData()
@@ -219,31 +236,19 @@ namespace FiftyOne.Pipeline.JavaScript.Tests
 
             // Completion testers
 
-            string postData = null;
-            bool completed = false;
-            OnRequestSent = e =>
-            {
-                if (e.RequestUrl.EndsWith("json"))
-                {
-                    postData = e.RequestPostData;
-                    Console.WriteLine($"[POST DATA] > {postData}");
-                }
-                if (e.RequestUrl.EndsWith("completed"))
-                {
-                    completed = true;
-                }
-            };
+            capturedPostData = null;
+            capturedCompleted = false;
             Action<string> WaitAndValidatePostData = (expectedData) =>
             {
-                while (postData == null)
+                while (capturedPostData == null)
                 {
                     DumpNewLogs();
                     Thread.Sleep(1000);
                 }
-                Assert.IsTrue(postData.Contains(expectedData), $"[{postData}] does not contain [{expectedData}]");
+                Assert.IsTrue(capturedPostData.Contains(expectedData), $"[{capturedPostData}] does not contain [{expectedData}]");
             };
             Action WaitAndValidateScriptCompletion = () => {
-                while (!completed)
+                while (!capturedCompleted)
                 {
                     DumpNewLogs();
                     Thread.Sleep(1000);
@@ -302,8 +307,8 @@ namespace FiftyOne.Pipeline.JavaScript.Tests
 
             var secondaryData = BuildNewDataObject("prop2javascript", "", "\"51D_prop2=\"+769", "", "51D_prop2=769");
             jsonData = secondaryData.json;
-            postData = null;
-            completed = false;
+            capturedPostData = null;
+            capturedCompleted = false;
 
             string lastFullJS = fullJS;
             fullJS = BuildScript(jsonData) + additionalCode;
@@ -356,6 +361,8 @@ namespace FiftyOne.Pipeline.JavaScript.Tests
         public override async Task Cleanup()
         {
             await base.Cleanup();
+            capturedPostData = null;
+            capturedCompleted = false;
             webAppKillSwitch.Cancel();
             await webApp.StopAsync();
             jsonData.RemoveAll();

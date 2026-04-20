@@ -37,7 +37,6 @@ namespace FiftyOne.Pipeline.JavaScript.Tests
         public string ClientServerUrl { get; private set; }
 
         public static ChromeDriver Driver { get; private set; }
-        public static INetwork Interceptor => Driver?.Manage().Network;
 
         public ILoggerFactory LoggerFactory { get; private set; }
 
@@ -46,22 +45,19 @@ namespace FiftyOne.Pipeline.JavaScript.Tests
         private Mock<IElementData> _elementDataMock;
         private IList<IElementPropertyMetaData> _elementPropertyMetaDatas;
 
-        public static Action<NetworkRequestSentEventArgs> OnRequestSent { get; set; } = null;
-
-        public static async Task ClassInit(TestContext context)
+        public static Task ClassInit(TestContext context)
         {
             var chromeOptions = new ChromeOptions();
             chromeOptions.SetLoggingPreference(LogType.Browser, OpenQA.Selenium.LogLevel.Info);
             chromeOptions.AcceptInsecureCertificates = true;
             // run in headless mode.
             chromeOptions.AddArgument("--headless");
-            
+
             // Add additional stability arguments for CI environments
             chromeOptions.AddArgument("--no-sandbox");
             chromeOptions.AddArgument("--disable-dev-shm-usage");
             chromeOptions.AddArgument("--disable-gpu");
-            chromeOptions.AddArgument("--remote-debugging-port=0");
-            
+
             try
             {
                 Driver = new ChromeDriver(chromeOptions);
@@ -72,11 +68,10 @@ namespace FiftyOne.Pipeline.JavaScript.Tests
                                     "that the Chromium driver is installed");
             }
 
-            Interceptor.NetworkRequestSent += OnNetworkRequestSent;
-            await Interceptor.StartMonitoring();
+            return Task.CompletedTask;
         }
         
-        public virtual async Task Init() {
+        public virtual Task Init() {
             ClientServerUrl = $"http://localhost:{TestHttpListener.GetRandomUnusedPort()}/";
             
             _mockjsonBuilderElement = new Mock<IJsonBuilderElement>();
@@ -91,11 +86,9 @@ namespace FiftyOne.Pipeline.JavaScript.Tests
             _elementDataMock.Setup(ed => ed.AsDictionary()).Returns(new Dictionary<string, object>() { { "property", "thisIsAValue" } });
 
             LoggerFactory = new LoggerFactory();
+
+            return Task.CompletedTask;
         }
-
-        private static void OnNetworkRequestSent(object sender, NetworkRequestSentEventArgs e)
-            => OnRequestSent?.Invoke(e);
-
 
         delegate void GetValueCallback(string key, out object result);
 
@@ -188,18 +181,16 @@ namespace FiftyOne.Pipeline.JavaScript.Tests
 
         public virtual Task Cleanup()
         {
-            // Ignore request monitoring events
-            OnRequestSent = null;
             return Task.CompletedTask;
         }
 
-        public static async Task ClassCleanup()
+        public static Task ClassCleanup()
         {
             if (Driver != null)
             {
-                await Interceptor.StopMonitoring();
                 Driver.Quit();
             }
+            return Task.CompletedTask;
         }
     }
 }
