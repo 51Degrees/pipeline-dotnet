@@ -50,11 +50,7 @@ namespace FiftyOne.Pipeline.Core.Tests.HelperClasses
 
         protected override void ProcessInternal(IFlowData data)
         {
-#pragma warning disable CS0618 // Type or member is obsolete
-            // This usage will be replaced once the Cancellation Token
-            // mechanism is available.
-            data.Stop = true;
-#pragma warning restore CS0618 // Type or member is obsolete
+            data.StopTokenSource.Cancel();
         }
 
         protected override void ManagedResourcesCleanup()
