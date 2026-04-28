@@ -378,11 +378,7 @@ namespace FiftyOne.Pipeline.Core.FlowElements
                 try
                 {
                     element.Process(data);
-#pragma warning disable CS0618 // Type or member is obsolete
-                    // This usage will be replaced once the Cancellation Token
-                    // mechanism is available.
-                    if (data.Stop) break;
-#pragma warning restore CS0618 // Type or member is obsolete
+                    if (data.StopTokenSource.IsCancellationRequested) break;
                 }
 #pragma warning disable CA1031 // Do not catch general exception types
                 // We want to catch any exception here so that the

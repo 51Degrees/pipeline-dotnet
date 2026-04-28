@@ -28,6 +28,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Runtime.CompilerServices;
+using System.Threading;
 
 [assembly: InternalsVisibleTo("FiftyOne.Pipeline.Web.Tests")]
 [assembly: InternalsVisibleTo("FiftyOne.Pipeline.Core.Tests")]
@@ -98,8 +99,13 @@ namespace FiftyOne.Pipeline.Core.Data
         /// A boolean flag that can be used to stop further elements
         /// from executing.
         /// </summary>
-        public bool Stop { get; set; }
-
+        public bool Stop {
+            get => StopTokenSource.IsCancellationRequested;
+            set { if (value) StopTokenSource.Cancel(); }
+        }
+        
+        /// <inheritdoc/>
+        public CancellationTokenSource StopTokenSource { get; }
 
         /// <summary>
         /// Get a filter that will only include the evidence keys that can 
@@ -126,16 +132,27 @@ namespace FiftyOne.Pipeline.Core.Data
         /// <param name="evidence">
         /// The initial evidence.
         /// </param>
+        /// <param name="cancellationToken">
+        /// A cancellation token that can be used to stop processing of the pipeline.
+        /// Note that this token is linked to the internal cancellation token source for
+        /// this FlowData instance so if the token is canceled then the Stop property
+        /// will return true and processing of the pipeline will stop.
+        /// Cancelling of internal cancellation token source will NOT cancel this token.
+        /// </param>
         internal FlowData(
             ILogger<FlowData> logger,
             IPipelineInternal pipeline,
-            Evidence evidence)
+            Evidence evidence,
+            CancellationToken cancellationToken = default)
         {
             _logger = logger;
             PipelineInternal = pipeline;
             _data = new TypedKeyMap(pipeline?.IsConcurrent ?? false);
             _evidence = evidence;
-
+            
+            StopTokenSource =
+                CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+            
             if (_logger != null && _logger.IsEnabled(LogLevel.Debug))
             {
                 _logger.LogDebug($"FlowData '{GetHashCode()}' created.");

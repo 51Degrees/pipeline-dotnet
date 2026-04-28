@@ -130,12 +130,8 @@ namespace FiftyOne.Pipeline.Core.Tests.Integration
             {
                 flowData.Process();
 
-                // Check that the stop flag is set
-#pragma warning disable CS0618 // Type or member is obsolete
-                // This usage will be replaced once the Cancellation Token
-                // mechanism is available.
-                Assert.IsTrue(flowData.Stop);
-#pragma warning restore CS0618 // Type or member is obsolete
+                // Check that the process is canceled
+                Assert.IsTrue(flowData.StopTokenSource.IsCancellationRequested);
             }
             // Check that the second element was never processed
             testElement.Verify(e => e.Process(It.IsAny<IFlowData>()), Times.Never());
