@@ -504,6 +504,12 @@ namespace FiftyOne.Pipeline.JsonBuilderElementTests
             Weighted_IP,
             APV_Weighted_IP,
             APV_Weighted_IP_List,
+            Lazy_String,
+            Lazy_String_List,
+            APV_Lazy_String,
+            APV_Lazy_String_List,
+            Lazy_APV_String,
+            Lazy_APV_String_List,
         }
         public static IEnumerable<object[]> SerializationTestGenerator()
         {
@@ -651,6 +657,39 @@ carriage return and new line
                     });
                     expectedValue = $@"[
                       {{""{nameof(IWeightedValue<string>.RawWeighting).ToLower()}"": {rawWeighting},""{nameof(IWeightedValue<string>.Value).ToLower()}"": {expectedValue}}}
+                    ]";
+                    break;
+                case TypeToBeTested.Lazy_String:
+                    valueInDict = new Lazy<string>(valueOfProperty);
+                    break;
+                case TypeToBeTested.Lazy_String_List:
+                    valueInDict = new Lazy<IReadOnlyList<string>>(
+                        new List<string>() { valueOfProperty });
+                    expectedValue = $@"[
+                      {expectedValue}
+                    ]";
+                    break;
+                case TypeToBeTested.APV_Lazy_String:
+                    valueInDict = new AspectPropertyValue<Lazy<string>>(
+                        new(valueOfProperty));
+                    break;
+                case TypeToBeTested.APV_Lazy_String_List:
+                    valueInDict = new AspectPropertyValue<Lazy<IReadOnlyList<string>>>(
+                        new(new List<string>() { valueOfProperty }));
+                    expectedValue = $@"[
+                      {expectedValue}
+                    ]";
+                    break;
+                case TypeToBeTested.Lazy_APV_String:
+                    valueInDict = new Lazy<IAspectPropertyValue<string>>(
+                        new AspectPropertyValue<string>(valueOfProperty));
+                    break;
+                case TypeToBeTested.Lazy_APV_String_List:
+                    valueInDict = new Lazy<IAspectPropertyValue<IReadOnlyList<string>>>(
+                        new AspectPropertyValue<IReadOnlyList<string>>(
+                            new List<string>() { valueOfProperty }));
+                    expectedValue = $@"[
+                      {expectedValue}
                     ]";
                     break;
                 default:

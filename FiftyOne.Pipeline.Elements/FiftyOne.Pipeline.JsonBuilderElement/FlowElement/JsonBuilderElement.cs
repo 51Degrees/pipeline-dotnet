@@ -127,6 +127,7 @@ namespace FiftyOne.Pipeline.JsonBuilder.FlowElement
         // the property values.
         private static JsonConverter[] JSON_CONVERTERS = new JsonConverter[]
         {
+            new LazyValueConverter(),
             new JavaScriptConverter(),
             new AspectPropertyValueConverter(),
             new IPAddressValueConverter(),
