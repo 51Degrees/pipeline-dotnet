@@ -228,18 +228,20 @@ namespace FiftyOne.Pipeline.Core.FlowElements
             var subElementBuilderNames = 
                 (elementOptions.SubElements == null || 
                 elementOptions.SubElements.Count == 0)
-                ?  "No SubElements" 
-                :  String.Join(",", elementOptions.SubElements                  
+                ? "No SubElements" 
+                : string.Join(",", elementOptions.SubElements                  
                     .Select(i => i.BuilderName));
 
+            var exceptionMessage = ex.Message ?? "(No exception message)";
             var innerException = ex.InnerException != null ?
                 ex.InnerException.Message :
                 "No Inner Exception.";
 
             sb.Append("BuilderName: ");
-            sb.AppendLine(elementOptions.BuilderName);
+            sb.AppendLine(builderName);
             sb.Append("SubElement Builder Names: ");
             sb.AppendLine(subElementBuilderNames);
+            sb.AppendLine(exceptionMessage);
             sb.AppendLine(innerException);
             return sb.ToString();
         }
