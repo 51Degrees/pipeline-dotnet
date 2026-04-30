@@ -24,6 +24,7 @@ using FiftyOne.Pipeline.Core.Data;
 using FiftyOne.Pipeline.Core.FlowElements;
 using FiftyOne.Pipeline.Engines.Data;
 using FiftyOne.Pipeline.Engines.FiftyOne.Data;
+using FiftyOne.Pipeline.Engines.Services;
 using Microsoft.Extensions.Logging;
 using System;
 using System.Collections.Concurrent;
@@ -159,8 +160,21 @@ namespace FiftyOne.Pipeline.Engines.FiftyOne.FlowElements
                 }
                 catch (PropertyMissingException e)
                 {
-                    Logger.LogWarning($"Property '${property.Key}' was missing. " +
-                        $"Not adding SetHeader value. Error was: ${e.Message}");
+                    if (e.Reason == MissingPropertyReason.CloudRequestFailed)
+                    {
+                        // Upstream cloud failure already logged once by the
+                        // request engine. Avoid repeating a warning per
+                        // SetHeader property; debug-level keeps the trail
+                        // for anyone investigating.
+                        Logger.LogDebug($"Property '${property.Key}' was missing " +
+                            $"because the cloud request failed for this request. " +
+                            $"Not adding SetHeader value. Error was: ${e.Message}");
+                    }
+                    else
+                    {
+                        Logger.LogWarning($"Property '${property.Key}' was missing. " +
+                            $"Not adding SetHeader value. Error was: ${e.Message}");
+                    }
                 }
                 if (propertyValue != null)
                 {

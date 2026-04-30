@@ -29,6 +29,7 @@ using Moq;
 using System;
 using System.Collections.Generic;
 using FiftyOne.Common.TestHelpers;
+using FiftyOne.Pipeline.Core.Data;
 using FiftyOne.Pipeline.Core.FlowElements;
 
 namespace FiftyOne.Pipeline.Engines.Tests.Data
@@ -87,7 +88,7 @@ namespace FiftyOne.Pipeline.Engines.Tests.Data
         }
 
         /// <summary>
-        /// Check that the indexers can be used to set and get a 
+        /// Check that the indexers can be used to set and get a
         /// property value.
         /// </summary>
         [TestMethod]
@@ -99,7 +100,7 @@ namespace FiftyOne.Pipeline.Engines.Tests.Data
         }
 
         /// <summary>
-        /// Check that the base class will throw a 
+        /// Check that the base class will throw a
         /// <see cref="PropertyMissingException"/> if the property
         /// is not present.
         /// </summary>
@@ -108,6 +109,129 @@ namespace FiftyOne.Pipeline.Engines.Tests.Data
         public void AspectData_Indexer_GetMissing()
         {
             var result = _data["testproperty"];
+        }
+
+        /// <summary>
+        /// When a property is missing AND the flow data reports an upstream
+        /// error AND this aspect's data dictionary is empty, the heuristic
+        /// in <see cref="AspectDataBase"/> should bypass the missing-property
+        /// service and throw with reason
+        /// <see cref="MissingPropertyReason.CloudRequestFailed"/>.
+        /// </summary>
+        [TestMethod]
+        public void AspectData_Indexer_GetMissing_CloudRequestFailed_WhenErrorAndEmpty()
+        {
+            var failingElement = new Mock<IFlowElement>();
+            var flowData = new Mock<IFlowData>();
+            flowData.SetupGet(d => d.Errors).Returns(new List<IFlowError>
+            {
+                new FlowError(new Exception("upstream timeout"), failingElement.Object)
+            });
+            _data.SetFlowData(flowData.Object);
+
+            var propertyMissingException = Assert.ThrowsException<PropertyMissingException>(
+                () => { var _ = _data["testproperty"]; });
+
+            Assert.AreEqual(MissingPropertyReason.CloudRequestFailed, propertyMissingException.Reason);
+            Assert.AreEqual("testproperty", propertyMissingException.PropertyName);
+            StringAssert.Contains(propertyMissingException.Message, "upstream timeout");
+            // The missing-property service must NOT be consulted on this path
+            // -- the heuristic owns the answer.
+            _missingPropertyService.Verify(m => m.GetMissingPropertyReason(
+                It.IsAny<string>(), It.IsAny<IReadOnlyList<IAspectEngine>>()),
+                Times.Never);
+        }
+
+        /// <summary>
+        /// If the flow data has an upstream error but this aspect's data
+        /// dictionary is non-empty (the engine populated something), the
+        /// heuristic should NOT fire and the missing-property service is
+        /// consulted as before.
+        /// </summary>
+        [TestMethod]
+        public void AspectData_Indexer_GetMissing_DelegatesToService_WhenDataNotEmpty()
+        {
+            var failingElement = new Mock<IFlowElement>();
+            var flowData = new Mock<IFlowData>();
+            flowData.SetupGet(d => d.Errors).Returns(new List<IFlowError>
+            {
+                new FlowError(new Exception("anything"), failingElement.Object)
+            });
+            _data.SetFlowData(flowData.Object);
+            _data["someOtherProp"] = "populated";
+
+            var propertyMissingException = Assert.ThrowsException<PropertyMissingException>(
+                () => { var _ = _data["testproperty"]; });
+
+            Assert.AreEqual(MissingPropertyReason.Unknown, propertyMissingException.Reason);
+            _missingPropertyService.Verify(m => m.GetMissingPropertyReason(
+                It.IsAny<string>(), It.IsAny<IReadOnlyList<IAspectEngine>>()),
+                Times.Once);
+        }
+
+        /// <summary>
+        /// If the flow data dictionary is empty but FlowData reports no
+        /// errors (genuine 'not in resource key' / 'data tier' case), the
+        /// heuristic must NOT fire -- delegate to the missing-property
+        /// service so the user gets the correct, license-related reason.
+        /// </summary>
+        [TestMethod]
+        public void AspectData_Indexer_GetMissing_DelegatesToService_WhenNoErrors()
+        {
+            var flowData = new Mock<IFlowData>();
+            flowData.SetupGet(d => d.Errors).Returns(new List<IFlowError>());
+            _data.SetFlowData(flowData.Object);
+
+            var propertyMissingException = Assert.ThrowsException<PropertyMissingException>(
+                () => { var _ = _data["testproperty"]; });
+
+            Assert.AreEqual(MissingPropertyReason.Unknown, propertyMissingException.Reason);
+            _missingPropertyService.Verify(m => m.GetMissingPropertyReason(
+                It.IsAny<string>(), It.IsAny<IReadOnlyList<IAspectEngine>>()),
+                Times.Once);
+        }
+
+        /// <summary>
+        /// If <see cref="AspectDataBase.SetFlowData"/> was never called
+        /// (older callers, or aspect data created outside the standard
+        /// engine pipeline), the heuristic must short-circuit cleanly
+        /// rather than NRE -- delegating to the existing service path.
+        /// </summary>
+        [TestMethod]
+        public void AspectData_Indexer_GetMissing_DelegatesToService_WhenFlowDataUnset()
+        {
+            var propertyMissingException = Assert.ThrowsException<PropertyMissingException>(
+                () => { var _ = _data["testproperty"]; });
+
+            Assert.AreEqual(MissingPropertyReason.Unknown, propertyMissingException.Reason);
+            _missingPropertyService.Verify(m => m.GetMissingPropertyReason(
+                It.IsAny<string>(), It.IsAny<IReadOnlyList<IAspectEngine>>()),
+                Times.Once);
+        }
+
+        /// <summary>
+        /// The exception description should name the upstream flow element
+        /// that errored, so a user reading the log knows which component
+        /// to investigate -- not just that 'something went wrong'.
+        /// </summary>
+        [TestMethod]
+        public void AspectData_CloudRequestFailed_DescriptionIdentifiesUpstreamElement()
+        {
+            var failingElement = new Mock<IFlowElement>();
+            var flowData = new Mock<IFlowData>();
+            flowData.SetupGet(d => d.Errors).Returns(new List<IFlowError>
+            {
+                new FlowError(new Exception("network timeout"), failingElement.Object)
+            });
+            _data.SetFlowData(flowData.Object);
+
+            var propertyMissingException = Assert.ThrowsException<PropertyMissingException>(
+                () => { var _ = _data["testproperty"]; });
+
+            // Description must reference both the failing element type
+            // and the underlying exception message.
+            StringAssert.Contains(propertyMissingException.Message, failingElement.Object.GetType().Name);
+            StringAssert.Contains(propertyMissingException.Message, "network timeout");
         }
     }
 }

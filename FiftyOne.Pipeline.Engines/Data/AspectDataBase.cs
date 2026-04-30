@@ -45,6 +45,7 @@ namespace FiftyOne.Pipeline.Engines.Data
         private List<Task> _processTasks = new List<Task>();
         private List<IAspectEngine> _engines;
         private bool _cacheHit;
+        private IFlowData _flowData;
 
         /// <summary>
         /// The <see cref="IMissingPropertyService"/> instance to be queried
@@ -176,6 +177,18 @@ namespace FiftyOne.Pipeline.Engines.Data
         }
 
         /// <summary>
+        /// Record the <see cref="IFlowData"/> instance that this aspect data
+        /// belongs to. Used by the missing-property heuristic to detect
+        /// per-request upstream failures (e.g. a failed cloud call) and
+        /// surface a more accurate reason than a static metadata check
+        /// would give.
+        /// </summary>
+        internal void SetFlowData(IFlowData flowData)
+        {
+            _flowData = flowData;
+        }
+
+        /// <summary>
         /// Add a process task to the lazy loading tasks for this 
         /// data instance.
         /// The property accessors will only complete once all such
@@ -280,6 +293,41 @@ namespace FiftyOne.Pipeline.Engines.Data
                 if (gotProperty == false &&
                     MissingPropertyService != null)
                 {
+                    // Heuristic: if this aspect data was never populated
+                    // for the current request AND any upstream element
+                    // recorded an error on the flow data, the property is
+                    // unavailable because of that per-request failure --
+                    // not because of the user's data tier or resource key.
+                    // Surface a dedicated reason so callers do not log
+                    // misleading 'DataFileUpgradeRequired' / resource-key
+                    // messages for transient cloud failures.
+                    if (_flowData != null &&
+                        _flowData.Errors != null &&
+                        _flowData.Errors.Count > 0 &&
+                        AsDictionary().Count == 0)
+                    {
+                        var firstError = _flowData.Errors[0];
+                        var sourceName = firstError.FlowElement == null
+                            ? "Unknown"
+                            : firstError.FlowElement.GetType().Name;
+                        var sourceMessage = firstError.ExceptionData == null
+                            ? string.Empty
+                            : firstError.ExceptionData.Message;
+                        var description = string.Format(CultureInfo.InvariantCulture,
+                            "Property '{0}' is not available for this request " +
+                            "because an upstream error occurred in '{1}': {2}",
+                            key, sourceName, sourceMessage);
+                        if (Logger != null && Logger.IsEnabled(LogLevel.Warning))
+                        {
+                            Logger.LogWarning($"Property '{key}' missing from aspect " +
+                                $"data '{GetType().Name}'. " +
+                                $"{MissingPropertyReason.CloudRequestFailed}");
+                        }
+                        throw new PropertyMissingException(
+                            MissingPropertyReason.CloudRequestFailed,
+                            key, description);
+                    }
+
                     // If there was no entry for the key then use the missing
                     // property service to find out why.
                     var missingReason = MissingPropertyService

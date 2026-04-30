@@ -25,7 +25,9 @@ using Microsoft.VisualStudio.TestTools.UnitTesting;
 using System;
 using System.Collections.Generic;
 using Microsoft.Extensions.Logging;
+using FiftyOne.Pipeline.Engines;
 using FiftyOne.Pipeline.Engines.Data;
+using FiftyOne.Pipeline.Engines.Services;
 using FiftyOne.Pipeline.Core.FlowElements;
 using FiftyOne.Pipeline.Core.Data;
 using FiftyOne.Pipeline.Engines.FiftyOne.FlowElements;
@@ -312,6 +314,147 @@ namespace FiftyOne.Pipeline.Engines.FiftyOne.Tests.FlowElements
             var typedOutput = elementOutput as SetHeadersData;
             Assert.IsNotNull(typedOutput.ResponseHeaderDictionary);
             return typedOutput;
+        }
+
+        #region log-level test helpers
+        private class ThrowingSourceData : SetHeadersSourceData
+        {
+            private readonly MissingPropertyReason _reason;
+            public ThrowingSourceData(
+                ILogger<ElementDataBase> logger,
+                IPipeline pipeline,
+                MissingPropertyReason reason)
+                : base(logger, pipeline)
+            {
+                _reason = reason;
+            }
+            public override object this[string key]
+            {
+                get
+                {
+                    throw new PropertyMissingException(
+                        _reason, key, $"simulated reason: {_reason}");
+                }
+            }
+        }
+
+        private class ThrowingSourceElement
+            : FlowElementBase<SetHeadersSourceData, IElementPropertyMetaData>
+        {
+            private readonly string _propertyName;
+
+            public ThrowingSourceElement(
+                ILogger<FlowElementBase<SetHeadersSourceData, IElementPropertyMetaData>> logger,
+                ILogger<ElementDataBase> dataLogger,
+                string propertyName,
+                MissingPropertyReason reason)
+                : base(logger,
+                      (p, e) => new ThrowingSourceData(dataLogger, p, reason))
+            {
+                _propertyName = propertyName;
+            }
+
+            public override string ElementDataKey => "setheaderssourceelement";
+
+            public override IEvidenceKeyFilter EvidenceKeyFilter
+                => new EvidenceKeyFilterWhitelist(new List<string>());
+
+            public override IList<IElementPropertyMetaData> Properties
+                => new List<IElementPropertyMetaData>
+                {
+                    new ElementPropertyMetaData(this, _propertyName, typeof(object), true)
+                };
+
+            protected override void ManagedResourcesCleanup() { }
+            protected override void UnmanagedResourcesCleanup() { }
+
+            protected override void ProcessInternal(IFlowData data)
+            {
+                // Add the data instance so SetHeadersElement can find it,
+                // but the indexer will throw when read.
+                data.GetOrAdd(ElementDataKey, p => CreateElementData(p));
+            }
+        }
+        #endregion
+
+        /// <summary>
+        /// When SetHeadersElement encounters a missing property whose reason
+        /// is <see cref="MissingPropertyReason.CloudRequestFailed"/>, it must
+        /// log at Debug rather than Warning. The cloud failure was already
+        /// surfaced once by the request engine; per-SetHeader warnings
+        /// would just repeat the same incident.
+        /// </summary>
+        [TestMethod]
+        public void SetHeadersElement_MissingProperty_CloudRequestFailed_LogsDebugNotWarning()
+        {
+            var propertyName = "SetHeaderBrowserAccept-CH";
+            var sourceElement = new ThrowingSourceElement(
+                _loggerFactory.CreateLogger<FlowElementBase<SetHeadersSourceData, IElementPropertyMetaData>>(),
+                _loggerFactory.CreateLogger<ElementDataBase>(),
+                propertyName,
+                MissingPropertyReason.CloudRequestFailed);
+
+            _element = new SetHeadersElement(
+                _loggerFactory.CreateLogger<SetHeadersElement>(),
+                (p, e) => new SetHeadersData(_loggerFactory.CreateLogger<SetHeadersData>(), p));
+
+            _pipeline = new PipelineBuilder(_loggerFactory)
+                .AddFlowElement(sourceElement)
+                .AddFlowElement(_element)
+                .Build();
+
+            var data = _pipeline.CreateFlowData();
+            data.Process();
+
+            var elementLogger = _loggerFactory.Loggers
+                .Single(l => l.Category == typeof(SetHeadersElement).FullName);
+            elementLogger.AssertMaxWarnings(0);
+            Assert.IsTrue(elementLogger.DebugEntries.Any(
+                e => e.Contains(propertyName)),
+                "Expected a Debug log entry naming the missing property; " +
+                $"got debug entries: [{string.Join("|", elementLogger.DebugEntries)}]");
+        }
+
+        /// <summary>
+        /// For any reason other than CloudRequestFailed, SetHeadersElement
+        /// must keep its existing Warning-level behaviour -- this is the
+        /// signal users rely on for genuine resource-key / data-tier
+        /// misconfiguration.
+        /// </summary>
+        [DataTestMethod]
+        [DataRow(MissingPropertyReason.DataFileUpgradeRequired)]
+        [DataRow(MissingPropertyReason.PropertyNotAccessibleWithResourceKey)]
+        [DataRow(MissingPropertyReason.PropertyExcludedFromEngineConfiguration)]
+        [DataRow(MissingPropertyReason.Unknown)]
+        public void SetHeadersElement_MissingProperty_OtherReasons_LogsWarning(
+            MissingPropertyReason reason)
+        {
+            var propertyName = "SetHeaderBrowserAccept-CH";
+            var sourceElement = new ThrowingSourceElement(
+                _loggerFactory.CreateLogger<FlowElementBase<SetHeadersSourceData, IElementPropertyMetaData>>(),
+                _loggerFactory.CreateLogger<ElementDataBase>(),
+                propertyName,
+                reason);
+
+            _element = new SetHeadersElement(
+                _loggerFactory.CreateLogger<SetHeadersElement>(),
+                (p, e) => new SetHeadersData(_loggerFactory.CreateLogger<SetHeadersData>(), p));
+
+            _pipeline = new PipelineBuilder(_loggerFactory)
+                .AddFlowElement(sourceElement)
+                .AddFlowElement(_element)
+                .Build();
+
+            var data = _pipeline.CreateFlowData();
+            data.Process();
+
+            var elementLogger = _loggerFactory.Loggers
+                .Single(l => l.Category == typeof(SetHeadersElement).FullName);
+            Assert.IsTrue(elementLogger.WarningEntries.Any(
+                e => e.Contains(propertyName)),
+                $"Expected a Warning log entry naming the missing property for " +
+                $"reason {reason}; got warnings: " +
+                $"[{string.Join("|", elementLogger.WarningEntries)}]");
         }
     }
 }

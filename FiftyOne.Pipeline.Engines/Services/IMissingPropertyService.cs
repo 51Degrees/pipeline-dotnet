@@ -20,6 +20,7 @@
  * such notice(s) shall fulfill the requirements of that article.
  * ********************************************************************* */
 
+using FiftyOne.Pipeline.Core.Data;
 using FiftyOne.Pipeline.Engines.FlowElements;
 using System.Collections.Generic;
 
@@ -121,7 +122,16 @@ namespace FiftyOne.Pipeline.Engines.Services
         ProductNotAccessibleWithResourceKey,
         //CloudEngine,
         /// <summary>
-        /// The reason for the property not being present could not 
+        /// The property exists in the engine's metadata but was not
+        /// populated for this specific request because an upstream call
+        /// (typically the cloud service) failed or returned no data.
+        /// The user's resource key / data tier is fine; this is a
+        /// per-request failure. Inspect <see cref="IFlowData.Errors"/>
+        /// for the underlying exception.
+        /// </summary>
+        CloudRequestFailed,
+        /// <summary>
+        /// The reason for the property not being present could not
         /// be determined.
         /// </summary>
         Unknown
