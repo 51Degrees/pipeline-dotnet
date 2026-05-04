@@ -139,7 +139,7 @@ namespace FiftyOne.Pipeline.Engines.FiftyOne.Tests.FlowElements
             {
             }
         }
-        #endregion 
+        #endregion
 
         private SetHeadersElement _element;
         private ActivePropertySourceElement _sourceElement;
@@ -182,11 +182,11 @@ namespace FiftyOne.Pipeline.Engines.FiftyOne.Tests.FlowElements
         /// <summary>
         /// The 'SetHeaderAcceptCH' property contains JSON for a single
         /// header.
-        /// Output from SetHeadersElement should contain the expected 
+        /// Output from SetHeadersElement should contain the expected
         /// header value.
         /// </summary>
         [TestMethod]
-        // Output should be the same whether value is wrapped in 
+        // Output should be the same whether value is wrapped in
         // AspectPropertyValue or not.
         [DataRow(true)]
         [DataRow(false)]
@@ -199,11 +199,11 @@ namespace FiftyOne.Pipeline.Engines.FiftyOne.Tests.FlowElements
                 value = new AspectPropertyValue<string>(valueStr);
             }
 
-            var propertyNameValues = new Dictionary<string, object>() 
+            var propertyNameValues = new Dictionary<string, object>()
             {
                 { "SetHeaderBrowserAccept-CH", value }
             };
-            CreatePipeline(propertyNameValues);            
+            CreatePipeline(propertyNameValues);
             using var data = _pipeline.CreateFlowData();
             data.Process();
 
@@ -252,7 +252,7 @@ namespace FiftyOne.Pipeline.Engines.FiftyOne.Tests.FlowElements
             var typedOutput = GetFromFlowData(data);
             Assert.IsEmpty(typedOutput.ResponseHeaderDictionary);
             Assert.HasCount(
-                1, 
+                1,
                 _loggerFactory.Loggers.SelectMany(i=>i.WarningEntries),
                 "One warning should be logged to indicate that the " +
                 "SetHeaderBrowserAccept-CH property could not be found.");
@@ -333,7 +333,7 @@ namespace FiftyOne.Pipeline.Engines.FiftyOne.Tests.FlowElements
         }
 
         /// <summary>
-        /// Test that the SetHeadersElement will combine values from 
+        /// Test that the SetHeadersElement will combine values from
         /// multiple properties that are associated with the same header.
         /// </summary>
         [TestMethod]
@@ -351,12 +351,12 @@ namespace FiftyOne.Pipeline.Engines.FiftyOne.Tests.FlowElements
             var typedOutput = GetFromFlowData(data);
             Assert.HasCount(1, typedOutput.ResponseHeaderDictionary);
             Assert.IsTrue(typedOutput.ResponseHeaderDictionary.ContainsKey("Accept-CH"));
-            Assert.AreEqual("Sec-CH-UA,Sec-CH-UA-Model,Sec-CH-UA-Mobile", 
+            Assert.AreEqual("Sec-CH-UA,Sec-CH-UA-Model,Sec-CH-UA-Mobile",
                 typedOutput.ResponseHeaderDictionary["Accept-CH"]);
         }
 
         /// <summary>
-        /// Test that the SetHeadersElement will remove duplicate values from multiple properties 
+        /// Test that the SetHeadersElement will remove duplicate values from multiple properties
         /// that are associated with the same header.
         /// I.e. there is only one 'Sec-CH-UA-Model' in the output, despite it appearing in both
         /// property values below.
@@ -468,6 +468,5 @@ namespace FiftyOne.Pipeline.Engines.FiftyOne.Tests.FlowElements
             Assert.IsNotNull(typedOutput.ResponseHeaderDictionary);
             return typedOutput;
         }
-
     }
 }
