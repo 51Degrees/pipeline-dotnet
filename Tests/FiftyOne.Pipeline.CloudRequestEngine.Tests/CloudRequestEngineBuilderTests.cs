@@ -1,6 +1,6 @@
 /* *********************************************************************
  * This Original Work is copyright of 51 Degrees Mobile Experts Limited.
- * Copyright 2023 51 Degrees Mobile Experts Limited, Davidson House,
+ * Copyright 2026 51 Degrees Mobile Experts Limited, Davidson House,
  * Forbury Square, Reading, Berkshire, United Kingdom RG1 3EU.
  *
  * This Original Work is licensed under the European Union Public Licence
@@ -96,14 +96,16 @@ namespace FiftyOne.Pipeline.CloudRequestEngine.Tests
         /// Test exception is thrown if no resource key is specified.
         /// </summary>
         [TestMethod]
-        [ExpectedException(typeof(PipelineConfigurationException))]
         public void BuildEngine_ResourceKey_NotSet()
         {
-            var cloudRequestsEngine =
-                new CloudRequestEngineBuilder(
-                    new LoggerFactory(), 
-                    new HttpClient())
-                .Build();
+            Assert.ThrowsExactly<PipelineConfigurationException>(() =>
+            {
+                var cloudRequestsEngine =
+                    new CloudRequestEngineBuilder(
+                        new LoggerFactory(),
+                        new HttpClient())
+                    .Build();
+            });
         }
 
         /// <summary>

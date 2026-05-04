@@ -1,6 +1,6 @@
 /* *********************************************************************
  * This Original Work is copyright of 51 Degrees Mobile Experts Limited.
- * Copyright 2023 51 Degrees Mobile Experts Limited, Davidson House,
+ * Copyright 2026 51 Degrees Mobile Experts Limited, Davidson House,
  * Forbury Square, Reading, Berkshire, United Kingdom RG1 3EU.
  *
  * This Original Work is licensed under the European Union Public Licence
@@ -174,14 +174,14 @@ namespace FiftyOne.Pipeline.Engines.Tests.Services
         }
 
         /// <summary>
-        /// Check that an argument null exception is thrown if the 
+        /// Check that an argument null exception is thrown if the
         /// configuration parameter is null
         /// </summary>
         [TestMethod]
-        [ExpectedException(typeof(ArgumentNullException))]
         public void DataUpdateService_Register_Null()
         {
-            _dataUpdate.RegisterDataFile(null);
+            Assert.ThrowsExactly<ArgumentNullException>(() =>
+                _dataUpdate.RegisterDataFile(null));
         }
 
         /// <summary>
@@ -363,7 +363,7 @@ namespace FiftyOne.Pipeline.Engines.Tests.Services
         /// Check that enabling the FileSystemWatcher will create a watcher
         /// and assign it to the configuration object as expected.
         /// </summary>
-        [DataTestMethod]
+        [TestMethod]
         [DataRow(true)]
         [DataRow(false)]
         public void DataUpdateService_Register_FileSystemWatcher(bool autoUpdateEnabled)
@@ -1187,7 +1187,7 @@ namespace FiftyOne.Pipeline.Engines.Tests.Services
         /// The test should result in the same behavior regardless of
         /// whether auto updates and enabled or disabled.
         /// </remarks>
-        [DataTestMethod]
+        [TestMethod]
         [DataRow(true, false)]
         [DataRow(false, false)]
         [DataRow(true, true)]
@@ -1308,7 +1308,7 @@ namespace FiftyOne.Pipeline.Engines.Tests.Services
         /// The update service should download the latest file and
         /// use it to refresh the engine.
         /// </summary>
-        [DataTestMethod]
+        [TestMethod]
         [DataRow(true)]
         [DataRow(false)]
         public void DataUpdateService_Register_UpdateOnStartup_InMemory(
@@ -1427,7 +1427,7 @@ namespace FiftyOne.Pipeline.Engines.Tests.Services
         /// In this scenario, confirm that the timer is configured so that
         /// the service will check again in the future.
         /// </summary>
-        [DataTestMethod]
+        [TestMethod]
         [DataRow(true, false)]
         [DataRow(false, false)]
         [DataRow(true, true)]

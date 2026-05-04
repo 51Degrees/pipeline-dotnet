@@ -1,6 +1,6 @@
 /* *********************************************************************
  * This Original Work is copyright of 51 Degrees Mobile Experts Limited.
- * Copyright 2023 51 Degrees Mobile Experts Limited, Davidson House,
+ * Copyright 2026 51 Degrees Mobile Experts Limited, Davidson House,
  * Forbury Square, Reading, Berkshire, United Kingdom RG1 3EU.
  *
  * This Original Work is licensed under the European Union Public Licence
@@ -81,10 +81,12 @@ namespace FiftyOne.Pipeline.Engines.Tests.Data
         /// a null property name
         /// </summary>
         [TestMethod]
-        [ExpectedException(typeof(ArgumentNullException))]
         public void AspectData_Indexer_NullKey()
         {
-            var result = _data[null];
+            Assert.ThrowsExactly<ArgumentNullException>(() =>
+            {
+                var result = _data[null];
+            });
         }
 
         /// <summary>
@@ -105,10 +107,12 @@ namespace FiftyOne.Pipeline.Engines.Tests.Data
         /// is not present.
         /// </summary>
         [TestMethod]
-        [ExpectedException(typeof(PropertyMissingException))]
         public void AspectData_Indexer_GetMissing()
         {
-            var result = _data["testproperty"];
+            Assert.ThrowsExactly<PropertyMissingException>(() =>
+            {
+                var result = _data["testproperty"];
+            });
         }
 
         /// <summary>
@@ -129,7 +133,7 @@ namespace FiftyOne.Pipeline.Engines.Tests.Data
             });
             _data.SetFlowData(flowData.Object);
 
-            var propertyMissingException = Assert.ThrowsException<PropertyMissingException>(
+            var propertyMissingException = Assert.ThrowsExactly<PropertyMissingException>(
                 () => { var _ = _data["testproperty"]; });
 
             Assert.AreEqual(MissingPropertyReason.CloudRequestFailed, propertyMissingException.Reason);
@@ -160,7 +164,7 @@ namespace FiftyOne.Pipeline.Engines.Tests.Data
             _data.SetFlowData(flowData.Object);
             _data["someOtherProp"] = "populated";
 
-            var propertyMissingException = Assert.ThrowsException<PropertyMissingException>(
+            var propertyMissingException = Assert.ThrowsExactly<PropertyMissingException>(
                 () => { var _ = _data["testproperty"]; });
 
             Assert.AreEqual(MissingPropertyReason.Unknown, propertyMissingException.Reason);
@@ -182,7 +186,7 @@ namespace FiftyOne.Pipeline.Engines.Tests.Data
             flowData.SetupGet(d => d.Errors).Returns(new List<IFlowError>());
             _data.SetFlowData(flowData.Object);
 
-            var propertyMissingException = Assert.ThrowsException<PropertyMissingException>(
+            var propertyMissingException = Assert.ThrowsExactly<PropertyMissingException>(
                 () => { var _ = _data["testproperty"]; });
 
             Assert.AreEqual(MissingPropertyReason.Unknown, propertyMissingException.Reason);
@@ -200,7 +204,7 @@ namespace FiftyOne.Pipeline.Engines.Tests.Data
         [TestMethod]
         public void AspectData_Indexer_GetMissing_DelegatesToService_WhenFlowDataUnset()
         {
-            var propertyMissingException = Assert.ThrowsException<PropertyMissingException>(
+            var propertyMissingException = Assert.ThrowsExactly<PropertyMissingException>(
                 () => { var _ = _data["testproperty"]; });
 
             Assert.AreEqual(MissingPropertyReason.Unknown, propertyMissingException.Reason);
@@ -225,7 +229,7 @@ namespace FiftyOne.Pipeline.Engines.Tests.Data
             });
             _data.SetFlowData(flowData.Object);
 
-            var propertyMissingException = Assert.ThrowsException<PropertyMissingException>(
+            var propertyMissingException = Assert.ThrowsExactly<PropertyMissingException>(
                 () => { var _ = _data["testproperty"]; });
 
             // Description must reference both the failing element type

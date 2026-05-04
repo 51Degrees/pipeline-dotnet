@@ -1,6 +1,6 @@
 /* *********************************************************************
  * This Original Work is copyright of 51 Degrees Mobile Experts Limited.
- * Copyright 2023 51 Degrees Mobile Experts Limited, Davidson House,
+ * Copyright 2026 51 Degrees Mobile Experts Limited, Davidson House,
  * Forbury Square, Reading, Berkshire, United Kingdom RG1 3EU.
  *
  * This Original Work is licensed under the European Union Public Licence
@@ -46,7 +46,7 @@ namespace FiftyOne.Pipeline.Engines.FiftyOne.Tests.Configuration
             var config2 = builder2.Build("some file", false);
 
             // Assert
-            Assert.AreEqual(0, config2.DataUpdateLicenseKeys.Count);
+            Assert.IsEmpty(config2.DataUpdateLicenseKeys);
         }
     }
 }

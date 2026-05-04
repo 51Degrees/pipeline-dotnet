@@ -1,6 +1,6 @@
 /* *********************************************************************
  * This Original Work is copyright of 51 Degrees Mobile Experts Limited.
- * Copyright 2023 51 Degrees Mobile Experts Limited, Davidson House,
+ * Copyright 2026 51 Degrees Mobile Experts Limited, Davidson House,
  * Forbury Square, Reading, Berkshire, United Kingdom RG1 3EU.
  *
  * This Original Work is licensed under the European Union Public Licence
@@ -100,6 +100,96 @@ namespace FiftyOne.Pipeline.CloudRequestEngine.Tests
                ),
                ItExpr.IsAny<CancellationToken>()
             );
+        }
+
+        /// <summary>
+        /// Verify that nested evidence keys like 'query.id.usage' preserve
+        /// the full suffix 'id.usage' rather than just the last segment 'usage'.
+        /// </summary>
+        [TestMethod]
+        public void EvidenceNestedKey_PreservesFullSuffix()
+        {
+            string resourceKey = "resource_key";
+            string nestedKey = "query.id.usage";
+            string value = "test123";
+            string capturedContent = null;
+
+            // Set up mock to capture the request content
+            _handlerMock = new Mock<HttpMessageHandler>(MockBehavior.Strict);
+            
+            // Set up the JSON response - capture content for later assertion
+            _handlerMock
+               .Protected()
+               .Setup<Task<HttpResponseMessage>>(
+                  "SendAsync",
+                  ItExpr.Is<HttpRequestMessage>(r =>
+                      r.RequestUri.AbsolutePath.ToLower().EndsWith("json")),
+                  ItExpr.IsAny<CancellationToken>()
+               )
+               .ReturnsAsync((HttpRequestMessage req, CancellationToken ct) =>
+               {
+                   // Capture the content for assertion
+                   capturedContent = req.Content.ReadAsStringAsync().Result;
+                   return new HttpResponseMessage()
+                   {
+                       StatusCode = _jsonResponseStatus,
+                       Content = new StringContent(_jsonResponse),
+                   };
+               })
+               .Verifiable();
+
+            // Set up the evidencekeys response
+            _handlerMock
+               .Protected()
+               .Setup<Task<HttpResponseMessage>>(
+                  "SendAsync",
+                  ItExpr.Is<HttpRequestMessage>(r =>
+                      r.RequestUri.AbsolutePath.ToLower().EndsWith("evidencekeys")),
+                  ItExpr.IsAny<CancellationToken>()
+               )
+               .ReturnsAsync(() => new HttpResponseMessage()
+               {
+                   StatusCode = _evidenceKeysResponseStatus,
+                   Content = new StringContent(_evidenceKeysResponse),
+               })
+               .Verifiable();
+
+            // Set up the accessibleproperties response
+            _handlerMock
+               .Protected()
+               .Setup<Task<HttpResponseMessage>>(
+                  "SendAsync",
+                  ItExpr.Is<HttpRequestMessage>(r =>
+                      r.RequestUri.AbsolutePath.ToLower().EndsWith("accessibleproperties")),
+                  ItExpr.IsAny<CancellationToken>()
+               )
+               .ReturnsAsync(() => new HttpResponseMessage()
+               {
+                   StatusCode = _accessiblePropertiesResponseStatus,
+                   Content = new StringContent(_accessiblePropertiesResponse),
+               })
+               .Verifiable();
+
+            _httpClient = new HttpClient(_handlerMock.Object);
+
+            var engine = new CloudRequestEngineBuilder(
+                _loggerFactory,
+                _httpClient)
+                .SetResourceKey(resourceKey)
+                .Build();
+
+            using (var pipeline = new PipelineBuilder(_loggerFactory).AddFlowElement(engine).Build())
+            {
+                var data = pipeline.CreateFlowData();
+                data.AddEvidence(nestedKey, value);
+                data.Process();
+            }
+
+            // The key should be "id.usage" (everything after the first dot), not just "usage"
+            Assert.Contains(
+                "id.usage=test123",
+                capturedContent,
+                $"The nested key 'query.id.usage' should produce suffix 'id.usage', not just 'usage'.");
         }
 
         /// <summary>
@@ -553,14 +643,13 @@ namespace FiftyOne.Pipeline.CloudRequestEngine.Tests
         }
 
         /// <summary>
-        /// Test cloud request engine handles a lack of data from the 
+        /// Test cloud request engine handles a lack of data from the
         /// cloud service as expected.
         /// An exception should be thrown by the cloud request engine
-        /// and the pipeline is configured to throw any exceptions up 
+        /// and the pipeline is configured to throw any exceptions up
         /// the stack as an AggregateException.
         /// </summary>
         [TestMethod]
-        [ExpectedException(typeof(AggregateException))]
         public void ValidateErrorHandling_NoData()
         {
             string resourceKey = "resource_key";
@@ -573,7 +662,7 @@ namespace FiftyOne.Pipeline.CloudRequestEngine.Tests
             );
 
             var engine = new CloudRequestEngineBuilder(
-                _loggerFactory, 
+                _loggerFactory,
                 _httpClient)
                 .SetResourceKey(resourceKey)
                 .Build();
@@ -583,19 +672,18 @@ namespace FiftyOne.Pipeline.CloudRequestEngine.Tests
                 var data = pipeline.CreateFlowData();
                 data.AddEvidence("query.User-Agent", userAgent);
 
-                data.Process();
+                Assert.ThrowsExactly<AggregateException>(() => data.Process());
             }
         }
 
         /// <summary>
-        /// Test cloud request engine handles a lack of data from the 
+        /// Test cloud request engine handles a lack of data from the
         /// cloud service as expected.
         /// An exception should be thrown by the cloud request engine
-        /// and the pipeline is configured to throw any exceptions up 
+        /// and the pipeline is configured to throw any exceptions up
         /// the stack as an AggregateException.
         /// </summary>
         [TestMethod]
-        [ExpectedException(typeof(CloudRequestException))]
         public void ValidateErrorHandling_NotJson()
         {
             string resourceKey = "resource_key";
@@ -612,24 +700,20 @@ namespace FiftyOne.Pipeline.CloudRequestEngine.Tests
             ConfigureMockedClient(_ => true);
 
             var engine = new CloudRequestEngineBuilder(
-                _loggerFactory, 
+                _loggerFactory,
                 _httpClient)
                 .SetResourceKey(resourceKey)
                 .Build();
 
-            try
+            var ex = Assert.ThrowsExactly<CloudRequestException>(() =>
             {
                 var cloudEngineProps = engine.PublicProperties;
-                Assert.Fail("Expected exception did not occur");
-            }
-            catch (CloudRequestException ex)
-            {
-                Assert.AreEqual(ex.HttpStatusCode, 404, "Status code should be 404");
-                Assert.IsNotNull(ex.ResponseHeaders, "Response headers not populated");
-                Assert.IsNotNull(ex.InnerException, "Inner exception not populated");
-                Assert.IsInstanceOfType<JsonReaderException>(ex.InnerException, $"Inner exception is not an instance of {nameof(JsonReaderException)}");
-                throw;
-            }
+            });
+
+            Assert.AreEqual(ex.HttpStatusCode, 404, "Status code should be 404");
+            Assert.IsNotNull(ex.ResponseHeaders, "Response headers not populated");
+            Assert.IsNotNull(ex.InnerException, "Inner exception not populated");
+            Assert.IsInstanceOfType<JsonReaderException>(ex.InnerException, $"Inner exception is not an instance of {nameof(JsonReaderException)}");
         }
 
         /// <summary>

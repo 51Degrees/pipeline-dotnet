@@ -1,6 +1,6 @@
 /* *********************************************************************
  * This Original Work is copyright of 51 Degrees Mobile Experts Limited.
- * Copyright 2023 51 Degrees Mobile Experts Limited, Davidson House,
+ * Copyright 2026 51 Degrees Mobile Experts Limited, Davidson House,
  * Forbury Square, Reading, Berkshire, United Kingdom RG1 3EU.
  *
  * This Original Work is licensed under the European Union Public Licence
@@ -91,8 +91,8 @@ namespace FiftyOne.Pipeline.Engines.FiftyOne.Tests.Performance
 
             double msOverheadPerCall =
                 end.Subtract(start).TotalMilliseconds / iterations;
-            Assert.IsTrue(msOverheadPerCall < 0.1,
-                $"Pipeline with share usage overhead per Process call was " +
+            Assert.IsLessThan(0.1,
+msOverheadPerCall, $"Pipeline with share usage overhead per Process call was " +
                 $"{msOverheadPerCall}ms. Maximum permitted is 0.1ms");
         }
 
@@ -128,8 +128,8 @@ namespace FiftyOne.Pipeline.Engines.FiftyOne.Tests.Performance
 
             double msOverheadPerCall =
                 end.Subtract(start).TotalMilliseconds / iterations;
-            Assert.IsTrue(msOverheadPerCall < 10,
-                $"Pipeline with share usage overhead per Process call was " +
+            Assert.IsLessThan(10,
+msOverheadPerCall, $"Pipeline with share usage overhead per Process call was " +
                 $"{msOverheadPerCall}ms. Maximum permitted is 10ms");
         }
 

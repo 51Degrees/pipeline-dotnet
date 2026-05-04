@@ -1,6 +1,6 @@
 /* *********************************************************************
  * This Original Work is copyright of 51 Degrees Mobile Experts Limited.
- * Copyright 2023 51 Degrees Mobile Experts Limited, Davidson House,
+ * Copyright 2026 51 Degrees Mobile Experts Limited, Davidson House,
  * Forbury Square, Reading, Berkshire, United Kingdom RG1 3EU.
  *
  * This Original Work is licensed under the European Union Public Licence
@@ -94,7 +94,7 @@ namespace FiftyOne.Pipeline.Engines.FiftyOne.Tests.Trackers
 				if (_shareUsageTracker.Track(_data.Object))
 					trackedEvents++;
 			}
-			Assert.IsTrue(trackedEvents == 1);
+			Assert.AreEqual(1, trackedEvents);
 		}
 
 		/// <summary>
@@ -113,7 +113,7 @@ namespace FiftyOne.Pipeline.Engines.FiftyOne.Tests.Trackers
                 // Wait some time equal to the interval to elapse.
 				Thread.Sleep(_interval);
 			}
-			Assert.IsTrue(trackedEvents == 2);
+			Assert.AreEqual(2, trackedEvents);
 		}
 
 		/// <summary>
@@ -151,7 +151,7 @@ namespace FiftyOne.Pipeline.Engines.FiftyOne.Tests.Trackers
 
 			}
 
-			Assert.IsTrue(trackedEvents == 2);
+			Assert.AreEqual(2, trackedEvents);
 		}
 
 		/// <summary>
@@ -189,7 +189,7 @@ namespace FiftyOne.Pipeline.Engines.FiftyOne.Tests.Trackers
 					trackedEvents++;
 
 			}
-			Assert.IsTrue(trackedEvents == 1);
+			Assert.AreEqual(1, trackedEvents);
 		}
 
 		public DataKey GenerateKey(IEvidenceKeyFilter filter, Dictionary<string, object> evidence)

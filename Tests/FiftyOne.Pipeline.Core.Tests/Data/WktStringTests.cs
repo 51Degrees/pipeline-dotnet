@@ -1,6 +1,6 @@
-﻿/* *********************************************************************
+/* *********************************************************************
  * This Original Work is copyright of 51 Degrees Mobile Experts Limited.
- * Copyright 2025 51 Degrees Mobile Experts Limited, Davidson House,
+ * Copyright 2026 51 Degrees Mobile Experts Limited, Davidson House,
  * Forbury Square, Reading, Berkshire, United Kingdom RG1 3EU.
  *
  * This Original Work is licensed under the European Union Public Licence
@@ -39,7 +39,7 @@ public class WktStringTests
         new[] { WktPolygon, },
     };
     
-    [DataTestMethod]
+    [TestMethod]
     [DynamicData(nameof(RawStrings))]
     public void WktString_Value_NewImplicit(string rawString)
     {
@@ -47,7 +47,7 @@ public class WktStringTests
         Assert.AreEqual(rawString, wktString.Value);
     }
     
-    [DataTestMethod]
+    [TestMethod]
     [DynamicData(nameof(RawStrings))]
     public void WktString_Value_NewExplicit(string rawString)
     {
@@ -55,7 +55,7 @@ public class WktStringTests
         Assert.AreEqual(rawString, wktString.Value);
     }
     
-    [DataTestMethod]
+    [TestMethod]
     [DynamicData(nameof(RawStrings))]
     public void WktString_GetHashCode(string rawString)
     {
@@ -63,7 +63,7 @@ public class WktStringTests
         Assert.AreEqual(rawString.GetHashCode(), wktString.GetHashCode());
     }
     
-    [DataTestMethod]
+    [TestMethod]
     [DynamicData(nameof(RawStrings))]
     public void WktString_ToString_Method(string rawString)
     {
@@ -72,7 +72,7 @@ public class WktStringTests
         Assert.AreEqual(rawString, theString);
     }
     
-    [DataTestMethod]
+    [TestMethod]
     [DynamicData(nameof(RawStrings))]
     public void WktString_ToString_Implicit(string rawString)
     {
@@ -81,7 +81,7 @@ public class WktStringTests
         Assert.AreEqual(rawString, theString);
     }
     
-    [DataTestMethod]
+    [TestMethod]
     [DynamicData(nameof(RawStrings))]
     public void WktString_ToString_Equals_WktExplicit(string rawString)
     {
@@ -91,7 +91,7 @@ public class WktStringTests
         Assert.IsTrue(wktString2.Equals(wktString));
     }
     
-    [DataTestMethod]
+    [TestMethod]
     [DynamicData(nameof(RawStrings))]
     public void WktString_ToString_Equals_StringExplicit(string rawString)
     {
@@ -107,7 +107,7 @@ public class WktStringTests
         [new WktString(WktPolygon), typeof(WktString), false],
     ];
     
-    [DataTestMethod]
+    [TestMethod]
     [DynamicData(nameof(EqualityTestData))]
     public void WktString_ToString_Equals_ObjectMethod(object obj, Type type, bool expected)
     {

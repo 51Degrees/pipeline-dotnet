@@ -1,6 +1,6 @@
 /* *********************************************************************
  * This Original Work is copyright of 51 Degrees Mobile Experts Limited.
- * Copyright 2023 51 Degrees Mobile Experts Limited, Davidson House,
+ * Copyright 2026 51 Degrees Mobile Experts Limited, Davidson House,
  * Forbury Square, Reading, Berkshire, United Kingdom RG1 3EU.
  *
  * This Original Work is licensed under the European Union Public Licence
@@ -38,7 +38,7 @@ namespace FiftyOne.Pipeline.Engines.FiftyOne.Tests.FlowElements
         /// to be added or not added based on the value passed to it.
         /// </summary>
         /// <param name="shareUsageEnabled"></param>
-        [DataTestMethod]
+        [TestMethod]
         [DataRow(true)]
         [DataRow(false)]
         public void TestShareUsageOption(bool shareUsageEnabled)
@@ -56,7 +56,7 @@ namespace FiftyOne.Pipeline.Engines.FiftyOne.Tests.FlowElements
         /// from configuration.
         /// </summary>
         /// <param name="shareUsageEnabled"></param>
-        [DataTestMethod]
+        [TestMethod]
         [DataRow(true)]
         [DataRow(false)]
         public void TestShareUsageOption_BuildFromConfig(bool shareUsageEnabled)
@@ -76,7 +76,7 @@ namespace FiftyOne.Pipeline.Engines.FiftyOne.Tests.FlowElements
         /// regardless of the pipeline level 'ShareUsage' setting.
         /// </summary>
         /// <param name="shareUsageEnabled"></param>
-        [DataTestMethod]
+        [TestMethod]
         [DataRow(true)]
         [DataRow(false)]
         public void TestShareUsageConfigOverridesOption(bool shareUsageEnabled)

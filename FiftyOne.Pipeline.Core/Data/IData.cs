@@ -1,6 +1,6 @@
 /* *********************************************************************
  * This Original Work is copyright of 51 Degrees Mobile Experts Limited.
- * Copyright 2023 51 Degrees Mobile Experts Limited, Davidson House,
+ * Copyright 2026 51 Degrees Mobile Experts Limited, Davidson House,
  * Forbury Square, Reading, Berkshire, United Kingdom RG1 3EU.
  *
  * This Original Work is licensed under the European Union Public Licence
@@ -77,6 +77,16 @@ namespace FiftyOne.Pipeline.Core.Data
         /// <returns>
         /// The property value
         /// </returns>
-        object this[string key] { get; set;  }
+        object this[string key] { get; set; }
+
+        /// <summary>
+        /// Try and get the value associated with the property key.
+        /// </summary>
+        /// <param name="key">The name of the property</param>
+        /// <param name="value">The value associated with the key</param>
+        /// <returns>
+        /// True if the property key is found, otherwise false.
+        /// </returns>
+        bool TryGet(string key, out object value);
     }
 }

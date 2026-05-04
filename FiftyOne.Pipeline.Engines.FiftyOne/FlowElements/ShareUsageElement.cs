@@ -1,6 +1,6 @@
 /* *********************************************************************
  * This Original Work is copyright of 51 Degrees Mobile Experts Limited.
- * Copyright 2023 51 Degrees Mobile Experts Limited, Davidson House,
+ * Copyright 2026 51 Degrees Mobile Experts Limited, Davidson House,
  * Forbury Square, Reading, Berkshire, United Kingdom RG1 3EU.
  *
  * This Original Work is licensed under the European Union Public Licence
@@ -20,6 +20,7 @@
  * such notice(s) shall fulfill the requirements of that article.
  * ********************************************************************* */
 
+using FiftyOne.Pipeline.Core.FailHandling.Facade;
 using FiftyOne.Pipeline.Engines.Trackers;
 using Microsoft.Extensions.Logging;
 using System;
@@ -62,7 +63,8 @@ namespace FiftyOne.Pipeline.Engines.FiftyOne.FlowElements
             List<KeyValuePair<string, string>> ignoreDataEvidenceFilter,
             string aspSessionCookieName,
             ITracker tracker,
-            bool shareAllEvidence)
+            bool shareAllEvidence,
+            IFailHandler failHandler = null)
             : base(logger,
                   httpClient,
                   sharePercentage,
@@ -78,7 +80,8 @@ namespace FiftyOne.Pipeline.Engines.FiftyOne.FlowElements
                   ignoreDataEvidenceFilter,
                   aspSessionCookieName,
                   tracker,
-                  shareAllEvidence)
+                  shareAllEvidence,
+                  failHandler)
         {
         }
 

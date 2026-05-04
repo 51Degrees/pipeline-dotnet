@@ -20,17 +20,6 @@ jobs:
     secrets:
       token: ${{ secrets.ACCESS_TOKEN }}
 
-  DocumentationUpdate:
-    name: Nightly Documentation Update
-    uses: 51Degrees/common-ci/.github/workflows/nightly-documentation-update.yml@main
-    with:
-      repo-name: ${{ github.event.repository.name }}
-      org-name: ${{ github.event.repository.owner.login }}
-      dryrun: ${{ inputs.dryrun || false }}
-      separate-examples: true
-    secrets:
-      token: ${{ secrets.ACCESS_TOKEN }}
-
   SubmoduleUpdate:
     name: Nightly Submodule Update
     uses: 51Degrees/common-ci/.github/workflows/nightly-submodule-update.yml@main
@@ -43,14 +32,13 @@ jobs:
 
   PullRequests:
     if: ${{ !cancelled() }}
-    needs: [PackageUpdate, DocumentationUpdate, SubmoduleUpdate]
+    needs: [PackageUpdate, SubmoduleUpdate]
     name: Nightly Pull Requests
     uses: 51Degrees/common-ci/.github/workflows/nightly-pull-requests.yml@main
     with:
       repo-name: ${{ github.event.repository.name }}
       org-name: ${{ github.event.repository.owner.login }}
       dryrun: ${{ inputs.dryrun || false }}
-      cache-assets: true
     secrets:
       token: ${{ secrets.ACCESS_TOKEN }}
 
@@ -63,7 +51,6 @@ jobs:
       repo-name: ${{ github.event.repository.name }}
       org-name: ${{ github.event.repository.owner.login }}
       dryrun: ${{ inputs.dryrun || false }}
-      cache-assets: true
       build-platform: windows-latest
     secrets:
       token: ${{ secrets.ACCESS_TOKEN }}

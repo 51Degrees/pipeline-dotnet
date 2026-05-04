@@ -1,6 +1,6 @@
 /* *********************************************************************
  * This Original Work is copyright of 51 Degrees Mobile Experts Limited.
- * Copyright 2023 51 Degrees Mobile Experts Limited, Davidson House,
+ * Copyright 2026 51 Degrees Mobile Experts Limited, Davidson House,
  * Forbury Square, Reading, Berkshire, United Kingdom RG1 3EU.
  *
  * This Original Work is licensed under the European Union Public Licence
@@ -38,6 +38,10 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
+
+#if !NET8_0_OR_GREATER
+using ICSharpCode.SharpZipLib.GZip;
+#endif
 
 namespace FiftyOne.Pipeline.Engines.Services
 {
@@ -1314,8 +1318,16 @@ namespace FiftyOne.Pipeline.Engines.Services
 		{
 			AutoUpdateStatus status = AutoUpdateStatus.AUTO_UPDATE_IN_PROGRESS;
 			compressedDataStream.Position = 0;
+#if !NET8_0_OR_GREATER
+			using (var fis = new GZipInputStream(
+				compressedDataStream)
+			{
+                IsStreamOwner = false,
+            })
+#else
 			using (var fis = new GZipStream(
 				compressedDataStream, CompressionMode.Decompress, true))
+#endif
 			{
 				fis.CopyTo(uncompressedDataStream);
             }

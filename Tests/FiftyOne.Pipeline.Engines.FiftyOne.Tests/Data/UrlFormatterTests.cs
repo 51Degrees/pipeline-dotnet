@@ -1,6 +1,6 @@
 /* *********************************************************************
  * This Original Work is copyright of 51 Degrees Mobile Experts Limited.
- * Copyright 2023 51 Degrees Mobile Experts Limited, Davidson House,
+ * Copyright 2026 51 Degrees Mobile Experts Limited, Davidson House,
  * Forbury Square, Reading, Berkshire, United Kingdom RG1 3EU.
  *
  * This Original Work is licensed under the European Union Public Licence
@@ -136,10 +136,10 @@ namespace FiftyOne.Pipeline.Engines.FiftyOne.Tests.Data
 
             var url1 = file1.FormattedUri.AbsoluteUri;
             var url2 = file2.FormattedUri.AbsoluteUri;
-            Assert.IsTrue(url1.Contains("license1"));
-            Assert.IsFalse(url1.Contains("license2"));
-            Assert.IsTrue(url2.Contains("license2"));
-            Assert.IsFalse(url2.Contains("license1"));
+            Assert.Contains("license1", url1);
+            Assert.DoesNotContain("license2", url1);
+            Assert.Contains("license2", url2);
+            Assert.DoesNotContain("license1", url2);
         }
 
         /// <summary>

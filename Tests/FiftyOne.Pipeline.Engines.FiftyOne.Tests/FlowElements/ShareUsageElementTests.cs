@@ -1,6 +1,6 @@
 /* *********************************************************************
  * This Original Work is copyright of 51 Degrees Mobile Experts Limited.
- * Copyright 2023 51 Degrees Mobile Experts Limited, Davidson House,
+ * Copyright 2026 51 Degrees Mobile Experts Limited, Davidson House,
  * Forbury Square, Reading, Berkshire, United Kingdom RG1 3EU.
  *
  * This Original Work is licensed under the European Union Public Licence
@@ -39,6 +39,7 @@ using FiftyOne.Pipeline.Engines.TestHelpers;
 using System;
 using System.Linq;
 using System.Threading;
+using System.Threading.Tasks;
 
 namespace FiftyOne.Pipeline.Engines.FiftyOne.Tests.FlowElements
 {
@@ -52,13 +53,46 @@ namespace FiftyOne.Pipeline.Engines.FiftyOne.Tests.FlowElements
 
         // Mocks and dependencies
         private TestLogger<ShareUsageElement> _logger;
-        private Mock<MockHttpMessageHandler> _httpHandler;
+        private TestHttpHandler _httpHandler;
         private Mock<IPipeline> _pipeline;
         private Mock<ITracker> _tracker;
         private HttpClient _httpClient;
 
         // Test instance data.
         private List<string> _xmlContent = new List<string>();
+
+        /// <summary>
+        /// Simple HTTP handler for tests that directly implements SendAsync
+        /// without relying on Moq's CallBase behavior for protected methods.
+        /// </summary>
+        private class TestHttpHandler : HttpMessageHandler
+        {
+            private Func<HttpRequestMessage, HttpResponseMessage> _responseFactory;
+            public int SendCallCount { get; private set; } = 0;
+
+            public void SetupResponse(Func<HttpRequestMessage, HttpResponseMessage> responseFactory)
+            {
+                _responseFactory = responseFactory;
+            }
+
+            protected override Task<HttpResponseMessage> SendAsync(
+                HttpRequestMessage request,
+                CancellationToken cancellationToken)
+            {
+                SendCallCount++;
+                if (_responseFactory == null)
+                {
+                    throw new InvalidOperationException("Response factory not configured. Call SetupResponse first.");
+                }
+                return Task.FromResult(_responseFactory(request));
+            }
+
+            public void VerifySendCalled(int expectedCount)
+            {
+                Assert.AreEqual(expectedCount, SendCallCount,
+                    $"Expected Send to be called {expectedCount} time(s), but was called {SendCallCount} time(s).");
+            }
+        }
 
         /// <summary>
         /// Initialise the test instance.
@@ -68,21 +102,21 @@ namespace FiftyOne.Pipeline.Engines.FiftyOne.Tests.FlowElements
         {
             _logger = new TestLogger<ShareUsageElement>();
 
-            // Create the HttpClient using the mock handler
-            _httpHandler = new Mock<MockHttpMessageHandler>() { CallBase = true };
-            _httpClient = new HttpClient(_httpHandler.Object);
+            // Create the HttpClient using a simple test handler that directly
+            // implements SendAsync without relying on Moq's CallBase behavior.
+            _httpHandler = new TestHttpHandler();
+            _httpClient = new HttpClient(_httpHandler);
 
-            // Configure the mock handler to store the XML content of requests
+            // Configure the handler to store the XML content of requests
             // in the _xmlContent list and return an 'OK' status code.
-            _httpHandler.Setup(h => h.Send(It.IsAny<HttpRequestMessage>()))
-                .Callback((HttpRequestMessage request) =>
-                {
-                    StoreRequestXml(request);
-                })
-                .Returns(new HttpResponseMessage(System.Net.HttpStatusCode.OK)
+            _httpHandler.SetupResponse(request =>
+            {
+                StoreRequestXml(request);
+                return new HttpResponseMessage(System.Net.HttpStatusCode.OK)
                 {
                     Content = new StringContent("<empty />", Encoding.UTF8, "application/xml"),
-                });
+                };
+            });
 
             // Configure the pipeline to return an empty list of flow elements
             _pipeline = new Mock<IPipeline>();
@@ -152,13 +186,12 @@ namespace FiftyOne.Pipeline.Engines.FiftyOne.Tests.FlowElements
             // Act
             _shareUsageElement.Process(data.Object);
             // Wait for the consumer task to finish.
-            Assert.IsNotNull(_shareUsageElement.SendDataTask);
-            _shareUsageElement.SendDataTask.Wait();
+            WaitForSendDataTask();
 
             // Assert
             // Check that one and only one HTTP message was sent
-            _httpHandler.Verify(h => h.Send(It.IsAny<HttpRequestMessage>()), Times.Once);
-            Assert.AreEqual(1, _xmlContent.Count);
+            _httpHandler.VerifySendCalled(1);
+            Assert.HasCount(1, _xmlContent);
 
             // Validate that the XML is well formed by passing it through a reader
             using (XmlReader xr = XmlReader.Create(new StringReader(_xmlContent[0])))
@@ -166,11 +199,11 @@ namespace FiftyOne.Pipeline.Engines.FiftyOne.Tests.FlowElements
                 while (xr.Read()) { }
             }
             // Check that the expected values are populated.
-            Assert.IsTrue(_xmlContent[0].Contains("<ClientIP>1.2.3.4</ClientIP>"));
-            Assert.IsTrue(_xmlContent[0].Contains("<header Name=\"x-forwarded-for\"><![CDATA[5.6.7.8]]></header>"));
-            Assert.IsTrue(_xmlContent[0].Contains("<header Name=\"forwarded-for\"><![CDATA[2001::]]></header>"));
-            Assert.IsTrue(_xmlContent[0].Contains($"<cookie Name=\"{Engines.Constants.FIFTYONE_COOKIE_PREFIX}Profile\"><![CDATA[123456]]></cookie>"));
-            Assert.IsFalse(_xmlContent[0].Contains("<cookie Name=\"RemoveMe\">"));
+            Assert.Contains("<ClientIP>1.2.3.4</ClientIP>", _xmlContent[0]);
+            Assert.Contains("<header Name=\"x-forwarded-for\"><![CDATA[5.6.7.8]]></header>", _xmlContent[0]);
+            Assert.Contains("<header Name=\"forwarded-for\"><![CDATA[2001::]]></header>", _xmlContent[0]);
+            Assert.Contains($"<cookie Name=\"{Engines.Constants.FIFTYONE_COOKIE_PREFIX}Profile\"><![CDATA[123456]]></cookie>", _xmlContent[0]);
+            Assert.DoesNotContain("<cookie Name=\"RemoveMe\">", _xmlContent[0]);
         }
 
         /// <summary>
@@ -195,7 +228,7 @@ namespace FiftyOne.Pipeline.Engines.FiftyOne.Tests.FlowElements
 
             // Assert
             // Check that no HTTP messages were sent.
-            _httpHandler.Verify(h => h.Send(It.IsAny<HttpRequestMessage>()), Times.Never);
+            _httpHandler.VerifySendCalled(0);
         }
 
         /// <summary>
@@ -220,13 +253,12 @@ namespace FiftyOne.Pipeline.Engines.FiftyOne.Tests.FlowElements
             _shareUsageElement.Process(data.Object);
 
             // Wait for the consumer task to finish.
-            Assert.IsNotNull(_shareUsageElement.SendDataTask);
-            _shareUsageElement.SendDataTask.Wait();
+            WaitForSendDataTask();
 
             // Assert
             // Check that one and only one HTTP message was sent.
-            _httpHandler.Verify(h => h.Send(It.IsAny<HttpRequestMessage>()), Times.Once);
-            Assert.AreEqual(1, _xmlContent.Count);
+            _httpHandler.VerifySendCalled(1);
+            Assert.HasCount(1, _xmlContent);
 
             // Validate that the XML is well formed by passing it through a reader
             using (XmlReader xr = XmlReader.Create(new StringReader(_xmlContent[0])))
@@ -269,13 +301,12 @@ namespace FiftyOne.Pipeline.Engines.FiftyOne.Tests.FlowElements
             // Act
             _shareUsageElement.Process(data.Object);
             // Wait for the consumer task to finish.
-            Assert.IsNotNull(_shareUsageElement.SendDataTask);
-            _shareUsageElement.SendDataTask.Wait();
+            WaitForSendDataTask();
 
             // Assert
             // Check that one and only one HTTP message was sent.
-            _httpHandler.Verify(h => h.Send(It.IsAny<HttpRequestMessage>()), Times.Once);
-            Assert.AreEqual(1, _xmlContent.Count);
+            _httpHandler.VerifySendCalled(1);
+            Assert.HasCount(1, _xmlContent);
 
             // Validate that the XML is well formed by passing it through a reader
             using (XmlReader xr = XmlReader.Create(new StringReader(_xmlContent[0])))
@@ -283,10 +314,10 @@ namespace FiftyOne.Pipeline.Engines.FiftyOne.Tests.FlowElements
                 while (xr.Read()) { }
             }
             // Check that the expected values are populated.
-            Assert.IsTrue(_xmlContent[0].Contains("<ClientIP>1.2.3.4</ClientIP>"));
-            Assert.IsTrue(_xmlContent[0].Contains($"<header Name=\"user-agent\"><![CDATA[{useragent}]]></header>"));
-            Assert.IsFalse(_xmlContent[0].Contains("<header Name=\"x-forwarded-for\">"));
-            Assert.IsFalse(_xmlContent[0].Contains("<header Name=\"forwarded-for\">"));
+            Assert.Contains("<ClientIP>1.2.3.4</ClientIP>", _xmlContent[0]);
+            Assert.Contains($"<header Name=\"user-agent\"><![CDATA[{useragent}]]></header>", _xmlContent[0]);
+            Assert.DoesNotContain("<header Name=\"x-forwarded-for\">", _xmlContent[0]);
+            Assert.DoesNotContain("<header Name=\"forwarded-for\">", _xmlContent[0]);
         }
 
         /// <summary>
@@ -317,22 +348,21 @@ namespace FiftyOne.Pipeline.Engines.FiftyOne.Tests.FlowElements
                 requiredEvents++;
             }
             // Wait for the consumer task to finish.
-            Assert.IsNotNull(_shareUsageElement.SendDataTask);
-            _shareUsageElement.SendDataTask.Wait();
+            WaitForSendDataTask();
 
             // Assert
-            // On average, the number of required events should be around 
-            // 100,000. However, as it's chance based it can vary 
+            // On average, the number of required events should be around
+            // 100,000. However, as it's chance based it can vary
             // significantly. We only want to catch any gross errors so just
             // make sure the value is of the expected order of magnitude.
             Console.WriteLine($"requiredEvents = {requiredEvents}");
-            Assert.IsTrue(requiredEvents > 10000, $"Expected the number of required " +
+            Assert.IsGreaterThan(10000, requiredEvents, $"Expected the number of required " +
                 $"events to be at least 10,000, but was actually '{requiredEvents}'");
-            Assert.IsTrue(requiredEvents < 1000000, $"Expected the number of required " +
+            Assert.IsLessThan(1000000, requiredEvents, $"Expected the number of required " +
                 $"events to be less than 1,000,000, but was actually '{requiredEvents}'");
             // Check that one and only one HTTP message was sent.
-            _httpHandler.Verify(h => h.Send(It.IsAny<HttpRequestMessage>()), Times.Once);
-            Assert.AreEqual(1, _xmlContent.Count);
+            _httpHandler.VerifySendCalled(1);
+            Assert.HasCount(1, _xmlContent);
         }
 
         /// <summary>
@@ -356,14 +386,18 @@ namespace FiftyOne.Pipeline.Engines.FiftyOne.Tests.FlowElements
 
             // No data should be being sending yet.
             Assert.IsNull(_shareUsageElement.SendDataTask);
-            _httpHandler.Verify(h => h.Send(It.IsAny<HttpRequestMessage>()), Times.Never);
+            _httpHandler.VerifySendCalled(0);
 
-            // Dispose of the element.
+            // Dispose of the element - this should trigger sending remaining data.
             _shareUsageElement.Dispose();
 
+            // The dispose should have completed the send synchronously, but allow
+            // a small buffer for async operations on slower CI environments.
+            Thread.Sleep(200);
+
             // Assert
-            // Check that no HTTP messages were sent.
-            _httpHandler.Verify(h => h.Send(It.IsAny<HttpRequestMessage>()), Times.Once);
+            // Check that one HTTP message was sent during cleanup.
+            _httpHandler.VerifySendCalled(1);
         }
 
         /// <summary>
@@ -373,9 +407,8 @@ namespace FiftyOne.Pipeline.Engines.FiftyOne.Tests.FlowElements
         public void ShareUsageElement_LogErrors()
         {
             // Arrange
-            _httpHandler.Setup(h => h.Send(It.IsAny<HttpRequestMessage>()))
-                .Returns(new HttpResponseMessage(
-                    System.Net.HttpStatusCode.InternalServerError));
+            _httpHandler.SetupResponse(request =>
+                new HttpResponseMessage(System.Net.HttpStatusCode.InternalServerError));
             CreateShareUsage(1, 1, 1, new List<string>(), new List<string>(), new List<KeyValuePair<string, string>>());
 
             Dictionary<string, object> evidenceData = new Dictionary<string, object>()
@@ -387,13 +420,16 @@ namespace FiftyOne.Pipeline.Engines.FiftyOne.Tests.FlowElements
             // Act
             _shareUsageElement.Process(data.Object);
             // Wait for the consumer task to finish.
-            Assert.IsNotNull(_shareUsageElement.SendDataTask);
-            _shareUsageElement.SendDataTask.Wait();
+            Assert.IsNotNull(_shareUsageElement.SendDataTask,
+                "SendDataTask should not be null after processing evidence");
+            var completed = _shareUsageElement.SendDataTask.Wait(30000);
+            Assert.IsTrue(completed,
+                $"SendDataTask did not complete within 30000ms. Task status: {_shareUsageElement.SendDataTask.Status}");
 
             // Assert
             // Check that a warning was logged.
             Assert.AreEqual(1, _logger.WarningEntries.Count());
-            Assert.IsTrue(_logger.WarningEntries.First().StartsWith("Failure sending usage data"));
+            Assert.StartsWith("Failure sending usage data", _logger.WarningEntries.First());
             Console.WriteLine(_logger.WarningEntries.First());
         }
 
@@ -405,9 +441,7 @@ namespace FiftyOne.Pipeline.Engines.FiftyOne.Tests.FlowElements
         public void ShareUsageElement_IgnoreOnEvidence()
         {
             // Arrange
-            _httpHandler.Setup(h => h.Send(It.IsAny<HttpRequestMessage>()))
-                .Returns(new HttpResponseMessage(
-                    System.Net.HttpStatusCode.OK));
+            // Note: SetupResponse is already configured in Init(), no need to override for OK response
             CreateShareUsage(1, 1, 1, new List<string>(), new List<string>(),
                 new List<KeyValuePair<string, string>>()
                 {
@@ -428,7 +462,7 @@ namespace FiftyOne.Pipeline.Engines.FiftyOne.Tests.FlowElements
 
             // Assert
             // Check that no HTTP messages were sent.
-            _httpHandler.Verify(h => h.Send(It.IsAny<HttpRequestMessage>()), Times.Never);
+            _httpHandler.VerifySendCalled(0);
         }
 
         /// <summary>
@@ -452,13 +486,12 @@ namespace FiftyOne.Pipeline.Engines.FiftyOne.Tests.FlowElements
             // Act
             _shareUsageElement.Process(data.Object);
             // Wait for the consumer task to finish.
-            Assert.IsNotNull(_shareUsageElement.SendDataTask);
-            _shareUsageElement.SendDataTask.Wait();
+            WaitForSendDataTask();
 
             // Assert
             // Check that one and only one HTTP message was sent.
-            _httpHandler.Verify(h => h.Send(It.IsAny<HttpRequestMessage>()), Times.Once);
-            Assert.AreEqual(1, _xmlContent.Count);
+            _httpHandler.VerifySendCalled(1);
+            Assert.HasCount(1, _xmlContent);
 
             // Validate that the XML is well formed by passing it through a reader
             using (XmlReader xr = XmlReader.Create(new StringReader(_xmlContent[0])))
@@ -466,8 +499,8 @@ namespace FiftyOne.Pipeline.Engines.FiftyOne.Tests.FlowElements
                 while (xr.Read()) { }
             }
             // Check that the expected values are populated.
-            Assert.IsTrue(_xmlContent[0].Contains(@"iPhone\x0018"));
-            Assert.IsTrue(_xmlContent[0].Contains("<BadSchema>true</BadSchema>"));
+            Assert.Contains(@"iPhone\x0018", _xmlContent[0]);
+            Assert.Contains("<BadSchema>true</BadSchema>", _xmlContent[0]);
 
         }
 
@@ -475,7 +508,7 @@ namespace FiftyOne.Pipeline.Engines.FiftyOne.Tests.FlowElements
         /// Test that the share usage build can handle invalid configuration for
         /// the ignoreDataEvidenceFilter.
         /// </summary>
-        [DataTestMethod]
+        [TestMethod]
         [DataRow("user-agent=iPhone")]
         [DataRow("user-agent,iPhone")]
         [DataRow("test,iPhone,block")]
@@ -490,14 +523,14 @@ namespace FiftyOne.Pipeline.Engines.FiftyOne.Tests.FlowElements
                 .SetIgnoreFlowDataEvidenceFilter(config)
                 .Build();
 
-            Assert.IsTrue(logger.WarningEntries.Count() > 0);
-            Assert.IsTrue(logger.ErrorEntries.Count() == 0);
+            Assert.IsGreaterThan(0, logger.WarningEntries.Count());
+            Assert.AreEqual(0, logger.ErrorEntries.Count());
         }
 
         /// <summary>
         /// Test valid configuration for the ignoreDataEvidenceFilter.
         /// </summary>
-        [DataTestMethod]
+        [TestMethod]
         [DataRow("user-agent:iPhone")]
         [DataRow("user-agent:iPhone,host:bacon.com")]
         [DataRow("user-agent:iPhone,host:bacon.com,license:ABCDEF")]
@@ -512,8 +545,8 @@ namespace FiftyOne.Pipeline.Engines.FiftyOne.Tests.FlowElements
                 .SetIgnoreFlowDataEvidenceFilter(config)
                 .Build();
 
-            Assert.IsTrue(logger.WarningEntries.Count() == 0);
-            Assert.IsTrue(logger.ErrorEntries.Count() == 0);
+            Assert.AreEqual(0, logger.WarningEntries.Count());
+            Assert.AreEqual(0, logger.ErrorEntries.Count());
         }
 
         /// <summary>
@@ -539,13 +572,12 @@ namespace FiftyOne.Pipeline.Engines.FiftyOne.Tests.FlowElements
             _sequenceElement.Process(data);
             _shareUsageElement.Process(data);
             // Wait for the consumer task to finish.
-            Assert.IsNotNull(_shareUsageElement.SendDataTask);
-            _shareUsageElement.SendDataTask.Wait();
+            WaitForSendDataTask();
 
             // Assert
             // Check that one and only one HTTP message was sent
-            _httpHandler.Verify(h => h.Send(It.IsAny<HttpRequestMessage>()), Times.Once);
-            Assert.AreEqual(1, _xmlContent.Count);
+            _httpHandler.VerifySendCalled(1);
+            Assert.HasCount(1, _xmlContent);
 
             // Validate that the XML is well formed by passing it through a reader
             using (XmlReader xr = XmlReader.Create(new StringReader(_xmlContent[0])))
@@ -554,8 +586,8 @@ namespace FiftyOne.Pipeline.Engines.FiftyOne.Tests.FlowElements
             }
 
             // Check that the expected values are populated.
-            Assert.IsTrue(_xmlContent[0].Contains("<SessionId>"));
-            Assert.IsTrue(_xmlContent[0].Contains("<Sequence>1</Sequence>"));
+            Assert.Contains("<SessionId>", _xmlContent[0]);
+            Assert.Contains("<Sequence>1</Sequence>", _xmlContent[0]);
             Assert.IsTrue(data.GetEvidence().AsDictionary().ContainsKey(Constants.EVIDENCE_SESSIONID));
             Assert.IsTrue(data.GetEvidence().AsDictionary().ContainsKey(Constants.EVIDENCE_SEQUENCE));
         }
@@ -586,13 +618,12 @@ namespace FiftyOne.Pipeline.Engines.FiftyOne.Tests.FlowElements
             _sequenceElement.Process(data);
             _shareUsageElement.Process(data);
             // Wait for the consumer task to finish.
-            Assert.IsNotNull(_shareUsageElement.SendDataTask);
-            _shareUsageElement.SendDataTask.Wait();
+            WaitForSendDataTask();
 
             // Assert
             // Check that one and only one HTTP message was sent
-            _httpHandler.Verify(h => h.Send(It.IsAny<HttpRequestMessage>()), Times.Once);
-            Assert.AreEqual(1, _xmlContent.Count);
+            _httpHandler.VerifySendCalled(1);
+            Assert.HasCount(1, _xmlContent);
 
             // Validate that the XML is well formed by passing it through a reader
             using (XmlReader xr = XmlReader.Create(new StringReader(_xmlContent[0])))
@@ -601,8 +632,8 @@ namespace FiftyOne.Pipeline.Engines.FiftyOne.Tests.FlowElements
             }
 
             // Check that the expected values are populated.
-            Assert.IsTrue(_xmlContent[0].Contains("<SessionId>abcdefg-hijklmn-opqrst-uvwyxz</SessionId>"));
-            Assert.IsTrue(_xmlContent[0].Contains("<Sequence>3</Sequence>"));
+            Assert.Contains("<SessionId>abcdefg-hijklmn-opqrst-uvwyxz</SessionId>", _xmlContent[0]);
+            Assert.Contains("<Sequence>3</Sequence>", _xmlContent[0]);
             Assert.IsTrue(data.GetEvidence().AsDictionary().ContainsKey(Constants.EVIDENCE_SESSIONID));
             Assert.IsTrue(data.GetEvidence().AsDictionary().ContainsKey(Constants.EVIDENCE_SEQUENCE));
         }
@@ -631,13 +662,12 @@ namespace FiftyOne.Pipeline.Engines.FiftyOne.Tests.FlowElements
             // Act
             _shareUsageElement.Process(data.Object);
             // Wait for the consumer task to finish.
-            Assert.IsNotNull(_shareUsageElement.SendDataTask);
-            _shareUsageElement.SendDataTask.Wait();
+            WaitForSendDataTask();
 
             // Assert
             // Check that one and only one HTTP message was sent
-            _httpHandler.Verify(h => h.Send(It.IsAny<HttpRequestMessage>()), Times.Once);
-            Assert.AreEqual(1, _xmlContent.Count);
+            _httpHandler.VerifySendCalled(1);
+            Assert.HasCount(1, _xmlContent);
 
             // Validate that the XML is well formed by passing it through a reader
             using (XmlReader xr = XmlReader.Create(new StringReader(_xmlContent[0])))
@@ -645,10 +675,10 @@ namespace FiftyOne.Pipeline.Engines.FiftyOne.Tests.FlowElements
                 while (xr.Read()) { }
             }
             // Check that the expected values are populated.
-            Assert.IsTrue(_xmlContent[0].Contains("<header Name=\"notblocked\"><![CDATA[abc]]></header>"));
-            Assert.IsTrue(_xmlContent[0].Contains("<query Name=\"somevalue\"><![CDATA[123]]></query>"));
-            Assert.IsTrue(_xmlContent[0].Contains("<cookie Name=\"mycookie\"><![CDATA[zyx]]></cookie>"));
-            Assert.IsTrue(_xmlContent[0].Contains("<someprefix Name=\"anothervalue\"><![CDATA[987]]></someprefix>"));
+            Assert.Contains("<header Name=\"notblocked\"><![CDATA[abc]]></header>", _xmlContent[0]);
+            Assert.Contains("<query Name=\"somevalue\"><![CDATA[123]]></query>", _xmlContent[0]);
+            Assert.Contains("<cookie Name=\"mycookie\"><![CDATA[zyx]]></cookie>", _xmlContent[0]);
+            Assert.Contains("<someprefix Name=\"anothervalue\"><![CDATA[987]]></someprefix>", _xmlContent[0]);
         }
 
         /// <summary>
@@ -673,13 +703,12 @@ namespace FiftyOne.Pipeline.Engines.FiftyOne.Tests.FlowElements
             // Act
             _shareUsageElement.Process(data.Object);
             // Wait for the consumer task to finish.
-            Assert.IsNotNull(_shareUsageElement.SendDataTask);
-            _shareUsageElement.SendDataTask.Wait();
+            WaitForSendDataTask();
 
             // Assert
             // Check that one and only one HTTP message was sent
-            _httpHandler.Verify(h => h.Send(It.IsAny<HttpRequestMessage>()), Times.Once);
-            Assert.AreEqual(1, _xmlContent.Count);
+            _httpHandler.VerifySendCalled(1);
+            Assert.HasCount(1, _xmlContent);
 
             // Validate that the XML is well formed by passing it through a reader
             using (XmlReader xr = XmlReader.Create(new StringReader(_xmlContent[0])))
@@ -687,11 +716,208 @@ namespace FiftyOne.Pipeline.Engines.FiftyOne.Tests.FlowElements
                 while (xr.Read()) { }
             }
             // Check that the expected values are populated.
-            Assert.IsTrue(_xmlContent[0].Contains("<query Name=\"somevalue\"><![CDATA[123]]></query>"));
+            Assert.Contains("<query Name=\"somevalue\"><![CDATA[123]]></query>", _xmlContent[0]);
         }
 
         /// <summary>
-        /// Helper method used to extract the XML data from an 
+        /// Helper to create a share usage instance with explicit queue size control.
+        /// </summary>
+        private void CreateShareUsage(double sharePercentage,
+            int minimumEntriesPerMessage,
+            int maximumQueueSize,
+            int interval,
+            List<string> blockedHeaders,
+            List<string> includedQueryStringParams,
+            List<KeyValuePair<string, string>> ignoreDataEvidenceFiler)
+        {
+            _sequenceElement = new SequenceElement(new Mock<ILogger<SequenceElement>>().Object);
+            _sequenceElement.AddPipeline(_pipeline.Object);
+            _shareUsageElement = new ShareUsageElement(
+                _logger,
+                _httpClient,
+                sharePercentage,
+                minimumEntriesPerMessage,
+                maximumQueueSize,
+                100,
+                100,
+                interval,
+                true,
+                "http://51Degrees.com/test",
+                blockedHeaders,
+                includedQueryStringParams,
+                ignoreDataEvidenceFiler,
+                Engines.Constants.DEFAULT_ASP_COOKIE_NAME,
+                _tracker.Object,
+                false);
+            _shareUsageElement.AddPipeline(_pipeline.Object);
+        }
+
+        /// <summary>
+        /// Test that when the queue fills up, data is dropped but the queue
+        /// eventually drains and recovers to accept new data.
+        /// Uses a small queue (20) with batch size 10 and a slow HTTP
+        /// endpoint to force the queue to fill up.
+        /// </summary>
+        [TestMethod]
+        public void ShareUsageElement_QueueFullRecovery()
+        {
+            // Arrange
+            // Small queue of 20, batch size 10, so each send drains up to 20 items.
+            // Add a delay to the HTTP handler to simulate a slow endpoint,
+            // causing the queue to fill up while a send is in progress.
+            int sendCount = 0;
+            _httpHandler.SetupResponse(request =>
+            {
+                Interlocked.Increment(ref sendCount);
+                // Simulate slow endpoint on first call to let queue fill up
+                if (sendCount == 1)
+                {
+                    Thread.Sleep(500);
+                }
+                StoreRequestXml(request);
+                return new HttpResponseMessage(System.Net.HttpStatusCode.OK)
+                {
+                    Content = new StringContent("<empty />", Encoding.UTF8, "application/xml"),
+                };
+            });
+
+            CreateShareUsage(
+                sharePercentage: 1,
+                minimumEntriesPerMessage: 10,
+                maximumQueueSize: 20,
+                interval: 1,
+                blockedHeaders: new List<string>(),
+                includedQueryStringParams: new List<string>(),
+                ignoreDataEvidenceFiler: new List<KeyValuePair<string, string>>());
+
+            // Act - flood with 50 unique requests (more than queue capacity)
+            int totalProcessed = 0;
+            for (int i = 0; i < 50; i++)
+            {
+                var evidenceData = new Dictionary<string, object>()
+                {
+                    { Core.Constants.EVIDENCE_CLIENTIP_KEY, $"1.2.3.{i % 256}" },
+                    { Core.Constants.EVIDENCE_HEADER_USERAGENT_KEY, $"TestAgent/{i}" },
+                };
+                var data = MockFlowData.CreateFromEvidence(evidenceData, false);
+                _shareUsageElement.Process(data.Object);
+                totalProcessed++;
+            }
+
+            // Wait for any in-progress send to complete
+            if (_shareUsageElement.SendDataTask != null)
+            {
+                _shareUsageElement.SendDataTask.Wait(10000);
+            }
+
+            // Now send more data - queue should have drained and accept new entries
+            _xmlContent.Clear();
+            for (int i = 50; i < 70; i++)
+            {
+                var evidenceData = new Dictionary<string, object>()
+                {
+                    { Core.Constants.EVIDENCE_CLIENTIP_KEY, $"1.2.3.{i % 256}" },
+                    { Core.Constants.EVIDENCE_HEADER_USERAGENT_KEY, $"TestAgent/{i}" },
+                };
+                var data = MockFlowData.CreateFromEvidence(evidenceData, false);
+                _shareUsageElement.Process(data.Object);
+            }
+
+            // Wait for the final send to complete
+            if (_shareUsageElement.SendDataTask != null)
+            {
+                _shareUsageElement.SendDataTask.Wait(10000);
+            }
+
+            // Assert
+            // The key assertion: HTTP sends happened (queue was drained)
+            Assert.IsGreaterThanOrEqualTo(2,
+sendCount, $"Expected at least 2 HTTP sends (initial + recovery), but got {sendCount}");
+
+            // After recovery, new data was accepted and sent
+            Assert.IsNotEmpty(_xmlContent,
+                "Expected data to be sent after queue recovery, but no XML content was captured");
+
+            // Verify no errors or warnings were logged (the original complaint
+            // was log flooding with overflow messages).
+            _logger.AssertMaxErrors(0);
+            _logger.AssertMaxWarnings(0);
+
+            Console.WriteLine($"Total HTTP sends: {sendCount}");
+            Console.WriteLine($"XML batches after recovery: {_xmlContent.Count}");
+        }
+
+        /// <summary>
+        /// Test that when the HTTP endpoint fails, the queue still drains
+        /// on subsequent requests and eventually recovers when the endpoint
+        /// comes back.
+        /// </summary>
+        [TestMethod]
+        public void ShareUsageElement_HttpFailureRecovery()
+        {
+            // Arrange
+            // First N calls fail, then succeed
+            int callCount = 0;
+            int failUntil = 3;
+            _httpHandler.SetupResponse(request =>
+            {
+                var count = Interlocked.Increment(ref callCount);
+                if (count <= failUntil)
+                {
+                    throw new HttpRequestException("Simulated network failure");
+                }
+                StoreRequestXml(request);
+                return new HttpResponseMessage(System.Net.HttpStatusCode.OK)
+                {
+                    Content = new StringContent("<empty />", Encoding.UTF8, "application/xml"),
+                };
+            });
+
+            CreateShareUsage(
+                sharePercentage: 1,
+                minimumEntriesPerMessage: 5,
+                maximumQueueSize: 20,
+                interval: 1,
+                blockedHeaders: new List<string>(),
+                includedQueryStringParams: new List<string>(),
+                ignoreDataEvidenceFiler: new List<KeyValuePair<string, string>>());
+
+            // Act - send enough data to trigger multiple send attempts
+            for (int batch = 0; batch < 10; batch++)
+            {
+                for (int i = 0; i < 5; i++)
+                {
+                    int idx = batch * 5 + i;
+                    var evidenceData = new Dictionary<string, object>()
+                    {
+                        { Core.Constants.EVIDENCE_CLIENTIP_KEY, $"10.0.{idx / 256}.{idx % 256}" },
+                        { Core.Constants.EVIDENCE_HEADER_USERAGENT_KEY, $"TestAgent/{idx}" },
+                    };
+                    var data = MockFlowData.CreateFromEvidence(evidenceData, false);
+                    _shareUsageElement.Process(data.Object);
+                }
+
+                // Wait for send task to complete between batches
+                if (_shareUsageElement.SendDataTask != null)
+                {
+                    _shareUsageElement.SendDataTask.Wait(10000);
+                }
+            }
+
+            // Assert
+            // Some calls failed but eventually sends succeeded
+            Assert.IsGreaterThan(failUntil,
+callCount, $"Expected more than {failUntil} HTTP attempts, got {callCount}");
+            Assert.IsNotEmpty(_xmlContent,
+                $"Expected successful sends after recovery, but got {_xmlContent.Count} XML batches");
+
+            Console.WriteLine($"Total HTTP attempts: {callCount}");
+            Console.WriteLine($"Failed attempts: {Math.Min(callCount, failUntil)}");
+            Console.WriteLine($"Successful XML batches: {_xmlContent.Count}");
+        }
+
+        /// <summary>
+        /// Helper method used to extract the XML data from an
         /// HTTP request.
         /// </summary>
         /// <param name="request">
@@ -700,12 +926,67 @@ namespace FiftyOne.Pipeline.Engines.FiftyOne.Tests.FlowElements
         /// </param>
         private void StoreRequestXml(HttpRequestMessage request)
         {
-            using (var stream = request.Content.ReadAsStreamAsync().Result)
+            // Read the content bytes first to avoid stream disposal issues
+            var bytes = request.Content.ReadAsByteArrayAsync().GetAwaiter().GetResult();
+            using (var memoryStream = new MemoryStream(bytes))
             using (GZipStream decompressedStream =
-                new GZipStream(stream, CompressionMode.Decompress, true))
+                new GZipStream(memoryStream, CompressionMode.Decompress, true))
             using (StreamReader reader = new StreamReader(decompressedStream))
             {
                 _xmlContent.Add(reader.ReadToEnd());
+            }
+        }
+
+        /// <summary>
+        /// Helper method to wait for the SendDataTask to complete with proper
+        /// timeout handling and exception checking.
+        /// </summary>
+        /// <param name="timeout">Optional timeout in milliseconds. Default is 30000ms.</param>
+        private void WaitForSendDataTask(int timeout = 30000)
+        {
+            Assert.IsNotNull(_shareUsageElement.SendDataTask,
+                "SendDataTask should not be null after processing evidence");
+
+            var completed = _shareUsageElement.SendDataTask.Wait(timeout);
+
+            // Build diagnostic message with all available information
+            var diagnostics = new List<string>();
+            diagnostics.Add($"Task Status: {_shareUsageElement.SendDataTask.Status}");
+            diagnostics.Add($"Task Completed: {completed}");
+            diagnostics.Add($"XML Content Count: {_xmlContent.Count}");
+
+            // Check for logged errors
+            var errors = _logger.ErrorEntries.ToList();
+            if (errors.Count > 0)
+            {
+                diagnostics.Add($"Logged Errors: {string.Join("; ", errors)}");
+            }
+
+            // Check for logged warnings
+            var warnings = _logger.WarningEntries.ToList();
+            if (warnings.Count > 0)
+            {
+                diagnostics.Add($"Logged Warnings: {string.Join("; ", warnings)}");
+            }
+
+            // Check if task is faulted
+            if (_shareUsageElement.SendDataTask.IsFaulted)
+            {
+                var exception = _shareUsageElement.SendDataTask.Exception;
+                diagnostics.Add($"Task Exception: {exception}");
+            }
+
+            Assert.IsTrue(completed,
+                $"SendDataTask did not complete within {timeout}ms. Diagnostics: {string.Join(" | ", diagnostics)}");
+
+            // Additional check: if task completed but errors were logged, fail with details including exceptions
+            if (errors.Count > 0)
+            {
+                // Get full error entries with exceptions for better diagnostics
+                var errorDetails = _logger.ExtendedEntries
+                    .Where(e => e.LogLevel == LogLevel.Error)
+                    .Select(e => $"Message: {e.Message}" + (e.Exception != null ? $" | Exception: {e.Exception}" : ""));
+                Assert.Fail($"SendDataTask completed but errors were logged: {string.Join("; ", errorDetails)}");
             }
         }
 

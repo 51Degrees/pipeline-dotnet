@@ -1,6 +1,6 @@
 /* *********************************************************************
  * This Original Work is copyright of 51 Degrees Mobile Experts Limited.
- * Copyright 2023 51 Degrees Mobile Experts Limited, Davidson House,
+ * Copyright 2026 51 Degrees Mobile Experts Limited, Davidson House,
  * Forbury Square, Reading, Berkshire, United Kingdom RG1 3EU.
  *
  * This Original Work is licensed under the European Union Public Licence
@@ -104,6 +104,57 @@ namespace FiftyOne.Pipeline.Engines.FiftyOne
         /// The default URL to send usage data to
         /// </summary>
         internal const string SHARE_USAGE_DEFAULT_URL = "https://devices-v4.51degrees.com/new.ashx";
+
+        /// <summary>
+        /// Default recovery period for CloudRequestEngine
+        /// once enough requests to server fail in short time.
+        /// </summary>
+        public const double SHARE_USAGE_RECOVERY_SECONDS_DEFAULT = 60.0;
+
+        /// <summary>
+        /// Whether exponential backoff is enabled by default.
+        /// </summary>
+        public const bool SHARE_USAGE_EXPONENTIAL_BACKOFF_ENABLED_DEFAULT = true;
+
+        /// <summary>
+        /// Default initial delay in seconds for exponential backoff recovery.
+        /// </summary>
+        public const double SHARE_USAGE_EXPONENTIAL_BACKOFF_INITIAL_DELAY_SECONDS_DEFAULT = 2.0;
+
+        /// <summary>
+        /// Default maximum delay in seconds for exponential backoff recovery.
+        /// </summary>
+        public const double SHARE_USAGE_EXPONENTIAL_BACKOFF_MAX_DELAY_SECONDS_DEFAULT = 300.0;
+
+        /// <summary>
+        /// Default multiplier for exponential backoff recovery.
+        /// </summary>
+        public const double SHARE_USAGE_EXPONENTIAL_BACKOFF_MULTIPLIER_DEFAULT = 2.0;
+
+        /// <summary>
+        /// Default number of failures to occur within some time
+        /// for CloudRequestEngine to temporarily stop sending requests.
+        /// </summary>
+        public const int SHARE_USAGE_FAILURES_TO_ENTER_RECOVERY_MIN = 1;
+
+        /// <summary>
+        /// Maximal number of failures to occur within some time
+        /// for CloudRequestEngine to temporarily stop sending requests.
+        /// </summary>
+        public const int SHARE_USAGE_FAILURES_TO_ENTER_RECOVERY_MAX = 100;
+
+        /// <summary>
+        /// Minimal number of failures to occur within some time
+        /// for CloudRequestEngine to temporarily stop sending requests.
+        /// </summary>
+        public const int SHARE_USAGE_FAILURES_TO_ENTER_RECOVERY_DEFAULT = 10;
+
+        /// <summary>
+        /// Default time period in seconds within which a number of
+        /// failed requests should reach `FailuresToEnterRecovery`
+        /// for CloudRequestEngine to enter "recovery period"
+        /// </summary>
+        public const int SHARE_USAGE_FAILURES_WINDOW_SECONDS_DEFAULT = 100;
 
         /// <summary>
         /// The suffix for 'session id' data populated and used by

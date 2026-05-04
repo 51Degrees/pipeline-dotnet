@@ -1,6 +1,6 @@
 /* *********************************************************************
  * This Original Work is copyright of 51 Degrees Mobile Experts Limited.
- * Copyright 2023 51 Degrees Mobile Experts Limited, Davidson House,
+ * Copyright 2026 51 Degrees Mobile Experts Limited, Davidson House,
  * Forbury Square, Reading, Berkshire, United Kingdom RG1 3EU.
  *
  * This Original Work is licensed under the European Union Public Licence
@@ -21,8 +21,8 @@
  * ********************************************************************* */
 
 using FiftyOne.Pipeline.CloudRequestEngine.Data;
-using FiftyOne.Pipeline.CloudRequestEngine.FailHandling.Facade;
-using FiftyOne.Pipeline.CloudRequestEngine.FailHandling.Recovery;
+using FiftyOne.Pipeline.Core.FailHandling.Facade;
+using FiftyOne.Pipeline.Core.FailHandling.Recovery;
 using FiftyOne.Pipeline.Core.Data;
 using FiftyOne.Pipeline.Core.FlowElements;
 using FiftyOne.Pipeline.Engines.Data;
@@ -37,6 +37,7 @@ using System.Linq;
 using System.Net.Http;
 using System.Threading;
 using System.Threading.Tasks;
+using FiftyOne.Pipeline.Core.Exceptions;
 
 namespace FiftyOne.Pipeline.CloudRequestEngine.FlowElements
 {
@@ -484,7 +485,8 @@ namespace FiftyOne.Pipeline.CloudRequestEngine.FlowElements
         {
             try
             {
-                _failHandler.ThrowIfStillRecovering();
+                _failHandler.CheckIfRecovered(
+                    (msg, ex) => new PipelineTemporarilyUnavailableException(msg, ex));
             }
             catch (Exception ex)
             {
@@ -753,7 +755,7 @@ namespace FiftyOne.Pipeline.CloudRequestEngine.FlowElements
             foreach (var item in evidence)
             {
                 // Get the key parts
-                var key = item.Key.Split(EVIDENCE_SEPARATOR_CHAR_ARRAY);
+                var key = item.Key.Split(EVIDENCE_SEPARATOR_CHAR_ARRAY, count: 2);
                 var prefix = key[0];
                 var suffix = key.Last();
 

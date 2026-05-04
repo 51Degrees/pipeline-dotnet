@@ -1,6 +1,6 @@
 /* *********************************************************************
  * This Original Work is copyright of 51 Degrees Mobile Experts Limited.
- * Copyright 2023 51 Degrees Mobile Experts Limited, Davidson House,
+ * Copyright 2026 51 Degrees Mobile Experts Limited, Davidson House,
  * Forbury Square, Reading, Berkshire, United Kingdom RG1 3EU.
  *
  * This Original Work is licensed under the European Union Public Licence
@@ -67,7 +67,7 @@ namespace FiftyOne.Pipeline.Engines.Tests.FlowElements
         /// <param name="updateOnStartup"></param>
         /// <param name="fileWatcher"></param>
         /// <param name="expectRegistration"></param>
-        [DataTestMethod]
+        [TestMethod]
         [DataRow(false, false, false, false)]
         [DataRow(true, false, false, true)]
         [DataRow(false, true, false, true)]

@@ -1,6 +1,6 @@
 /* *********************************************************************
  * This Original Work is copyright of 51 Degrees Mobile Experts Limited.
- * Copyright 2023 51 Degrees Mobile Experts Limited, Davidson House,
+ * Copyright 2026 51 Degrees Mobile Experts Limited, Davidson House,
  * Forbury Square, Reading, Berkshire, United Kingdom RG1 3EU.
  *
  * This Original Work is licensed under the European Union Public Licence
@@ -103,6 +103,26 @@ namespace FiftyOne.Pipeline.CloudRequestEngine
         /// once enough requests to server fail in short time.
         /// </summary>
         public const double CLOUD_REQUEST_RECOVERY_SECONDS_DEFAULT = 60.0;
+
+        /// <summary>
+        /// Whether exponential backoff is enabled by default.
+        /// </summary>
+        public const bool CLOUD_REQUEST_EXPONENTIAL_BACKOFF_ENABLED_DEFAULT = false;
+
+        /// <summary>
+        /// Default initial delay in seconds for exponential backoff recovery.
+        /// </summary>
+        public const double CLOUD_REQUEST_EXPONENTIAL_BACKOFF_INITIAL_DELAY_SECONDS_DEFAULT = 2.0;
+
+        /// <summary>
+        /// Default maximum delay in seconds for exponential backoff recovery.
+        /// </summary>
+        public const double CLOUD_REQUEST_EXPONENTIAL_BACKOFF_MAX_DELAY_SECONDS_DEFAULT = 300.0;
+
+        /// <summary>
+        /// Default multiplier for exponential backoff recovery.
+        /// </summary>
+        public const double CLOUD_REQUEST_EXPONENTIAL_BACKOFF_MULTIPLIER_DEFAULT = 2.0;
 
         /// <summary>
         /// Default number of failures to occur within some time

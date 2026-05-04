@@ -1,6 +1,6 @@
 /* *********************************************************************
  * This Original Work is copyright of 51 Degrees Mobile Experts Limited.
- * Copyright 2023 51 Degrees Mobile Experts Limited, Davidson House,
+ * Copyright 2026 51 Degrees Mobile Experts Limited, Davidson House,
  * Forbury Square, Reading, Berkshire, United Kingdom RG1 3EU.
  *
  * This Original Work is licensed under the European Union Public Licence
@@ -92,8 +92,8 @@ namespace FiftyOne.Pipeline.Core.Tests.Data
             data[key] = new List<string>() { "a", "b" };
             var result = data[key] as List<string>;
 
-            Assert.IsTrue(result.Contains("a"));
-            Assert.IsTrue(result.Contains("b"));
+            Assert.Contains("a", result);
+            Assert.Contains("b", result);
         }
 
         /// <summary>
@@ -215,17 +215,19 @@ namespace FiftyOne.Pipeline.Core.Tests.Data
         }
 
         /// <summary>
-        /// Test that the expected exception is thrown when the key 
+        /// Test that the expected exception is thrown when the key
         /// parameter is null.
         /// </summary>
         [TestMethod]
-        [ExpectedException(typeof(ArgumentNullException))]
         public void ElementData_NullKey()
         {
             TestElementData data = new TestElementData(_pipeline.Object);
             string key = null;
 
-            var result = data[key];
+            Assert.ThrowsExactly<ArgumentNullException>(() =>
+            {
+                var result = data[key];
+            });
         }
 
         /// <summary>

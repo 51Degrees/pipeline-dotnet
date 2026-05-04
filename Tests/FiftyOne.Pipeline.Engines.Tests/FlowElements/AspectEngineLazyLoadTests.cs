@@ -1,6 +1,6 @@
 /* *********************************************************************
  * This Original Work is copyright of 51 Degrees Mobile Experts Limited.
- * Copyright 2023 51 Degrees Mobile Experts Limited, Davidson House,
+ * Copyright 2026 51 Degrees Mobile Experts Limited, Davidson House,
  * Forbury Square, Reading, Berkshire, United Kingdom RG1 3EU.
  *
  * This Original Work is licensed under the European Union Public Licence
@@ -132,7 +132,6 @@ namespace FiftyOne.Pipeline.Engines.Tests.FlowElements
         /// takes longer than the timeout works as expected.
         /// </summary>
         [TestMethod]
-        [ExpectedException(typeof(TimeoutException))]
         public void AspectEngineLazyLoad_PropertyTimeout()
         {
             // Arrange
@@ -144,7 +143,7 @@ namespace FiftyOne.Pipeline.Engines.Tests.FlowElements
             {
                 { "user-agent", "1234" }
             };
-            // Use the mock flow data to populate this variable with the 
+            // Use the mock flow data to populate this variable with the
             // engine data from the call to process.
             var mockData = MockFlowData.CreateFromEvidence(evidence, false);
             EmptyEngineData engineData = null;
@@ -162,21 +161,20 @@ namespace FiftyOne.Pipeline.Engines.Tests.FlowElements
 
             // Process the data
             _engine.Process(data);
-            // Attempt to get the value. This should cause the timeout 
+            // Attempt to get the value. This should cause the timeout
             // to be triggered.
-            var result = engineData.ValueTwo;
-
-            // No asserts needed. Just the ExpectedException attribute
-            // on the method.
+            Assert.ThrowsExactly<TimeoutException>(() =>
+            {
+                var result = engineData.ValueTwo;
+            });
         }
 
         /// <summary>
         /// Check that activating the cancellation token while
-        /// waiting for processing for a lazy loaded property to 
+        /// waiting for processing for a lazy loaded property to
         /// complete will function as expected.
         /// </summary>
         [TestMethod]
-        [ExpectedException(typeof(OperationCanceledException))]
         public void AspectEngineLazyLoad_ProcessCancelled()
         {
             // Arrange
@@ -188,7 +186,7 @@ namespace FiftyOne.Pipeline.Engines.Tests.FlowElements
             {
                 { "user-agent", "1234" }
             };
-            // Use the mock flow data to populate this variable with the 
+            // Use the mock flow data to populate this variable with the
             // engine data from the call to process.
             var mockData = MockFlowData.CreateFromEvidence(evidence, false);
             EmptyEngineData engineData = null;
@@ -208,11 +206,11 @@ namespace FiftyOne.Pipeline.Engines.Tests.FlowElements
             _engine.Process(data);
 
             // Ideally, start a new task that will wait a short time and
-            // then trigger the cancellation token. 
+            // then trigger the cancellation token.
             // If we've only got one core to work with then this approach
-            // can cause the test to fail as the cancellation task may 
+            // can cause the test to fail as the cancellation task may
             // not get run in time.
-            // If we only have one core then just trigger cancellation 
+            // If we only have one core then just trigger cancellation
             // up-front.
             if (Environment.ProcessorCount > 1)
             {
@@ -228,12 +226,12 @@ namespace FiftyOne.Pipeline.Engines.Tests.FlowElements
             }
 
             // Attempt to get the value.
-            var result = engineData.ValueTwo;
-            // These asserts are not really needed but can help work out
-            // what is happening if the test fails to throw the expected
-            // exception.
+            Assert.ThrowsExactly<OperationCanceledException>(() =>
+            {
+                var result = engineData.ValueTwo;
+            });
+            // This assert can help work out what is happening if the test fails.
             Assert.IsTrue(_cancellationTokenSource.IsCancellationRequested);
-            Assert.IsNull(result);
         }
 
         /// <summary>
@@ -341,7 +339,7 @@ namespace FiftyOne.Pipeline.Engines.Tests.FlowElements
             {
                 Assert.IsTrue(e is AggregateException);
                 Assert.IsNotNull(((AggregateException)e).InnerExceptions);
-                Assert.AreEqual(2, ((AggregateException)e).InnerExceptions.Count);
+                Assert.HasCount(2, ((AggregateException)e).InnerExceptions);
                 Assert.AreEqual(
                     $"One or more errors occurred. ({exceptionMessage})",
                     ((AggregateException)e).InnerExceptions[0].Message);
@@ -408,8 +406,8 @@ namespace FiftyOne.Pipeline.Engines.Tests.FlowElements
                 try
                 {
                     logsEvents.Add(() => Trace.WriteLine($"Process complete in {processTimeMs} ms"));
-                    Assert.IsTrue(processTimeMs < processCostMs,
-                        $"Process time should have been less than " +
+                    Assert.IsLessThan(processCostMs,
+processTimeMs, $"Process time should have been less than " +
                         $"{processCostMs} ms but it took {processTimeMs} ms.");
 
                     // Assert
@@ -435,23 +433,23 @@ namespace FiftyOne.Pipeline.Engines.Tests.FlowElements
                     }
                 }
 
-                Assert.IsTrue(
-                    processStartedTimeMs >= 0,
-                    $"{nameof(processStartedTimeMs)} should be non-negative, got {processStartedTimeMs}");
-                Assert.IsTrue(
-                    processStartedTimeMs < processCostMs,
-                    $"{nameof(processStartedTimeMs)} is not within {nameof(processCostMs)}: {processStartedTimeMs} vs {processCostMs}");
+                Assert.IsGreaterThanOrEqualTo(
+0,
+                    processStartedTimeMs, $"{nameof(processStartedTimeMs)} should be non-negative, got {processStartedTimeMs}");
+                Assert.IsLessThan(
+processCostMs,
+                    processStartedTimeMs, $"{nameof(processStartedTimeMs)} is not within {nameof(processCostMs)}: {processStartedTimeMs} vs {processCostMs}");
 
-                Assert.IsTrue(valueOneTimeMs < processCostMs,
-                    $"Accessing value one should have taken less than " +
+                Assert.IsLessThan(processCostMs,
+valueOneTimeMs, $"Accessing value one should have taken less than " +
                     $"{processCostMs} ms from the time the Process method" +
                     $"was called but it took {valueOneTimeMs} ms.");   
 
                 // Note - this should really take at least 'processCostMs'
                 // but the accuracy of the timer seems to cause issues
                 // if we are being that exact.
-                Assert.IsTrue(valueTwoTimeMs >= processCostMs / 2,
-                    $"Accessing value two should have taken at least " +
+                Assert.IsGreaterThanOrEqualTo(processCostMs / 2,
+valueTwoTimeMs, $"Accessing value two should have taken at least " +
                     $"{processCostMs / 2} ms from the time the Process method" +
                     $"was called but it only took {valueTwoTimeMs} ms.");
             }
@@ -496,8 +494,8 @@ namespace FiftyOne.Pipeline.Engines.Tests.FlowElements
                 // Note - this should really take at least 'processCostMs'
                 // but the accuracy of the timer seems to cause issues
                 // if we are being that exact.
-                Assert.IsTrue(dictTimeMs > processCostMs / 2,
-                    $"Accessing the dictionary should have taken at least " +
+                Assert.IsGreaterThan(processCostMs / 2,
+dictTimeMs, $"Accessing the dictionary should have taken at least " +
                     $"{processCostMs / 2} ms from the time the Process method" +
                     $"was called but it only took {dictTimeMs} ms.");
             }

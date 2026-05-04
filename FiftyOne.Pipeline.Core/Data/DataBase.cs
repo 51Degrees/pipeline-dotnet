@@ -1,6 +1,6 @@
 /* *********************************************************************
  * This Original Work is copyright of 51 Degrees Mobile Experts Limited.
- * Copyright 2023 51 Degrees Mobile Experts Limited, Davidson House,
+ * Copyright 2026 51 Degrees Mobile Experts Limited, Davidson House,
  * Forbury Square, Reading, Berkshire, United Kingdom RG1 3EU.
  *
  * This Original Work is licensed under the European Union Public Licence
@@ -111,6 +111,12 @@ namespace FiftyOne.Pipeline.Core.Data
             }
         }
 
+        /// <inheritdoc/>
+        public bool TryGet(string key, out object value)
+        {
+            return _data.TryGetValue(key, out value);
+        }
+
         /// <summary>
         /// Get the data contained in this instance as an 
         /// <see cref="IReadOnlyDictionary{TKey, TValue}"/>.
@@ -150,6 +156,7 @@ namespace FiftyOne.Pipeline.Core.Data
                 this[value.Key] = value.Value;
             }
         }
+
         /// <summary>
         /// Deprecated. Use PopulateFrom method.
         /// Use the values in the specified dictionary to populate
@@ -201,9 +208,9 @@ namespace FiftyOne.Pipeline.Core.Data
                     $"property value requested for key '{key}'.");
             }
             T result = default(T);
-            if (_data.ContainsKey(key))
+            if (_data.TryGetValue(key, out var value))
             {
-                result = (T)_data[key];
+                result = (T)value;
             }
             return result;
         }

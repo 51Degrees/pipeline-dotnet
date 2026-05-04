@@ -1,6 +1,6 @@
 /* *********************************************************************
  * This Original Work is copyright of 51 Degrees Mobile Experts Limited.
- * Copyright 2023 51 Degrees Mobile Experts Limited, Davidson House,
+ * Copyright 2026 51 Degrees Mobile Experts Limited, Davidson House,
  * Forbury Square, Reading, Berkshire, United Kingdom RG1 3EU.
  *
  * This Original Work is licensed under the European Union Public Licence
@@ -23,6 +23,7 @@
 using FiftyOne.Caching;
 using FiftyOne.Pipeline.Core.Data;
 using FiftyOne.Pipeline.Core.Exceptions;
+using FiftyOne.Pipeline.Core.FailHandling.Facade;
 using FiftyOne.Pipeline.Core.FlowElements;
 using FiftyOne.Pipeline.Engines.Configuration;
 using FiftyOne.Pipeline.Engines.FiftyOne.Data;
@@ -36,6 +37,7 @@ using System.Globalization;
 using System.Linq;
 using System.Net;
 using System.Net.Http;
+using System.Threading;
 using System.Net.Sockets;
 using System.Reflection;
 using System.Runtime.CompilerServices;
@@ -304,12 +306,6 @@ namespace FiftyOne.Pipeline.Engines.FiftyOne.FlowElements
         }
 
         /// <summary>
-        /// Indicates whether share usage has been canceled as a result of an
-        /// error.
-        /// </summary>
-        protected internal bool IsCanceled { get; set; } = false;
-
-        /// <summary>
         /// True if there is a task running to send usage data to the remote
         /// service.
         /// </summary>
@@ -413,7 +409,8 @@ namespace FiftyOne.Pipeline.Engines.FiftyOne.FlowElements
                   ignoreDataEvidenceFilter,
                   aspSessionCookieName,
                   null,
-                  false)
+                  false,
+                  null)
         {
         }
 
@@ -504,7 +501,8 @@ namespace FiftyOne.Pipeline.Engines.FiftyOne.FlowElements
                   ignoreDataEvidenceFilter,
                   aspSessionCookieName,
                   tracker,
-                  false)
+                  false,
+                  null)
         {
         }
 
@@ -569,6 +567,9 @@ namespace FiftyOne.Pipeline.Engines.FiftyOne.FlowElements
         /// the blockedHttpHeaders, includedQueryStringParameters and
         /// ignoreDataEvidenceFilter parameters will be ignored.
         /// </param>
+        /// <param name="failHandler">
+        /// Obsolete. This parameter is no longer used.
+        /// </param>
         /// <exception cref="ArgumentNullException">
         /// Thrown if certain arguments are null.
         /// </exception>
@@ -591,7 +592,8 @@ namespace FiftyOne.Pipeline.Engines.FiftyOne.FlowElements
             List<KeyValuePair<string, string>> ignoreDataEvidenceFilter,
             string aspSessionCookieName,
             ITracker tracker,
-            bool shareAllEvidence)
+            bool shareAllEvidence,
+            IFailHandler failHandler = null)
             : base(logger)
         {
             if (blockedHttpHeaders == null)
@@ -610,7 +612,6 @@ namespace FiftyOne.Pipeline.Engines.FiftyOne.FlowElements
             }
 
             _httpClient = httpClient;
-
             EvidenceCollection = new BlockingCollection<ShareUsageData>(maximumQueueSize);
 
             _addTimeout = addTimeout;
@@ -727,7 +728,7 @@ namespace FiftyOne.Pipeline.Engines.FiftyOne.FlowElements
                 }
             }
 
-            if (IsCanceled == false && ignoreData == false)
+            if (ignoreData == false)
             {
                 ProcessData(data);
             }
@@ -775,31 +776,42 @@ namespace FiftyOne.Pipeline.Engines.FiftyOne.FlowElements
         /// </param>
         private void ProcessData(IFlowData data)
         {
-            if (_rng.NextDouble() <= _sharePercentage)
+            // If the queue is full, try to drain it by sending
+            // existing data, but don't accept new evidence.
+            if (EvidenceCollection.Count >= EvidenceCollection.BoundedCapacity)
             {
-                // Check if the tracker will allow sharing of this data
-                if (_tracker.Track(data))
-                {
-                    // Extract the data we want from the evidence and add
-                    // it to the collection.
-                    if (EvidenceCollection.TryAdd(
-                        GetDataFromEvidence(data.GetEvidence()),
-                        _addTimeout) == true)
-                    {
-                        // If the collection has enough entries then start
-                        // taking data from it to be sent.
-                        if (EvidenceCollection.Count >= MinEntriesPerMessage)
-                        {
-                            TrySendData();
-                        }
-                    }
-                    else
-                    {
-                        IsCanceled = true;
-                        Logger.LogError(Messages.MessageShareUsageFailedToAddData);
+                TrySendData();
+                return;
+            }
 
-                    }
+            if (_rng.NextDouble() > _sharePercentage)
+            {
+                return;
+            }
+
+            // Check if the tracker will allow sharing of this data
+            if (!_tracker.Track(data))
+            {
+                return;
+            }
+
+            // Extract the data we want from the evidence and add
+            // it to the collection.
+            if (EvidenceCollection.TryAdd(
+                GetDataFromEvidence(data.GetEvidence()),
+                _addTimeout))
+            {
+                // If the collection has enough entries then start
+                // taking data from it to be sent.
+                if (EvidenceCollection.Count >= MinEntriesPerMessage)
+                {
+                    TrySendData();
                 }
+            }
+            else
+            {
+                // Queue was full, try to drain it.
+                TrySendData();
             }
         }
 
@@ -894,15 +906,10 @@ namespace FiftyOne.Pipeline.Engines.FiftyOne.FlowElements
         /// <summary>
         /// Attempt to send the data to the remote service. This only happens
         /// if there is not a task already running.
-        ///
-        /// If any error occurs while sending the data, then usage sharing is
-        /// stopped.
         /// </summary>
-        /// <returns></returns>
         protected void TrySendData()
         {
-            if (IsCanceled == false &&
-                IsRunning == false)
+            if (IsRunning == false)
             {
                 lock (_lock)
                 {
@@ -910,16 +917,17 @@ namespace FiftyOne.Pipeline.Engines.FiftyOne.FlowElements
                     {
                         SendDataTask = Task.Run(async () =>
                         {
-                            await BuildAndSendXmlAsync().ConfigureAwait(false);
-                        }).ContinueWith(t =>
-                        {
-                            if(t.Exception != null)
+                            try
+                            {
+                                await BuildAndSendXmlAsync();
+                            }
+                            catch (Exception ex)
                             {
                                 Logger.LogError(
-                                    t.Exception,
+                                    ex,
                                     Messages.MessageShareUsageUnexpectedFailure);
                             }
-                        }, TaskScheduler.Default);
+                        });
                     }
                 }
             }

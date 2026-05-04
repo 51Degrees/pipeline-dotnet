@@ -176,5 +176,23 @@ namespace FiftyOne.Pipeline.Engines.FiftyOne {
                 return ResourceManager.GetString("MessageShareUsageUnexpectedFailure", resourceCulture);
             }
         }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to The value &apos;{0}&apos; was not found in the index for property &apos;{1}&apos;..
+        /// </summary>
+        internal static string PropertyKeyedMissingValue {
+            get {
+                return ResourceManager.GetString("PropertyKeyedMissingValue", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to Caching is not supported by property keyed engines..
+        /// </summary>
+        internal static string PropertyKeyedCacheNotSupported {
+            get {
+                return ResourceManager.GetString("PropertyKeyedCacheNotSupported", resourceCulture);
+            }
+        }
     }
 }

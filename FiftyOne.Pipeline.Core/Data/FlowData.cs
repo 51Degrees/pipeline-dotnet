@@ -1,6 +1,6 @@
 /* *********************************************************************
  * This Original Work is copyright of 51 Degrees Mobile Experts Limited.
- * Copyright 2023 51 Degrees Mobile Experts Limited, Davidson House,
+ * Copyright 2026 51 Degrees Mobile Experts Limited, Davidson House,
  * Forbury Square, Reading, Berkshire, United Kingdom RG1 3EU.
  *
  * This Original Work is licensed under the European Union Public Licence
@@ -393,6 +393,22 @@ namespace FiftyOne.Pipeline.Core.Data
                 throw new ArgumentNullException(nameof(elementDataKey));
             }
             return _data.AsStringKeyDictionary()[elementDataKey] as IElementData;
+        }
+
+        /// <inheritdoc/>
+        public bool TryGet(string elementDataKey, out IElementData elementData)
+        {
+            if (_processed == false)
+            {
+                throw new PipelineException(Messages.ExceptionFlowDataNotYetProcessed);
+            }
+            if (elementDataKey == null)
+            {
+                throw new ArgumentNullException(nameof(elementDataKey));
+            }
+            var result = _data.AsStringKeyDictionary().TryGetValue(elementDataKey, out var value);
+            elementData = value as IElementData;
+            return result;
         }
 
         /// <summary>

@@ -1,6 +1,6 @@
 /* *********************************************************************
  * This Original Work is copyright of 51 Degrees Mobile Experts Limited.
- * Copyright 2023 51 Degrees Mobile Experts Limited, Davidson House,
+ * Copyright 2026 51 Degrees Mobile Experts Limited, Davidson House,
  * Forbury Square, Reading, Berkshire, United Kingdom RG1 3EU.
  *
  * This Original Work is licensed under the European Union Public Licence
@@ -46,12 +46,14 @@ namespace FiftyOne.Pipeline.Engines.Tests.Data
         /// the default constructor.
         /// </summary>
         [TestMethod]
-        [ExpectedException(typeof(NoValueException))]
         public void AspectPropertyValue_DefaultConstructor()
         {
             AspectPropertyValue<int> value = new AspectPropertyValue<int>();
             Assert.IsFalse(value.HasValue);
-            var result = value.Value;
+            Assert.ThrowsExactly<NoValueException>(() =>
+            {
+                var result = value.Value;
+            });
         }
 
         /// <summary>

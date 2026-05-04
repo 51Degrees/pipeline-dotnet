@@ -1,6 +1,6 @@
 /* *********************************************************************
  * This Original Work is copyright of 51 Degrees Mobile Experts Limited.
- * Copyright 2023 51 Degrees Mobile Experts Limited, Davidson House,
+ * Copyright 2026 51 Degrees Mobile Experts Limited, Davidson House,
  * Forbury Square, Reading, Berkshire, United Kingdom RG1 3EU.
  *
  * This Original Work is licensed under the European Union Public Licence
@@ -74,10 +74,10 @@ namespace FiftyOne.Pipeline.Core.Tests.TypedMap
 
             var result = _map.Get(key);
 
-            Assert.AreEqual(3, result.Count);
-            Assert.IsTrue(result.Contains("a"));
-            Assert.IsTrue(result.Contains("b"));
-            Assert.IsTrue(result.Contains("c"));
+            Assert.HasCount(3, result);
+            Assert.Contains("a", result);
+            Assert.Contains("b", result);
+            Assert.Contains("c", result);
         }
 
         /// <summary>
@@ -214,7 +214,7 @@ namespace FiftyOne.Pipeline.Core.Tests.TypedMap
 
             var result = _map.Get<IReadOnlyList<string>>();
 
-            Assert.AreEqual(1, result.Count);
+            Assert.HasCount(1, result);
         }
 
         /// <summary>
@@ -250,7 +250,7 @@ namespace FiftyOne.Pipeline.Core.Tests.TypedMap
             var result = _map.TryGetValue(key2, out value);
 
             Assert.IsFalse(result);
-            Assert.AreEqual(null, value);
+            Assert.IsNull(value);
         }
 
         /// <summary>
@@ -326,7 +326,7 @@ namespace FiftyOne.Pipeline.Core.Tests.TypedMap
             var result = _map.TryGetValue(key2, out value);
 
             Assert.IsFalse(result);
-            Assert.AreEqual(null, value);
+            Assert.IsNull(value);
         }
 
         /// <summary>
@@ -345,7 +345,7 @@ namespace FiftyOne.Pipeline.Core.Tests.TypedMap
             var result = _map.TryGetValue(key2, out value);
 
             Assert.IsFalse(result);
-            Assert.AreEqual(null, value);
+            Assert.IsNull(value);
         }
     }
 }

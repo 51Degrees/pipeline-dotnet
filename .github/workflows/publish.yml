@@ -1,0 +1,33 @@
+name: Publish Main
+
+on:
+  workflow_dispatch:
+    inputs:
+      dryrun:
+        type: boolean
+        default: false
+
+jobs:
+  Publish:
+    name: Publish
+    uses: 51Degrees/common-ci/.github/workflows/nightly-publish.yml@main
+    with:
+      repo-name: ${{ github.event.repository.name }}
+      org-name: ${{ github.event.repository.owner.login }}
+      dryrun: ${{ inputs.dryrun || false }}
+      build-platform: windows-latest
+    secrets:
+      token: ${{ secrets.ACCESS_TOKEN }}
+      ApiKey: ${{ secrets.NUGET_API_KEY }}
+      CodeSigningKeyVaultUrl: ${{ secrets.CODE_SIGNING_KEY_VAULT_URL }}
+      CodeSigningKeyVaultClientId: ${{ secrets.CODE_SIGNING_KEY_VAULT_CLIENT_ID }}
+      CodeSigningKeyVaultTenantId: ${{ secrets.CODE_SIGNING_KEY_VAULT_TENANT_ID }}
+      CodeSigningKeyVaultClientSecret: ${{ secrets.CODE_SIGNING_KEY_VAULT_CLIENT_SECRET }}
+      CodeSigningKeyVaultCertificateName: ${{ secrets.CODE_SIGNING_KEY_VAULT_CERTIFICATE_NAME }}
+      DeviceDetection: ${{ secrets.DEVICE_DETECTION_KEY }}
+      DeviceDetectionUrl: ${{ secrets.DEVICE_DETECTION_URL }}
+      TestResourceKey: ${{ secrets.SUPER_RESOURCE_KEY}}
+      AcceptCHBrowserKey: ${{ secrets.ACCEPTCH_BROWSER_KEY}}
+      AcceptCHHardwareKey: ${{ secrets.ACCEPTCH_HARDWARE_KEY}}
+      AcceptCHPlatformKey: ${{ secrets.ACCEPTCH_PLATFORM_KEY}}
+      AcceptCHNoneKey: ${{ secrets.ACCEPTCH_NONE_KEY}}

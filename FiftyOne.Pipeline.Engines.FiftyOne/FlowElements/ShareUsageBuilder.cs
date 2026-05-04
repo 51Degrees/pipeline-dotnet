@@ -1,6 +1,6 @@
 /* *********************************************************************
  * This Original Work is copyright of 51 Degrees Mobile Experts Limited.
- * Copyright 2023 51 Degrees Mobile Experts Limited, Davidson House,
+ * Copyright 2026 51 Degrees Mobile Experts Limited, Davidson House,
  * Forbury Square, Reading, Berkshire, United Kingdom RG1 3EU.
  *
  * This Original Work is licensed under the European Union Public Licence
@@ -21,6 +21,7 @@
  * ********************************************************************* */
 
 using Microsoft.Extensions.Logging;
+using System;
 using System.Net.Http;
 using System.Runtime.CompilerServices;
 
@@ -83,8 +84,10 @@ namespace FiftyOne.Pipeline.Engines.FiftyOne.FlowElements
         /// </returns>
         public override ShareUsageElement Build()
         {
+            var logger = LoggerFactory.CreateLogger<ShareUsageElement>();
+
             return new ShareUsageElement(
-                LoggerFactory.CreateLogger<ShareUsageElement>(),
+                logger,
                 _httpClient,
                 SharePercentage,
                 MinimumEntriesPerMessage,

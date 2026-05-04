@@ -1,6 +1,6 @@
 /* *********************************************************************
  * This Original Work is copyright of 51 Degrees Mobile Experts Limited.
- * Copyright 2023 51 Degrees Mobile Experts Limited, Davidson House,
+ * Copyright 2026 51 Degrees Mobile Experts Limited, Davidson House,
  * Forbury Square, Reading, Berkshire, United Kingdom RG1 3EU.
  *
  * This Original Work is licensed under the European Union Public Licence
@@ -162,6 +162,21 @@ namespace FiftyOne.Pipeline.Core.Data
         // rather than functional problems.
         IElementData Get(string elementDataKey);
 #pragma warning restore CA1716 // Identifiers should not match keywords
+
+        /// <summary>
+        /// Try to get the <see cref="IElementData"/> instance containing data
+        /// populated by the element with the specified data key.
+        /// </summary>
+        /// <param name="elementDataKey">
+        /// The element data key of the element to get data from.
+        /// </param>
+        /// <param name="elementData">
+        /// The <see cref="IElementData"/> instance, or null if not present.
+        /// </param>
+        /// <returns>
+        /// True if data for the specified key exists, false otherwise.
+        /// </returns>
+        bool TryGet(string elementDataKey, out IElementData elementData);
 
         /// <summary>
         /// Get the <see cref="IElementData"/> instance containing data

@@ -1,6 +1,6 @@
 /* *********************************************************************
  * This Original Work is copyright of 51 Degrees Mobile Experts Limited.
- * Copyright 2023 51 Degrees Mobile Experts Limited, Davidson House,
+ * Copyright 2026 51 Degrees Mobile Experts Limited, Davidson House,
  * Forbury Square, Reading, Berkshire, United Kingdom RG1 3EU.
  *
  * This Original Work is licensed under the European Union Public Licence
@@ -63,7 +63,7 @@ namespace FiftyOne.Pipeline.Engines.FiftyOne.Tests.FlowElements
         /// <param name="minEntries"></param>
         /// <param name="maxQueueSize"></param>
         /// <param name="expectedMaxQueueSize"></param>
-        [DataTestMethod]
+        [TestMethod]
         [DataRow(null, null, 1000)]
         [DataRow(10, null, 1000)]
         [DataRow(100, null, 1000)]

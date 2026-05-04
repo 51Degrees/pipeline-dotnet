@@ -1,6 +1,6 @@
 /* *********************************************************************
  * This Original Work is copyright of 51 Degrees Mobile Experts Limited.
- * Copyright 2023 51 Degrees Mobile Experts Limited, Davidson House,
+ * Copyright 2026 51 Degrees Mobile Experts Limited, Davidson House,
  * Forbury Square, Reading, Berkshire, United Kingdom RG1 3EU.
  *
  * This Original Work is licensed under the European Union Public Licence
@@ -228,18 +228,20 @@ namespace FiftyOne.Pipeline.Core.FlowElements
             var subElementBuilderNames = 
                 (elementOptions.SubElements == null || 
                 elementOptions.SubElements.Count == 0)
-                ?  "No SubElements" 
-                :  String.Join(",", elementOptions.SubElements                  
+                ? "No SubElements" 
+                : string.Join(",", elementOptions.SubElements                  
                     .Select(i => i.BuilderName));
 
+            var exceptionMessage = ex.Message ?? "(No exception message)";
             var innerException = ex.InnerException != null ?
                 ex.InnerException.Message :
                 "No Inner Exception.";
 
             sb.Append("BuilderName: ");
-            sb.AppendLine(elementOptions.BuilderName);
+            sb.AppendLine(builderName);
             sb.Append("SubElement Builder Names: ");
             sb.AppendLine(subElementBuilderNames);
+            sb.AppendLine(exceptionMessage);
             sb.AppendLine(innerException);
             return sb.ToString();
         }
