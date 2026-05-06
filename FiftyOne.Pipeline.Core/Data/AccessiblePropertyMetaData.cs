@@ -87,7 +87,10 @@ namespace FiftyOne.Pipeline.Core.Data
         /// <summary>
         /// The property type name.
         /// Note that this is the JSON type, not the c# type.
-        /// For example, any list types will just have the type name 'Array'.
+        /// For example, most list types have the type name 'Array';
+        /// lists of <see cref="IWeightedValue{T}"/> are reported as
+        /// 'Weighted&lt;T&gt;' (e.g. 'WeightedString', 'WeightedInt32')
+        /// so the consumer can reconstruct the original generic shape.
         /// </summary>
         public string Type { get; set; }
 
@@ -157,8 +160,22 @@ namespace FiftyOne.Pipeline.Core.Data
             switch (type.Name)
             {
                 case "List`1":
+                case "IList`1":
                 case "IReadOnlyList`1":
+                {
+                    // A list of IWeightedValue<X> is reported as "Weighted<X>"
+                    // (e.g. "WeightedString", "WeightedInt32") so the consumer
+                    // can reconstruct IReadOnlyList<IWeightedValue<X>>. Other
+                    // list element types collapse to the generic "Array".
+                    var inner = type.GetGenericArguments()[0];
+                    if (inner.IsGenericType
+                        && (inner.Name == "IWeightedValue`1"
+                            || inner.Name == "WeightedValue`1"))
+                    {
+                        return "Weighted" + GetTypeName(inner.GetGenericArguments()[0]);
+                    }
                     return "Array";
+                }
                 case "AspectPropertyValue`1":
                 case "IAspectPropertyValue`1":
                     return GetTypeName(type.GetGenericArguments()[0]);
