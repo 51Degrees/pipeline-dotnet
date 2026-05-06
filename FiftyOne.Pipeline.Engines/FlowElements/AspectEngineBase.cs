@@ -223,7 +223,6 @@ namespace FiftyOne.Pipeline.Engines.FlowElements
                 {
                     (aspectData as AspectDataBase).AddEngine(this);
                 }
-                (aspectData as AspectDataBase).SetFlowData(data);
 
                 // Start the engine processing
                 if (LazyLoadingConfiguration != null)

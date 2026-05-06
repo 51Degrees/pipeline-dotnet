@@ -366,6 +366,16 @@ namespace FiftyOne.Pipeline.CloudRequestEngine.FlowElements
         protected override void ProcessEngine(IFlowData data, T aspectData) {
             if (data == null) throw new ArgumentNullException(nameof(data));
 
+            // Give cloud-aware aspect data a reference to the flow data so
+            // it can detect per-request upstream failures when callers later
+            // read missing properties. Opt-in by inheriting from
+            // CloudAspectDataBase; engines whose data still inherits directly
+            // from AspectDataBase are unaffected.
+            if (aspectData is CloudAspectDataBase cloudAspectData)
+            {
+                cloudAspectData.SetFlowData(data);
+            }
+
             CloudRequestData requestData;
             // Get requestData from CloudRequestEngine. If requestData does not
             // exist in the element data TypedKeyMap then the engine either 
