@@ -89,7 +89,7 @@ namespace FiftyOne.Pipeline.Engines.Tests.Data
         }
 
         /// <summary>
-        /// Check that the indexers can be used to set and get a
+        /// Check that the indexers can be used to set and get a 
         /// property value.
         /// </summary>
         [TestMethod]
