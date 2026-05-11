@@ -20,13 +20,14 @@
  * such notice(s) shall fulfill the requirements of that article.
  * ********************************************************************* */
 
+using FiftyOne.Pipeline.Core.Data;
 using FiftyOne.Pipeline.Engines.FlowElements;
 using System.Collections.Generic;
 
 namespace FiftyOne.Pipeline.Engines.Services
 {
     /// <summary>
-    /// Service that determines the reason for a property not being populated 
+    /// Service that determines the reason for a property not being populated
     /// by an engine.
     /// See the <see href="https://github.com/51Degrees/specifications/blob/main/pipeline-specification/features/properties.md#missing-properties">Specification</see>
     /// </summary>
@@ -43,7 +44,7 @@ namespace FiftyOne.Pipeline.Engines.Services
         /// The engine that was expected to populate the property.
         /// </param>
         /// <returns>
-        /// A <see cref="MissingPropertyResult"/> instance explaining 
+        /// A <see cref="MissingPropertyResult"/> instance explaining
         /// why the property is not populated.
         /// </returns>
         MissingPropertyResult GetMissingPropertyReason(string propertyName, IAspectEngine engine);
@@ -58,10 +59,40 @@ namespace FiftyOne.Pipeline.Engines.Services
         /// The engines that were expected to populate the property.
         /// </param>
         /// <returns>
-        /// A <see cref="MissingPropertyResult"/> instance explaining 
+        /// A <see cref="MissingPropertyResult"/> instance explaining
         /// why the property is not populated.
         /// </returns>
         MissingPropertyResult GetMissingPropertyReason(string propertyName, IReadOnlyList<IAspectEngine> engines);
+        /// <summary>
+        /// Get the reason that the specified property is not available
+        /// in the results from the specified engines, taking into account
+        /// any errors that have been recorded on the supplied
+        /// <see cref="IFlowData"/> for the current request.
+        /// </summary>
+        /// <param name="propertyName">
+        /// The property name to check.
+        /// </param>
+        /// <param name="engines">
+        /// The engines that were expected to populate the property.
+        /// </param>
+        /// <param name="flowData">
+        /// The <see cref="IFlowData"/> for the current request. This is used
+        /// to inspect <see cref="IFlowData.Errors"/> so that a missing
+        /// property caused by an upstream cloud request failure can be
+        /// reported as <see cref="MissingPropertyReason.CloudRequestFailed"/>
+        /// rather than e.g.
+        /// <see cref="MissingPropertyReason.DataFileUpgradeRequired"/>.
+        /// May be null, in which case the call behaves like the overload
+        /// without a flow data parameter.
+        /// </param>
+        /// <returns>
+        /// A <see cref="MissingPropertyResult"/> instance explaining
+        /// why the property is not populated.
+        /// </returns>
+        MissingPropertyResult GetMissingPropertyReason(
+            string propertyName,
+            IReadOnlyList<IAspectEngine> engines,
+            IFlowData flowData);
     }
 
     /// <summary>
@@ -121,7 +152,16 @@ namespace FiftyOne.Pipeline.Engines.Services
         ProductNotAccessibleWithResourceKey,
         //CloudEngine,
         /// <summary>
-        /// The reason for the property not being present could not 
+        /// The property could not be populated because an upstream
+        /// cloud request failed (for example, the request to the
+        /// 51Degrees cloud service timed out or returned an error).
+        /// The property is available in the engine's metadata, so this
+        /// is not a license/resource-key issue - the failure was
+        /// transient and specific to this request.
+        /// </summary>
+        CloudRequestFailed,
+        /// <summary>
+        /// The reason for the property not being present could not
         /// be determined.
         /// </summary>
         Unknown

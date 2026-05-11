@@ -496,12 +496,12 @@ namespace FiftyOne.Pipeline.CloudRequestEngine.Tests
         }
 
         /// <summary>
-        /// Test that when processing the cloud aspect engine, the 
+        /// Test that when processing the cloud aspect engine, the
         /// ProcessCloudMethod is not called when the JSON response is not
         /// populated.
         /// </summary>
         [TestMethod]
-        public void Process_NoCloudResponse() 
+        public void Process_NoCloudResponse()
         {
             // Setup properties.
             List<PropertyMetaData> properties = new List<PropertyMetaData>();
@@ -523,10 +523,14 @@ namespace FiftyOne.Pipeline.CloudRequestEngine.Tests
             var mockRequestEngine = new Mock<TestRequestEngine>() { CallBase = true };
             mockRequestEngine.Object.PublicProperties = _propertiesReturnedByRequestEngine;
 
-            // Construct the pipeline.
+            // Construct the pipeline. Suppress process exceptions because
+            // CloudAspectEngineBase records a FlowError when the JSON
+            // response is empty, and the Pipeline throws an
+            // AggregateException whenever the error list is non-empty.
             var pipeline = new PipelineBuilder(new LoggerFactory())
                 .AddFlowElement(mockRequestEngine.Object)
                 .AddFlowElement(mockTestInstance.Object)
+                .SetSuppressProcessExceptions(true)
                 .Build();
 
             // Process the pipeline.
@@ -542,13 +546,126 @@ namespace FiftyOne.Pipeline.CloudRequestEngine.Tests
                 "ProcessCloudEngine",
                 Times.Never(),
                 ItExpr.IsAny<IFlowData>(),
-                ItExpr.IsAny<TestData>(), 
+                ItExpr.IsAny<TestData>(),
                 ItExpr.IsAny<string>());
         }
 
         /// <summary>
-        /// Test that the expected exception is thrown when the 
-        /// CloudRequestEngine and a CloudAspectEngine have been added to the 
+        /// Test that when the CloudRequestEngine produces no JSON response
+        /// (which indicates that the cloud request has failed for this
+        /// request), the CloudAspectEngine records a FlowError against
+        /// itself on the flow data. This is what allows the
+        /// MissingPropertyService to report the failure as
+        /// <c>CloudRequestFailed</c> rather than a misleading
+        /// <c>DataFileUpgradeRequired</c>.
+        /// </summary>
+        [TestMethod]
+        public void Process_NoCloudResponse_AddsFlowError()
+        {
+            // Setup properties.
+            List<PropertyMetaData> properties = new List<PropertyMetaData>();
+            properties.Add(new PropertyMetaData() { Name = "ismobile", Type = "Boolean" });
+            ProductMetaData devicePropertyData = new ProductMetaData();
+            devicePropertyData.Properties = properties;
+            _propertiesReturnedByRequestEngine.Add("test", devicePropertyData);
+
+            var mockTestInstance = new Mock<TestInstance>() { CallBase = true };
+            var mockRequestEngine = new Mock<TestRequestEngine>() { CallBase = true };
+            mockRequestEngine.Object.PublicProperties = _propertiesReturnedByRequestEngine;
+            // The default mock ProcessEngine leaves JsonResponse null/empty
+            // which is the failure scenario we want to test.
+
+            var pipeline = new PipelineBuilder(new LoggerFactory())
+                .AddFlowElement(mockRequestEngine.Object)
+                .AddFlowElement(mockTestInstance.Object)
+                .SetSuppressProcessExceptions(true)
+                .Build();
+
+            using (var flowData = pipeline.CreateFlowData())
+            {
+                flowData
+                    .AddEvidence("query.user-agent", "iPhone")
+                    .Process();
+
+                // An error should have been recorded against the cloud
+                // aspect engine for this request.
+                var aspectErrors = flowData.Errors
+                    .Where(e => ReferenceEquals(e.FlowElement, mockTestInstance.Object))
+                    .ToList();
+
+                Assert.AreEqual(
+                    1,
+                    aspectErrors.Count,
+                    "Expected exactly one FlowError to be recorded against " +
+                    "the cloud aspect engine when the JSON response is empty.");
+                Assert.IsFalse(
+                    aspectErrors[0].ShouldThrow,
+                    "FlowError added by CloudAspectEngineBase for an empty " +
+                    "cloud response should not cause the pipeline to throw.");
+            }
+        }
+
+        /// <summary>
+        /// Test that when the CloudRequestEngine produces a populated JSON
+        /// response, the CloudAspectEngine does NOT record a FlowError
+        /// against itself. This guards against regressing the success
+        /// path of the cloud-failure detection logic.
+        /// </summary>
+        [TestMethod]
+        public void Process_CloudResponse_DoesNotAddFlowError()
+        {
+            // Setup properties.
+            List<PropertyMetaData> properties = new List<PropertyMetaData>();
+            properties.Add(new PropertyMetaData() { Name = "ismobile", Type = "Boolean" });
+            ProductMetaData devicePropertyData = new ProductMetaData();
+            devicePropertyData.Properties = properties;
+            _propertiesReturnedByRequestEngine.Add("test", devicePropertyData);
+
+            var mockTestInstance = new Mock<TestInstance>() { CallBase = true };
+            mockTestInstance.Protected().Setup(
+                "ProcessCloudEngine",
+                ItExpr.IsAny<IFlowData>(),
+                ItExpr.IsAny<TestData>(),
+                ItExpr.IsAny<string>());
+
+            var mockRequestEngine = new Mock<TestRequestEngine>() { CallBase = true };
+            mockRequestEngine.Object.PublicProperties = _propertiesReturnedByRequestEngine;
+            mockRequestEngine.Protected()
+                .Setup(
+                    "ProcessEngine",
+                    ItExpr.IsAny<IFlowData>(),
+                    ItExpr.IsAny<CloudRequestData>())
+                .Callback((IFlowData data, CloudRequestData aspectData) => {
+                    aspectData.JsonResponse = "{ \"response\": true }";
+                });
+
+            var pipeline = new PipelineBuilder(new LoggerFactory())
+                .AddFlowElement(mockRequestEngine.Object)
+                .AddFlowElement(mockTestInstance.Object)
+                .Build();
+
+            using (var flowData = pipeline.CreateFlowData())
+            {
+                flowData
+                    .AddEvidence("query.user-agent", "iPhone")
+                    .Process();
+
+                // Errors is null when no errors have been recorded; that
+                // is itself proof that we did not add a cloud-failure
+                // error on the success path.
+                var aspectErrors = flowData.Errors?
+                    .Where(e => ReferenceEquals(e.FlowElement, mockTestInstance.Object));
+
+                Assert.IsFalse(
+                    aspectErrors != null && aspectErrors.Any(),
+                    "No FlowError should be recorded against the cloud " +
+                    "aspect engine when the JSON response is populated.");
+            }
+        }
+
+        /// <summary>
+        /// Test that the expected exception is thrown when the
+        /// CloudRequestEngine and a CloudAspectEngine have been added to the
         /// Pipeline in the wrong order.
         /// </summary>
         [TestMethod]

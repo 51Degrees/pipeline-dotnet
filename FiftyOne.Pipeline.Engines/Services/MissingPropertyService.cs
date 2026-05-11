@@ -24,6 +24,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
+using FiftyOne.Pipeline.Core.Data;
 using FiftyOne.Pipeline.Engines.Data;
 using FiftyOne.Pipeline.Engines.FlowElements;
 using System.Globalization;
@@ -91,10 +92,37 @@ namespace FiftyOne.Pipeline.Engines.Services
         /// </returns>
         public MissingPropertyResult GetMissingPropertyReason(string propertyName, IReadOnlyList<IAspectEngine> engines)
         {
+            return GetMissingPropertyReason(propertyName, engines, null);
+        }
+
+        /// <summary>
+        /// Get the reason that a property is not available from any of
+        /// the supplied engines, taking into account errors recorded on
+        /// the supplied <see cref="IFlowData"/> for the current request.
+        /// </summary>
+        /// <param name="propertyName">
+        /// The name of the property to look for.
+        /// </param>
+        /// <param name="engines">
+        /// The engines that are expected to supply the property value.
+        /// </param>
+        /// <param name="flowData">
+        /// The <see cref="IFlowData"/> for the current request. Used to
+        /// detect transient cloud request failures.
+        /// May be null.
+        /// </param>
+        /// <returns>
+        /// A <see cref="MissingPropertyResult"/> instance.
+        /// </returns>
+        public MissingPropertyResult GetMissingPropertyReason(
+            string propertyName,
+            IReadOnlyList<IAspectEngine> engines,
+            IFlowData flowData)
+        {
             MissingPropertyResult result = null;
             foreach (var engine in engines.Where(e => e != null))
             {
-                result = GetMissingPropertyReason(propertyName, engine);
+                result = GetMissingPropertyReason(propertyName, engine, flowData);
                 if (result.Reason != MissingPropertyReason.Unknown)
                 {
                     return result;
@@ -119,7 +147,35 @@ namespace FiftyOne.Pipeline.Engines.Services
         /// </returns>
         public MissingPropertyResult GetMissingPropertyReason(string propertyName, IAspectEngine engine)
         {
-            if(engine == null)
+            return GetMissingPropertyReason(propertyName, engine, null);
+        }
+
+        /// <summary>
+        /// Get the reason that a property is not available from an engine,
+        /// taking into account errors recorded on the supplied
+        /// <see cref="IFlowData"/> for the current request.
+        /// </summary>
+        /// <param name="propertyName">
+        /// The name of the property to look for.
+        /// </param>
+        /// <param name="engine">
+        /// The engine that is expected to supply the property value.
+        /// </param>
+        /// <param name="flowData">
+        /// The <see cref="IFlowData"/> for the current request. Used to
+        /// detect transient cloud request failures.
+        /// May be null, in which case the call behaves like the overload
+        /// without a flow data parameter.
+        /// </param>
+        /// <returns>
+        /// A <see cref="MissingPropertyResult"/> instance.
+        /// </returns>
+        public MissingPropertyResult GetMissingPropertyReason(
+            string propertyName,
+            IAspectEngine engine,
+            IFlowData flowData)
+        {
+            if (engine == null)
             {
                 throw new ArgumentNullException(nameof(engine));
             }
@@ -135,9 +191,20 @@ namespace FiftyOne.Pipeline.Engines.Services
 
                 if (property != null)
                 {
-                    // Check if the property is available in the data file that is 
+                    // If the engine is a cloud aspect engine and the property
+                    // is in its metadata, then a missing value cannot be
+                    // explained by data-tier or resource-key issues for this
+                    // specific request. Check the flow data for an upstream
+                    // cloud request failure before falling through to the
+                    // metadata-based reasons.
+                    if (typeof(ICloudAspectEngine).IsAssignableFrom(engine.GetType()) &&
+                        HasCloudRequestFailure(engine, flowData))
+                    {
+                        reason = MissingPropertyReason.CloudRequestFailed;
+                    }
+                    // Check if the property is available in the data file that is
                     // being used by the engine.
-                    if (property.DataTiersWherePresent.Any(t => t == engine.DataSourceTier) == false)
+                    else if (property.DataTiersWherePresent.Any(t => t == engine.DataSourceTier) == false)
                     {
                         reason = MissingPropertyReason.DataFileUpgradeRequired;
                     }
@@ -149,7 +216,7 @@ namespace FiftyOne.Pipeline.Engines.Services
                 }
             }
 
-            if(reason == MissingPropertyReason.Unknown &&
+            if (reason == MissingPropertyReason.Unknown &&
                 engine.HasLoadedProperties &&
                 typeof(ICloudAspectEngine).IsAssignableFrom(engine.GetType()))
             {
@@ -166,8 +233,8 @@ namespace FiftyOne.Pipeline.Engines.Services
                 EngineDataContainsPropertyGetter(propertyName, engine))
             {
                 // If the property meta data is not available, but the engine
-                // data class defines a getter, it's safe to assume that the data
-                // file needs upgrading.
+                // data class defines a getter, it's safe to assume that the
+                // data file needs upgrading.
                 reason = MissingPropertyReason.DataFileUpgradeRequired;
             }
 
@@ -205,6 +272,9 @@ namespace FiftyOne.Pipeline.Engines.Services
                             engine.ElementDataKey,
                             string.Join(",", engine.Properties.Select(p => p.Name))));
                     break;
+                case MissingPropertyReason.CloudRequestFailed:
+                    message.Append(Messages.MissingPropertyMessageCloudRequestFailed);
+                    break;
                 case MissingPropertyReason.Unknown:
                     message.Append(Messages.MissingPropertyMessageUnknown);
                     break;
@@ -215,6 +285,40 @@ namespace FiftyOne.Pipeline.Engines.Services
             result.Description = message.ToString();
             result.Reason = reason;
             return result;
+        }
+
+        /// <summary>
+        /// Check whether the supplied <see cref="IFlowData"/> contains an
+        /// error recorded against the supplied cloud aspect engine for the
+        /// current request.
+        /// <para>
+        /// <c>CloudAspectEngineBase</c> is responsible for translating an
+        /// upstream cloud request failure (empty / missing JSON response)
+        /// into a <see cref="IFlowError"/> against itself. That keeps this
+        /// detection logic independent of any specific cloud request
+        /// engine implementation - <see cref="MissingPropertyService"/>
+        /// only needs to know whether <em>this</em> engine failed for
+        /// <em>this</em> request, not why.
+        /// </para>
+        /// </summary>
+        private static bool HasCloudRequestFailure(
+            IAspectEngine engine,
+            IFlowData flowData)
+        {
+            if (flowData == null || flowData.Errors == null || flowData.Errors.Count == 0)
+            {
+                return false;
+            }
+
+            foreach (var error in flowData.Errors)
+            {
+                if (error?.FlowElement != null &&
+                    ReferenceEquals(error.FlowElement, engine))
+                {
+                    return true;
+                }
+            }
+            return false;
         }
 
         /// <summary>

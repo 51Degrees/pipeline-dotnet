@@ -34,18 +34,18 @@ using System.Threading.Tasks;
 namespace FiftyOne.Pipeline.Engines.FlowElements
 {
     /// <summary>
-    /// Base class for 51Degrees aspect engines. 
+    /// Base class for 51Degrees aspect engines.
     /// See the <see href="https://github.com/51Degrees/specifications/blob/main/pipeline-specification/conceptual-overview.md#aspect-engine">Specification</see>
     /// </summary>
     /// <typeparam name="T">
-    /// The type of data that the engine will return. Must implement 
+    /// The type of data that the engine will return. Must implement
     /// <see cref="IAspectData"/>.
     /// </typeparam>
     /// <typeparam name="TMeta">
-    /// The type of meta data that the flow element will supply 
+    /// The type of meta data that the flow element will supply
     /// about the properties it populates.
     /// </typeparam>
-    public abstract class AspectEngineBase<T, TMeta> : 
+    public abstract class AspectEngineBase<T, TMeta> :
         FlowElementBase<T, TMeta>, IAspectEngine<T, TMeta>
         where T : IAspectData
         where TMeta : IAspectPropertyMetaData
@@ -72,7 +72,7 @@ namespace FiftyOne.Pipeline.Engines.FlowElements
         public LazyLoadingConfiguration LazyLoadingConfiguration { get; private set; }
 
         /// <summary>
-        /// Provide an implementation for the non-generic, 
+        /// Provide an implementation for the non-generic,
         /// aspect-specific version of the meta-data property.
         /// </summary>
         IList<IAspectPropertyMetaData> IAspectEngine.Properties
@@ -84,7 +84,7 @@ namespace FiftyOne.Pipeline.Engines.FlowElements
         }
 
         /// <summary>
-        /// Provide an implementation for the non-generic, 
+        /// Provide an implementation for the non-generic,
         /// aspect-specific version of the meta-data property.
         /// </summary>
         public virtual bool HasLoadedProperties { get { return true; } }
@@ -126,7 +126,7 @@ namespace FiftyOne.Pipeline.Engines.FlowElements
         }
 
         /// <summary>
-        /// Set the engine to flag when a cache hit occurs by setting a field 
+        /// Set the engine to flag when a cache hit occurs by setting a field
         /// on the cached aspect data.
         /// </summary>
         /// <param name="cacheHitOrMiss">
@@ -153,25 +153,25 @@ namespace FiftyOne.Pipeline.Engines.FlowElements
 
         /// <summary>
         /// Extending classes must implement this method.
-        /// It should perform the required processing and update the 
+        /// It should perform the required processing and update the
         /// specified aspect data instance.
         /// </summary>
         /// <param name="data">
         /// The <see cref="IFlowData"/> instance that provides the evidence.
         /// </param>
         /// <param name="aspectData">
-        /// The <see cref="IAspectData"/> instance to populate with the 
+        /// The <see cref="IAspectData"/> instance to populate with the
         /// results of processing.
         /// </param>
         protected abstract void ProcessEngine(IFlowData data, T aspectData);
 
         /// <summary>
-        /// Implementation of method from the base class 
+        /// Implementation of method from the base class
         /// <see cref="FlowElementBase{T, TMeta}"/>.
         /// This exists to centralize the results caching logic.
         /// </summary>
         /// <param name="data">
-        /// The <see cref="IFlowData"/> instance that provides the evidence 
+        /// The <see cref="IFlowData"/> instance that provides the evidence
         /// and holds the result.
         /// </param>
         /// <exception cref="ArgumentNullException">
@@ -189,18 +189,18 @@ namespace FiftyOne.Pipeline.Engines.FlowElements
         /// <summary>
         /// Private method that checks if the result is already in the cache
         /// or not.
-        /// If it is then the result is added to 'data', if not then 
+        /// If it is then the result is added to 'data', if not then
         /// <see cref="ProcessEngine(IFlowData, T)"/> is called to do so.
         /// </summary>
         /// <param name="data">
-        /// The <see cref="IFlowData"/> instance that provides the evidence 
+        /// The <see cref="IFlowData"/> instance that provides the evidence
         /// and holds the result.
         /// </param>
         private void ProcessWithCache(IFlowData data)
         {
             T cacheResult = default(T);
 
-            // If there is a cache then check if the result 
+            // If there is a cache then check if the result
             // is already in there.
             if (_cache != null)
             {
@@ -210,7 +210,7 @@ namespace FiftyOne.Pipeline.Engines.FlowElements
                 }
                 catch (InvalidCastException) { }
             }
-            // If we don't have a result from the cache then 
+            // If we don't have a result from the cache then
             // run through the normal processing.
             if (cacheResult == null)
             {
@@ -223,12 +223,13 @@ namespace FiftyOne.Pipeline.Engines.FlowElements
                 {
                     (aspectData as AspectDataBase).AddEngine(this);
                 }
+                (aspectData as AspectDataBase).SetFlowData(data);
 
                 // Start the engine processing
                 if (LazyLoadingConfiguration != null)
                 {
                     // If lazy loading is configured then create a task
-                    // to do the processing and assign the task to the 
+                    // to do the processing and assign the task to the
                     // aspect data property.
                     var task = Task.Run(() =>
                     {
@@ -241,7 +242,7 @@ namespace FiftyOne.Pipeline.Engines.FlowElements
                     // If not lazy loading, just start processing.
                     ProcessEngine(data, aspectData);
                 }
-                // If there is a cache then add the result 
+                // If there is a cache then add the result
                 // of processing to the cache.
                 if (_cache != null)
                 {
@@ -250,14 +251,21 @@ namespace FiftyOne.Pipeline.Engines.FlowElements
             }
             else
             {
-                // If this aspect engine is configured to record cache hits,
-                // set the cache hit value on the cached aspect data.
-                if (_cacheHitOrMiss) 
+                if (cacheResult is AspectDataBase cachedAspectData)
                 {
-                    (cacheResult as AspectDataBase).SetCacheHit();
+                    // If this aspect engine is configured to record cache hits,
+                    // set the cache hit value on the cached aspect data.
+                    if (_cacheHitOrMiss)
+                    {
+                        cachedAspectData.SetCacheHit();
+                    }
+                    // Update the flow data reference so that missing-property
+                    // diagnostics target the current request, not the
+                    // request that produced the cached result.
+                    cachedAspectData.SetFlowData(data);
                 }
 
-                // We have a result from the cache so add it 
+                // We have a result from the cache so add it
                 // into the flow data.
                 data.GetOrAdd(ElementDataKeyTyped, (f) =>
                 {

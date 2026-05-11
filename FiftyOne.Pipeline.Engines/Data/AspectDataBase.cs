@@ -45,6 +45,7 @@ namespace FiftyOne.Pipeline.Engines.Data
         private List<Task> _processTasks = new List<Task>();
         private List<IAspectEngine> _engines;
         private bool _cacheHit;
+        private IFlowData _flowData;
 
         /// <summary>
         /// The <see cref="IMissingPropertyService"/> instance to be queried
@@ -176,6 +177,17 @@ namespace FiftyOne.Pipeline.Engines.Data
         }
 
         /// <summary>
+        /// Record the <see cref="IFlowData"/> that this aspect data was
+        /// produced for. Used by the missing property service to detect
+        /// per-request errors (e.g. cloud request failures) when reporting
+        /// why a property is missing.
+        /// </summary>
+        internal void SetFlowData(IFlowData flowData)
+        {
+            _flowData = flowData;
+        }
+
+        /// <summary>
         /// Add a process task to the lazy loading tasks for this 
         /// data instance.
         /// The property accessors will only complete once all such
@@ -281,9 +293,12 @@ namespace FiftyOne.Pipeline.Engines.Data
                     MissingPropertyService != null)
                 {
                     // If there was no entry for the key then use the missing
-                    // property service to find out why.
+                    // property service to find out why. Pass the FlowData so
+                    // the service can distinguish per-request failures (e.g.
+                    // a failed cloud request) from license / data-tier
+                    // issues.
                     var missingReason = MissingPropertyService
-                        .GetMissingPropertyReason(key, Engines);
+                        .GetMissingPropertyReason(key, Engines, _flowData);
                     if (Logger != null && Logger.IsEnabled(LogLevel.Warning))
                     {
                         Logger.LogWarning($"Property '{key}' missing from aspect " +

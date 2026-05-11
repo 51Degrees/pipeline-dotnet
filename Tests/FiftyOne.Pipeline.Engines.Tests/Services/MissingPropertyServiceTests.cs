@@ -20,6 +20,8 @@
  * such notice(s) shall fulfill the requirements of that article.
  * ********************************************************************* */
 
+using FiftyOne.Pipeline.Core.Data;
+using FiftyOne.Pipeline.Core.FlowElements;
 using FiftyOne.Pipeline.Engines.Data;
 using FiftyOne.Pipeline.Engines.FlowElements;
 using FiftyOne.Pipeline.Engines.Services;
@@ -27,6 +29,7 @@ using FiftyOne.Pipeline.Engines.TestHelpers;
 using Microsoft.Extensions.Logging;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using Moq;
+using System;
 using System.Collections.Generic;
 
 namespace FiftyOne.Pipeline.Engines.Tests.Services
@@ -253,6 +256,151 @@ namespace FiftyOne.Pipeline.Engines.Tests.Services
 
             // Assert
             Assert.AreEqual(MissingPropertyReason.Unknown, result.Reason);
+        }
+
+        /// <summary>
+        /// When the property is in a cloud aspect engine's metadata but
+        /// the flow data contains an error recorded against that engine
+        /// for the current request, the reason should be
+        /// <see cref="MissingPropertyReason.CloudRequestFailed"/> rather
+        /// than the misleading
+        /// <see cref="MissingPropertyReason.DataFileUpgradeRequired"/>
+        /// that would otherwise be returned for a cloud engine (which has
+        /// an empty <c>DataTiersWherePresent</c>).
+        /// </summary>
+        [TestMethod]
+        public void MissingPropertyService_GetReason_CloudRequestFailed_PropertyInMetadata()
+        {
+            // Arrange - cloud aspect engine with the property in its metadata.
+            Mock<ICloudAspectEngine> engine = new Mock<ICloudAspectEngine>();
+            engine.SetupGet(e => e.ElementDataKey).Returns("testElement");
+            engine.SetupGet(e => e.DataSourceTier).Returns("cloud");
+            engine.SetupGet(e => e.HasLoadedProperties).Returns(true);
+            ConfigureCloudProperty(engine.As<IAspectEngine>());
+
+            var flowData = CreateFlowDataWithErrorOn(engine.Object);
+
+            // Act
+            var result = _service.GetMissingPropertyReason(
+                "testProperty",
+                new List<IAspectEngine>() { engine.Object },
+                flowData);
+
+            // Assert
+            Assert.AreEqual(MissingPropertyReason.CloudRequestFailed, result.Reason);
+            Assert.IsTrue(
+                result.Description.Contains("upstream cloud request failed"),
+                "Description should explain the cloud-request failure: " + result.Description);
+        }
+
+        /// <summary>
+        /// If the flow data contains an error but it is recorded against
+        /// some other element (not the engine we're asking about) then
+        /// the cloud-failure reason should NOT be returned.
+        /// </summary>
+        [TestMethod]
+        public void MissingPropertyService_GetReason_CloudRequestFailed_ErrorForDifferentEngine()
+        {
+            // Arrange
+            Mock<ICloudAspectEngine> engine = new Mock<ICloudAspectEngine>();
+            engine.SetupGet(e => e.ElementDataKey).Returns("testElement");
+            engine.SetupGet(e => e.DataSourceTier).Returns("cloud");
+            engine.SetupGet(e => e.HasLoadedProperties).Returns(true);
+            ConfigureCloudProperty(engine.As<IAspectEngine>());
+
+            // Error recorded against a different element.
+            var otherElement = new Mock<IFlowElement>().Object;
+            var flowData = CreateFlowDataWithErrorOn(otherElement);
+
+            // Act
+            var result = _service.GetMissingPropertyReason(
+                "testProperty",
+                new List<IAspectEngine>() { engine.Object },
+                flowData);
+
+            // Assert - we fall through to the pre-existing behaviour for cloud
+            // engines whose metadata has an empty DataTiersWherePresent list.
+            Assert.AreEqual(MissingPropertyReason.DataFileUpgradeRequired, result.Reason);
+        }
+
+        /// <summary>
+        /// When no flow data is supplied at all, behaviour matches the
+        /// original overload - existing callers must not be affected.
+        /// </summary>
+        [TestMethod]
+        public void MissingPropertyService_GetReason_CloudRequestFailed_NullFlowData()
+        {
+            // Arrange
+            Mock<ICloudAspectEngine> engine = new Mock<ICloudAspectEngine>();
+            engine.SetupGet(e => e.ElementDataKey).Returns("testElement");
+            engine.SetupGet(e => e.DataSourceTier).Returns("cloud");
+            engine.SetupGet(e => e.HasLoadedProperties).Returns(true);
+            ConfigureCloudProperty(engine.As<IAspectEngine>());
+
+            // Act - passing null for flow data uses pre-existing behaviour.
+            var result = _service.GetMissingPropertyReason(
+                "testProperty",
+                new List<IAspectEngine>() { engine.Object },
+                null);
+
+            // Assert
+            Assert.AreEqual(MissingPropertyReason.DataFileUpgradeRequired, result.Reason);
+        }
+
+        /// <summary>
+        /// A non-cloud engine with an error on the flow data should not be
+        /// reported as <see cref="MissingPropertyReason.CloudRequestFailed"/>.
+        /// </summary>
+        [TestMethod]
+        public void MissingPropertyService_GetReason_CloudRequestFailed_NonCloudEngine()
+        {
+            // Arrange - regular (non-cloud) engine.
+            Mock<IAspectEngine> engine = new Mock<IAspectEngine>();
+            engine.Setup(e => e.DataSourceTier).Returns("lite");
+            engine.Setup(e => e.HasLoadedProperties).Returns(true);
+            ConfigureProperty(engine);
+
+            var flowData = CreateFlowDataWithErrorOn(engine.Object);
+
+            // Act
+            var result = _service.GetMissingPropertyReason(
+                "testProperty",
+                new List<IAspectEngine>() { engine.Object },
+                flowData);
+
+            // Assert - cloud-request-failed should only apply to ICloudAspectEngine.
+            Assert.AreEqual(MissingPropertyReason.DataFileUpgradeRequired, result.Reason);
+        }
+
+        /// <summary>
+        /// Build an <see cref="IFlowData"/> mock whose Errors collection
+        /// contains a single error recorded against the supplied element.
+        /// </summary>
+        private static IFlowData CreateFlowDataWithErrorOn(IFlowElement element)
+        {
+            var error = new FlowError(
+                new Exception("simulated cloud failure"),
+                element,
+                shouldThrow: false);
+            var flowData = new Mock<IFlowData>();
+            flowData.SetupGet(f => f.Errors)
+                .Returns(new List<IFlowError>() { error });
+            return flowData.Object;
+        }
+
+        private void ConfigureCloudProperty(Mock<IAspectEngine> engine)
+        {
+            // Mirror the way CloudAspectEngineBase populates property
+            // metadata: DataTiersWherePresent is empty.
+            var property = new AspectPropertyMetaData(
+                engine.Object,
+                "testProperty",
+                typeof(string),
+                "",
+                new List<string>(),
+                true);
+            var propertyList = new List<IAspectPropertyMetaData>() { property };
+            engine.Setup(e => e.Properties).Returns(propertyList);
         }
 
         private void ConfigureProperty(Mock<IAspectEngine> engine)
