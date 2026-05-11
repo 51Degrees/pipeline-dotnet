@@ -197,15 +197,6 @@ namespace FiftyOne.Pipeline.Engines.FiftyOne.FlowElements
                                 ProcessProfileMatch(data, aspectData, result);
                             }
                         }
-                        else
-                        {
-                            data.AddError(
-                                new ArgumentException(String.Format(
-                                    Messages.PropertyKeyedMissingValue,
-                                    value,
-                                    propertyIndex.MetaData.Name)),
-                                this);
-                        }
                     }
                 }
             }
