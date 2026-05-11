@@ -29,6 +29,7 @@ using Moq;
 using System;
 using System.Collections.Generic;
 using FiftyOne.Common.TestHelpers;
+using FiftyOne.Pipeline.Core.Data;
 using FiftyOne.Pipeline.Core.FlowElements;
 
 namespace FiftyOne.Pipeline.Engines.Tests.Data
@@ -61,6 +62,18 @@ namespace FiftyOne.Pipeline.Engines.Tests.Data
             _missingPropertyService = new Mock<IMissingPropertyService>();
             _missingPropertyService.Setup(m => m.GetMissingPropertyReason(
                 It.IsAny<string>(), It.IsAny<IReadOnlyList<IAspectEngine>>()))
+                .Returns(new MissingPropertyResult()
+                {
+                    Description = "TEST",
+                    Reason = MissingPropertyReason.Unknown
+                });
+            // AspectDataBase now calls the flow-data overload by default;
+            // also configure that so tests which don't override it still
+            // receive a valid result.
+            _missingPropertyService.Setup(m => m.GetMissingPropertyReason(
+                It.IsAny<string>(),
+                It.IsAny<IReadOnlyList<IAspectEngine>>(),
+                It.IsAny<IFlowData>()))
                 .Returns(new MissingPropertyResult()
                 {
                     Description = "TEST",
@@ -112,6 +125,78 @@ namespace FiftyOne.Pipeline.Engines.Tests.Data
             {
                 var result = _data["testproperty"];
             });
+        }
+
+        /// <summary>
+        /// When a property is missing and no flow data has been
+        /// associated with the aspect data, the missing property
+        /// service should still be invoked, with a null flow data
+        /// argument. This preserves the behaviour of the
+        /// pre-existing overload.
+        /// </summary>
+        [TestMethod]
+        public void AspectData_GetMissing_CallsServiceWithNullFlowData()
+        {
+            _missingPropertyService.Setup(m => m.GetMissingPropertyReason(
+                It.IsAny<string>(),
+                It.IsAny<IReadOnlyList<IAspectEngine>>(),
+                It.IsAny<IFlowData>()))
+                .Returns(new MissingPropertyResult()
+                {
+                    Description = "TEST",
+                    Reason = MissingPropertyReason.Unknown
+                });
+
+            Assert.ThrowsExactly<PropertyMissingException>(() =>
+            {
+                var _ = _data["testproperty"];
+            });
+
+            _missingPropertyService.Verify(m => m.GetMissingPropertyReason(
+                "testproperty",
+                It.IsAny<IReadOnlyList<IAspectEngine>>(),
+                null),
+                Times.Once,
+                "Missing property lookup should call the flow-data overload " +
+                "with a null flow data argument when none has been set.");
+        }
+
+        /// <summary>
+        /// When the engine has associated a flow data instance with the
+        /// aspect data (via the internal <c>SetFlowData</c> hook used by
+        /// <c>AspectEngineBase</c>), that same flow data instance must be
+        /// forwarded to the missing property service so it can inspect
+        /// the request errors when deciding the reason.
+        /// </summary>
+        [TestMethod]
+        public void AspectData_GetMissing_ForwardsFlowDataToService()
+        {
+            var flowData = new Mock<IFlowData>().Object;
+            _data.SetFlowData(flowData);
+
+            _missingPropertyService.Setup(m => m.GetMissingPropertyReason(
+                It.IsAny<string>(),
+                It.IsAny<IReadOnlyList<IAspectEngine>>(),
+                It.IsAny<IFlowData>()))
+                .Returns(new MissingPropertyResult()
+                {
+                    Description = "TEST",
+                    Reason = MissingPropertyReason.CloudRequestFailed
+                });
+
+            var ex = Assert.ThrowsExactly<PropertyMissingException>(() =>
+            {
+                var _ = _data["testproperty"];
+            });
+
+            Assert.AreEqual(MissingPropertyReason.CloudRequestFailed, ex.Reason);
+            _missingPropertyService.Verify(m => m.GetMissingPropertyReason(
+                "testproperty",
+                It.IsAny<IReadOnlyList<IAspectEngine>>(),
+                flowData),
+                Times.Once,
+                "The missing property service should be called with the " +
+                "exact flow data instance that was set on the aspect data.");
         }
     }
 }

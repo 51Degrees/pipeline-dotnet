@@ -223,6 +223,7 @@ namespace FiftyOne.Pipeline.Engines.FlowElements
                 {
                     (aspectData as AspectDataBase).AddEngine(this);
                 }
+                (aspectData as AspectDataBase).SetFlowData(data);
 
                 // Start the engine processing
                 if (LazyLoadingConfiguration != null)
@@ -250,11 +251,18 @@ namespace FiftyOne.Pipeline.Engines.FlowElements
             }
             else
             {
-                // If this aspect engine is configured to record cache hits,
-                // set the cache hit value on the cached aspect data.
-                if (_cacheHitOrMiss) 
+                if (cacheResult is AspectDataBase cachedAspectData)
                 {
-                    (cacheResult as AspectDataBase).SetCacheHit();
+                    // If this aspect engine is configured to record cache hits,
+                    // set the cache hit value on the cached aspect data.
+                    if (_cacheHitOrMiss)
+                    {
+                        cachedAspectData.SetCacheHit();
+                    }
+                    // Update the flow data reference so that missing-property
+                    // diagnostics target the current request, not the
+                    // request that produced the cached result.
+                    cachedAspectData.SetFlowData(data);
                 }
 
                 // We have a result from the cache so add it 
