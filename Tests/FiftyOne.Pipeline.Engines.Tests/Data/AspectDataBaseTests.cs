@@ -59,13 +59,24 @@ namespace FiftyOne.Pipeline.Engines.Tests.Data
             _engine = new Mock<IAspectEngine>();
             _pipeline = new Mock<IPipeline>();
             _missingPropertyService = new Mock<IMissingPropertyService>();
+            var stubbedResult = new MissingPropertyResult()
+            {
+                Description = "TEST",
+                Reason = MissingPropertyReason.Unknown
+            };
             _missingPropertyService.Setup(m => m.GetMissingPropertyReason(
-                It.IsAny<string>(), It.IsAny<IReadOnlyList<IAspectEngine>>()))
-                .Returns(new MissingPropertyResult()
-                {
-                    Description = "TEST",
-                    Reason = MissingPropertyReason.Unknown
-                });
+                    It.IsAny<string>(),
+                    It.IsAny<IReadOnlyList<IAspectEngine>>()))
+                .Returns(stubbedResult);
+            // AspectDataBase.GetAs<T> now passes the aspect data instance so
+            // that the service can detect a recorded cloud-request failure.
+            // Mock the 3-arg overload too — otherwise Moq returns null and
+            // the call site NREs.
+            _missingPropertyService.Setup(m => m.GetMissingPropertyReason(
+                    It.IsAny<string>(),
+                    It.IsAny<IReadOnlyList<IAspectEngine>>(),
+                    It.IsAny<IAspectData>()))
+                .Returns(stubbedResult);
             _data = new TestData(
                 _logger,
                 _pipeline.Object,

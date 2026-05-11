@@ -189,4 +189,7 @@
   <data name="MissingPropertyMessageUnknown" xml:space="preserve">
     <value>The reason for this is unknown. Please check that the aspect and property name are correct.</value>
   </data>
+  <data name="MissingPropertyMessageCloudRequestFailed" xml:space="preserve">
+    <value>This is because the upstream cloud request engine failed to retrieve a response for this request. See the errors stored against the FlowData instance for details. The property is available in your resource key but was not populated due to the cloud request failure.</value>
+  </data>
 </root>

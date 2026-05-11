@@ -22,30 +22,31 @@
 
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.Linq;
 using System.Text;
 using FiftyOne.Pipeline.Engines.Data;
 using FiftyOne.Pipeline.Engines.FlowElements;
-using System.Globalization;
 
 namespace FiftyOne.Pipeline.Engines.Services
 {
     /// <summary>
-    /// Service that determines the reason for a property not being populated 
+    /// Service that determines the reason for a property not being populated
     /// by an engine.
     /// See the <see href="https://github.com/51Degrees/specifications/blob/main/pipeline-specification/features/properties.md#missing-properties">Specification</see>
     /// </summary>
     public class MissingPropertyService : IMissingPropertyService
     {
         private static IMissingPropertyService _instance;
-        private static object _lock = new object();
+        private static readonly object _lock = new object();
 
         /// <summary>
-        /// Used to store the results of looking up whether a property is available or not.
-        /// <seealso cref="EngineDataContainsPropertyGetter"/>
-        /// The key is the engine type. The inner dictionary is keyed on property name.
+        /// Cache of "does the engine data type define a getter for property X"
+        /// answers, resolved via reflection by
+        /// <see cref="EngineDataContainsPropertyGetter"/>. Keyed first on
+        /// engine type and then on property name (case-insensitive).
         /// </summary>
-        private static Dictionary<Type, Dictionary<string, bool>> _propertyAvailable = 
+        private static readonly Dictionary<Type, Dictionary<string, bool>> _propertyAvailable =
             new Dictionary<Type, Dictionary<string, bool>>();
 
         /// <summary>
@@ -59,7 +60,7 @@ namespace FiftyOne.Pipeline.Engines.Services
                 {
                     lock (_lock)
                     {
-                        if(_instance == null)
+                        if (_instance == null)
                         {
                             _instance = new MissingPropertyService();
                         }
@@ -71,30 +72,41 @@ namespace FiftyOne.Pipeline.Engines.Services
 
         /// <summary>
         /// Constructor is private to ensure the single instance accessible
-        /// through the 'Instance' property is used.
+        /// through the <see cref="Instance"/> property is used.
         /// </summary>
         private MissingPropertyService() { }
 
-        /// <summary>
-        /// Get the reason that a property is not available from an engine.
-        /// </summary>
-        /// <param name="propertyName">
-        /// The name of the property to look for
-        /// </param>
-        /// <param name="engines">
-        /// The engines that are expected to supply the property value.
-        /// </param>
-        /// <returns>
-        /// A <see cref="MissingPropertyResult"/> instance that includes an
-        /// enum giving the reason and a developer-facing description of 
-        /// the reason.
-        /// </returns>
-        public MissingPropertyResult GetMissingPropertyReason(string propertyName, IReadOnlyList<IAspectEngine> engines)
+        /// <inheritdoc/>
+        public MissingPropertyResult GetMissingPropertyReason(
+            string propertyName,
+            IReadOnlyList<IAspectEngine> engines)
         {
+            return GetMissingPropertyReason(propertyName, engines, null);
+        }
+
+        /// <inheritdoc/>
+        public MissingPropertyResult GetMissingPropertyReason(
+            string propertyName,
+            IAspectEngine engine)
+        {
+            return GetMissingPropertyReason(propertyName, engine, null);
+        }
+
+        /// <inheritdoc/>
+        public MissingPropertyResult GetMissingPropertyReason(
+            string propertyName,
+            IReadOnlyList<IAspectEngine> engines,
+            IAspectData aspectData)
+        {
+            if (engines == null)
+            {
+                throw new ArgumentNullException(nameof(engines));
+            }
+
             MissingPropertyResult result = null;
             foreach (var engine in engines.Where(e => e != null))
             {
-                result = GetMissingPropertyReason(propertyName, engine);
+                result = GetMissingPropertyReason(propertyName, engine, aspectData);
                 if (result.Reason != MissingPropertyReason.Unknown)
                 {
                     return result;
@@ -103,107 +115,188 @@ namespace FiftyOne.Pipeline.Engines.Services
             return result;
         }
 
-        /// <summary>
-        /// Get the reason that a property is not available from an engine.
-        /// </summary>
-        /// <param name="propertyName">
-        /// The name of the property to look for
-        /// </param>
-        /// <param name="engine">
-        /// The engine that is expected to supply the property value.
-        /// </param>
-        /// <returns>
-        /// A <see cref="MissingPropertyResult"/> instance that includes an
-        /// enum giving the reason and a developer-facing description of 
-        /// the reason.
-        /// </returns>
-        public MissingPropertyResult GetMissingPropertyReason(string propertyName, IAspectEngine engine)
+        /// <inheritdoc/>
+        public MissingPropertyResult GetMissingPropertyReason(
+            string propertyName,
+            IAspectEngine engine,
+            IAspectData aspectData)
         {
-            if(engine == null)
+            if (engine == null)
             {
                 throw new ArgumentNullException(nameof(engine));
             }
 
-            MissingPropertyResult result = new MissingPropertyResult();
-            MissingPropertyReason reason = MissingPropertyReason.Unknown;
+            var reason = DetermineReason(
+                propertyName,
+                engine,
+                aspectData,
+                out IAspectPropertyMetaData property);
 
-            IAspectPropertyMetaData property = null;
+            return new MissingPropertyResult
+            {
+                Reason = reason,
+                Description = BuildDescription(reason, propertyName, engine, property),
+            };
+        }
 
+        /// <summary>
+        /// Determine the reason that <paramref name="propertyName"/> is
+        /// missing for the supplied <paramref name="engine"/>.
+        /// </summary>
+        /// <remarks>
+        /// Resolution order (first match wins):
+        /// <list type="number">
+        /// <item>
+        /// If <paramref name="aspectData"/> records that the upstream cloud
+        /// request failed for this request, return
+        /// <see cref="MissingPropertyReason.CloudRequestFailed"/>. This
+        /// takes precedence over every other reason because the other
+        /// reasons describe configuration issues that do not apply when the
+        /// cloud call simply did not return data.
+        /// </item>
+        /// <item>
+        /// If the property is in the engine's meta-data:
+        /// <list type="bullet">
+        /// <item>
+        /// For on-premise engines, if the engine's
+        /// <see cref="IAspectEngine.DataSourceTier"/> is not listed in the
+        /// property's <see cref="IAspectPropertyMetaData.DataTiersWherePresent"/>,
+        /// return <see cref="MissingPropertyReason.DataFileUpgradeRequired"/>.
+        /// (Cloud engines do not populate <c>DataTiersWherePresent</c>, so
+        /// this check is skipped for them — it would otherwise always fail
+        /// and mis-report missing cloud properties as upgrade-required.)
+        /// </item>
+        /// <item>
+        /// Otherwise, if the property is marked
+        /// <see cref="IElementPropertyMetaData.Available"/>=<c>false</c>,
+        /// return
+        /// <see cref="MissingPropertyReason.PropertyExcludedFromEngineConfiguration"/>.
+        /// </item>
+        /// </list>
+        /// </item>
+        /// <item>
+        /// If the engine is an <see cref="ICloudAspectEngine"/> and has
+        /// loaded its meta-data: return
+        /// <see cref="MissingPropertyReason.ProductNotAccessibleWithResourceKey"/>
+        /// when the engine reports zero properties, otherwise
+        /// <see cref="MissingPropertyReason.PropertyNotAccessibleWithResourceKey"/>.
+        /// </item>
+        /// <item>
+        /// If reflection on the engine's data type finds a property getter
+        /// with the requested name, fall back to
+        /// <see cref="MissingPropertyReason.DataFileUpgradeRequired"/>.
+        /// </item>
+        /// <item>
+        /// Otherwise <see cref="MissingPropertyReason.Unknown"/>.
+        /// </item>
+        /// </list>
+        /// </remarks>
+        private MissingPropertyReason DetermineReason(
+            string propertyName,
+            IAspectEngine engine,
+            IAspectData aspectData,
+            out IAspectPropertyMetaData property)
+        {
+            property = null;
+
+            // 1. Cloud-request failure short-circuit. If the aspect data
+            //    was marked as the product of a failed cloud request, the
+            //    other checks below would produce misleading reasons (cloud
+            //    property meta-data carries no DataTiersWherePresent, so
+            //    the data-tier branch would mis-report DataFileUpgradeRequired
+            //    for every missing property).
+            if (IsCloudRequestFailureRecorded(aspectData))
+            {
+                return MissingPropertyReason.CloudRequestFailed;
+            }
+
+            bool isCloudEngine = engine is ICloudAspectEngine;
+
+            // 2. Reason derived from the property's own meta-data.
             if (engine.HasLoadedProperties)
             {
                 property = engine.Properties.FirstOrDefault(p => p.Name == propertyName);
 
                 if (property != null)
                 {
-                    // Check if the property is available in the data file that is 
-                    // being used by the engine.
-                    if (property.DataTiersWherePresent.Any(t => t == engine.DataSourceTier) == false)
+                    if (isCloudEngine == false &&
+                        property.DataTiersWherePresent.Any(t => t == engine.DataSourceTier) == false)
                     {
-                        reason = MissingPropertyReason.DataFileUpgradeRequired;
+                        return MissingPropertyReason.DataFileUpgradeRequired;
                     }
-                    // Check if the property is excluded from the results.
-                    else if (property.Available == false)
+                    if (property.Available == false)
                     {
-                        reason = MissingPropertyReason.PropertyExcludedFromEngineConfiguration;
+                        return MissingPropertyReason.PropertyExcludedFromEngineConfiguration;
                     }
                 }
             }
 
-            if(reason == MissingPropertyReason.Unknown &&
-                engine.HasLoadedProperties &&
-                typeof(ICloudAspectEngine).IsAssignableFrom(engine.GetType()))
+            // 3. Cloud engine with no matching property → resource-key reason.
+            if (isCloudEngine && engine.HasLoadedProperties)
             {
-                if (engine.Properties.Count == 0)
-                {
-                    reason = MissingPropertyReason.ProductNotAccessibleWithResourceKey;
-                }
-                else
-                {
-                    reason = MissingPropertyReason.PropertyNotAccessibleWithResourceKey;
-                }
-            }
-            else if (reason == MissingPropertyReason.Unknown &&
-                EngineDataContainsPropertyGetter(propertyName, engine))
-            {
-                // If the property meta data is not available, but the engine
-                // data class defines a getter, it's safe to assume that the data
-                // file needs upgrading.
-                reason = MissingPropertyReason.DataFileUpgradeRequired;
+                return engine.Properties.Count == 0
+                    ? MissingPropertyReason.ProductNotAccessibleWithResourceKey
+                    : MissingPropertyReason.PropertyNotAccessibleWithResourceKey;
             }
 
-            // Build the message string to return to the caller.
-            StringBuilder message = new StringBuilder();
-            message.Append(
-                string.Format(CultureInfo.InvariantCulture,
-                    Messages.MissingPropertyMessagePrefix,
-                    propertyName,
-                    engine.ElementDataKey));
+            // 4. Reflection fallback on the engine's data type.
+            if (EngineDataContainsPropertyGetter(propertyName, engine))
+            {
+                return MissingPropertyReason.DataFileUpgradeRequired;
+            }
+
+            // 5. Nothing matched.
+            return MissingPropertyReason.Unknown;
+        }
+
+        /// <summary>
+        /// Build the developer-facing description string for the supplied
+        /// reason. Always begins with
+        /// <see cref="Messages.MissingPropertyMessagePrefix"/> and is
+        /// suffixed with the reason-specific message.
+        /// </summary>
+        private static string BuildDescription(
+            MissingPropertyReason reason,
+            string propertyName,
+            IAspectEngine engine,
+            IAspectPropertyMetaData property)
+        {
+            var message = new StringBuilder();
+            message.Append(string.Format(
+                CultureInfo.InvariantCulture,
+                Messages.MissingPropertyMessagePrefix,
+                propertyName,
+                engine.ElementDataKey));
+
             switch (reason)
             {
                 case MissingPropertyReason.DataFileUpgradeRequired:
-                    message.Append(
-                        string.Format(CultureInfo.InvariantCulture,
-                            Messages.MissingPropertyMessageDataUpgradeRequired,
-                            property == null ?
-                                "Unknown" :
-                                string.Join(",", property.DataTiersWherePresent),
-                            engine.GetType().Name));
+                    message.Append(string.Format(
+                        CultureInfo.InvariantCulture,
+                        Messages.MissingPropertyMessageDataUpgradeRequired,
+                        property == null
+                            ? "Unknown"
+                            : string.Join(",", property.DataTiersWherePresent),
+                        engine.GetType().Name));
                     break;
                 case MissingPropertyReason.PropertyExcludedFromEngineConfiguration:
                     message.Append(Messages.MissingPropertyMessagePropertyExcluded);
                     break;
                 case MissingPropertyReason.ProductNotAccessibleWithResourceKey:
-                    message.Append(
-                       string.Format(CultureInfo.InvariantCulture,
-                           Messages.MissingPropertyMessageProductNotInCloudResource,
-                           engine.ElementDataKey));
+                    message.Append(string.Format(
+                        CultureInfo.InvariantCulture,
+                        Messages.MissingPropertyMessageProductNotInCloudResource,
+                        engine.ElementDataKey));
                     break;
                 case MissingPropertyReason.PropertyNotAccessibleWithResourceKey:
-                    message.Append(
-                        string.Format(CultureInfo.InvariantCulture,
-                            Messages.MissingPropertyMessagePropertyNotInCloudResource,
-                            engine.ElementDataKey,
-                            string.Join(",", engine.Properties.Select(p => p.Name))));
+                    message.Append(string.Format(
+                        CultureInfo.InvariantCulture,
+                        Messages.MissingPropertyMessagePropertyNotInCloudResource,
+                        engine.ElementDataKey,
+                        string.Join(",", engine.Properties.Select(p => p.Name))));
+                    break;
+                case MissingPropertyReason.CloudRequestFailed:
+                    message.Append(Messages.MissingPropertyMessageCloudRequestFailed);
                     break;
                 case MissingPropertyReason.Unknown:
                     message.Append(Messages.MissingPropertyMessageUnknown);
@@ -212,23 +305,29 @@ namespace FiftyOne.Pipeline.Engines.Services
                     break;
             }
 
-            result.Description = message.ToString();
-            result.Reason = reason;
-            return result;
+            return message.ToString();
         }
 
         /// <summary>
-        /// Return true if there is an explicit property getter for the name provided
-        /// in the data type returned by the engine.
+        /// True if the supplied aspect data has the cloud-request-failure
+        /// marker set (see
+        /// <see cref="AspectDataBase.CloudRequestFailed"/>).
         /// </summary>
-        /// <param name="propertyName"></param>
-        /// <param name="engine"></param>
-        /// <returns></returns>
-        private bool EngineDataContainsPropertyGetter(string propertyName, IAspectEngine engine)
+        private static bool IsCloudRequestFailureRecorded(IAspectData aspectData)
         {
-            // Get the property dictionary for this engine
-            Dictionary<string, bool> engineProperties;
-            if(_propertyAvailable.TryGetValue(engine.GetType(), out engineProperties) == false)
+            return aspectData is AspectDataBase asp && asp.CloudRequestFailed;
+        }
+
+        /// <summary>
+        /// Return true if there is an explicit property getter for the name
+        /// provided in the data type returned by the engine. Results are
+        /// cached in <see cref="_propertyAvailable"/> to avoid repeating the
+        /// reflection cost.
+        /// </summary>
+        private static bool EngineDataContainsPropertyGetter(string propertyName, IAspectEngine engine)
+        {
+            // Get-or-create the per-engine-type property dictionary.
+            if (_propertyAvailable.TryGetValue(engine.GetType(), out var engineProperties) == false)
             {
                 lock (_propertyAvailable)
                 {
@@ -240,35 +339,37 @@ namespace FiftyOne.Pipeline.Engines.Services
                 }
             }
 
-            // If we don't have a stored result in the dictionary for this property then use
-            // reflection to figure it out.
-            if (engineProperties.TryGetValue(propertyName, out var result) == false)
+            if (engineProperties.TryGetValue(propertyName, out var result))
             {
-                result = false;
+                return result;
+            }
 
-                foreach (var dataType in engine.GetType().GetInterfaces().SelectMany(i => i.GetGenericArguments())
-                    .Where(i => typeof(IAspectData).IsAssignableFrom(i)))
+            // Walk the engine's generic IAspectData type arguments and check
+            // for a property with this name on any of them.
+            result = false;
+            foreach (var dataType in engine.GetType().GetInterfaces()
+                .SelectMany(i => i.GetGenericArguments())
+                .Where(t => typeof(IAspectData).IsAssignableFrom(t)))
+            {
+                if (result)
                 {
-                    if (dataType != null && result == false)
+                    break;
+                }
+                foreach (var property in dataType.GetProperties())
+                {
+                    if (property.Name.Equals(propertyName, StringComparison.InvariantCultureIgnoreCase))
                     {
-                        foreach (var property in dataType.GetProperties())
-                        {
-                            if (property.Name.Equals(propertyName, StringComparison.InvariantCultureIgnoreCase))
-                            {
-                                result = true;
-                                break;
-                            }
-                        }
+                        result = true;
+                        break;
                     }
                 }
+            }
 
-                // Add the result to the property dictionary.
-                lock (engineProperties)
+            lock (engineProperties)
+            {
+                if (engineProperties.ContainsKey(propertyName) == false)
                 {
-                    if (engineProperties.ContainsKey(propertyName) == false)
-                    {
-                        engineProperties.Add(propertyName, result);
-                    }
+                    engineProperties.Add(propertyName, result);
                 }
             }
             return result;
