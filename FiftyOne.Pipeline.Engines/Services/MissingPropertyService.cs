@@ -216,7 +216,7 @@ namespace FiftyOne.Pipeline.Engines.Services
                 }
             }
 
-            if (reason == MissingPropertyReason.Unknown &&
+            if(reason == MissingPropertyReason.Unknown &&
                 engine.HasLoadedProperties &&
                 typeof(ICloudAspectEngine).IsAssignableFrom(engine.GetType()))
             {
@@ -233,8 +233,8 @@ namespace FiftyOne.Pipeline.Engines.Services
                 EngineDataContainsPropertyGetter(propertyName, engine))
             {
                 // If the property meta data is not available, but the engine
-                // data class defines a getter, it's safe to assume that the
-                // data file needs upgrading.
+                // data class defines a getter, it's safe to assume that the data
+                // file needs upgrading.
                 reason = MissingPropertyReason.DataFileUpgradeRequired;
             }
 
@@ -379,4 +379,3 @@ namespace FiftyOne.Pipeline.Engines.Services
         }
     }
 }
-

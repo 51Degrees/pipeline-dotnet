@@ -27,7 +27,7 @@ using System.Collections.Generic;
 namespace FiftyOne.Pipeline.Engines.Services
 {
     /// <summary>
-    /// Service that determines the reason for a property not being populated
+    /// Service that determines the reason for a property not being populated 
     /// by an engine.
     /// See the <see href="https://github.com/51Degrees/specifications/blob/main/pipeline-specification/features/properties.md#missing-properties">Specification</see>
     /// </summary>
@@ -44,7 +44,7 @@ namespace FiftyOne.Pipeline.Engines.Services
         /// The engine that was expected to populate the property.
         /// </param>
         /// <returns>
-        /// A <see cref="MissingPropertyResult"/> instance explaining
+        /// A <see cref="MissingPropertyResult"/> instance explaining 
         /// why the property is not populated.
         /// </returns>
         MissingPropertyResult GetMissingPropertyReason(string propertyName, IAspectEngine engine);
@@ -59,7 +59,7 @@ namespace FiftyOne.Pipeline.Engines.Services
         /// The engines that were expected to populate the property.
         /// </param>
         /// <returns>
-        /// A <see cref="MissingPropertyResult"/> instance explaining
+        /// A <see cref="MissingPropertyResult"/> instance explaining 
         /// why the property is not populated.
         /// </returns>
         MissingPropertyResult GetMissingPropertyReason(string propertyName, IReadOnlyList<IAspectEngine> engines);

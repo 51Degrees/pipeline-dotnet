@@ -275,7 +275,7 @@ namespace FiftyOne.Pipeline.CloudRequestEngine.Tests
         }
 
         /// <summary>
-        /// Test that an exception is thrown by the Properties auto property if 
+        /// Test that an exception is thrown by the Properties auto property if
         /// the cloud engine only returns properties for other engines.
         /// </summary>
         [TestMethod]
@@ -487,7 +487,7 @@ namespace FiftyOne.Pipeline.CloudRequestEngine.Tests
 
             // Verify the ProcessCloudEngine method was called
             mockTestInstance.Protected().Verify(
-                "ProcessCloudEngine",
+                "ProcessCloudEngine", 
                 Times.AtLeastOnce(),
                 ItExpr.IsAny<IFlowData>(),
                 ItExpr.IsAny<TestData>(),
@@ -496,12 +496,12 @@ namespace FiftyOne.Pipeline.CloudRequestEngine.Tests
         }
 
         /// <summary>
-        /// Test that when processing the cloud aspect engine, the
+        /// Test that when processing the cloud aspect engine, the 
         /// ProcessCloudMethod is not called when the JSON response is not
         /// populated.
         /// </summary>
         [TestMethod]
-        public void Process_NoCloudResponse()
+        public void Process_NoCloudResponse() 
         {
             // Setup properties.
             List<PropertyMetaData> properties = new List<PropertyMetaData>();
@@ -546,7 +546,7 @@ namespace FiftyOne.Pipeline.CloudRequestEngine.Tests
                 "ProcessCloudEngine",
                 Times.Never(),
                 ItExpr.IsAny<IFlowData>(),
-                ItExpr.IsAny<TestData>(),
+                ItExpr.IsAny<TestData>(), 
                 ItExpr.IsAny<string>());
         }
 
@@ -829,7 +829,7 @@ namespace FiftyOne.Pipeline.CloudRequestEngine.Tests
                         .AddEvidence("query.user-agent", "iPhone")
                         .Process();
                 }
-            }
+            } 
             catch (AggregateException ex)
             {
                 var expectedExceptions = ex.InnerExceptions
@@ -848,7 +848,7 @@ namespace FiftyOne.Pipeline.CloudRequestEngine.Tests
         }
 
         /// <summary>
-        /// Test that the expected exception is thrown when the 
+        /// Test that the expected exception is thrown when the
         /// CloudRequestEngine has not been added to the Pipeline but a
         /// CloudAspectEngine has
         /// </summary>
@@ -881,4 +881,3 @@ namespace FiftyOne.Pipeline.CloudRequestEngine.Tests
         #endregion
     }
 }
-

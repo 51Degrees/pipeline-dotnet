@@ -373,7 +373,7 @@ namespace FiftyOne.Pipeline.CloudRequestEngine.FlowElements
             try
             {
                 requestData = data.GetFromElement(RequestEngine.GetInstance());
-            }
+            } 
             catch (KeyNotFoundException ex) 
             {
                 throw new PipelineConfigurationException(
@@ -395,9 +395,9 @@ namespace FiftyOne.Pipeline.CloudRequestEngine.FlowElements
             var json = requestData?.JsonResponse;
 
             // If the JSON is empty or null then do not Process the CloudAspectEngine.
-            // Empty or null JSON indicates that an error has occurred in the
-            // CloudRequestEngine. The error will have been reported by the
-            // CloudRequestEngine so just log a warning that this
+            // Empty or null JSON indicates that an error has occurred in the 
+            // CloudRequestEngine. The error will have been reported by the 
+            // CloudRequestEngine so just log a warning that this 
             // CloudAspectEngine did not process.
             if (string.IsNullOrEmpty(json) == false)
             {
@@ -533,7 +533,7 @@ namespace FiftyOne.Pipeline.CloudRequestEngine.FlowElements
                             apv.Value = newValue;
                         }
                         else 
-                        {
+                        { 
                             // Value is null so check if we have a 
                             // corresponding reason.
                             // We need to set the no value message with 
@@ -614,4 +614,3 @@ namespace FiftyOne.Pipeline.CloudRequestEngine.FlowElements
         }
     }
 }
-
