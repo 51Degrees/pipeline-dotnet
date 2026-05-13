@@ -38,15 +38,15 @@ using System.Net;
 namespace FiftyOne.Pipeline.CloudRequestEngine.FlowElements
 {
     /// <summary>
-    /// Base class for 51Degrees cloud aspect engines.
-    /// See the <see href="https://github.com/51Degrees/specifications/blob/main/pipeline-specification/pipeline-elements/cloud-aspect-engine.md">Specification</see>
+    /// Base class for 51Degrees cloud aspect engines.   
+    /// See the <see href="https://github.com/51Degrees/specifications/blob/main/pipeline-specification/pipeline-elements/cloud-aspect-engine.md">Specification</see> 
     /// </summary>
     /// <typeparam name="T">
-    /// The type of data that the engine will return. Must implement
+    /// The type of data that the engine will return. Must implement 
     /// <see cref="IAspectData"/>.
     /// </typeparam>
-    public abstract class CloudAspectEngineBase<T> :
-        AspectEngineBase<T, IAspectPropertyMetaData>,
+    public abstract class CloudAspectEngineBase<T> : 
+        AspectEngineBase<T, IAspectPropertyMetaData>, 
         ICloudAspectEngine
         where T : IAspectData
     {
@@ -66,11 +66,11 @@ namespace FiftyOne.Pipeline.CloudRequestEngine.FlowElements
             /// Constructor
             /// </summary>
             /// <param name="pipelinesAccessor">
-            /// A function that returns the list of pipelines associated
+            /// A function that returns the list of pipelines associated 
             /// with the parent engine.
             /// </param>
             /// <param name="currentElement">
-            /// The <see cref="IFlowElement"/> this instance of
+            /// The <see cref="IFlowElement"/> this instance of 
             /// RequestEngineAccessor was created by.
             /// </param>
             public RequestEngineAccessor(
@@ -86,7 +86,7 @@ namespace FiftyOne.Pipeline.CloudRequestEngine.FlowElements
             /// Get the <see cref="CloudRequestEngine"/> that will be making
             /// requests on behalf of this engine.
             /// </summary>
-            ///
+            /// 
             [Obsolete("Use the 'GetInstance' method instead. " +
                 "This property will be removed in a future version.")]
 #pragma warning disable CA1721 // Property names should not match get methods
@@ -142,7 +142,7 @@ namespace FiftyOne.Pipeline.CloudRequestEngine.FlowElements
         /// <summary>
         /// The 'tier' of the source data used to service this request.
         /// For 51Degrees cloud, this means the name for the set of
-        /// properties that are accessible to the license key(s)
+        /// properties that are accessible to the license key(s) 
         /// associated with the resource key that is used.
         /// </summary>
         public override string DataSourceTier => _dataSourceTier;
@@ -157,8 +157,8 @@ namespace FiftyOne.Pipeline.CloudRequestEngine.FlowElements
         /// <summary>
         /// Get property meta-data for properties populated by this engine
         /// </summary>
-        [System.Diagnostics.CodeAnalysis.SuppressMessage("Design",
-            "CA1065:Do not raise exceptions in unexpected locations",
+        [System.Diagnostics.CodeAnalysis.SuppressMessage("Design", 
+            "CA1065:Do not raise exceptions in unexpected locations", 
             Justification = "")]
         public override IList<IAspectPropertyMetaData> Properties
         {
@@ -193,7 +193,7 @@ namespace FiftyOne.Pipeline.CloudRequestEngine.FlowElements
         }
 
         /// <summary>
-        /// Provide an implementation for the non-generic,
+        /// Provide an implementation for the non-generic, 
         /// aspect-specific version of the meta-data property.
         /// </summary>
         public override bool HasLoadedProperties { get { return _aspectProperties != null; } }
@@ -208,12 +208,12 @@ namespace FiftyOne.Pipeline.CloudRequestEngine.FlowElements
         /// The factory function to use when creating new data instances
         /// of type <code>T</code>.
         /// </param>
-        public CloudAspectEngineBase(ILogger<AspectEngineBase<T, IAspectPropertyMetaData>> logger,
+        public CloudAspectEngineBase(ILogger<AspectEngineBase<T, IAspectPropertyMetaData>> logger, 
             Func<IPipeline, FlowElementBase<T, IAspectPropertyMetaData>, T> aspectDataFactory) : base(logger, aspectDataFactory)
         {
             RequestEngine = new RequestEngineAccessor(() => Pipelines, this);
         }
-
+        
         /// <summary>
         /// Cleanup any unmanaged resources.
         /// </summary>
@@ -222,7 +222,7 @@ namespace FiftyOne.Pipeline.CloudRequestEngine.FlowElements
         }
 
         /// <summary>
-        /// Get property meta data from the <see cref="CloudRequestEngine"/>
+        /// Get property meta data from the <see cref="CloudRequestEngine"/> 
         /// for properties relating to this engine instance.
         /// This method will populate the <see cref="_aspectProperties"/>
         /// field.
@@ -236,7 +236,7 @@ namespace FiftyOne.Pipeline.CloudRequestEngine.FlowElements
         /// of which properties the <see cref="CloudRequestEngine"/> can
         /// return.
         /// They must extract the properties relevant to them from the
-        /// meta-data for all properties that the
+        /// meta-data for all properties that the 
         /// <see cref="CloudRequestEngine"/> exposes.
         /// </remarks>
         /// <param name="engine">
@@ -300,7 +300,7 @@ namespace FiftyOne.Pipeline.CloudRequestEngine.FlowElements
             {
                 parentObjectType = typeof(T);
             }
-            // Get the property info for this property based on the
+            // Get the property info for this property based on the 
             // supplied name.
             var propertyType = GetPropertyType(property, parentObjectType);
 
@@ -349,9 +349,9 @@ namespace FiftyOne.Pipeline.CloudRequestEngine.FlowElements
         }
 
         /// <summary>
-        /// Retrieve the raw JSON response from the
-        /// <see cref="CloudRequestEngine"/> in this pipeline, extract
-        /// the data for this specific engine and populate the
+        /// Retrieve the raw JSON response from the 
+        /// <see cref="CloudRequestEngine"/> in this pipeline, extract 
+        /// the data for this specific engine and populate the 
         /// <code>TData</code> instance accordingly.
         /// </summary>
         /// <param name="data">
@@ -368,20 +368,20 @@ namespace FiftyOne.Pipeline.CloudRequestEngine.FlowElements
 
             CloudRequestData requestData;
             // Get requestData from CloudRequestEngine. If requestData does not
-            // exist in the element data TypedKeyMap then the engine either
+            // exist in the element data TypedKeyMap then the engine either 
             // does not exist in the Pipeline or is not run before this engine.
             try
             {
                 requestData = data.GetFromElement(RequestEngine.GetInstance());
-            }
-            catch (KeyNotFoundException ex)
+            } 
+            catch (KeyNotFoundException ex) 
             {
                 throw new PipelineConfigurationException(
                     $"The '{GetType().Name}' requires a 'CloudRequestEngine' " +
                     $"before it in the Pipeline. This engine will be unable " +
                     $"to produce results until this is corrected.", ex);
             }
-
+            
             // Check the requestData ProcessStarted flag which informs whether
             // the cloud request engine process method was called.
             if (requestData?.ProcessStarted == false)
@@ -395,9 +395,9 @@ namespace FiftyOne.Pipeline.CloudRequestEngine.FlowElements
             var json = requestData?.JsonResponse;
 
             // If the JSON is empty or null then do not Process the CloudAspectEngine.
-            // Empty or null JSON indicates that an error has occurred in the
-            // CloudRequestEngine. The error will have been reported by the
-            // CloudRequestEngine so just log a warning that this
+            // Empty or null JSON indicates that an error has occurred in the 
+            // CloudRequestEngine. The error will have been reported by the 
+            // CloudRequestEngine so just log a warning that this 
             // CloudAspectEngine did not process.
             if (string.IsNullOrEmpty(json) == false)
             {
@@ -469,7 +469,7 @@ namespace FiftyOne.Pipeline.CloudRequestEngine.FlowElements
 
         /// <summary>
         /// A virtual method to be implemented by the derived class which
-        /// uses the JsonResponse from the CloudRequestEngine to populate the
+        /// uses the JsonResponse from the CloudRequestEngine to populate the 
         /// <code>T</code> instance accordingly.
         /// </summary>
         /// <param name="data">
@@ -487,21 +487,21 @@ namespace FiftyOne.Pipeline.CloudRequestEngine.FlowElements
         }
 
         /// <summary>
-        /// Use the supplied cloud data to create a dictionary of
+        /// Use the supplied cloud data to create a dictionary of 
         /// <see cref="AspectPropertyValue{T}"/> instances.
         /// </summary>
         /// <remarks>
-        /// This method uses the meta-data exposed by the
+        /// This method uses the meta-data exposed by the 
         /// <see cref="Properties"/> collection to determine
         /// if a given entry in the supplied cloudData should
         /// be converted to an <see cref="AspectPropertyValue{T}"/>
         /// or not.
         /// If not it will be output unchanged. If it is then a new
-        /// <see cref="AspectPropertyValue{T}"/> instance will be created
+        /// <see cref="AspectPropertyValue{T}"/> instance will be created 
         /// and the value from the cloud data assigned to it.
         /// If the value is null then the code will look for a property
         /// in the cloud data with the same name suffixed with 'nullreason'.
-        /// If it exists, then it's value will be used to set the
+        /// If it exists, then it's value will be used to set the 
         /// noValueMessage on the new <see cref="AspectPropertyValue{T}"/>.
         /// </remarks>
         /// <param name="cloudData">
@@ -515,9 +515,9 @@ namespace FiftyOne.Pipeline.CloudRequestEngine.FlowElements
         /// but will be different if dealing with sub-properties.
         /// </param>
         /// <returns>
-        /// A dictionary containing the original values converted to
+        /// A dictionary containing the original values converted to 
         /// <see cref="AspectPropertyValue{T}"/> instances where needed.
-        /// Any entries in the source dictionary where the key ends
+        /// Any entries in the source dictionary where the key ends 
         /// with 'nullreason' will not appear in the output.
         /// </returns>
         /// <exception cref="ArgumentNullException">
@@ -531,14 +531,14 @@ namespace FiftyOne.Pipeline.CloudRequestEngine.FlowElements
 
             // Convert the meta-data to a dictionary for faster access.
             var metaDataDictionary = propertyMetaData.ToDictionary(
-                p => p.Name, p => p,
+                p => p.Name, p => p, 
                 StringComparer.OrdinalIgnoreCase);
 
             Dictionary<string, object> result = new Dictionary<string, object>();
             // Iterate through all entries in the source data where the
             // key is not suffixed with 'nullreason'.
             foreach (var property in cloudData
-                .Where(kvp => kvp.Key.EndsWith("nullreason",
+                .Where(kvp => kvp.Key.EndsWith("nullreason", 
                     StringComparison.OrdinalIgnoreCase) == false))
             {
                 var outputValue = property.Value;
@@ -568,12 +568,12 @@ namespace FiftyOne.Pipeline.CloudRequestEngine.FlowElements
                             }
                             apv.Value = newValue;
                         }
-                        else
-                        {
-                            // Value is null so check if we have a
+                        else 
+                        { 
+                            // Value is null so check if we have a 
                             // corresponding reason.
-                            // We need to set the no value message with
-                            // reflection as the property is read only
+                            // We need to set the no value message with 
+                            // reflection as the property is read only 
                             // through the interface.
                             var messageProperty = genericType.GetProperty("NoValueMessage");
                             if (cloudData.TryGetValue(property.Key + "nullreason", out object nullreason))

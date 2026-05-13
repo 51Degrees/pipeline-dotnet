@@ -31,7 +31,7 @@ using FiftyOne.Pipeline.Engines.FlowElements;
 namespace FiftyOne.Pipeline.Engines.Services
 {
     /// <summary>
-    /// Service that determines the reason for a property not being populated
+    /// Service that determines the reason for a property not being populated 
     /// by an engine.
     /// See the <see href="https://github.com/51Degrees/specifications/blob/main/pipeline-specification/features/properties.md#missing-properties">Specification</see>
     /// </summary>
@@ -60,7 +60,7 @@ namespace FiftyOne.Pipeline.Engines.Services
                 {
                     lock (_lock)
                     {
-                        if (_instance == null)
+                        if(_instance == null)
                         {
                             _instance = new MissingPropertyService();
                         }
@@ -121,7 +121,7 @@ namespace FiftyOne.Pipeline.Engines.Services
             IAspectEngine engine,
             IAspectData aspectData)
         {
-            if (engine == null)
+            if(engine == null)
             {
                 throw new ArgumentNullException(nameof(engine));
             }
