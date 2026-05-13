@@ -216,7 +216,7 @@ namespace FiftyOne.Pipeline.Engines.Services
                 }
             }
 
-            if(reason == MissingPropertyReason.Unknown &&
+            if (reason == MissingPropertyReason.Unknown &&
                 engine.HasLoadedProperties &&
                 typeof(ICloudAspectEngine).IsAssignableFrom(engine.GetType()))
             {
