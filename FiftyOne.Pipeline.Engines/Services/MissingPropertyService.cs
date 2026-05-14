@@ -31,22 +31,21 @@ using FiftyOne.Pipeline.Engines.FlowElements;
 namespace FiftyOne.Pipeline.Engines.Services
 {
     /// <summary>
-    /// Service that determines the reason for a property not being populated
+    /// Service that determines the reason for a property not being populated 
     /// by an engine.
     /// See the <see href="https://github.com/51Degrees/specifications/blob/main/pipeline-specification/features/properties.md#missing-properties">Specification</see>
     /// </summary>
     public class MissingPropertyService : IMissingPropertyService
     {
         private static IMissingPropertyService _instance;
-        private static readonly object _lock = new object();
+        private static object _lock = new object();
 
         /// <summary>
-        /// Cache of "does the engine data type define a getter for property X"
-        /// answers, resolved via reflection by
-        /// <see cref="EngineDataContainsPropertyGetter"/>. Keyed first on
-        /// engine type and then on property name (case-insensitive).
+        /// Used to store the results of looking up whether a property is available or not.
+        /// <seealso cref="EngineDataContainsPropertyGetter"/>
+        /// The key is the engine type. The inner dictionary is keyed on property name.
         /// </summary>
-        private static readonly Dictionary<Type, Dictionary<string, bool>> _propertyAvailable =
+        private static Dictionary<Type, Dictionary<string, bool>> _propertyAvailable = 
             new Dictionary<Type, Dictionary<string, bool>>();
 
         /// <summary>
@@ -72,20 +71,26 @@ namespace FiftyOne.Pipeline.Engines.Services
 
         /// <summary>
         /// Constructor is private to ensure the single instance accessible
-        /// through the <see cref="Instance"/> property is used.
+        /// through the 'Instance' property is used.
         /// </summary>
         private MissingPropertyService() { }
 
-        /// <inheritdoc/>
-        public MissingPropertyResult GetMissingPropertyReason(
-            string propertyName,
-            IReadOnlyList<IAspectEngine> engines)
+        /// <summary>
+        /// Get the reason that a property is not available from an engine.
+        /// </summary>
+        /// <param name="propertyName">
+        /// The name of the property to look for
+        /// </param>
+        /// <param name="engines">
+        /// The engines that are expected to supply the property value.
+        /// </param>
+        /// <returns>
+        /// A <see cref="MissingPropertyResult"/> instance that includes an
+        /// enum giving the reason and a developer-facing description of 
+        /// the reason.
+        /// </returns>
+        public MissingPropertyResult GetMissingPropertyReason(string propertyName, IReadOnlyList<IAspectEngine> engines)
         {
-            if (engines == null)
-            {
-                throw new ArgumentNullException(nameof(engines));
-            }
-
             MissingPropertyResult result = null;
             foreach (var engine in engines.Where(e => e != null))
             {
@@ -98,12 +103,23 @@ namespace FiftyOne.Pipeline.Engines.Services
             return result;
         }
 
-        /// <inheritdoc/>
-        public MissingPropertyResult GetMissingPropertyReason(
-            string propertyName,
-            IAspectEngine engine)
+        /// <summary>
+        /// Get the reason that a property is not available from an engine.
+        /// </summary>
+        /// <param name="propertyName">
+        /// The name of the property to look for
+        /// </param>
+        /// <param name="engine">
+        /// The engine that is expected to supply the property value.
+        /// </param>
+        /// <returns>
+        /// A <see cref="MissingPropertyResult"/> instance that includes an
+        /// enum giving the reason and a developer-facing description of 
+        /// the reason.
+        /// </returns>
+        public MissingPropertyResult GetMissingPropertyReason(string propertyName, IAspectEngine engine)
         {
-            if (engine == null)
+            if(engine == null)
             {
                 throw new ArgumentNullException(nameof(engine));
             }
