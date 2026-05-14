@@ -411,14 +411,26 @@ namespace FiftyOne.Pipeline.CloudRequestEngine.FlowElements
                     $"CloudRequestEngine in the logs as this indicates an error " +
                     $"occurred there.");
 
-                // Record a FlowError on the flow data so that downstream
-                // consumers (e.g. MissingPropertyService) can distinguish a
-                // property that was not populated because of a transient
-                // cloud request failure from a property that is genuinely
-                // unavailable (data-tier / resource-key issues).
-                // The underlying error has already been logged by the
-                // CloudRequestEngine, and we do not want to fail the whole
-                // pipeline because of it, so shouldThrow and shouldLog are
+                // Mark this engine's aspect data so that subsequent
+                // property accesses through AspectDataBase.GetAs<T> will
+                // throw PropertyMissingException with reason
+                // CloudRequestFailed instead of falling through to the
+                // misleading reasons the MissingPropertyService would
+                // otherwise produce (it has no per-request context — for
+                // cloud properties it typically mis-reports as
+                // DataFileUpgradeRequired because cloud meta-data does
+                // not populate DataTiersWherePresent).
+                if (aspectData is AspectDataBase aspectDataBase)
+                {
+                    aspectDataBase.MarkCloudRequestFailed();
+                }
+
+                // Also record a FlowError on the flow data so that
+                // diagnostics (logs, telemetry, callers of FlowData.Errors)
+                // can see that this engine did not process for the current
+                // request. We do not want this to bring down the pipeline
+                // — the underlying cloud failure was already reported by
+                // CloudRequestEngine — so shouldThrow and shouldLog are
                 // both false.
                 data.AddError(
                     new PipelineException(string.Format(

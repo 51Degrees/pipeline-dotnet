@@ -29,7 +29,6 @@ using Moq;
 using System;
 using System.Collections.Generic;
 using FiftyOne.Common.TestHelpers;
-using FiftyOne.Pipeline.Core.Data;
 using FiftyOne.Pipeline.Core.FlowElements;
 
 namespace FiftyOne.Pipeline.Engines.Tests.Data
@@ -61,19 +60,7 @@ namespace FiftyOne.Pipeline.Engines.Tests.Data
             _pipeline = new Mock<IPipeline>();
             _missingPropertyService = new Mock<IMissingPropertyService>();
             _missingPropertyService.Setup(m => m.GetMissingPropertyReason(
-                It.IsAny<string>(), It.IsAny<IReadOnlyList<IAspectEngine>>()))
-                .Returns(new MissingPropertyResult()
-                {
-                    Description = "TEST",
-                    Reason = MissingPropertyReason.Unknown
-                });
-            // AspectDataBase now calls the flow-data overload by default;
-            // also configure that so tests which don't override it still
-            // receive a valid result.
-            _missingPropertyService.Setup(m => m.GetMissingPropertyReason(
-                It.IsAny<string>(),
-                It.IsAny<IReadOnlyList<IAspectEngine>>(),
-                It.IsAny<IFlowData>()))
+                    It.IsAny<string>(), It.IsAny<IReadOnlyList<IAspectEngine>>()))
                 .Returns(new MissingPropertyResult()
                 {
                     Description = "TEST",
@@ -130,59 +117,64 @@ namespace FiftyOne.Pipeline.Engines.Tests.Data
         /// <summary>
         /// When a property is missing and no flow data has been
         /// associated with the aspect data, the missing property
-        /// service should still be invoked, with a null flow data
-        /// argument. This preserves the behaviour of the
-        /// pre-existing overload.
+        /// service should be invoked with the engines list. Sanity check
+        /// that the call site delegates to the missing property service
+        /// when no cloud-request-failure marker has been set.
         /// </summary>
         [TestMethod]
-        public void AspectData_GetMissing_CallsServiceWithNullFlowData()
+        public void AspectData_GetMissing_CallsMissingPropertyService()
         {
-            _missingPropertyService.Setup(m => m.GetMissingPropertyReason(
-                It.IsAny<string>(),
-                It.IsAny<IReadOnlyList<IAspectEngine>>(),
-                It.IsAny<IFlowData>()))
-                .Returns(new MissingPropertyResult()
-                {
-                    Description = "TEST",
-                    Reason = MissingPropertyReason.Unknown
-                });
-
             Assert.ThrowsExactly<PropertyMissingException>(() =>
             {
                 var _ = _data["testproperty"];
             });
 
             _missingPropertyService.Verify(m => m.GetMissingPropertyReason(
-                "testproperty",
-                It.IsAny<IReadOnlyList<IAspectEngine>>(),
-                null),
+                    "testproperty",
+                    It.IsAny<IReadOnlyList<IAspectEngine>>()),
                 Times.Once,
-                "Missing property lookup should call the flow-data overload " +
-                "with a null flow data argument when none has been set.");
+                "Missing property lookup must delegate to the service " +
+                "when CloudRequestFailed is not set.");
         }
 
         /// <summary>
-        /// When the engine has associated a flow data instance with the
-        /// aspect data (via the internal <c>SetFlowData</c> hook used by
-        /// <c>AspectEngineBase</c>), that same flow data instance must be
-        /// forwarded to the missing property service so it can inspect
-        /// the request errors when deciding the reason.
+        /// <see cref="AspectDataBase.CloudRequestFailed"/> is <c>false</c>
+        /// by default — no marker on a fresh aspect data instance.
         /// </summary>
         [TestMethod]
-        public void AspectData_GetMissing_ForwardsFlowDataToService()
+        public void AspectData_CloudRequestFailed_DefaultsToFalse()
         {
-            var flowData = new Mock<IFlowData>().Object;
-            _data.SetFlowData(flowData);
+            Assert.IsFalse(_data.CloudRequestFailed);
+        }
 
-            _missingPropertyService.Setup(m => m.GetMissingPropertyReason(
-                It.IsAny<string>(),
-                It.IsAny<IReadOnlyList<IAspectEngine>>(),
-                It.IsAny<IFlowData>()))
-                .Returns(new MissingPropertyResult()
-                {
-                    Description = "TEST",
-                    Reason = MissingPropertyReason.CloudRequestFailed
-                });
+        /// <summary>
+        /// <see cref="AspectDataBase.MarkCloudRequestFailed"/> flips
+        /// <see cref="AspectDataBase.CloudRequestFailed"/> to <c>true</c>.
+        /// The marker is stored in the underlying dictionary, not as a
+        /// dedicated field — so it survives any operation that respects
+        /// the existing data slot semantics.
+        /// </summary>
+        [TestMethod]
+        public void AspectData_MarkCloudRequestFailed_SetsFlag()
+        {
+            Assert.IsFalse(_data.CloudRequestFailed);
+            _data.MarkCloudRequestFailed();
+            Assert.IsTrue(_data.CloudRequestFailed);
+        }
+
+        /// <summary>
+        /// When the cloud-request-failure marker is set,
+        /// <see cref="AspectDataBase.GetAs{T}"/> must short-circuit to a
+        /// <see cref="PropertyMissingException"/> with reason
+        /// <see cref="MissingPropertyReason.CloudRequestFailed"/> without
+        /// consulting the <see cref="IMissingPropertyService"/>. The
+        /// service has no per-request context and would otherwise
+        /// mis-report the reason.
+        /// </summary>
+        [TestMethod]
+        public void AspectData_GetMissing_CloudRequestFailed_ShortCircuits()
+        {
+            _data.MarkCloudRequestFailed();
 
             var ex = Assert.ThrowsExactly<PropertyMissingException>(() =>
             {
@@ -190,13 +182,13 @@ namespace FiftyOne.Pipeline.Engines.Tests.Data
             });
 
             Assert.AreEqual(MissingPropertyReason.CloudRequestFailed, ex.Reason);
+            Assert.AreEqual("testproperty", ex.PropertyName);
             _missingPropertyService.Verify(m => m.GetMissingPropertyReason(
-                "testproperty",
-                It.IsAny<IReadOnlyList<IAspectEngine>>(),
-                flowData),
-                Times.Once,
-                "The missing property service should be called with the " +
-                "exact flow data instance that was set on the aspect data.");
+                    It.IsAny<string>(),
+                    It.IsAny<IReadOnlyList<IAspectEngine>>()),
+                Times.Never,
+                "Service must not be consulted when CloudRequestFailed " +
+                "is set on the aspect data — the reason is decided locally.");
         }
     }
 }
