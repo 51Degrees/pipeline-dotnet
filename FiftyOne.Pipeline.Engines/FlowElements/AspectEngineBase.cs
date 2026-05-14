@@ -252,12 +252,12 @@ namespace FiftyOne.Pipeline.Engines.FlowElements
             {
                 // If this aspect engine is configured to record cache hits,
                 // set the cache hit value on the cached aspect data.
-                if (_cacheHitOrMiss && cacheResult is AspectDataBase cachedAspectData)
+                if (_cacheHitOrMiss) 
                 {
-                    cachedAspectData.SetCacheHit();
+                    (cacheResult as AspectDataBase).SetCacheHit();
                 }
 
-                // We have a result from the cache so add it
+                // We have a result from the cache so add it 
                 // into the flow data.
                 data.GetOrAdd(ElementDataKeyTyped, (f) =>
                 {
