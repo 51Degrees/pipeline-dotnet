@@ -28,6 +28,7 @@ using FiftyOne.Pipeline.Engines.Services;
 using Microsoft.Extensions.Logging;
 using System.Collections.Generic;
 using FiftyOne.Pipeline.CloudRequestEngine.FlowElements;
+using FiftyOne.Pipeline.CloudRequestEngine.Services;
 
 namespace Examples.CloudEngine.FlowElements
 {
@@ -66,7 +67,7 @@ namespace Examples.CloudEngine.FlowElements
                 _dataLogger,
                 pipeline,
                 (IAspectEngine)engine,
-                MissingPropertyService.Instance);
+                MissingPropertyServiceCloud.Instance);
         }
 
     }

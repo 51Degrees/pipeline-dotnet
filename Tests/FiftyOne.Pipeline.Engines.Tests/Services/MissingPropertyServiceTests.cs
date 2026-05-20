@@ -20,8 +20,6 @@
  * such notice(s) shall fulfill the requirements of that article.
  * ********************************************************************* */
 
-using FiftyOne.Pipeline.Core.Data;
-using FiftyOne.Pipeline.Core.FlowElements;
 using FiftyOne.Pipeline.Engines.Data;
 using FiftyOne.Pipeline.Engines.FlowElements;
 using FiftyOne.Pipeline.Engines.Services;
@@ -29,7 +27,6 @@ using FiftyOne.Pipeline.Engines.TestHelpers;
 using Microsoft.Extensions.Logging;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using Moq;
-using System;
 using System.Collections.Generic;
 
 namespace FiftyOne.Pipeline.Engines.Tests.Services
@@ -256,79 +253,6 @@ namespace FiftyOne.Pipeline.Engines.Tests.Services
 
             // Assert
             Assert.AreEqual(MissingPropertyReason.Unknown, result.Reason);
-        }
-
-        /// <summary>
-        /// Cloud property meta-data carries an empty
-        /// <c>DataTiersWherePresent</c> list, so the data-tier check is
-        /// not meaningful for a cloud engine. Verify that a cloud engine
-        /// whose metadata contains the property does NOT report
-        /// <see cref="MissingPropertyReason.DataFileUpgradeRequired"/> —
-        /// the pre-fix behaviour was to mis-report this case.
-        /// </summary>
-        [TestMethod]
-        public void MissingPropertyService_GetReason_CloudEngine_PropertyInMetadata_SkipsTierCheck()
-        {
-            // Arrange — cloud engine with the property in its metadata.
-            // DataTiersWherePresent is empty (as produced by
-            // CloudAspectEngineBase.LoadProperty).
-            Mock<ICloudAspectEngine> engine = new Mock<ICloudAspectEngine>();
-            engine.SetupGet(e => e.ElementDataKey).Returns("testElement");
-            engine.SetupGet(e => e.DataSourceTier).Returns("cloud");
-            engine.SetupGet(e => e.HasLoadedProperties).Returns(true);
-            ConfigureCloudProperty(engine.As<IAspectEngine>());
-
-            // Act
-            var result = _service.GetMissingPropertyReason(
-                "testProperty",
-                engine.Object);
-
-            // Assert — must not be DataFileUpgradeRequired. The property is
-            // in the metadata so the service falls through to the cloud
-            // resource-key branch.
-            Assert.AreNotEqual(
-                MissingPropertyReason.DataFileUpgradeRequired,
-                result.Reason,
-                "Cloud engine must skip the data-tier check; " +
-                $"got {result.Reason} with description: {result.Description}");
-        }
-
-        /// <summary>
-        /// Verify the description string for the
-        /// <see cref="MissingPropertyReason.CloudRequestFailed"/> reason.
-        /// The service itself never produces this reason via its own
-        /// heuristics (that decision lives in
-        /// <see cref="AspectDataBase.GetAs{T}"/>'s short-circuit), but
-        /// callers can synthesise a <see cref="MissingPropertyResult"/>
-        /// for it. The service's description template must therefore
-        /// match the one used in <c>AspectDataBase</c> so that consumers
-        /// see consistent text regardless of which path produced the
-        /// result.
-        /// </summary>
-        [TestMethod]
-        public void MissingPropertyService_CloudRequestFailedMessage_Exists()
-        {
-            Assert.IsFalse(
-                string.IsNullOrEmpty(Messages.MissingPropertyMessageCloudRequestFailed),
-                "MissingPropertyMessageCloudRequestFailed resource string " +
-                "must be defined so AspectDataBase and any caller " +
-                "synthesising a CloudRequestFailed result render the " +
-                "same description text.");
-        }
-
-        private void ConfigureCloudProperty(Mock<IAspectEngine> engine)
-        {
-            // Mirror the way CloudAspectEngineBase populates property
-            // metadata: DataTiersWherePresent is empty.
-            var property = new AspectPropertyMetaData(
-                engine.Object,
-                "testProperty",
-                typeof(string),
-                "",
-                new List<string>(),
-                true);
-            var propertyList = new List<IAspectPropertyMetaData>() { property };
-            engine.Setup(e => e.Properties).Returns(propertyList);
         }
 
         private void ConfigureProperty(Mock<IAspectEngine> engine)

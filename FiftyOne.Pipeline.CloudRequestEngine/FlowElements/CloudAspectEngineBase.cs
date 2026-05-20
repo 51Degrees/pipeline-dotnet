@@ -411,27 +411,19 @@ namespace FiftyOne.Pipeline.CloudRequestEngine.FlowElements
                     $"CloudRequestEngine in the logs as this indicates an error " +
                     $"occurred there.");
 
-                // Mark this engine's aspect data so that subsequent
-                // property accesses through AspectDataBase.GetAs<T> will
-                // throw PropertyMissingException with reason
-                // CloudRequestFailed instead of falling through to the
-                // misleading reasons the MissingPropertyService would
-                // otherwise produce (it has no per-request context — for
-                // cloud properties it typically mis-reports as
-                // DataFileUpgradeRequired because cloud meta-data does
-                // not populate DataTiersWherePresent).
+                // Mark the aspect data so that downstream property
+                // accesses see CloudRequestFailed instead of the
+                // misleading reasons MissingPropertyService would
+                // otherwise return for missing cloud properties.
                 if (aspectData is AspectDataBase aspectDataBase)
                 {
                     aspectDataBase.MarkCloudRequestFailed();
                 }
 
-                // Also record a FlowError on the flow data so that
-                // diagnostics (logs, telemetry, callers of FlowData.Errors)
-                // can see that this engine did not process for the current
-                // request. We do not want this to bring down the pipeline
-                // — the underlying cloud failure was already reported by
-                // CloudRequestEngine — so shouldThrow and shouldLog are
-                // both false.
+                // Record a non-throwing, non-logging FlowError so the
+                // failure is visible to diagnostics (FlowData.Errors).
+                // The underlying error is already reported by the
+                // CloudRequestEngine itself, so we do not re-log here.
                 data.AddError(
                     new PipelineException(string.Format(
                         CultureInfo.InvariantCulture,

@@ -60,7 +60,9 @@ namespace FiftyOne.Pipeline.Engines.Tests.Data
             _pipeline = new Mock<IPipeline>();
             _missingPropertyService = new Mock<IMissingPropertyService>();
             _missingPropertyService.Setup(m => m.GetMissingPropertyReason(
-                    It.IsAny<string>(), It.IsAny<IReadOnlyList<IAspectEngine>>()))
+                    It.IsAny<string>(),
+                    It.IsAny<IReadOnlyList<IAspectEngine>>(),
+                    It.IsAny<IAspectData>()))
                 .Returns(new MissingPropertyResult()
                 {
                     Description = "TEST",
@@ -115,11 +117,10 @@ namespace FiftyOne.Pipeline.Engines.Tests.Data
         }
 
         /// <summary>
-        /// When a property is missing and no flow data has been
-        /// associated with the aspect data, the missing property
-        /// service should be invoked with the engines list. Sanity check
-        /// that the call site delegates to the missing property service
-        /// when no cloud-request-failure marker has been set.
+        /// When a property is missing, the missing-property service
+        /// should be invoked with the engines list and the aspect data
+        /// instance. Per-request state lives on the aspect data — the
+        /// service decides how to interpret it.
         /// </summary>
         [TestMethod]
         public void AspectData_GetMissing_CallsMissingPropertyService()
@@ -131,10 +132,12 @@ namespace FiftyOne.Pipeline.Engines.Tests.Data
 
             _missingPropertyService.Verify(m => m.GetMissingPropertyReason(
                     "testproperty",
-                    It.IsAny<IReadOnlyList<IAspectEngine>>()),
+                    It.IsAny<IReadOnlyList<IAspectEngine>>(),
+                    It.Is<IAspectData>(d => ReferenceEquals(d, _data))),
                 Times.Once,
                 "Missing property lookup must delegate to the service " +
-                "when CloudRequestFailed is not set.");
+                "and pass the aspect data instance so the service can " +
+                "consult any per-request state on it.");
         }
 
         /// <summary>
@@ -160,35 +163,6 @@ namespace FiftyOne.Pipeline.Engines.Tests.Data
             Assert.IsFalse(_data.CloudRequestFailed);
             _data.MarkCloudRequestFailed();
             Assert.IsTrue(_data.CloudRequestFailed);
-        }
-
-        /// <summary>
-        /// When the cloud-request-failure marker is set,
-        /// <see cref="AspectDataBase.GetAs{T}"/> must short-circuit to a
-        /// <see cref="PropertyMissingException"/> with reason
-        /// <see cref="MissingPropertyReason.CloudRequestFailed"/> without
-        /// consulting the <see cref="IMissingPropertyService"/>. The
-        /// service has no per-request context and would otherwise
-        /// mis-report the reason.
-        /// </summary>
-        [TestMethod]
-        public void AspectData_GetMissing_CloudRequestFailed_ShortCircuits()
-        {
-            _data.MarkCloudRequestFailed();
-
-            var ex = Assert.ThrowsExactly<PropertyMissingException>(() =>
-            {
-                var _ = _data["testproperty"];
-            });
-
-            Assert.AreEqual(MissingPropertyReason.CloudRequestFailed, ex.Reason);
-            Assert.AreEqual("testproperty", ex.PropertyName);
-            _missingPropertyService.Verify(m => m.GetMissingPropertyReason(
-                    It.IsAny<string>(),
-                    It.IsAny<IReadOnlyList<IAspectEngine>>()),
-                Times.Never,
-                "Service must not be consulted when CloudRequestFailed " +
-                "is set on the aspect data — the reason is decided locally.");
         }
     }
 }

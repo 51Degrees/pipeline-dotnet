@@ -71,12 +71,13 @@ namespace FiftyOne.Pipeline.Engines.Data
         /// <c>FlowData.Errors</c>).
         /// </para>
         /// <para>
-        /// When this flag is set, <see cref="GetAs{T}"/> short-circuits to
+        /// The configured <see cref="IMissingPropertyService"/> reads
+        /// this flag via the
+        /// <c>GetMissingPropertyReason(string, IReadOnlyList&lt;IAspectEngine&gt;, IAspectData)</c>
+        /// overload and may use it to return
         /// <see cref="MissingPropertyReason.CloudRequestFailed"/> without
-        /// consulting the <see cref="IMissingPropertyService"/>. The
-        /// service has no per-request context and cannot otherwise
-        /// distinguish a transient cloud failure from a license or
-        /// resource-key issue.
+        /// running its standard heuristics. The flag itself carries no
+        /// reason-resolution logic — that lives in the cloud service.
         /// </para>
         /// </summary>
         public bool CloudRequestFailed
@@ -230,16 +231,13 @@ namespace FiftyOne.Pipeline.Engines.Data
         /// <para>
         /// Called by <c>CloudAspectEngineBase.ProcessEngine</c> after it
         /// observes that the upstream cloud request did not produce a
-        /// JSON response (and recorded an error against itself on
-        /// <c>FlowData.Errors</c>). Subsequent property accesses through
-        /// <see cref="GetAs{T}"/> on this instance will then throw
-        /// <see cref="PropertyMissingException"/> with reason
-        /// <see cref="MissingPropertyReason.CloudRequestFailed"/>, rather
-        /// than the misleading reasons that the
-        /// <see cref="IMissingPropertyService"/> would otherwise produce
-        /// (it has no per-request context — for cloud properties it would
-        /// typically mis-report
-        /// <see cref="MissingPropertyReason.DataFileUpgradeRequired"/>).
+        /// JSON response. The configured
+        /// <see cref="IMissingPropertyService"/> — typically a cloud-aware
+        /// implementation when this method is in use — reads the marker
+        /// via the
+        /// <c>GetMissingPropertyReason(string, IReadOnlyList&lt;IAspectEngine&gt;, IAspectData)</c>
+        /// overload and decides what reason to surface. This base class
+        /// does not interpret the marker itself.
         /// </para>
         /// </summary>
         public void MarkCloudRequestFailed()
@@ -351,29 +349,14 @@ namespace FiftyOne.Pipeline.Engines.Data
 
                 if (gotProperty == false)
                 {
-                    // Per-request short-circuit. If the upstream cloud
-                    // call recorded a failure on this aspect data, the
-                    // missing-property service has no way to know about
-                    // it — it would mis-report the reason (typically as
-                    // DataFileUpgradeRequired) because cloud property
-                    // meta-data does not carry data-tier information.
-                    // Decide CloudRequestFailed locally before delegating.
-                    if (CloudRequestFailed)
-                    {
-                        var description = BuildCloudRequestFailedDescription(key);
-                        LogMissingProperty(key, MissingPropertyReason.CloudRequestFailed);
-                        throw new PropertyMissingException(
-                            MissingPropertyReason.CloudRequestFailed,
-                            key,
-                            description);
-                    }
-
                     if (MissingPropertyService != null)
                     {
-                        // If there was no entry for the key then use the missing
-                        // property service to find out why.
+                        // Pass `this` so a cloud-aware service can
+                        // consult the per-request CloudRequestFailed
+                        // marker. The base service ignores the
+                        // argument.
                         var missingReason = MissingPropertyService
-                            .GetMissingPropertyReason(key, Engines);
+                            .GetMissingPropertyReason(key, Engines, this);
                         LogMissingProperty(key, missingReason.Reason);
                         throw new PropertyMissingException(missingReason.Reason,
                             key, missingReason.Description);
@@ -382,27 +365,6 @@ namespace FiftyOne.Pipeline.Engines.Data
             }
 
             return propertyValue;
-        }
-
-        /// <summary>
-        /// Build the developer-facing description string used when a
-        /// property access fails because of an upstream cloud-request
-        /// failure. Format matches
-        /// <see cref="Services.MissingPropertyService"/> for consistency:
-        /// the standard prefix followed by the cloud-request-failed
-        /// message body.
-        /// </summary>
-        private string BuildCloudRequestFailedDescription(string key)
-        {
-            var elementKey = (Engines != null && Engines.Count > 0)
-                ? Engines[0].ElementDataKey
-                : GetType().Name;
-            return string.Format(
-                CultureInfo.InvariantCulture,
-                "{0} {1}",
-                string.Format(CultureInfo.InvariantCulture, Messages.MissingPropertyMessagePrefix, key, elementKey),
-                Messages.MissingPropertyMessageCloudRequestFailed
-            );
         }
 
         /// <summary>

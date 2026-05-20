@@ -86,25 +86,36 @@
             preference first.
             </returns>
         </member>
-        <member name="M:FiftyOne.Pipeline.Translation.Data.Languages.TryResolveLocale(System.String,System.Collections.Generic.IEnumerable{System.String},System.String@)">
-            <summary>
-            Resolves an Accept-Language header value against a set of
-            available locale keys, returning the best matching locale.
-            Handles both exact locale matches (e.g. "fr_FR") and 2-char
-            language code fallbacks (e.g. "fr" matching "fr_FR").
-            </summary>
-            <param name="acceptLanguage">
-            The raw Accept-Language header value.
-            </param>
-            <param name="availableLocales">
-            The set of available locale keys (e.g. "fr_FR", "de_DE").
-            </param>
-            <param name="matchedLocale">
-            The locale key that was matched, or null if no match was found.
-            </param>
-            <returns>
-            True if a matching locale was found, false otherwise.
-            </returns>
+        <member name="M:FiftyOne.Pipeline.Translation.Data.Languages.TryResolveLocale(System.String,System.Collections.Generic.IEnumerable{System.String},System.String@,System.String)">
+             <summary>
+             Resolves an Accept-Language header value against a set of
+             available locale keys, returning the best matching locale.
+             Handles both exact locale matches (e.g. "fr_FR") and 2-char
+             language code fallbacks (e.g. "fr" matching "fr_FR").
+            
+             If the highest-priority language matches the
+             <paramref name="baseLanguage"/> (default "en"), resolution
+             stops immediately and returns false, since the source values
+             are already in the base language and no translation is needed.
+             This prevents falling through to a lower-priority language.
+             </summary>
+             <param name="acceptLanguage">
+             The raw Accept-Language header value.
+             </param>
+             <param name="availableLocales">
+             The set of available locale keys (e.g. "fr_FR", "de_DE").
+             </param>
+             <param name="matchedLocale">
+             The locale key that was matched, or null if no match was found.
+             </param>
+             <param name="baseLanguage">
+             The 2-char code of the base language that source values are
+             already in. Defaults to "en". If the preferred language
+             matches this, no translation is performed.
+             </param>
+             <returns>
+             True if a matching locale was found, false otherwise.
+             </returns>
         </member>
         <member name="T:FiftyOne.Pipeline.Translation.Data.MissingTranslationBehavior">
             <summary>
@@ -466,7 +477,7 @@
         </member>
         <member name="M:FiftyOne.Pipeline.Translation.FlowElements.TranslationEngineBase`1.Populate(FiftyOne.Pipeline.Core.Data.IElementData,FiftyOne.Pipeline.Translation.Data.Translator,`0,FiftyOne.Pipeline.Core.Data.IFlowData)">
             <summary>
-            Populates the translation data wither all configured translations using
+            Populates the translation data with all configured translations using
             the provided translator.
             </summary>
             <param name="sourceData"></param>

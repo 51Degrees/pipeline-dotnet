@@ -31,10 +31,18 @@ using FiftyOne.Pipeline.Engines.FlowElements;
 namespace FiftyOne.Pipeline.Engines.Services
 {
     /// <summary>
-    /// Service that determines the reason for a property not being populated 
+    /// Service that determines the reason for a property not being populated
     /// by an engine.
     /// See the <see href="https://github.com/51Degrees/specifications/blob/main/pipeline-specification/features/properties.md#missing-properties">Specification</see>
     /// </summary>
+    /// <remarks>
+    /// Cloud-specific behaviour that depends on per-request state — such as
+    /// reporting <see cref="MissingPropertyReason.CloudRequestFailed"/> when
+    /// the upstream cloud request failed for the request that produced the
+    /// aspect data — is added by the cloud-specific subclass
+    /// <c>MissingPropertyServiceCloud</c> in the CloudRequestEngine
+    /// package.
+    /// </remarks>
     public class MissingPropertyService : IMissingPropertyService
     {
         private static IMissingPropertyService _instance;
@@ -70,10 +78,11 @@ namespace FiftyOne.Pipeline.Engines.Services
         }
 
         /// <summary>
-        /// Constructor is private to ensure the single instance accessible
-        /// through the 'Instance' property is used.
+        /// Constructor. Use <see cref="Instance"/> to obtain a singleton.
+        /// The constructor is protected so that cloud-specific subclasses
+        /// (e.g. <c>MissingPropertyServiceCloud</c>) can inherit.
         /// </summary>
-        private MissingPropertyService() { }
+        protected MissingPropertyService() { }
 
         /// <summary>
         /// Get the reason that a property is not available from an engine.
@@ -101,6 +110,12 @@ namespace FiftyOne.Pipeline.Engines.Services
                 }
             }
             return result;
+        }
+
+        /// <inheritdoc/>
+        public virtual MissingPropertyResult GetMissingPropertyReason(string propertyName, IReadOnlyList<IAspectEngine> engines, IAspectData aspectData)
+        {
+            return GetMissingPropertyReason(propertyName, engines);
         }
 
         /// <summary>
@@ -175,12 +190,11 @@ namespace FiftyOne.Pipeline.Engines.Services
         /// </item>
         /// </list>
         /// <para>
-        /// A per-request cloud-failure check is not performed here.
-        /// <see cref="MissingPropertyReason.CloudRequestFailed"/> is decided
-        /// upstream in <see cref="Data.AspectDataBase.GetAs{T}"/>, which
-        /// reads the per-aspect-data marker
-        /// (<see cref="Data.AspectDataBase.CloudRequestFailed"/>) before
-        /// delegating to this service.
+        /// <see cref="MissingPropertyReason.CloudRequestFailed"/> is not
+        /// produced here — that reason depends on per-request state and
+        /// is added by <c>MissingPropertyServiceCloud</c> via the 3-arg
+        /// <see cref="GetMissingPropertyReason(string, IReadOnlyList{IAspectEngine}, IAspectData)"/>
+        /// overload.
         /// </para>
         /// </remarks>
         private MissingPropertyReason DetermineReason(
