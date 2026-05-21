@@ -87,7 +87,9 @@ namespace FiftyOne.Pipeline.Engines.Tests.FlowElements
                 _loggerFactory.CreateLogger<EmptyEngineData>(),
                 data.Object.Pipeline,
                 _engine,
+#pragma warning disable CS0618 // on-premise test fixture
                 MissingPropertyService.Instance);
+#pragma warning restore CS0618
             data.Setup(d => d.GetOrAdd(
                 It.IsAny<TypedKey<EmptyEngineData>>(),
                 It.IsAny<Func<IPipeline, EmptyEngineData>>()))

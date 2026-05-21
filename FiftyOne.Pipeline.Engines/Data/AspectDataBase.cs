@@ -45,54 +45,24 @@ namespace FiftyOne.Pipeline.Engines.Data
         private List<Task> _processTasks = new List<Task>();
         private List<IAspectEngine> _engines;
         private bool _cacheHit;
+        private bool _cloudRequestFailed;
 
         /// <summary>
-        /// The key under which the cloud-request-failed marker is stored
-        /// in the underlying <see cref="DataBase"/> dictionary. Exposed so
-        /// callers can introspect the flag via <see cref="DataBase.TryGet"/>
-        /// if they need to; the recommended access is via the
-        /// <see cref="CloudRequestFailed"/> property.
+        /// True if the cloud aspect engine that owns this data observed
+        /// that the upstream cloud request did not return a usable
+        /// response. Set by
+        /// <c>CloudAspectEngineBase.ProcessEngine</c> when it detects an
+        /// empty JSON response from the <c>CloudRequestEngine</c>; the
+        /// underlying error is already reported on
+        /// <c>FlowData.Errors</c> by the cloud engine itself.
         /// </summary>
-#pragma warning disable CA1707 // Identifiers should not contain underscores
-        public const string CLOUD_REQUEST_FAILED_KEY = "cloud-request-failed";
-#pragma warning restore CA1707 // Identifiers should not contain underscores
-
-        /// <summary>
-        /// True if the upstream cloud request that should have populated
-        /// this aspect data failed for the request that produced this
-        /// instance.
-        /// <para>
-        /// For <c>CloudRequestData</c> the flag is set by the
-        /// <c>CloudRequestEngine</c> exception path. For downstream cloud
-        /// aspect data (e.g. <c>DeviceDataCloud</c>) the flag is
-        /// propagated by <c>CloudAspectEngineBase.ProcessEngine</c> when
-        /// it observes that the upstream <c>CloudRequestData</c> failed
-        /// (typically signalled by an empty JSON response and an entry on
-        /// <c>FlowData.Errors</c>).
-        /// </para>
-        /// <para>
-        /// The configured <see cref="IMissingPropertyService"/> reads
-        /// this flag via the
-        /// <c>GetMissingPropertyReason(string, IReadOnlyList&lt;IAspectEngine&gt;, IAspectData)</c>
-        /// overload and may use it to return
-        /// <see cref="MissingPropertyReason.CloudRequestFailed"/> without
-        /// running its standard heuristics. The flag itself carries no
-        /// reason-resolution logic — that lives in the cloud service.
-        /// </para>
-        /// </summary>
-        public bool CloudRequestFailed
-        {
-            get
-            {
-                // Read directly via the non-virtual DataBase.TryGet rather
-                // than the base[key] indexer. The indexer dispatches
-                // through the overridden GetAs<T> below, which itself
-                // reads this property — that would recurse without bound.
-                return TryGet(CLOUD_REQUEST_FAILED_KEY, out object value)
-                    && value is bool flag
-                    && flag;
-            }
-        }
+        /// <remarks>
+        /// Kept off the underlying <see cref="DataBase"/> dictionary
+        /// deliberately — storing the marker in the dictionary would
+        /// surface it on <see cref="DataBase.AsDictionary"/> and leak it
+        /// into JSON output produced by <c>JsonBuilderElement</c>.
+        /// </remarks>
+        internal bool CloudRequestFailed => _cloudRequestFailed;
 
         /// <summary>
         /// The <see cref="IMissingPropertyService"/> instance to be queried
@@ -225,24 +195,17 @@ namespace FiftyOne.Pipeline.Engines.Data
 
         /// <summary>
         /// Mark this aspect data as having been produced for a request
-        /// whose upstream cloud call failed. The marker is stored in the
-        /// existing <see cref="DataBase"/> dictionary — no field, and no
-        /// reference back to the containing <c>IFlowData</c>.
-        /// <para>
-        /// Called by <c>CloudAspectEngineBase.ProcessEngine</c> after it
-        /// observes that the upstream cloud request did not produce a
-        /// JSON response. The configured
-        /// <see cref="IMissingPropertyService"/> — typically a cloud-aware
-        /// implementation when this method is in use — reads the marker
-        /// via the
-        /// <c>GetMissingPropertyReason(string, IReadOnlyList&lt;IAspectEngine&gt;, IAspectData)</c>
-        /// overload and decides what reason to surface. This base class
-        /// does not interpret the marker itself.
-        /// </para>
+        /// whose upstream cloud call failed. Called by
+        /// <c>CloudAspectEngineBase.ProcessEngine</c> after it observes
+        /// that the upstream cloud request did not produce a JSON
+        /// response. <see cref="MissingPropertyService"/> subclasses
+        /// (typically <c>MissingPropertyServiceCloud</c>) read the marker
+        /// to decide what reason to surface; this base class does not
+        /// interpret it.
         /// </summary>
-        public void MarkCloudRequestFailed()
+        internal void MarkCloudRequestFailed()
         {
-            base[CLOUD_REQUEST_FAILED_KEY] = true;
+            _cloudRequestFailed = true;
         }
 
         /// <summary>
