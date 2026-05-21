@@ -72,7 +72,9 @@ namespace Examples.OnPremiseEngine.FlowElements
                 _dataLogger,
                 pipeline,
                 (SimpleOnPremiseEngine)aspectEngine,
+#pragma warning disable CS0618 // on-premise example uses the on-prem singleton
                 MissingPropertyService.Instance);
+#pragma warning restore CS0618
         }
 
         public override SimpleOnPremiseEngineBuilder SetPerformanceProfile(PerformanceProfiles profile)

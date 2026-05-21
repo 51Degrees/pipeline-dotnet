@@ -39,7 +39,9 @@ namespace FiftyOne.Pipeline.Engines.Tests.Services
         [TestInitialize]
         public void Initialise()
         {
+#pragma warning disable CS0618 // these tests exercise the on-premise service directly
             _service = MissingPropertyService.Instance;
+#pragma warning restore CS0618
         }
 
         /// <summary>

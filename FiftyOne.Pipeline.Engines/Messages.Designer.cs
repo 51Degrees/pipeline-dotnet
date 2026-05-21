@@ -223,6 +223,15 @@ namespace FiftyOne.Pipeline.Engines {
         }
         
         /// <summary>
+        ///   Looks up a localized string similar to This is because an upstream cloud request failed, so no data was available to populate the property..
+        /// </summary>
+        internal static string MissingPropertyMessageCloudRequestFailed {
+            get {
+                return ResourceManager.GetString("MissingPropertyMessageCloudRequestFailed", resourceCulture);
+            }
+        }
+        
+        /// <summary>
         ///   Looks up a localized string similar to This is because your license and/or data file does not include this property. The property is available with the {0} license/data for the {1}.
         /// </summary>
         internal static string MissingPropertyMessageDataUpgradeRequired {

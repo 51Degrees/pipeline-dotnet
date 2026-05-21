@@ -104,6 +104,15 @@ namespace FiftyOne.Pipeline.CloudRequestEngine {
                 return ResourceManager.GetString("ExceptionCloudResponseFailure", resourceCulture);
             }
         }
+
+        /// <summary>
+        ///   Looks up a localized string similar to The &apos;{0}&apos; did not process because the JSON response from the CloudRequestEngine was null or empty. This indicates that the cloud request failed for this request. See the underlying CloudRequestEngine error on this flow data for details..
+        /// </summary>
+        internal static string ExceptionCloudResponseNotProcessed {
+            get {
+                return ResourceManager.GetString("ExceptionCloudResponseNotProcessed", resourceCulture);
+            }
+        }
         
         /// <summary>
         ///   Looks up a localized string similar to Failed to load aspect properties for element &apos;{0}&apos;. This is because your resource key does not include access to any properties under &apos;{0}&apos;. For more details on resource keys, see our explainer: https://51degrees.com/documentation/_info__resource_keys.html.

@@ -132,6 +132,9 @@
   <data name="ExceptionCloudResponseFailure" xml:space="preserve">
     <value>Error waiting for response from the cloud service.</value>
   </data>
+  <data name="ExceptionCloudResponseNotProcessed" xml:space="preserve">
+    <value>The '{0}' did not process because the JSON response from the CloudRequestEngine was null or empty. This indicates that the cloud request failed.</value>
+  </data>
   <data name="ExceptionFailedToLoadProperties" xml:space="preserve">
     <value>Failed to load aspect properties for element '{0}'. This is because your resource key does not include access to any properties under '{0}'. For more details on resource keys, see our explainer: https://51degrees.com/documentation/_info__resource_keys.html</value>
   </data>

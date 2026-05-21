@@ -45,6 +45,24 @@ namespace FiftyOne.Pipeline.Engines.Data
         private List<Task> _processTasks = new List<Task>();
         private List<IAspectEngine> _engines;
         private bool _cacheHit;
+        private bool _cloudRequestFailed;
+
+        /// <summary>
+        /// True if the cloud aspect engine that owns this data observed
+        /// that the upstream cloud request did not return a usable
+        /// response. Set by
+        /// <c>CloudAspectEngineBase.ProcessEngine</c> when it detects an
+        /// empty JSON response from the <c>CloudRequestEngine</c>; the
+        /// underlying error is already reported on
+        /// <c>FlowData.Errors</c> by the cloud engine itself.
+        /// </summary>
+        /// <remarks>
+        /// Kept off the underlying <see cref="DataBase"/> dictionary
+        /// deliberately — storing the marker in the dictionary would
+        /// surface it on <see cref="DataBase.AsDictionary"/> and leak it
+        /// into JSON output produced by <c>JsonBuilderElement</c>.
+        /// </remarks>
+        internal bool CloudRequestFailed => _cloudRequestFailed;
 
         /// <summary>
         /// The <see cref="IMissingPropertyService"/> instance to be queried
@@ -176,7 +194,22 @@ namespace FiftyOne.Pipeline.Engines.Data
         }
 
         /// <summary>
-        /// Add a process task to the lazy loading tasks for this 
+        /// Mark this aspect data as having been produced for a request
+        /// whose upstream cloud call failed. Called by
+        /// <c>CloudAspectEngineBase.ProcessEngine</c> after it observes
+        /// that the upstream cloud request did not produce a JSON
+        /// response. <see cref="MissingPropertyService"/> subclasses
+        /// (typically <c>MissingPropertyServiceCloud</c>) read the marker
+        /// to decide what reason to surface; this base class does not
+        /// interpret it.
+        /// </summary>
+        internal void MarkCloudRequestFailed()
+        {
+            _cloudRequestFailed = true;
+        }
+
+        /// <summary>
+        /// Add a process task to the lazy loading tasks for this
         /// data instance.
         /// The property accessors will only complete once all such
         /// tasks have completed.
@@ -223,7 +256,7 @@ namespace FiftyOne.Pipeline.Engines.Data
         /// </summary>
         /// <remarks>
         /// This overrides the default implementation to provide additional
-        /// capabilities such as lazy loading and exposing a reason for  
+        /// capabilities such as lazy loading and exposing a reason for 
         /// properties that are not present in the data.
         /// </remarks>
         /// <typeparam name="T">
@@ -277,24 +310,64 @@ namespace FiftyOne.Pipeline.Engines.Data
                     gotProperty = TryGetValue(key, out propertyValue);
                 }
 
-                if (gotProperty == false &&
-                    MissingPropertyService != null)
+                if (gotProperty == false)
                 {
-                    // If there was no entry for the key then use the missing
-                    // property service to find out why.
-                    var missingReason = MissingPropertyService
-                        .GetMissingPropertyReason(key, Engines);
-                    if (Logger != null && Logger.IsEnabled(LogLevel.Warning))
+                    if (MissingPropertyService != null)
                     {
-                        Logger.LogWarning($"Property '{key}' missing from aspect " +
-                        $"data '{GetType().Name}'. {missingReason.Reason}");
+                        // Pass `this` so a cloud-aware service can
+                        // consult the per-request CloudRequestFailed
+                        // marker. The base service ignores the
+                        // argument.
+                        var missingReason = MissingPropertyService
+                            .GetMissingPropertyReason(key, Engines, this);
+                        LogMissingProperty(key, missingReason.Reason);
+                        throw new PropertyMissingException(missingReason.Reason,
+                            key, missingReason.Description);
                     }
-                    throw new PropertyMissingException(missingReason.Reason,
-                        key, missingReason.Description);
                 }
             }
 
             return propertyValue;
+        }
+
+        /// <summary>
+        /// Emit the appropriate log entry for a missing-property access.
+        /// </summary>
+        /// <remarks>
+        /// <para>
+        /// A single transient cloud failure typically causes many missing-
+        /// property accesses in quick succession. Logging those at
+        /// Warning would create noise that obscures the underlying
+        /// <c>CloudRequestException</c> (already recorded against
+        /// <c>FlowData.Errors</c>). So
+        /// <see cref="MissingPropertyReason.CloudRequestFailed"/> is
+        /// logged at Information and every other reason at Warning.
+        /// </para>
+        /// </remarks>
+        private void LogMissingProperty(string key, MissingPropertyReason reason)
+        {
+            if (Logger == null)
+            {
+                return;
+            }
+            if (reason == MissingPropertyReason.CloudRequestFailed)
+            {
+                if (Logger.IsEnabled(LogLevel.Information))
+                {
+                    Logger.LogInformation(
+                        $"Property '{key}' missing from aspect data " +
+                        $"'{GetType().Name}' because the upstream cloud " +
+                        $"request failed for this request ({reason}). " +
+                        $"See FlowData.Errors for details.");
+                }
+                return;
+            }
+            if (Logger.IsEnabled(LogLevel.Warning))
+            {
+                Logger.LogWarning(
+                    $"Property '{key}' missing from aspect data " +
+                    $"'{GetType().Name}'. {reason}");
+            }
         }
 
         /// <inheritdoc/>

@@ -60,7 +60,9 @@ namespace FiftyOne.Pipeline.Engines.Tests.Data
             _pipeline = new Mock<IPipeline>();
             _missingPropertyService = new Mock<IMissingPropertyService>();
             _missingPropertyService.Setup(m => m.GetMissingPropertyReason(
-                It.IsAny<string>(), It.IsAny<IReadOnlyList<IAspectEngine>>()))
+                    It.IsAny<string>(),
+                    It.IsAny<IReadOnlyList<IAspectEngine>>(),
+                    It.IsAny<IAspectData>()))
                 .Returns(new MissingPropertyResult()
                 {
                     Description = "TEST",
@@ -112,6 +114,55 @@ namespace FiftyOne.Pipeline.Engines.Tests.Data
             {
                 var result = _data["testproperty"];
             });
+        }
+
+        /// <summary>
+        /// When a property is missing, the missing-property service
+        /// should be invoked with the engines list and the aspect data
+        /// instance. Per-request state lives on the aspect data — the
+        /// service decides how to interpret it.
+        /// </summary>
+        [TestMethod]
+        public void AspectData_GetMissing_CallsMissingPropertyService()
+        {
+            Assert.ThrowsExactly<PropertyMissingException>(() =>
+            {
+                var _ = _data["testproperty"];
+            });
+
+            _missingPropertyService.Verify(m => m.GetMissingPropertyReason(
+                    "testproperty",
+                    It.IsAny<IReadOnlyList<IAspectEngine>>(),
+                    It.Is<IAspectData>(d => ReferenceEquals(d, _data))),
+                Times.Once,
+                "Missing property lookup must delegate to the service " +
+                "and pass the aspect data instance so the service can " +
+                "consult any per-request state on it.");
+        }
+
+        /// <summary>
+        /// <see cref="AspectDataBase.CloudRequestFailed"/> is <c>false</c>
+        /// by default — no marker on a fresh aspect data instance.
+        /// </summary>
+        [TestMethod]
+        public void AspectData_CloudRequestFailed_DefaultsToFalse()
+        {
+            Assert.IsFalse(_data.CloudRequestFailed);
+        }
+
+        /// <summary>
+        /// <see cref="AspectDataBase.MarkCloudRequestFailed"/> flips
+        /// <see cref="AspectDataBase.CloudRequestFailed"/> to <c>true</c>.
+        /// The marker is stored in the underlying dictionary, not as a
+        /// dedicated field — so it survives any operation that respects
+        /// the existing data slot semantics.
+        /// </summary>
+        [TestMethod]
+        public void AspectData_MarkCloudRequestFailed_SetsFlag()
+        {
+            Assert.IsFalse(_data.CloudRequestFailed);
+            _data.MarkCloudRequestFailed();
+            Assert.IsTrue(_data.CloudRequestFailed);
         }
     }
 }
