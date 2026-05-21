@@ -1,0 +1,58 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <AssemblyName>FiftyOne.Did</AssemblyName>
+    <RootNamespace>FiftyOne.Did</RootNamespace>
+    <Platforms>AnyCPU</Platforms>
+    <DocumentationFile>FiftyOne.Did.xml</DocumentationFile>
+    <PublishRepositoryUrl>true</PublishRepositoryUrl>
+    <EmbedUntrackedSources>true</EmbedUntrackedSources>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <Nullable>enable</Nullable>
+
+    <!-- NuGet package properties -->
+    <PackageId>FiftyOne.Did</PackageId>
+    <Title>51Degrees Device Identifier (51Did) parser</Title>
+    <PackageDescription>Parses a 51Degrees device identifier (51Did) value as returned by the 51Degrees Cloud service. The 51Did is an OWID envelope whose payload encodes a 1-byte usage flags bit-mask, a 4-byte little-endian License Id, and a 32-byte SHA-256 probabilistic identifier hash. The FodId type inherits from Owid.Client.Model.Owid (SWAN-community/owid-dotnet) and unpacks those three payload fields.</PackageDescription>
+    <Authors>51Degrees Engineering</Authors>
+    <PackageLicenseExpression>EUPL-1.2</PackageLicenseExpression>
+    <PackageIconUrl>https://51degrees.com/portals/0/Logos/Square%20Logo.png?width=64</PackageIconUrl>
+    <Copyright>51Degrees Mobile Experts Limited</Copyright>
+    <PackageTags>51degrees,51did,fodid,did,pipeline,owid</PackageTags>
+    <RepositoryUrl>https://github.com/51Degrees/pipeline-dotnet</RepositoryUrl>
+    <PackageIcon>51d-logo.png</PackageIcon>
+    <PackageProjectUrl>https://51degrees.com</PackageProjectUrl>
+    <Description>Parses a 51Degrees device identifier (51Did) value as returned by the 51Degrees Cloud service.</Description>
+    <RepositoryType>git</RepositoryType>
+    <NeutralLanguage>en</NeutralLanguage>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(Configuration)'=='Debug'">
+    <DebugType>full</DebugType>
+    <DebugSymbols>true</DebugSymbols>
+  </PropertyGroup>
+
+  <!-- Compile the Owid.Client source directly into FiftyOne.Did.dll. The
+       owid-dotnet submodule provides the source; we deliberately do NOT
+       reference Owid.Client.csproj so there is no separate assembly to
+       ship or to surface as a NuGet dependency. -->
+  <ItemGroup>
+    <Compile Include="..\owid-dotnet\Owid.Client\**\*.cs"
+             Exclude="..\owid-dotnet\Owid.Client\obj\**\*.cs;..\owid-dotnet\Owid.Client\bin\**\*.cs"
+             LinkBase="Owid" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="README.md">
+      <Pack>True</Pack>
+      <PackagePath>\</PackagePath>
+    </None>
+    <None Include="..\Images\51d-logo.png">
+      <Pack>True</Pack>
+      <PackagePath></PackagePath>
+    </None>
+  </ItemGroup>
+
+</Project>
