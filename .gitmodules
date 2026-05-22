@@ -5,3 +5,6 @@
 [submodule "JavascriptTemplates"]
 	path = FiftyOne.Pipeline.Elements/FiftyOne.Pipeline.JavaScriptBuilderElement/Templates
 	url = ../javascript-templates
+[submodule "owid-dotnet"]
+	path = owid-dotnet
+	url = https://github.com/SWAN-community/owid-dotnet.git
