@@ -21,6 +21,7 @@
  * ********************************************************************* */
 
 using System;
+using System.Buffers.Binary;
 
 namespace FiftyOne.Did.Model
 {
@@ -160,6 +161,8 @@ namespace FiftyOne.Did.Model
 
         private void Unpack(string paramName)
         {
+            // Payload can only be null on the FodId(Owid) promote path,
+            // where the caller-supplied OWID may carry an explicit null.
             if (Payload == null || Payload.Length < PayloadLength)
             {
                 throw new ArgumentException(
@@ -168,13 +171,9 @@ namespace FiftyOne.Did.Model
                     paramName);
             }
             Flags = Payload[FlagsOffset];
-            LicenseId = (uint)(
-                Payload[LicenseIdOffset]
-                | (Payload[LicenseIdOffset + 1] << 8)
-                | (Payload[LicenseIdOffset + 2] << 16)
-                | (Payload[LicenseIdOffset + 3] << 24));
-            Hash = new byte[HashLength];
-            Array.Copy(Payload, HashOffset, Hash, 0, HashLength);
+            LicenseId = BinaryPrimitives.ReadUInt32LittleEndian(
+                Payload.AsSpan(LicenseIdOffset, LicenseIdLength));
+            Hash = Payload.AsSpan(HashOffset, HashLength).ToArray();
         }
     }
 }
