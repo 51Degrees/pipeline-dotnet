@@ -159,8 +159,23 @@ namespace FiftyOne.Pipeline.Web.Services
                             CheckAndAdd(flowData, evidenceKey, formValue.Value.ToString());
                         }
                     }
-                    catch (InvalidDataException e)
+                    catch (Exception e) when (e is InvalidDataException || e is IOException)
                     {
+                        // InvalidDataException - malformed form payload
+                        //   (existing case).
+                        // IOException        - client disconnected mid-body
+                        //   or Kestrel aborted a very slow upload via the
+                        //   MinRequestBodyDataRate guard. Kestrel surfaces
+                        //   both as BadHttpRequestException, which inherits
+                        //   from IOException, so we can catch it without
+                        //   taking a Microsoft.AspNetCore.Server.Kestrel.Core
+                        //   dependency (this library stays server-agnostic).
+                        // Both are benign client-side conditions, not
+                        // server-side faults, so they are logged at
+                        // Information rather than escaping to the outer
+                        // catch where they would be logged at Warning and
+                        // surface as ExceptionTelemetry in App Insights.
+                        // See https://github.com/51Degrees/pipeline-dotnet/issues/298
                         _logger.LogInformation(e,
                             Messages.MessageInvalidForm);
                     }

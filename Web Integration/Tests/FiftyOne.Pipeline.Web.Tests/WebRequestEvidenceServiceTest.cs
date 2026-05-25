@@ -357,7 +357,44 @@ namespace FiftyOne.Pipeline.Web.Tests
             _request.SetupGet(r => r.Form).Throws(new InvalidDataException());
             // Check that this does not throw an exception.
             _service.AddEvidenceFromRequest(_flowData.Object, _request.Object);
-            
+
+        }
+
+        /// <summary>
+        /// Regression test for issue #298.
+        ///
+        /// When the client disconnects mid-POST, the access to
+        /// <see cref="HttpRequest.Form"/> throws an
+        /// <see cref="IOException"/> -- Kestrel's
+        /// <c>BadHttpRequestException</c> inherits from it. Pre-fix, the
+        /// inner catch only handled <see cref="InvalidDataException"/>
+        /// so the IOException escaped to the outer general catch and
+        /// was logged at Warning level, surfacing as
+        /// ExceptionTelemetry in App Insights. Post-fix the inner
+        /// catch covers IOException too and the service swallows it
+        /// silently.
+        /// </summary>
+        [TestMethod]
+        public void WebRequestEvidenceService_BenignClientDisconnect_DoesNotThrow()
+        {
+            _request.SetupGet(r => r.Form).Throws(
+                new IOException("Unexpected end of request content."));
+            _service.AddEvidenceFromRequest(_flowData.Object, _request.Object);
+        }
+
+        /// <summary>
+        /// As above but for the <c>MinRequestBodyDataRate</c> abort,
+        /// which Kestrel surfaces with the same exception shape but a
+        /// different message string.
+        /// </summary>
+        [TestMethod]
+        public void WebRequestEvidenceService_BenignSlowUpload_DoesNotThrow()
+        {
+            _request.SetupGet(r => r.Form).Throws(
+                new IOException(
+                    "Reading the request body timed out due to data " +
+                    "arriving too slowly. See MinRequestBodyDataRate."));
+            _service.AddEvidenceFromRequest(_flowData.Object, _request.Object);
         }
 
         /// <summary>
