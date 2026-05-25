@@ -27,9 +27,18 @@ namespace FiftyOne.Did.Model
     /// <summary>
     /// An OWID whose payload encodes the three fields of a 51Did: a 1-byte
     /// usage flags bitmask, a 4-byte little-endian License Id, and the
-    /// 32-byte SHA-256 probabilistic identifier hash.
+    /// 32-byte SHA-256 probabilistic value.
     /// </summary>
     /// <remarks>
+    /// <para>
+    /// Terminology. The 51Did itself (this OWID envelope) is the
+    /// identifier. The 32-byte SHA-256 hash inside the payload is the
+    /// probabilistic value carried by that identifier; two responses for
+    /// the same device + IP + usage share the same probabilistic value
+    /// but differ at the byte level because the envelope embeds a fresh
+    /// date and signature on each call. Compare probabilistic values,
+    /// never full identifiers.
+    /// </para>
     /// <para>
     /// Payload layout (37 bytes):
     /// </para>
@@ -93,7 +102,13 @@ namespace FiftyOne.Did.Model
         public uint LicenseId { get; private set; }
 
         /// <summary>
-        /// The 32-byte SHA-256 probabilistic identifier hash from the payload.
+        /// The 32-byte SHA-256 probabilistic value from the payload.
+        /// This is the stable field for comparing two 51Did identifiers:
+        /// two identifiers for the same device + IP + usage share the
+        /// same probabilistic value even though their wrapping envelopes
+        /// (date, signature) differ on every issue. Treat as the cache /
+        /// dedup key. SHA-256 is the underlying hash function; the
+        /// property is named Hash to reflect that implementation detail.
         /// </summary>
         public byte[] Hash { get; private set; } = Array.Empty<byte>();
 
