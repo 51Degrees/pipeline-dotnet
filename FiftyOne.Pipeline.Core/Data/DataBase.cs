@@ -112,7 +112,7 @@ namespace FiftyOne.Pipeline.Core.Data
         }
 
         /// <inheritdoc/>
-        public bool TryGet(string key, out object value)
+        public virtual bool TryGet(string key, out object value)
         {
             return _data.TryGetValue(key, out value);
         }

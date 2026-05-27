@@ -26,6 +26,7 @@ using System;
 using System.Collections.Generic;
 using Microsoft.Extensions.Logging;
 using FiftyOne.Pipeline.Engines.Data;
+using FiftyOne.Pipeline.Engines.FlowElements;
 using FiftyOne.Pipeline.Core.FlowElements;
 using FiftyOne.Pipeline.Core.Data;
 using FiftyOne.Pipeline.Engines.FiftyOne.FlowElements;
@@ -139,7 +140,83 @@ namespace FiftyOne.Pipeline.Engines.FiftyOne.Tests.FlowElements
             {
             }
         }
-        #endregion 
+
+        /// <summary>
+        /// Simulates on-premise engine data where values are accessed
+        /// through TryGetValue (lazy loading from native results) and
+        /// the base _data dictionary is NOT eagerly populated.
+        /// This mirrors DeviceDataBaseOnPremise behavior.
+        /// </summary>
+        private class LazyLoadedSourceData : AspectDataBase
+        {
+            private readonly Dictionary<string, object> _lazyValues;
+
+            public LazyLoadedSourceData(
+                ILogger<AspectDataBase> logger,
+                IPipeline pipeline,
+                IAspectEngine engine,
+                Dictionary<string, object> values)
+                : base(logger, pipeline, engine)
+            {
+                _lazyValues = values;
+            }
+
+            protected override bool TryGetValue<T>(string key, out T value)
+            {
+                if (_lazyValues.TryGetValue(key, out var obj))
+                {
+                    value = (T)obj;
+                    return true;
+                }
+                value = default;
+                return false;
+            }
+        }
+
+        /// <summary>
+        /// Source element that uses LazyLoadedSourceData to simulate
+        /// an on-premise engine where the base dictionary is not populated.
+        /// </summary>
+        private class LazyLoadedSourceElement :
+            AspectEngineBase<LazyLoadedSourceData, IAspectPropertyMetaData>
+        {
+            private readonly Dictionary<string, object> _propertyValuesToReturn;
+            private readonly IReadOnlyCollection<string> _properties;
+
+            public LazyLoadedSourceElement(
+                ILogger<AspectEngineBase<LazyLoadedSourceData, IAspectPropertyMetaData>> logger,
+                Func<IPipeline, FlowElementBase<LazyLoadedSourceData, IAspectPropertyMetaData>, LazyLoadedSourceData> elementDataFactory,
+                Dictionary<string, object> propertyValuesToReturn,
+                IReadOnlyCollection<string> properties)
+                : base(logger, elementDataFactory)
+            {
+                _propertyValuesToReturn = propertyValuesToReturn;
+                _properties = properties;
+            }
+
+            public override string ElementDataKey => "lazyloadedsourceelement";
+
+            public override IEvidenceKeyFilter EvidenceKeyFilter =>
+                new EvidenceKeyFilterWhitelist(new List<string>());
+
+            public override IList<IAspectPropertyMetaData> Properties => _properties
+                .Select(p => (IAspectPropertyMetaData)new AspectPropertyMetaData(
+                    this, p, typeof(string), "", new List<string>(), true))
+                .ToList();
+
+            public override string DataSourceTier => "test";
+
+            protected override void ManagedResourcesCleanup() { }
+            protected override void UnmanagedResourcesCleanup() { }
+
+            protected override void ProcessEngine(IFlowData data, LazyLoadedSourceData aspectData)
+            {
+                // Values are already in _lazyValues from construction;
+                // we intentionally do NOT call PopulateFrom, mirroring
+                // how on-premise engines work.
+            }
+        }
+        #endregion
 
         private SetHeadersElement _element;
         private ActivePropertySourceElement _sourceElement;
@@ -456,6 +533,58 @@ namespace FiftyOne.Pipeline.Engines.FiftyOne.Tests.FlowElements
             Assert.IsTrue(typedOutput.ResponseHeaderDictionary.ContainsKey("Accept-CH"));
             Assert.AreEqual("Sec-CH-UA", typedOutput.ResponseHeaderDictionary["Accept-CH"]);
             Assert.IsFalse(typedOutput.ResponseHeaderDictionary.ContainsKey("Critical-CH"));
+        }
+
+        /// <summary>
+        /// Verify that SetHeadersElement works with on-premise style data
+        /// where the base dictionary is NOT eagerly populated (values are
+        /// only available through the TryGetValue override).
+        /// This test would fail without the AspectDataBase.TryGet override
+        /// that routes through TryGetValue.
+        /// </summary>
+        [TestMethod]
+        [DataRow(true)]
+        [DataRow(false)]
+        public void SetHeadersElement_LazyLoadedData(bool valueIsAPV)
+        {
+            var valueStr = "Sec-CH-UA";
+            object value = valueIsAPV
+                ? new AspectPropertyValue<string>(valueStr)
+                : (object)valueStr;
+
+            var propertyValues = new Dictionary<string, object>()
+            {
+                { "SetHeaderBrowserAccept-CH", value }
+            };
+
+            var lazyElement = new LazyLoadedSourceElement(
+                _loggerFactory.CreateLogger<LazyLoadedSourceElement>(),
+                (pipeline, element) => new LazyLoadedSourceData(
+                    _loggerFactory.CreateLogger<LazyLoadedSourceData>(),
+                    pipeline,
+                    (IAspectEngine)element,
+                    propertyValues),
+                propertyValues,
+                propertyValues.Keys);
+
+            _element = new SetHeadersElementBuilder(_loggerFactory).Build();
+            _pipeline = new PipelineBuilder(_loggerFactory)
+                .AddFlowElement(lazyElement)
+                .AddFlowElement(_element)
+                .Build();
+
+            using var data = _pipeline.CreateFlowData();
+            data.Process();
+
+            var typedOutput = GetFromFlowData(data);
+            Assert.HasCount(1, typedOutput.ResponseHeaderDictionary);
+            Assert.IsTrue(typedOutput.ResponseHeaderDictionary.ContainsKey("Accept-CH"));
+            Assert.AreEqual("Sec-CH-UA", typedOutput.ResponseHeaderDictionary["Accept-CH"]);
+
+            Assert.IsEmpty(
+                _loggerFactory.Loggers.SelectMany(i => i.WarningEntries),
+                "No warnings should be logged when values are available " +
+                "through lazy loading.");
         }
 
         private SetHeadersData GetFromFlowData(IFlowData data)

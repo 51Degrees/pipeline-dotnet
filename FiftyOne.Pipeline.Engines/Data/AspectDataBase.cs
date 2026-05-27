@@ -389,6 +389,12 @@ namespace FiftyOne.Pipeline.Engines.Data
             return base.AsDictionary();
         }
 
+        /// <inheritdoc/>
+        public override bool TryGet(string key, out object value)
+        {
+            return TryGetValue(key, out value);
+        }
+
         /// <summary>
         /// Get the value associated with the specified key.
         /// Inheriting classes can override this method where they access
