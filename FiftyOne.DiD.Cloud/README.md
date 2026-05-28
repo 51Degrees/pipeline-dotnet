@@ -1,9 +1,9 @@
-# 51Degrees DiD Cloud
+# 51Degrees Did Cloud
 
-[![NuGet](https://img.shields.io/nuget/v/FiftyOne.DiD.Cloud)](https://www.nuget.org/packages/FiftyOne.DiD.Cloud)
+[![NuGet](https://img.shields.io/nuget/v/FiftyOne.Did.Cloud)](https://www.nuget.org/packages/FiftyOne.Did.Cloud)
 [![License](https://img.shields.io/badge/license-EUPL--1.2-blue)](LICENSE)
 
-Cloud aspect engine for **51Degrees Device Identification (DiD)**. Maps 51DiD data properties to and from the cloud API JSON response.
+Cloud aspect engine for **51Degrees Device Identification (Did)**. Maps 51Did data properties to and from the cloud API JSON response.
 
 ## This Package
 

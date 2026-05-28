@@ -2,16 +2,16 @@
 
   <PropertyGroup>
     <TargetFramework>netstandard2.0</TargetFramework>
-    <AssemblyName>FiftyOne.DiD.Core</AssemblyName>
+    <AssemblyName>FiftyOne.Did.Core</AssemblyName>
     <Platforms>AnyCPU</Platforms>
-    <DocumentationFile>FiftyOne.DiD.Core.xml</DocumentationFile>
+    <DocumentationFile>FiftyOne.Did.Core.xml</DocumentationFile>
     <PublishRepositoryUrl>true</PublishRepositoryUrl>
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
     
     <!-- NuGet package properties -->
-    <PackageId>FiftyOne.DiD.Core</PackageId>
-    <Title>51Degrees DiD Core - Device Identification Core Library</Title>
-    <PackageDescription>Core library for 51Degrees Device Identification (DiD). Provides foundational components and data structures for device identification within the 51Degrees Pipeline API.</PackageDescription>
+    <PackageId>FiftyOne.Did.Core</PackageId>
+    <Title>51Degrees Did Core - Device Identification Core Library</Title>
+    <PackageDescription>Core library for 51Degrees Device Identification (Did). Provides foundational components and data structures for device identification within the 51Degrees Pipeline API.</PackageDescription>
     <Authors>51Degrees Engineering</Authors>
     <PackageLicenseExpression>EUPL-1.2</PackageLicenseExpression>
     <PackageIconUrl>https://51degrees.com/portals/0/Logos/Square%20Logo.png?width=64</PackageIconUrl>
@@ -20,7 +20,7 @@
     <RepositoryUrl>https://github.com/51Degrees/pipeline-dotnet</RepositoryUrl>
     <PackageIcon>51d-logo.png</PackageIcon>
     <PackageProjectUrl>https://51degrees.com</PackageProjectUrl>
-    <Description>Core library for 51Degrees Device Identification (DiD). Provides foundational components and data structures for device identification within the 51Degrees Pipeline API.</Description>
+    <Description>Core library for 51Degrees Device Identification (Did). Provides foundational components and data structures for device identification within the 51Degrees Pipeline API.</Description>
     <RepositoryType>git</RepositoryType>
     <NeutralLanguage>en</NeutralLanguage>
     <PackageReadmeFile>README.md</PackageReadmeFile>
@@ -38,7 +38,7 @@
   </ItemGroup>
 
   <!-- Siblings in pipeline-dotnet — use ProjectReference so all of
-       FiftyOne.DiD.* builds against the locally-versioned Pipeline.* and
+       FiftyOne.Did.* builds against the locally-versioned Pipeline.* and
        ships with implicit package deps at pack time. -->
   <ItemGroup>
     <ProjectReference Include="..\FiftyOne.Pipeline.Engines\FiftyOne.Pipeline.Engines.csproj" />

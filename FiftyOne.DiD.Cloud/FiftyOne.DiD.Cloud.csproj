@@ -2,25 +2,25 @@
 
   <PropertyGroup>
     <TargetFramework>netstandard2.0</TargetFramework>
-    <AssemblyName>FiftyOne.DiD.Cloud</AssemblyName>
+    <AssemblyName>FiftyOne.Did.Cloud</AssemblyName>
     <Platforms>AnyCPU</Platforms>
-    <DocumentationFile>FiftyOne.DiD.Cloud.xml</DocumentationFile>
+    <DocumentationFile>FiftyOne.Did.Cloud.xml</DocumentationFile>
     <PublishRepositoryUrl>true</PublishRepositoryUrl>
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
     
     <!-- NuGet package properties -->
-    <PackageId>FiftyOne.DiD.Cloud</PackageId>
-    <Title>51Degrees DiD Cloud - Device Identification Engine</Title>
-    <PackageDescription>Cloud device identification engine for 51Degrees DiD. Enables local device identification processing using the 51Degrees Pipeline API with OWID client support.</PackageDescription>
+    <PackageId>FiftyOne.Did.Cloud</PackageId>
+    <Title>51Degrees Did Cloud - Device Identification Engine</Title>
+    <PackageDescription>Cloud device identification engine for 51Degrees Did. Enables local device identification processing using the 51Degrees Pipeline API with OWID client support.</PackageDescription>
     <Authors>51Degrees Engineering</Authors>
     <PackageLicenseExpression>EUPL-1.2</PackageLicenseExpression>
     <PackageIconUrl>https://51degrees.com/portals/0/Logos/Square%20Logo.png?width=64</PackageIconUrl>
     <Copyright>51Degrees Mobile Experts Limited</Copyright>
-    <PackageTags>51degrees,device-identification,did,pipeline,cloud,owid,51DiD</PackageTags>
+    <PackageTags>51degrees,device-identification,did,pipeline,cloud,owid,51Did</PackageTags>
     <RepositoryUrl>https://github.com/51Degrees/pipeline-dotnet</RepositoryUrl>
     <PackageIcon>51d-logo.png</PackageIcon>
     <PackageProjectUrl>https://51degrees.com</PackageProjectUrl>
-    <Description>Cloud device identification engine for 51Degrees DiD. Enables local device identification processing using the 51Degrees Pipeline API with OWID client support.</Description>
+    <Description>Cloud device identification engine for 51Degrees Did. Enables local device identification processing using the 51Degrees Pipeline API with OWID client support.</Description>
     <RepositoryType>git</RepositoryType>
     <NeutralLanguage>en</NeutralLanguage>
     <PackageReadmeFile>README.md</PackageReadmeFile>
@@ -38,12 +38,12 @@
   </ItemGroup>
 
   <!-- Siblings in pipeline-dotnet — use ProjectReference so all of
-       FiftyOne.DiD.* builds against the locally-versioned Pipeline.* and
+       FiftyOne.Did.* builds against the locally-versioned Pipeline.* and
        ships with implicit package deps at pack time. -->
   <ItemGroup>
     <ProjectReference Include="..\FiftyOne.Pipeline.CloudRequestEngine\FiftyOne.Pipeline.CloudRequestEngine.csproj" />
     <ProjectReference Include="..\FiftyOne.Pipeline.Engines.FiftyOne\FiftyOne.Pipeline.Engines.FiftyOne.csproj" />
-    <ProjectReference Include="..\FiftyOne.DiD.Core\FiftyOne.Did.Core.csproj" />
+    <ProjectReference Include="..\FiftyOne.Did.Core\FiftyOne.Did.Core.csproj" />
   </ItemGroup>
 
 </Project>
