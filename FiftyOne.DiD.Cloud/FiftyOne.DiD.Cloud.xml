@@ -1,0 +1,106 @@
+<?xml version="1.0"?>
+<doc>
+    <assembly>
+        <name>FiftyOne.DiD.Cloud</name>
+    </assembly>
+    <members>
+        <member name="T:FiftyOne.DiD.Cloud.Data.Cloud51DidData">
+            <summary>
+            Contains 51DiDs related to the user.
+            </summary>
+        </member>
+        <member name="M:FiftyOne.DiD.Cloud.Data.Cloud51DidData.#ctor(Microsoft.Extensions.Logging.ILogger{FiftyOne.DiD.Cloud.Data.Cloud51DidData},FiftyOne.Pipeline.Core.FlowElements.IPipeline,FiftyOne.Pipeline.Engines.FlowElements.IAspectEngine)">
+            <summary>
+                Designated constructor.
+            </summary>
+            <param name="logger">
+                Used for logging
+            </param>
+            <param name="pipeline">
+                The FiftyOne.Pipeline.Core.FlowElements.IPipeline instance
+                this element data will be associated with.
+            </param>
+            <param name="engine">
+                The FiftyOne.Pipeline.Engines.FlowElements.<see cref="T:FiftyOne.Pipeline.Engines.FlowElements.IAspectEngine"/>
+                that created this instance
+            </param>
+        </member>
+        <member name="P:FiftyOne.DiD.Cloud.Data.Cloud51DidData.IdProbGlobal">
+            <inheritdoc/>
+        </member>
+        <member name="P:FiftyOne.DiD.Cloud.Data.Cloud51DidData.IdProbLic">
+            <inheritdoc/>
+        </member>
+        <member name="T:FiftyOne.DiD.Cloud.FlowElements.DiDCloudEngine">
+            <summary>
+            On-premise engine for 51DiD
+            </summary>
+        </member>
+        <member name="P:FiftyOne.DiD.Cloud.FlowElements.DiDCloudEngine.ElementDataKey">
+            <inheritdoc/>
+        </member>
+        <member name="P:FiftyOne.DiD.Cloud.FlowElements.DiDCloudEngine.EvidenceKeyFilter">
+            <inheritdoc/>
+        </member>
+        <member name="P:FiftyOne.DiD.Cloud.FlowElements.DiDCloudEngine.Properties">
+            <inheritdoc/>
+        </member>
+        <member name="P:FiftyOne.DiD.Cloud.FlowElements.DiDCloudEngine.HasLoadedProperties">
+            <summary>
+            Indicates that properties have been loaded.
+            Always returns true since this engine uses locally defined properties
+            rather than cloud metadata.
+            </summary>
+        </member>
+        <member name="M:FiftyOne.DiD.Cloud.FlowElements.DiDCloudEngine.#ctor(Microsoft.Extensions.Logging.ILogger{FiftyOne.Pipeline.Engines.FlowElements.AspectEngineBase{FiftyOne.DiD.Core.Data.I51DidData,FiftyOne.Pipeline.Engines.Data.IAspectPropertyMetaData}},System.Func{FiftyOne.Pipeline.Core.FlowElements.IPipeline,FiftyOne.Pipeline.Core.FlowElements.FlowElementBase{FiftyOne.DiD.Core.Data.I51DidData,FiftyOne.Pipeline.Engines.Data.IAspectPropertyMetaData},FiftyOne.DiD.Core.Data.I51DidData})">
+            <summary>
+                Designated constructor.
+            </summary>
+            <param name="logger">
+                The logger to use
+            </param>
+            <param name="aspectDataFactory">
+                The factory function to use
+                when the engine creates an
+                FiftyOne.Pipeline.Engines.Data.AspectDataBase instance.
+            </param>
+        </member>
+        <member name="M:FiftyOne.DiD.Cloud.FlowElements.DiDCloudEngine.ProcessCloudEngine(FiftyOne.Pipeline.Core.Data.IFlowData,FiftyOne.DiD.Core.Data.I51DidData,System.String)">
+            <inheritdoc/>
+        </member>
+        <member name="M:FiftyOne.DiD.Cloud.FlowElements.DiDCloudEngine.GetPropertyType(FiftyOne.Pipeline.Core.Data.PropertyMetaData,System.Type)">
+            <inheritdoc/>
+        </member>
+        <member name="M:FiftyOne.DiD.Cloud.FlowElements.DiDCloudEngine.Dispose(System.Boolean)">
+            <inheritdoc/>
+        </member>
+        <member name="T:FiftyOne.DiD.Cloud.FlowElements.DiDCloudEngineBuilder">
+            <summary>
+            Builder for the <see cref="T:FiftyOne.DiD.Cloud.FlowElements.DiDCloudEngine"/> element.
+            This requires no configuration.
+            </summary>
+        </member>
+        <member name="M:FiftyOne.DiD.Cloud.FlowElements.DiDCloudEngineBuilder.#ctor(Microsoft.Extensions.Logging.ILoggerFactory)">
+            <summary>
+            Constructor.
+            </summary>
+            <param name="loggerFactory">
+            Logger factory used by the engine and any element data created.
+            </param>
+        </member>
+        <member name="M:FiftyOne.DiD.Cloud.FlowElements.DiDCloudEngineBuilder.Build">
+            <summary>
+            Build a new instance of <see cref="T:FiftyOne.DiD.Cloud.FlowElements.DiDCloudEngine"/>.
+            </summary>
+            <returns></returns>
+        </member>
+        <member name="M:FiftyOne.DiD.Cloud.FlowElements.DiDCloudEngineBuilder.CreateData(FiftyOne.Pipeline.Core.FlowElements.IPipeline,FiftyOne.Pipeline.Core.FlowElements.FlowElementBase{FiftyOne.DiD.Core.Data.I51DidData,FiftyOne.Pipeline.Engines.Data.IAspectPropertyMetaData})">
+            <summary>
+            Creates an instance of <see cref="T:FiftyOne.DiD.Cloud.Data.Cloud51DidData"/>
+            </summary>
+            <param name="pipeline"></param>
+            <param name="flowElement"></param>
+            <returns></returns>
+        </member>
+    </members>
+</doc>
