@@ -62,7 +62,7 @@ namespace FiftyOne.Pipeline.Web
         /// </param>
         internal static void ConfigureServices<TBuilder>(IServiceCollection services,
             IConfiguration configuration,
-            Func<IConfiguration, IPipelineBuilderFromConfiguration, IPipeline> pipelineFactory)
+            Func<IServiceProvider, IConfiguration, IPipelineBuilderFromConfiguration, IPipeline> pipelineFactory)
             where TBuilder : class, IPipelineBuilderFromConfiguration
         {
             services.AddLogging();
@@ -128,7 +128,7 @@ namespace FiftyOne.Pipeline.Web
                 {
                     // If a factory method was provided then use it to create
                     // the pipeline.
-                    pipeline = pipelineFactory(configuration, pipelineBuilder);
+                    pipeline = pipelineFactory(serviceProvider, configuration, pipelineBuilder);
                 }
 
                 return pipeline;

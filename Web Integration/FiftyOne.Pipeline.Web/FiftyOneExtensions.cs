@@ -74,6 +74,21 @@ public static class FiftyOneExtensions
         Func<IConfiguration, IPipelineBuilderFromConfiguration, IPipeline> pipelineFactory = null)
         where TBuilder : class, IPipelineBuilderFromConfiguration
     {
+        AddFiftyOne<TBuilder>(
+            services,
+            configuration,
+            pipelineFactory is null
+            ? null
+            : (Func<IServiceProvider, IConfiguration, IPipelineBuilderFromConfiguration, IPipeline>)
+            ((_, config, builder) => pipelineFactory(config, builder)));
+    }
+
+    /// <inheritdoc cref="AddFiftyOne{TBuilder}(IServiceCollection, IConfiguration, Func{IConfiguration, IPipelineBuilderFromConfiguration, IPipeline})"/>
+    public static void AddFiftyOne<TBuilder>(this IServiceCollection services,
+        IConfiguration configuration,
+        Func<IServiceProvider, IConfiguration, IPipelineBuilderFromConfiguration, IPipeline> pipelineFactory)
+        where TBuilder : class, IPipelineBuilderFromConfiguration
+    {
         FiftyOneStartup.ConfigureServices<TBuilder>(services, configuration, pipelineFactory);
     }
 
@@ -97,6 +112,20 @@ public static class FiftyOneExtensions
     public static void AddFiftyOne(this IServiceCollection services,
         IConfiguration configuration,
         Func<IConfiguration, IPipelineBuilderFromConfiguration, IPipeline> pipelineFactory = null)
+    {
+        AddFiftyOne<FiftyOnePipelineBuilder>(
+            services,
+            configuration,
+            pipelineFactory is null
+            ? null
+            : (Func<IServiceProvider, IConfiguration, IPipelineBuilderFromConfiguration, IPipeline>)
+            ((_, config, builder) => pipelineFactory(config, builder)));
+    }
+
+    /// <inheritdoc cref="AddFiftyOne(IServiceCollection, IConfiguration, Func{IConfiguration, IPipelineBuilderFromConfiguration, IPipeline})"/>
+    public static void AddFiftyOne(this IServiceCollection services,
+        IConfiguration configuration,
+        Func<IServiceProvider, IConfiguration, IPipelineBuilderFromConfiguration, IPipeline> pipelineFactory)
     {
         AddFiftyOne<FiftyOnePipelineBuilder>(services, configuration, pipelineFactory);
     }
