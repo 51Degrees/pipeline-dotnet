@@ -22,7 +22,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\FiftyOne.DiD.Cloud\FiftyOne.DiD.Cloud.csproj" />
+    <ProjectReference Include="..\..\FiftyOne.Did.Cloud\FiftyOne.Did.Cloud.csproj" />
   </ItemGroup>
 
 </Project>

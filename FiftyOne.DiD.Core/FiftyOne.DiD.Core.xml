@@ -1,7 +1,7 @@
 <?xml version="1.0"?>
 <doc>
     <assembly>
-        <name>FiftyOne.DiD.Core</name>
+        <name>FiftyOne.Did.Core</name>
     </assembly>
     <members>
         <member name="T:FiftyOne.Did.OnPremise.Data.ComponentMetaDataDefault">

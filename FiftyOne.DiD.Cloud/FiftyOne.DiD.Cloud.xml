@@ -1,7 +1,7 @@
 <?xml version="1.0"?>
 <doc>
     <assembly>
-        <name>FiftyOne.DiD.Cloud</name>
+        <name>FiftyOne.Did.Cloud</name>
     </assembly>
     <members>
         <member name="T:FiftyOne.Did.Cloud.Data.Cloud51DidData">
