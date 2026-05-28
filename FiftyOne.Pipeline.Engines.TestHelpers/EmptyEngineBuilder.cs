@@ -55,9 +55,7 @@ namespace FiftyOne.Pipeline.Engines.TestHelpers
                 _dataLogger,
                 pipeline,
                 engine as IAspectEngine,
-#pragma warning disable CS0618 // on-premise test helper uses the on-prem singleton
-                MissingPropertyService.Instance);
-#pragma warning restore CS0618
+                MissingPropertyServiceOnPremise.Instance);
         }
 
         public EmptyEngineBuilder SetProcessCost(long ticks)

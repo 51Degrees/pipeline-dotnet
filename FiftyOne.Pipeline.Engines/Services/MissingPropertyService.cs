@@ -59,11 +59,11 @@ namespace FiftyOne.Pipeline.Engines.Services
         /// <summary>
         /// Get the singleton instance of this service.
         /// </summary>
-        [Obsolete("For cloud engines use MissingPropertyServiceCloud.Instance — " +
-            "this singleton returns generic reasons that mis-report missing " +
-            "properties when a cloud request has failed. On-premise engines " +
-            "may continue to use this singleton; suppress this warning at the " +
-            "call site to acknowledge the choice.")]
+        [Obsolete("MissingPropertyService.Instance is ambiguous about deployment " +
+            "type. For cloud engines use MissingPropertyServiceCloud.Instance; for " +
+            "on-premise engines use MissingPropertyServiceOnPremise.Instance. This " +
+            "singleton is deprecated only to force that conscious choice — " +
+            "MissingPropertyServiceOnPremise inherits this exact behaviour.")]
         public static IMissingPropertyService Instance
         {
             get
