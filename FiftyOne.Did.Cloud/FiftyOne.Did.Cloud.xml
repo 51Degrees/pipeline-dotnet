@@ -77,7 +77,9 @@
         <member name="T:FiftyOne.Did.Cloud.FlowElements.DidCloudEngineBuilder">
             <summary>
             Builder for the <see cref="T:FiftyOne.Did.Cloud.FlowElements.DidCloudEngine"/> element.
-            This requires no configuration.
+            Extends the standard cloud engine builder base so the engine can be
+            added through the fluent and JSON-configured pipeline builders, in
+            common with every other 51Degrees cloud engine.
             </summary>
         </member>
         <member name="M:FiftyOne.Did.Cloud.FlowElements.DidCloudEngineBuilder.#ctor(Microsoft.Extensions.Logging.ILoggerFactory)">
@@ -93,6 +95,18 @@
             Build a new instance of <see cref="T:FiftyOne.Did.Cloud.FlowElements.DidCloudEngine"/>.
             </summary>
             <returns></returns>
+        </member>
+        <member name="M:FiftyOne.Did.Cloud.FlowElements.DidCloudEngineBuilder.NewEngine(System.Collections.Generic.List{System.String})">
+            <summary>
+            Create a new <see cref="T:FiftyOne.Did.Cloud.FlowElements.DidCloudEngine"/> instance. Called by
+            <see cref="M:FiftyOne.Pipeline.Engines.FlowElements.AspectEngineBuilderBase`2.BuildEngine"/>.
+            The requested properties are ignored as this engine exposes a
+            fixed, locally-defined set of properties.
+            </summary>
+            <param name="properties">
+            The set of properties that the engine should populate. Unused.
+            </param>
+            <returns>A new <see cref="T:FiftyOne.Did.Cloud.FlowElements.DidCloudEngine"/> instance.</returns>
         </member>
         <member name="M:FiftyOne.Did.Cloud.FlowElements.DidCloudEngineBuilder.CreateData(FiftyOne.Pipeline.Core.FlowElements.IPipeline,FiftyOne.Pipeline.Core.FlowElements.FlowElementBase{FiftyOne.Did.Core.Data.I51DidData,FiftyOne.Pipeline.Engines.Data.IAspectPropertyMetaData})">
             <summary>

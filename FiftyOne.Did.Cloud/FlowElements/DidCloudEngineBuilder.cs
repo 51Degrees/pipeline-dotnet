@@ -22,18 +22,23 @@
 
 using FiftyOne.Did.Cloud.Data;
 using FiftyOne.Did.Core.Data;
+using FiftyOne.Pipeline.CloudRequestEngine.FlowElements;
 using FiftyOne.Pipeline.Core.FlowElements;
 using FiftyOne.Pipeline.Engines.Data;
 using FiftyOne.Pipeline.Engines.FlowElements;
 using Microsoft.Extensions.Logging;
+using System.Collections.Generic;
 
 namespace FiftyOne.Did.Cloud.FlowElements
 {
     /// <summary>
     /// Builder for the <see cref="DidCloudEngine"/> element.
-    /// This requires no configuration.
+    /// Extends the standard cloud engine builder base so the engine can be
+    /// added through the fluent and JSON-configured pipeline builders, in
+    /// common with every other 51Degrees cloud engine.
     /// </summary>
     public class DidCloudEngineBuilder
+        : CloudAspectEngineBuilderBase<DidCloudEngineBuilder, DidCloudEngine>
     {
         private readonly ILoggerFactory _loggerFactory;
 
@@ -53,6 +58,21 @@ namespace FiftyOne.Did.Cloud.FlowElements
         /// </summary>
         /// <returns></returns>
         public DidCloudEngine Build()
+        {
+            return BuildEngine();
+        }
+
+        /// <summary>
+        /// Create a new <see cref="DidCloudEngine"/> instance. Called by
+        /// <see cref="AspectEngineBuilderBase{TBuilder, TEngine}.BuildEngine"/>.
+        /// The requested properties are ignored as this engine exposes a
+        /// fixed, locally-defined set of properties.
+        /// </summary>
+        /// <param name="properties">
+        /// The set of properties that the engine should populate. Unused.
+        /// </param>
+        /// <returns>A new <see cref="DidCloudEngine"/> instance.</returns>
+        protected override DidCloudEngine NewEngine(List<string> properties)
         {
             return new DidCloudEngine(
                 _loggerFactory.CreateLogger<DidCloudEngine>(),
