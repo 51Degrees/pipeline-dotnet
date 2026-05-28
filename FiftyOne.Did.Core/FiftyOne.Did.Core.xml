@@ -49,11 +49,6 @@
             </param>
             <returns>Component MetaData with properties populated.</returns>
         </member>
-        <member name="F:FiftyOne.Did.Core.FlowElements.DidBaseEnginePropertiesBuilder.AllProperties">
-            <summary>
-            All properties that can be taken from <see cref="T:FiftyOne.Did.Core.Data.I51DidData"/>.
-            </summary>
-        </member>
         <member name="T:FiftyOne.Did.Core.FlowElements.IDidEngine">
             <summary>
             General interface for 51Did engines.

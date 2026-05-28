@@ -24,7 +24,6 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using FiftyOne.Did.Core.Data;
-using FiftyOne.Did.OnPremise.Data;
 using FiftyOne.Pipeline.Engines.Data;
 using FiftyOne.Pipeline.Engines.FiftyOne.Data;
 using FiftyOne.Pipeline.Engines.FlowElements;
@@ -79,14 +78,6 @@ namespace FiftyOne.Did.Core.FlowElements
                     "Probabilistic 51Did, unique only across the caller’s license key."
                 },
             };
-        
-        /// <summary>
-        /// All properties that can be taken from <see cref="I51DidData"/>.
-        /// </summary>
-        public static readonly IReadOnlyList<string> AllProperties =
-            IdProperties.Keys
-                .Select(x => $"{ComponentName}.{x}".ToLowerInvariant())
-                .ToList();
 
         private static IEnumerable<IFiftyOneAspectPropertyMetaData> BuildProperties(
             IAspectEngine engine,
