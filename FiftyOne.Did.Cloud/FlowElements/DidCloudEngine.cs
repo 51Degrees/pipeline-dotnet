@@ -27,6 +27,7 @@ using FiftyOne.Pipeline.CloudRequestEngine.FlowElements;
 using FiftyOne.Pipeline.Core.Data;
 using FiftyOne.Pipeline.Core.FlowElements;
 using FiftyOne.Pipeline.Engines.Data;
+using FiftyOne.Pipeline.Engines.FiftyOne.Data;
 using FiftyOne.Pipeline.Engines.FlowElements;
 using Microsoft.Extensions.Logging;
 using Newtonsoft.Json;
@@ -37,7 +38,7 @@ using System.Linq;
 namespace FiftyOne.Did.Cloud.FlowElements
 {
     /// <summary>
-    /// On-premise engine for 51Did
+    /// Cloud engine for 51Did
     /// </summary>
     public class DidCloudEngine : CloudAspectEngineBase<I51DidData>, IDidEngine
     {

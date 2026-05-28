@@ -33,7 +33,7 @@
         </member>
         <member name="T:FiftyOne.Did.Cloud.FlowElements.DidCloudEngine">
             <summary>
-            On-premise engine for 51Did
+            Cloud engine for 51Did
             </summary>
         </member>
         <member name="P:FiftyOne.Did.Cloud.FlowElements.DidCloudEngine.ElementDataKey">
