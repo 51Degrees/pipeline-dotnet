@@ -20,6 +20,7 @@
  * such notice(s) shall fulfill the requirements of that article.
  * ********************************************************************* */
 
+using FiftyOne.Pipeline.Core.Configuration;
 using FiftyOne.Pipeline.Core.FlowElements;
 using FiftyOne.Pipeline.Engines.FiftyOne.FlowElements;
 using FiftyOne.Pipeline.Engines.TestHelpers;
@@ -30,8 +31,10 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
+using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Reflection;
 
 namespace FiftyOne.Pipeline.Web.Tests
 {
@@ -39,17 +42,42 @@ namespace FiftyOne.Pipeline.Web.Tests
     public class ExtensionTests
     {
         /// <summary>
-        /// Verify that the 'AddFiftyOne' extension method is adding the expected elements
+        /// Generates test cases for all AddFiftyOne overloads combined with configuration variants.
+        /// </summary>
+        public static IEnumerable<object[]> AddFiftyOneTestCases =>
+            from overload in new (string Name, bool UsesDefaultBuilder, Action<IServiceCollection, IConfiguration> Add)[]
+            {
+                ("Default", true, (s, c) => s.AddFiftyOne(c)),
+                ("WithFactory", false, (s, c) => s.AddFiftyOne(c, (config, builder) => 
+                    builder.BuildFromConfiguration(config.GetSection("PipelineOptions").Get<PipelineOptions>()))),
+                ("WithServiceProviderFactory", false, (s, c) => s.AddFiftyOne(c, (sp, config, builder) => 
+                {
+                    Assert.IsNotNull(sp, "IServiceProvider should be passed to factory");
+                    return builder.BuildFromConfiguration(config.GetSection("PipelineOptions").Get<PipelineOptions>());
+                }))
+            }
+            from shareUsage in new[] { true, false }
+            from clientSide in new[] { true, false }
+            select new object[] { overload.Name, overload.UsesDefaultBuilder, shareUsage, clientSide, overload.Add };
+
+        /// <summary>
+        /// Generates descriptive test display names.
+        /// </summary>
+        public static string GetTestDisplayName(MethodInfo _, object[] data) =>
+            $"TestAddFiftyOne ({data[0]}, ShareUsage={data[2]}, ClientSide={data[3]})";
+
+        /// <summary>
+        /// Verify that the 'AddFiftyOne' extension method overloads are adding the expected elements
         /// to the pipeline.
         /// </summary>
-        /// <param name="shareUsageEnabled"></param>
-        /// <param name="clientSideEvidenceEnabled"></param>
-        [DataTestMethod]
-        [DataRow(true, true)]
-        [DataRow(false, true)]
-        [DataRow(true, false)]
-        [DataRow(false, false)]
-        public void TestAddFiftyOne(bool shareUsageEnabled, bool clientSideEvidenceEnabled)
+        [TestMethod]
+        [DynamicData(nameof(AddFiftyOneTestCases), DynamicDataDisplayName = nameof(GetTestDisplayName))]
+        public void TestAddFiftyOne(
+            string overloadName,
+            bool usesDefaultBuilder,
+            bool shareUsageEnabled,
+            bool clientSideEvidenceEnabled,
+            Action<IServiceCollection, IConfiguration> addFiftyOne)
         {
             // Create configuration overrides.
             var testConfig = new Dictionary<string, string>();
@@ -77,23 +105,32 @@ namespace FiftyOne.Pipeline.Web.Tests
             var services = new ServiceCollection();
             services.AddLogging(b => b.AddConsole().SetMinimumLevel(LogLevel.Debug));
             services.AddSingleton<EmptyEngineBuilder>();
-            services.AddFiftyOne(host.Services.GetRequiredService<IConfiguration>());
+            
+            var configuration = host.Services.GetRequiredService<IConfiguration>();
+            addFiftyOne(services, configuration);
 
             var provider = services.BuildServiceProvider();
             // Get the pipeline that's been created.
             var pipeline = provider.GetRequiredService<IPipeline>();
 
             // Verify that the expected elements are present in the pipeline.
+            // ShareUsage and SequenceElement are added by the builder based on config.
             Assert.AreEqual(shareUsageEnabled, pipeline.FlowElements
                 .Any(e => e.ElementDataKey == ShareUsageBase.DEFAULT_ELEMENT_DATA_KEY));
             Assert.IsTrue(pipeline.FlowElements
                 .Any(e => e.ElementDataKey == SequenceElement.DEFAULT_ELEMENT_DATA_KEY));
-            Assert.AreEqual(clientSideEvidenceEnabled, pipeline.FlowElements
-                .Any(e => e.ElementDataKey == JavaScriptBuilderElement.DEFAULT_ELEMENT_DATA_KEY));
-            Assert.AreEqual(clientSideEvidenceEnabled, pipeline.FlowElements
-                .Any(e => e.ElementDataKey == JsonBuilderElement.DEFAULT_ELEMENT_DATA_KEY));
-            Assert.IsTrue(pipeline.FlowElements
-                .Any(e => e.ElementDataKey == SetHeadersElement.DEFAULT_ELEMENT_DATA_KEY));
+            
+            // JavaScriptBuilder, JsonBuilder, and SetHeaders are only added by the default
+            // FiftyOnePipelineBuilder, not when using a custom factory.
+            if (usesDefaultBuilder)
+            {
+                Assert.AreEqual(clientSideEvidenceEnabled, pipeline.FlowElements
+                    .Any(e => e.ElementDataKey == JavaScriptBuilderElement.DEFAULT_ELEMENT_DATA_KEY));
+                Assert.AreEqual(clientSideEvidenceEnabled, pipeline.FlowElements
+                    .Any(e => e.ElementDataKey == JsonBuilderElement.DEFAULT_ELEMENT_DATA_KEY));
+                Assert.IsTrue(pipeline.FlowElements
+                    .Any(e => e.ElementDataKey == SetHeadersElement.DEFAULT_ELEMENT_DATA_KEY));
+            }
         }
     }
 }
