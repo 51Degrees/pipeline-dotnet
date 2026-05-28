@@ -9,13 +9,11 @@ Core library for **51Degrees Device Identification (Did)**, providing foundation
 
 This is a shared dependency library. Most consumers should reference one of the engine packages instead:
 
-| Package | Use case |
-|---------|----------|
-| [FiftyOne.Did.Cloud](https://www.nuget.org/packages/FiftyOne.Did.Cloud) | Device identification via the 51Degrees Cloud service |
+| Package                                                                         | Use case                                               |
+|---------------------------------------------------------------------------------|--------------------------------------------------------|
+| [FiftyOne.Did.Cloud](https://www.nuget.org/packages/FiftyOne.Did.Cloud)         | Device identification via the 51Degrees Cloud service  |
 | [FiftyOne.Did.OnPremise](https://www.nuget.org/packages/FiftyOne.Did.OnPremise) | On-premise device identification with local data files |
 
 ## Links
 
-- [51Degrees Website](https://51degrees.com)
 - [Documentation](https://51degrees.com/documentation)
-- [Source Repository](https://github.com/51Degrees/cloud)

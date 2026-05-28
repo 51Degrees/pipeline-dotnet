@@ -37,9 +37,6 @@
     </None>
   </ItemGroup>
 
-  <!-- Siblings in pipeline-dotnet — use ProjectReference so all of
-       FiftyOne.Did.* builds against the locally-versioned Pipeline.* and
-       ships with implicit package deps at pack time. -->
   <ItemGroup>
     <ProjectReference Include="..\FiftyOne.Pipeline.CloudRequestEngine\FiftyOne.Pipeline.CloudRequestEngine.csproj" />
     <ProjectReference Include="..\FiftyOne.Pipeline.Engines.FiftyOne\FiftyOne.Pipeline.Engines.FiftyOne.csproj" />

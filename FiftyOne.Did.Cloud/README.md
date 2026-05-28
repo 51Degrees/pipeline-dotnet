@@ -13,6 +13,4 @@ Requires a valid 51Degrees resource key for cloud API access.
 
 ## Links
 
-- [51Degrees Website](https://51degrees.com)
 - [Documentation](https://51degrees.com/documentation)
-- [Source Repository](https://github.com/51Degrees/cloud)

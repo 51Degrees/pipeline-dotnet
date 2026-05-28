@@ -20,12 +20,11 @@
  * such notice(s) shall fulfill the requirements of that article.
  * ********************************************************************* */
 
-using FiftyOne.Pipeline.Engines.FiftyOne.Data;
 using System;
 using System.Collections.Generic;
 using System.Linq;
 
-namespace FiftyOne.Did.OnPremise.Data
+namespace FiftyOne.Pipeline.Engines.FiftyOne.Data
 {
     /// <summary>
     /// Data class that contains meta-data relating to a specific 
