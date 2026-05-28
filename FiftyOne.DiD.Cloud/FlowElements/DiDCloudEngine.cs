@@ -1,5 +1,5 @@
-﻿using FiftyOne.DiD.Core.Data;
-using FiftyOne.DiD.Core.FlowElements;
+﻿using FiftyOne.Did.Core.Data;
+using FiftyOne.Did.Core.FlowElements;
 using FiftyOne.Pipeline.CloudRequestEngine.Data;
 using FiftyOne.Pipeline.CloudRequestEngine.FlowElements;
 using FiftyOne.Pipeline.Core.Data;
@@ -11,21 +11,21 @@ using Newtonsoft.Json;
 using System;
 using System.Collections.Generic;
 using System.Linq;
-// ComponentMetaDataDefault lives in the FiftyOne.DiD.Core project but
-// (inconsistently) under the FiftyOne.DiD.OnPremise.Data namespace —
-// no dependency on a DiD.OnPremise project, just the namespace.
-using FiftyOne.DiD.OnPremise.Data;
+// ComponentMetaDataDefault lives in the FiftyOne.Did.Core project but
+// (inconsistently) under the FiftyOne.Did.OnPremise.Data namespace —
+// no dependency on a Did.OnPremise project, just the namespace.
+using FiftyOne.Did.OnPremise.Data;
 
-namespace FiftyOne.DiD.Cloud.FlowElements
+namespace FiftyOne.Did.Cloud.FlowElements
 {
     /// <summary>
-    /// On-premise engine for 51DiD
+    /// On-premise engine for 51Did
     /// </summary>
-    public class DiDCloudEngine : CloudAspectEngineBase<I51DidData>, IDiDEngine
+    public class DidCloudEngine : CloudAspectEngineBase<I51DidData>, IDidEngine
     {
         /// <inheritdoc/>
         public override string ElementDataKey
-            => DiDBaseEnginePropertiesBuilder.ComponentName;
+            => DidBaseEnginePropertiesBuilder.ComponentName;
     
         /// <inheritdoc/>
         public override IEvidenceKeyFilter EvidenceKeyFilter { get; } =
@@ -59,7 +59,7 @@ namespace FiftyOne.DiD.Cloud.FlowElements
         ///     when the engine creates an
         ///     FiftyOne.Pipeline.Engines.Data.AspectDataBase instance.
         /// </param>
-        public DiDCloudEngine(
+        public DidCloudEngine(
             ILogger<AspectEngineBase<I51DidData, IAspectPropertyMetaData>> logger,
             Func<
                 IPipeline,
@@ -67,7 +67,7 @@ namespace FiftyOne.DiD.Cloud.FlowElements
                 I51DidData> aspectDataFactory)
             : base(logger, aspectDataFactory)
         {
-            _componentMetaData = DiDBaseEnginePropertiesBuilder
+            _componentMetaData = DidBaseEnginePropertiesBuilder
                 .BuildComponentMetaData(this, withAspectValueTypes: true);
             _properties = _componentMetaData.GetProperties()
                 .Cast<IAspectPropertyMetaData>()

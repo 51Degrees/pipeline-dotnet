@@ -23,7 +23,7 @@
 using FiftyOne.Pipeline.Engines.FiftyOne.Data;
 using System;
 
-namespace FiftyOne.DiD.OnPremise.Data
+namespace FiftyOne.Did.OnPremise.Data
 {
     /// <summary>
     /// Data class that contains meta-data relating to a specific 

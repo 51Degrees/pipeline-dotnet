@@ -1,13 +1,13 @@
-﻿using FiftyOne.DiD.Core.Data;
+﻿using FiftyOne.Did.Core.Data;
 using FiftyOne.Pipeline.Core.FlowElements;
 using FiftyOne.Pipeline.Engines.Data;
 using FiftyOne.Pipeline.Engines.FlowElements;
 using Microsoft.Extensions.Logging;
 
-namespace FiftyOne.DiD.Cloud.Data
+namespace FiftyOne.Did.Cloud.Data
 {
     /// <summary>
-    /// Contains 51DiDs related to the user.
+    /// Contains 51Dids related to the user.
     /// </summary>
     public class Cloud51DidData : AspectDataBase, I51DidData
     {

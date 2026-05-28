@@ -20,20 +20,20 @@
  * such notice(s) shall fulfill the requirements of that article.
  * ********************************************************************* */
 
-using FiftyOne.DiD.Cloud.Data;
-using FiftyOne.DiD.Core.Data;
+using FiftyOne.Did.Cloud.Data;
+using FiftyOne.Did.Core.Data;
 using FiftyOne.Pipeline.Core.FlowElements;
 using FiftyOne.Pipeline.Engines.Data;
 using FiftyOne.Pipeline.Engines.FlowElements;
 using Microsoft.Extensions.Logging;
 
-namespace FiftyOne.DiD.Cloud.FlowElements
+namespace FiftyOne.Did.Cloud.FlowElements
 {
     /// <summary>
-    /// Builder for the <see cref="DiDCloudEngine"/> element.
+    /// Builder for the <see cref="DidCloudEngine"/> element.
     /// This requires no configuration.
     /// </summary>
-    public class DiDCloudEngineBuilder
+    public class DidCloudEngineBuilder
     {
         private readonly ILoggerFactory _loggerFactory;
 
@@ -43,19 +43,19 @@ namespace FiftyOne.DiD.Cloud.FlowElements
         /// <param name="loggerFactory">
         /// Logger factory used by the engine and any element data created.
         /// </param>
-        public DiDCloudEngineBuilder(ILoggerFactory loggerFactory)
+        public DidCloudEngineBuilder(ILoggerFactory loggerFactory)
         {
             _loggerFactory = loggerFactory;
         }
 
         /// <summary>
-        /// Build a new instance of <see cref="DiDCloudEngine"/>.
+        /// Build a new instance of <see cref="DidCloudEngine"/>.
         /// </summary>
         /// <returns></returns>
-        public DiDCloudEngine Build()
+        public DidCloudEngine Build()
         {
-            return new DiDCloudEngine(
-                _loggerFactory.CreateLogger<DiDCloudEngine>(),
+            return new DidCloudEngine(
+                _loggerFactory.CreateLogger<DidCloudEngine>(),
                 CreateData);
         }
 

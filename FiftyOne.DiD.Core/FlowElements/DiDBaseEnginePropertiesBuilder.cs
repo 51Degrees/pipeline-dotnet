@@ -1,34 +1,34 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
-using FiftyOne.DiD.Core.Data;
-using FiftyOne.DiD.OnPremise.Data;
+using FiftyOne.Did.Core.Data;
+using FiftyOne.Did.OnPremise.Data;
 using FiftyOne.Pipeline.Engines.Data;
 using FiftyOne.Pipeline.Engines.FiftyOne.Data;
 using FiftyOne.Pipeline.Engines.FlowElements;
 
-namespace FiftyOne.DiD.Core.FlowElements
+namespace FiftyOne.Did.Core.FlowElements
 {
     /// <summary>
     /// Helper class that builds metadata
-    /// for both OnPremise and Cloud versions of 51DiD engine.
+    /// for both OnPremise and Cloud versions of 51Did engine.
     /// </summary>
-    public static class DiDBaseEnginePropertiesBuilder
+    public static class DidBaseEnginePropertiesBuilder
     {
         /// <summary>
         /// Category name for the data.
         /// </summary>
-        public const string CategoryName = "FODiD";
+        public const string CategoryName = "FODid";
         /// <summary>
         /// Component name for the data.
         /// </summary>
-        public const string ComponentName = "FODiD";
+        public const string ComponentName = "FODid";
         private const string DefaultValue = "N/A";
 
         /// <summary>
-        /// Build metadata for 51DiD aspect engine.
+        /// Build metadata for 51Did aspect engine.
         /// </summary>
-        /// <param name="engine">51DiD aspect engine.</param>
+        /// <param name="engine">51Did aspect engine.</param>
         /// <param name="withAspectValueTypes">
         /// If <c>true</c>, will wrap the type of properties
         /// into <see cref="IAspectPropertyValue"/>. 
@@ -50,11 +50,11 @@ namespace FiftyOne.DiD.Core.FlowElements
             = new Dictionary<string, string> {
                 {
                     nameof(I51DidData.IdProbGlobal),
-                    "Probabilistic 51DiD, unique across all callers from the same device and network."
+                    "Probabilistic 51Did, unique across all callers from the same device and network."
                 },
                 {
                     nameof(I51DidData.IdProbLic),
-                    "Probabilistic 51DiD, unique only across the caller’s license key."
+                    "Probabilistic 51Did, unique only across the caller’s license key."
                 },
             };
         
