@@ -17,3 +17,4 @@ jobs:
       dryrun: ${{ inputs.dryrun || false }}
     secrets:
       token: ${{ secrets.ACCESS_TOKEN }}
+      StrongNameKeyBase64: ${{ secrets.STRONG_NAME_KEY_BASE64 }}
