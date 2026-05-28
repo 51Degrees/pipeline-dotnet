@@ -56,9 +56,9 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "FiftyOne.Did", "FiftyOne.Di
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "FiftyOne.Did.Tests", "Tests\FiftyOne.Did.Tests\FiftyOne.Did.Tests.csproj", "{BD49B7A4-DCFD-4897-AE77-4BFA24CD5E40}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "FiftyOne.Did.Core", "FiftyOne.DiD.Core\FiftyOne.Did.Core.csproj", "{13432A61-8807-435D-B8C0-664773D1CE70}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "FiftyOne.Did.Core", "FiftyOne.Did.Core\FiftyOne.Did.Core.csproj", "{13432A61-8807-435D-B8C0-664773D1CE70}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "FiftyOne.Did.Cloud", "FiftyOne.DiD.Cloud\FiftyOne.Did.Cloud.csproj", "{F9FDB936-8339-4EDC-B185-6474499C7BBB}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "FiftyOne.Did.Cloud", "FiftyOne.Did.Cloud\FiftyOne.Did.Cloud.csproj", "{F9FDB936-8339-4EDC-B185-6474499C7BBB}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "FiftyOne.Did.Cloud.Tests", "Tests\FiftyOne.Did.Cloud.Tests\FiftyOne.Did.Cloud.Tests.csproj", "{F261E12B-68F4-4451-8AAA-804160DEF6A7}"
 EndProject
