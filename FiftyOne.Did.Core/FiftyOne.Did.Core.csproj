@@ -1,0 +1,45 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>netstandard2.0</TargetFramework>
+    <AssemblyName>FiftyOne.Did.Core</AssemblyName>
+    <Platforms>AnyCPU</Platforms>
+    <DocumentationFile>FiftyOne.Did.Core.xml</DocumentationFile>
+    <PublishRepositoryUrl>true</PublishRepositoryUrl>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    
+    <!-- NuGet package properties -->
+    <PackageId>FiftyOne.Did.Core</PackageId>
+    <Title>51Degrees Did Core - Device Identification Core Library</Title>
+    <PackageDescription>Core library for 51Degrees Device Identification (Did). Provides foundational components and data structures for device identification within the 51Degrees Pipeline API.</PackageDescription>
+    <Authors>51Degrees Engineering</Authors>
+    <PackageLicenseExpression>EUPL-1.2</PackageLicenseExpression>
+    <PackageIconUrl>https://51degrees.com/portals/0/Logos/Square%20Logo.png?width=64</PackageIconUrl>
+    <Copyright>51Degrees Mobile Experts Limited</Copyright>
+    <PackageTags>51degrees,device-identification,did,pipeline,core</PackageTags>
+    <RepositoryUrl>https://github.com/51Degrees/pipeline-dotnet</RepositoryUrl>
+    <PackageIcon>51d-logo.png</PackageIcon>
+    <PackageProjectUrl>https://51degrees.com</PackageProjectUrl>
+    <Description>Core library for 51Degrees Device Identification (Did). Provides foundational components and data structures for device identification within the 51Degrees Pipeline API.</Description>
+    <RepositoryType>git</RepositoryType>
+    <NeutralLanguage>en</NeutralLanguage>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <None Include="README.md">
+      <Pack>True</Pack>
+      <PackagePath>\</PackagePath>
+    </None>
+    <None Include="..\Images\51d-logo.png">
+      <Pack>True</Pack>
+      <PackagePath></PackagePath>
+    </None>
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\FiftyOne.Pipeline.Engines\FiftyOne.Pipeline.Engines.csproj" />
+    <ProjectReference Include="..\FiftyOne.Pipeline.Engines.FiftyOne\FiftyOne.Pipeline.Engines.FiftyOne.csproj" />
+  </ItemGroup>
+
+</Project>

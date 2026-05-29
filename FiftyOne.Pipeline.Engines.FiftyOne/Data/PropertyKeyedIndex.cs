@@ -21,12 +21,12 @@
  * ********************************************************************* */
 
 using FiftyOne.Pipeline.Core.Data;
-using FiftyOne.Pipeline.Engines.FiftyOne.Data;
+using FiftyOne.Pipeline.Engines.FiftyOne.FlowElements;
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 
-namespace FiftyOne.Pipeline.Engines.FiftyOne.FlowElements
+namespace FiftyOne.Pipeline.Engines.FiftyOne.Data
 {
     /// <summary>
     /// Index of values and profile ids for a single property. Used by 

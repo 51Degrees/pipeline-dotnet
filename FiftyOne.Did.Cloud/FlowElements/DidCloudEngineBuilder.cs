@@ -1,0 +1,100 @@
+﻿/* *********************************************************************
+ * This Original Work is copyright of 51 Degrees Mobile Experts Limited.
+ * Copyright 2026 51 Degrees Mobile Experts Limited, Davidson House,
+ * Forbury Square, Reading, Berkshire, United Kingdom RG1 3EU.
+ *
+ * This Original Work is licensed under the European Union Public Licence
+ * (EUPL) v.1.2 and is subject to its terms as set out below.
+ *
+ * If a copy of the EUPL was not distributed with this file, You can obtain
+ * one at https://opensource.org/licenses/EUPL-1.2.
+ *
+ * The 'Compatible Licences' set out in the Appendix to the EUPL (as may be
+ * amended by the European Commission) shall be deemed incompatible for
+ * the purposes of the Work and the provisions of the compatibility
+ * clause in Article 5 of the EUPL shall not apply.
+ *
+ * If using the Work as, or as part of, a network application, by
+ * including the attribution notice(s) required under Article 5 of the EUPL
+ * in the end user terms of the application under an appropriate heading,
+ * such notice(s) shall fulfill the requirements of that article.
+ * ********************************************************************* */
+
+using FiftyOne.Did.Cloud.Data;
+using FiftyOne.Did.Core.Data;
+using FiftyOne.Pipeline.CloudRequestEngine.FlowElements;
+using FiftyOne.Pipeline.Core.FlowElements;
+using FiftyOne.Pipeline.Engines.Data;
+using FiftyOne.Pipeline.Engines.FlowElements;
+using Microsoft.Extensions.Logging;
+using System.Collections.Generic;
+
+namespace FiftyOne.Did.Cloud.FlowElements
+{
+    /// <summary>
+    /// Builder for the <see cref="DidCloudEngine"/> element.
+    /// Extends the standard cloud engine builder base so the engine can be
+    /// added through the fluent and JSON-configured pipeline builders, in
+    /// common with every other 51Degrees cloud engine.
+    /// </summary>
+    public class DidCloudEngineBuilder
+        : CloudAspectEngineBuilderBase<DidCloudEngineBuilder, DidCloudEngine>
+    {
+        private readonly ILoggerFactory _loggerFactory;
+
+        /// <summary>
+        /// Constructor.
+        /// </summary>
+        /// <param name="loggerFactory">
+        /// Logger factory used by the engine and any element data created.
+        /// </param>
+        public DidCloudEngineBuilder(ILoggerFactory loggerFactory)
+        {
+            _loggerFactory = loggerFactory;
+        }
+
+        /// <summary>
+        /// Build a new instance of <see cref="DidCloudEngine"/>.
+        /// </summary>
+        /// <returns></returns>
+        public DidCloudEngine Build()
+        {
+            return BuildEngine();
+        }
+
+        /// <summary>
+        /// Create a new <see cref="DidCloudEngine"/> instance. Called by
+        /// <see cref="AspectEngineBuilderBase{TBuilder, TEngine}.BuildEngine"/>.
+        /// The requested properties are ignored as this engine exposes a
+        /// fixed, locally-defined set of properties.
+        /// </summary>
+        /// <param name="properties">
+        /// The set of properties that the engine should populate. Unused.
+        /// </param>
+        /// <returns>A new <see cref="DidCloudEngine"/> instance.</returns>
+        protected override DidCloudEngine NewEngine(List<string> properties)
+        {
+            return new DidCloudEngine(
+                _loggerFactory.CreateLogger<DidCloudEngine>(),
+                CreateData);
+        }
+
+        /// <summary>
+        /// Creates an instance of <see cref="Cloud51DidData"/>
+        /// </summary>
+        /// <param name="pipeline"></param>
+        /// <param name="flowElement"></param>
+        /// <returns></returns>
+        private I51DidData CreateData(
+            IPipeline pipeline,
+            FlowElementBase<
+                I51DidData,
+                IAspectPropertyMetaData> flowElement)
+        {
+            return new Cloud51DidData(
+                _loggerFactory.CreateLogger<Cloud51DidData>(),
+                pipeline,
+                flowElement as IAspectEngine);
+        }
+    }
+}

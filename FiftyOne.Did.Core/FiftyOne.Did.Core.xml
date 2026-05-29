@@ -1,0 +1,58 @@
+<?xml version="1.0"?>
+<doc>
+    <assembly>
+        <name>FiftyOne.Did.Core</name>
+    </assembly>
+    <members>
+        <member name="T:FiftyOne.Did.Core.Data.I51DidData">
+            <summary>
+            Contains IDs related to the user.
+            </summary>
+        </member>
+        <member name="P:FiftyOne.Did.Core.Data.I51DidData.IdProbGlobal">
+            <summary>
+            Probabilistic 51Did,
+            unique across all callers
+            from the same device and network.
+            </summary>
+        </member>
+        <member name="P:FiftyOne.Did.Core.Data.I51DidData.IdProbLic">
+            <summary>
+            Probabilistic 51Did,
+            unique only across the caller’s license key.
+            </summary>
+        </member>
+        <member name="T:FiftyOne.Did.Core.FlowElements.DidBaseEnginePropertiesBuilder">
+            <summary>
+            Helper class that builds metadata
+            for both OnPremise and Cloud versions of 51Did engine.
+            </summary>
+        </member>
+        <member name="F:FiftyOne.Did.Core.FlowElements.DidBaseEnginePropertiesBuilder.CategoryName">
+            <summary>
+            Category name for the data.
+            </summary>
+        </member>
+        <member name="F:FiftyOne.Did.Core.FlowElements.DidBaseEnginePropertiesBuilder.ComponentName">
+            <summary>
+            Component name for the data.
+            </summary>
+        </member>
+        <member name="M:FiftyOne.Did.Core.FlowElements.DidBaseEnginePropertiesBuilder.BuildComponentMetaData(FiftyOne.Pipeline.Engines.FlowElements.IAspectEngine,System.Boolean)">
+            <summary>
+            Build metadata for 51Did aspect engine.
+            </summary>
+            <param name="engine">51Did aspect engine.</param>
+            <param name="withAspectValueTypes">
+            If <c>true</c>, will wrap the type of properties
+            into <see cref="T:FiftyOne.Pipeline.Engines.Data.IAspectPropertyValue"/>. 
+            </param>
+            <returns>Component MetaData with properties populated.</returns>
+        </member>
+        <member name="T:FiftyOne.Did.Core.FlowElements.IDidEngine">
+            <summary>
+            General interface for 51Did engines.
+            </summary>
+        </member>
+    </members>
+</doc>

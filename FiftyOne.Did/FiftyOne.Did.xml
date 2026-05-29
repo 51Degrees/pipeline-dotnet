@@ -1,0 +1,472 @@
+<?xml version="1.0"?>
+<doc>
+    <assembly>
+        <name>FiftyOne.Did</name>
+    </assembly>
+    <members>
+        <member name="T:FiftyOne.Did.Model.FodId">
+            <summary>
+            An OWID whose payload encodes the three fields of a 51Did: a 1-byte
+            usage flags bitmask, a 4-byte little-endian License Id, and the
+            32-byte SHA-256 probabilistic value.
+            </summary>
+            <remarks>
+            <para>
+            Terminology. The 51Did itself (this OWID envelope) is the
+            identifier. The 32-byte SHA-256 hash inside the payload is the
+            probabilistic value carried by that identifier; two responses for
+            the same device + IP + usage share the same probabilistic value
+            but differ at the byte level because the envelope embeds a fresh
+            date and signature on each call. Compare probabilistic values,
+            never full identifiers.
+            </para>
+            <para>
+            Payload layout (37 bytes):
+            </para>
+            <list type="table">
+              <listheader><term>Offset</term><term>Length</term><term>Field</term></listheader>
+              <item><term>0</term><term>1</term><term>Flags (uint8 bit-mask)</term></item>
+              <item><term>1</term><term>4</term><term>LicenseId (uint32 LE)</term></item>
+              <item><term>5</term><term>32</term><term>Hash (SHA-256)</term></item>
+            </list>
+            <para>
+            Inherits <see cref="N:Owid"/> so callers can use OWID-level features
+            (signature verification, base64 round-tripping) directly on a
+            <see cref="T:FiftyOne.Did.Model.FodId"/> instance.
+            </para>
+            <para>
+            This class does NOT verify the OWID signature on construction. Callers
+            wanting cryptographic verification should call the extension methods on
+            <see cref="N:Owid"/> on this instance after construction.
+            </para>
+            </remarks>
+        </member>
+        <member name="F:FiftyOne.Did.Model.FodId.FlagsOffset">
+            <summary>
+            Byte offset of the Flags field within the payload.
+            </summary>
+        </member>
+        <member name="F:FiftyOne.Did.Model.FodId.LicenseIdOffset">
+            <summary>
+            Byte offset of the License Id field within the payload.
+            </summary>
+        </member>
+        <member name="F:FiftyOne.Did.Model.FodId.LicenseIdLength">
+            <summary>
+            Byte length of the License Id field.
+            </summary>
+        </member>
+        <member name="F:FiftyOne.Did.Model.FodId.HashOffset">
+            <summary>
+            Byte offset of the Hash field within the payload.
+            </summary>
+        </member>
+        <member name="F:FiftyOne.Did.Model.FodId.HashLength">
+            <summary>
+            Byte length of the Hash field (SHA-256).
+            </summary>
+        </member>
+        <member name="F:FiftyOne.Did.Model.FodId.PayloadLength">
+            <summary>
+            Minimum byte length of a 51Did payload (Flags + LicenseId + Hash).
+            </summary>
+        </member>
+        <member name="P:FiftyOne.Did.Model.FodId.Flags">
+            <summary>
+            The 1-byte usage flags bit-mask from the payload.
+            </summary>
+        </member>
+        <member name="P:FiftyOne.Did.Model.FodId.LicenseId">
+            <summary>
+            The 4-byte little-endian License Id from the payload.
+            </summary>
+        </member>
+        <member name="P:FiftyOne.Did.Model.FodId.Hash">
+            <summary>
+            The 32-byte SHA-256 probabilistic value from the payload.
+            This is the stable field for comparing two 51Did identifiers:
+            two identifiers for the same device + IP + usage share the
+            same probabilistic value even though their wrapping envelopes
+            (date, signature) differ on every issue. Treat as the cache /
+            dedup key. SHA-256 is the underlying hash function; the
+            property is named Hash to reflect that implementation detail.
+            </summary>
+        </member>
+        <member name="M:FiftyOne.Did.Model.FodId.#ctor(System.String)">
+            <summary>
+            Parse a 51Did from its base64-encoded OWID string.
+            </summary>
+            <param name="base64">
+            Base64 of the full OWID envelope (version + domain + date +
+            length-prefixed payload + 64-byte signature) as produced by the
+            51Degrees cloud service.
+            </param>
+            <exception cref="T:System.ArgumentNullException">
+            Thrown when <paramref name="base64"/> is <c>null</c>.
+            </exception>
+            <exception cref="T:System.FormatException">
+            Thrown by the underlying OWID parser when <paramref name="base64"/>
+            is not valid Base64.
+            </exception>
+            <exception cref="T:System.ArgumentException">
+            Thrown when the decoded payload is shorter than
+            <see cref="F:FiftyOne.Did.Model.FodId.PayloadLength"/> bytes.
+            </exception>
+        </member>
+        <member name="M:FiftyOne.Did.Model.FodId.#ctor(System.Byte[])">
+            <summary>
+            Parse a 51Did from the raw bytes of an OWID envelope.
+            </summary>
+            <param name="buffer">The OWID envelope bytes.</param>
+            <exception cref="T:System.ArgumentNullException">
+            Thrown when <paramref name="buffer"/> is <c>null</c>.
+            </exception>
+            <exception cref="T:System.ArgumentException">
+            Thrown when the payload is shorter than <see cref="F:FiftyOne.Did.Model.FodId.PayloadLength"/>
+            bytes.
+            </exception>
+        </member>
+        <member name="M:FiftyOne.Did.Model.FodId.#ctor(Owid.Client.Model.Owid)">
+            <summary>
+            Promote an already-parsed OWID into a 51Did by unpacking its
+            payload fields. The OWID's Version, Domain, Date, Payload and
+            Signature are copied by reference onto the new instance.
+            </summary>
+            <param name="owid">The already-parsed OWID envelope.</param>
+            <exception cref="T:System.ArgumentNullException">
+            Thrown when <paramref name="owid"/> is <c>null</c>.
+            </exception>
+            <exception cref="T:System.ArgumentException">
+            Thrown when <paramref name="owid"/>'s payload is shorter than
+            <see cref="F:FiftyOne.Did.Model.FodId.PayloadLength"/> bytes.
+            </exception>
+        </member>
+        <member name="F:Owid.Client.Constants.BaseDate">
+            <summary>
+            The base data for OWIDs. The date and time information is stored
+            in hours or minutes after this date.
+            </summary>
+        </member>
+        <member name="F:Owid.Client.Constants.SignatureLength">
+            <summary>
+            The length of an OWID signature in bytes. 
+            </summary>
+        </member>
+        <member name="F:Owid.Client.Constants.Empty">
+            <summary>
+            Used when cryptographic operations are required where there is no
+            other data to be considered.
+            </summary>
+        </member>
+        <member name="T:Owid.Client.Creator">
+            <summary>
+            Needed to create new OWIDs.
+            </summary>
+        </member>
+        <member name="P:Owid.Client.Creator.Domain">
+            <summary>
+            Domain associated with the OWID creator. Contains well known end
+            points to provide public keys and other information needed to 
+            conform to the OWID specification.
+            </summary>
+        </member>
+        <member name="P:Owid.Client.Creator.Crypto">
+            <summary>
+            Used to sign OWIDs from this creator.
+            </summary>
+        </member>
+        <member name="M:Owid.Client.Creator.#ctor(Owid.Client.Model.Configuration.OwidConfiguration)">
+            <summary>
+            Make new <see cref="N:Owid"/> from config.
+            </summary>
+            <param name="configuration">
+            Configuration to use.
+            </param>
+            <exception cref="T:System.ArithmeticException">
+            <paramref name="configuration"/>.<see cref="P:Owid.Client.Model.Configuration.OwidConfiguration.Domain"/> is empty or whitespace.
+            </exception>
+        </member>
+        <member name="M:Owid.Client.Creator.#ctor(System.String,System.Security.Cryptography.ECDsa)">
+            <summary>
+            Make new <see cref="N:Owid"/>.
+            </summary>
+            <param name="domain">
+            Web domain to be used.
+            </param>
+            <param name="crypto">
+            Crypto provider for signing <see cref="N:Owid"/>/-s.
+            </param>
+            <exception cref="T:System.ArgumentException">
+              <paramref name="crypto" />'s <see cref="P:System.Security.Cryptography.HashAlgorithmName.Name" /> is an empty string.
+            </exception>
+            <exception cref="T:System.ArgumentNullException">
+              <paramref name="crypto" />'s <see cref="P:System.Security.Cryptography.HashAlgorithmName.Name" /> is <see langword="null" />.
+            </exception>
+        </member>
+        <member name="M:Owid.Client.Creator.Sign(Owid.Client.Model.Owid)">
+            <summary>
+            Sign the OWID provided.
+            </summary>
+            <param name="owid"></param>
+            <returns></returns>
+        </member>
+        <member name="M:Owid.Client.Creator.Sign(Owid.Client.Model.Owid,Owid.Client.Model.Owid[])">
+            <summary>
+            Sign the OWID provided AND the other OWIDs provided.
+            </summary>
+            <param name="owid"></param>
+            <param name="others"></param>
+            <returns></returns>
+        </member>
+        <member name="M:Owid.Client.Creator.SignWithOthers(Owid.Client.Model.Owid,Owid.Client.Model.Owid[])">
+            <summary>
+            Sign the OWID provided AND the other OWIDs provided.
+            </summary>
+            <param name="owid"></param>
+            <param name="others"></param>
+            <returns></returns>
+        </member>
+        <member name="M:Owid.Client.Creator.Sign(System.String)">
+            <summary>
+            Create a new OWID for the creator containing the value as the 
+            payload.
+            </summary>
+            <param name="value">Payload value</param>
+            <returns>Signed OWID with payload provided.</returns>
+        </member>
+        <member name="M:Owid.Client.Creator.Sign(System.Byte[])">
+            <summary>
+            Create a new OWID for the creator containing the value as the 
+            payload.
+            </summary>
+            <param name="value">Payload value</param>
+            <returns>Signed OWID with payload provided.</returns>
+        </member>
+        <member name="T:Owid.Client.CryptoExtensions">
+            <summary>
+            Extensions methods for crypto operations
+            on <see cref="N:Owid"/> instances.
+            </summary>
+        </member>
+        <member name="F:Owid.Client.CryptoExtensions._handler">
+            <summary>
+            Handlers used with HTTP clients to automatically decompress any
+            compressed data streams.
+            </summary>
+        </member>
+        <member name="F:Owid.Client.CryptoExtensions._publicKeyCache">
+            <summary>
+            Cache used to avoid repeat requests for the same public keys.
+            </summary>
+        </member>
+        <member name="M:Owid.Client.CryptoExtensions.VerifyAsync(Owid.Client.Model.Owid)">
+            <summary>
+            Verify that <see cref="N:Owid"/> signature is correct.
+            </summary>
+            <param name="owid"></param>
+            <returns></returns>
+        </member>
+        <member name="M:Owid.Client.CryptoExtensions.VerifyAsync(Owid.Client.Model.Owid,System.Security.Cryptography.ECDsa)">
+            <summary>
+            Verify that <see cref="N:Owid"/> signature is correct.
+            </summary>
+            <param name="owid"></param>
+            <param name="crypto"></param>
+            <returns></returns>
+        </member>
+        <member name="M:Owid.Client.CryptoExtensions.VerifyAsync(Owid.Client.Model.Owid,Owid.Client.Model.Owid[])">
+            <summary>
+            Verify that <see cref="N:Owid"/> signature is correct.
+            </summary>
+            <param name="owid"></param>
+            <param name="others"></param>
+            <returns></returns>
+        </member>
+        <member name="M:Owid.Client.CryptoExtensions.VerifyAsync(Owid.Client.Model.Owid,System.Security.Cryptography.ECDsa,Owid.Client.Model.Owid[])">
+            <summary>
+            Verify that <see cref="N:Owid"/> signature is correct.
+            </summary>
+            <param name="owid"></param>
+            <param name="crypto"></param>
+            <param name="others"></param>
+            <returns></returns>
+        </member>
+        <member name="M:Owid.Client.CryptoExtensions.VerifyAsyncWithOthers(Owid.Client.Model.Owid,System.Security.Cryptography.ECDsa,Owid.Client.Model.Owid[])">
+            <summary>
+            Verify that <see cref="N:Owid"/> signature is correct.
+            </summary>
+            <param name="owid"></param>
+            <param name="crypto"></param>
+            <param name="others"></param>
+            <returns></returns>
+        </member>
+        <member name="M:Owid.Client.CryptoExtensions.GetDataForCrypto(Owid.Client.Model.Owid,Owid.Client.Model.Owid[])">
+            <summary>
+            Adds the fields from this OWID to the byte buffer without the 
+            signature. Adds all the bytes of the others to the data.
+            </summary>
+            <param name="owid"></param>
+            <param name="others"></param>
+            <returns></returns>
+        </member>
+        <member name="M:Owid.Client.CryptoExtensions.GetPublicKey(Owid.Client.Model.Owid,System.String)">
+            <summary>
+            Gets the public key for the owid.
+            </summary>
+            <param name="owid"></param>
+            <param name="scheme"></param>
+            <returns></returns>
+        </member>
+        <member name="M:Owid.Client.CryptoExtensions.GetPublicKey(System.Uri)">
+            <summary>
+            Get the public key from the domain contained in the OWID if it is 
+            not already contained in the cache.
+            </summary>
+            <param name="u"></param>
+            <returns></returns>
+        </member>
+        <member name="T:Owid.Client.Extensions">
+            <summary>
+            Extensions methods for <see cref="N:Owid"/>.
+            </summary>
+        </member>
+        <member name="M:Owid.Client.Extensions.AsByteArray(Owid.Client.Model.Owid)">
+            <summary>
+            Converts <see cref="N:Owid"/> to byte array.
+            </summary>
+            <param name="owid"></param>
+            <returns></returns>
+        </member>
+        <member name="M:Owid.Client.Extensions.AsBase64(Owid.Client.Model.Owid)">
+            <summary>
+            Converts <see cref="N:Owid"/> to Base64-encoded string.
+            </summary>
+            <param name="owid"></param>
+            <returns></returns>
+        </member>
+        <member name="M:Owid.Client.Extensions.EmptyToBuffer(System.IO.BinaryWriter)">
+            <summary>
+            Writes empty <see cref="N:Owid"/> to <paramref name="writer"/>.
+            </summary>
+            <param name="writer"></param>
+        </member>
+        <member name="M:Owid.Client.Extensions.ToBuffer(Owid.Client.Model.Owid,System.IO.BinaryWriter)">
+            <summary>
+            Writes <paramref name="owid"/> to <paramref name="writer"/>
+            </summary>
+            <param name="owid"></param>
+            <param name="writer"></param>
+        </member>
+        <member name="M:Owid.Client.Extensions.FromBuffer(Owid.Client.Model.Owid,System.IO.BinaryReader)">
+            <summary>
+            Reads <see cref="N:Owid"/> data
+            from <paramref name="reader"/>.
+            </summary>
+            <param name="owid"></param>
+            <param name="reader"></param>
+            <exception cref="T:System.Exception"></exception>
+        </member>
+        <member name="T:Owid.Client.Model.Configuration.OwidConfiguration">
+            <summary>
+            Configuration for <see cref="T:Owid.Client.Creator"/>
+            to make new <see cref="T:Owid.Client.Model.Owid"/>s with.
+            </summary>
+        </member>
+        <member name="P:Owid.Client.Model.Configuration.OwidConfiguration.Domain">
+            <summary>
+            Domain associated with the OWID creator. Contains well known end
+            points to provide public keys and other information needed to 
+            conform to the OWID specification.
+            </summary>
+        </member>
+        <member name="P:Owid.Client.Model.Configuration.OwidConfiguration.PrivateKey">
+            <summary>
+            The PEM format private key for the OWID creator.
+            </summary>
+        </member>
+        <member name="P:Owid.Client.Model.Configuration.OwidConfiguration.PublicKey">
+            <summary>
+            The PEM format public key for the OWID creator.
+            </summary>
+        </member>
+        <member name="T:Owid.Client.Model.Owid">
+            <summary>
+            OWID structure which can be used as a node in a tree.
+            </summary>
+        </member>
+        <member name="P:Owid.Client.Model.Owid.Version">
+            <summary>
+            The byte version of the OWID.
+            </summary>
+        </member>
+        <member name="P:Owid.Client.Model.Owid.Domain">
+            <summary>
+            Domain associated with the creator.
+            </summary>
+        </member>
+        <member name="P:Owid.Client.Model.Owid.Date">
+            <summary>
+            The date and time to the nearest minute in UTC of the creation.
+            </summary>
+        </member>
+        <member name="P:Owid.Client.Model.Owid.Payload">
+            <summary>
+            Array of bytes that form the payload.
+            </summary>
+        </member>
+        <member name="P:Owid.Client.Model.Owid.PayloadAsString">
+            <summary>
+            The payload as a string.
+            </summary>
+        </member>
+        <member name="P:Owid.Client.Model.Owid.Signature">
+            <summary>
+            Signature for this OWID and it's ancestor. Generated by the 
+            <see cref="T:Owid.Client.Creator"/> instance.
+            </summary>
+        </member>
+        <member name="M:Owid.Client.Model.Owid.#ctor">
+            <summary>
+            Make empty <see cref="T:Owid.Client.Model.Owid"/>
+            </summary>
+        </member>
+        <member name="M:Owid.Client.Model.Owid.#ctor(System.String)">
+            <summary>
+            Make <see cref="T:Owid.Client.Model.Owid"/> from Base64-encoded string.
+            </summary>
+        </member>
+        <member name="M:Owid.Client.Model.Owid.#ctor(System.Byte[])">
+            <summary>
+            Make <see cref="T:Owid.Client.Model.Owid"/> from binary data.
+            </summary>
+        </member>
+        <member name="M:Owid.Client.Model.Owid.ToString">
+            <inheritdoc/>
+        </member>
+        <member name="T:Owid.Client.Model.OwidVersion">
+            <summary>
+            A version of <see cref="T:Owid.Client.Model.Owid"/> data.
+            </summary>
+        </member>
+        <member name="F:Owid.Client.Model.OwidVersion.Empty">
+            <summary>
+            Represents an empty <see cref="T:Owid.Client.Model.Owid"/>.
+            </summary>
+        </member>
+        <member name="F:Owid.Client.Model.OwidVersion.Version1">
+            <summary>
+            Version 1.
+            </summary>
+        </member>
+        <member name="F:Owid.Client.Model.OwidVersion.Version2">
+            <summary>
+            Version 2.
+            </summary>
+        </member>
+        <member name="F:Owid.Client.Model.OwidVersion.Version3">
+            <summary>
+            Version 3.
+            </summary>
+        </member>
+    </members>
+</doc>
