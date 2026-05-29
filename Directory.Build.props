@@ -1,0 +1,12 @@
+<Project>
+  <PropertyGroup>
+    <Version>4.5.40</Version>                       <!-- CI overrides via /p:Version= per release -->
+    <AssemblyVersion>4.5.0.0</AssemblyVersion>      <!-- PIN to major.minor.0.0; do not bump per patch -->
+
+    <SignAssembly>true</SignAssembly>
+    <AssemblyOriginatorKeyFile Condition="'$(BuiltOnCI)' != 'true'">$(MSBuildThisFileDirectory)51Degrees.publickey</AssemblyOriginatorKeyFile>
+    <AssemblyOriginatorKeyFile Condition="'$(BuiltOnCI)' == 'true'">$(MSBuildThisFileDirectory)51Degrees.snk</AssemblyOriginatorKeyFile>
+    <PublicSign Condition="'$(BuiltOnCI)' != 'true'">true</PublicSign>
+    <PublicSign Condition="'$(BuiltOnCI)' == 'true'">false</PublicSign>
+  </PropertyGroup>
+</Project>
