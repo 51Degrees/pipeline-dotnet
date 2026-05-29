@@ -201,9 +201,7 @@ namespace FiftyOne.Pipeline.Web.Framework
             services.AddService(loggerFactory);
             services.AddService(httpClient);
             services.AddService(updateService);
-#pragma warning disable CS0618 // legacy WebPipeline registers the generic singleton; cloud engines override per-pipeline
-            services.AddService(MissingPropertyService.Instance);
-#pragma warning restore CS0618
+            services.AddService(MissingPropertyServiceOnPremise.Instance);
 
             Pipeline = new PipelineBuilder(
                 loggerFactory,
