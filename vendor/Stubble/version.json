@@ -1,0 +1,11 @@
+﻿{
+  "version": "1.10",
+  "publicReleaseRefSpec": [
+    "^refs/heads/master$", // we release out of master
+  ],
+  "cloudBuild": {
+    "buildNumber": {
+      "enabled": true
+    }
+  }
+}
