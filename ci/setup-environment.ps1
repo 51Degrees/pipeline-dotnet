@@ -7,6 +7,7 @@ param(
     [string]$Arch = "x64",
     [string]$Configuration = "Release",
     [string]$BuildMethod,
+    [string]$StrongNameKeyBase64,
     [hashtable]$Keys
 )
 
@@ -16,3 +17,5 @@ if ($BuildMethod -ne "dotnet") {
     ./environments/setup-msbuild.ps1
     ./environments/setup-vstest.ps1
 }
+
+[IO.File]::WriteAllBytes("$PSScriptRoot/../51Degrees.snk", [Convert]::FromBase64String($StrongNameKeyBase64))
