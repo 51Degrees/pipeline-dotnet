@@ -97,15 +97,13 @@ namespace FiftyOne.Pipeline.JavaScript.Tests
         [DataRow("htps")]
         [DataRow("ftp")]
         [DataRow("tcp")]
-        [ExpectedException(typeof(PipelineConfigurationException))]
         public void JavaScriptBuilderElement_Builder_SetDefaultProtocol_InvalidProtocol(string protocol)
         {
             TestLoggerFactory loggerFactory = new TestLoggerFactory();
-            var engine = new JavaScriptBuilderElementBuilder(loggerFactory)
-                .SetProtocol(protocol)
-                .Build();
-
-            Assert.Fail("Expected exception was not thrown");
+            Assert.ThrowsExactly<PipelineConfigurationException>(() =>
+                new JavaScriptBuilderElementBuilder(loggerFactory)
+                    .SetProtocol(protocol)
+                    .Build());
         }
 
         /// <summary>
