@@ -2,6 +2,10 @@
 
   <PropertyGroup>
     <TargetFramework>netstandard2.0</TargetFramework>
+    <!-- The vendored Stubble.Core source (compiled in below) uses C# 9 features, matching
+         Stubble's own LangVersion=latest. This only enables newer syntax; it does not
+         change the netstandard2.0 target. -->
+    <LangVersion>latest</LangVersion>
     <AssemblyName>FiftyOne.Pipeline.JavaScriptBuilderElement</AssemblyName>
     <RootNamespace>FiftyOne.Pipeline.JavaScriptBuilder</RootNamespace>
     <Platforms>AnyCPU</Platforms>
@@ -52,28 +56,29 @@
   <ItemGroup>
     <PackageReference Include="NUglify" Version="1.20.7" />
     <PackageReference Include="System.CodeDom" Version="6.0.0" />
+    <!-- Dependency closure of the vendored Stubble.Core source compiled into this assembly
+         (see the Compile Include below). The Stubble code uses these types, so they are
+         declared here directly. -->
+    <PackageReference Include="Microsoft.CSharp" Version="4.7.0" />
+    <PackageReference Include="System.Collections.Immutable" Version="5.0.0" />
+    <PackageReference Include="System.Threading.Tasks.Extensions" Version="4.5.4" />
   </ItemGroup>
 
   <ItemGroup>
     <ProjectReference Include="..\..\FiftyOne.Pipeline.Engines\FiftyOne.Pipeline.Engines.csproj" />
     <ProjectReference Include="..\FiftyOne.Pipeline.JsonBuilderElement\FiftyOne.Pipeline.JsonBuilder.csproj" />
-    <!-- Stubble.Core is vendored and embedded into this package (its DLL is added to
-         lib/ by the IncludeStubbleCoreInPackage target below) instead of being an
-         external NuGet dependency. The public Stubble.Core is not strong-named, and no
-         Stubble.Core is published at the 51Degrees package version, so a normal package
-         dependency cannot resolve. PrivateAssets="all" stops that dependency being emitted. -->
-    <ProjectReference Include="..\..\vendor\Stubble\src\Stubble.Core\Stubble.Core.csproj" PrivateAssets="all" />
   </ItemGroup>
 
-  <!-- Add the embedded Stubble.Core.dll to lib/<tfm>/ in the package. -->
-  <PropertyGroup>
-    <TargetsForTfmSpecificBuildOutput>$(TargetsForTfmSpecificBuildOutput);IncludeStubbleCoreInPackage</TargetsForTfmSpecificBuildOutput>
-  </PropertyGroup>
-  <Target Name="IncludeStubbleCoreInPackage" DependsOnTargets="ResolveReferences">
-    <ItemGroup>
-      <BuildOutputInPackage Include="@(ReferenceCopyLocalPaths)" Condition="'%(Filename)' == 'Stubble.Core' And '%(Extension)' == '.dll'" />
-    </ItemGroup>
-  </Target>
+  <!-- Stubble.Core ({{mustache}} templating) is vendored as SOURCE and compiled directly
+       into this assembly: no separate Stubble.Core.dll, no package dependency, no version
+       juggling. Assembly-attribute files (and obj) are excluded so they don't duplicate
+       this project's generated assembly attributes. Stubble's source-level warnings are
+       silenced for this strict (warnings-as-errors) project via vendor/Stubble/.editorconfig. -->
+  <ItemGroup>
+    <Compile Include="..\..\vendor\Stubble\src\Stubble.Core\**\*.cs"
+             Exclude="..\..\vendor\Stubble\src\Stubble.Core\obj\**\*.cs;..\..\vendor\Stubble\src\Stubble.Core\Properties\AssemblyInfo.cs;..\..\vendor\Stubble\src\Stubble.Core\GlobalSuppressions.cs"
+             LinkBase="Stubble" />
+  </ItemGroup>
 
   <ItemGroup>
     <Service Include="{508349b6-6b84-4df5-91f0-309beebad82d}" />

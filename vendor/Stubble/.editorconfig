@@ -15,6 +15,17 @@ indent_size = 4
 insert_final_newline = true
 charset = utf-8-bom
 
+# This vendored Stubble.Core source is compiled into FiftyOne.Pipeline.JavaScriptBuilderElement,
+# which builds with TreatWarningsAsErrors. Silence Stubble's own source-level warnings here
+# (path-scoped) so they don't fail that strict build, without relaxing rules for 51Degrees code.
+# Mirrors the NoWarn that Stubble.Core.csproj used (1591) plus warnings the strict project surfaces.
+[*.cs]
+dotnet_diagnostic.CS0108.severity = none
+dotnet_diagnostic.CS1591.severity = none
+dotnet_diagnostic.CS1701.severity = none
+dotnet_diagnostic.CS1702.severity = none
+dotnet_diagnostic.CS1705.severity = none
+
 # Xml project files
 [*.{csproj,vbproj,vcxproj,vcxproj.filters,proj,projitems,shproj}]
 indent_size = 2
