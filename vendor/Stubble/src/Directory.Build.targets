@@ -8,7 +8,6 @@
   </ItemGroup>
   <ItemGroup>
     <AdditionalFiles Include="..\..\stylecop.json" Link="stylecop.json" />
-    <AdditionalFiles Include="..\..\version.json" Link="version.json" />
     <None Include="..\..\licence.md" Pack="true" Visible="false" PackagePath=""/>
     <None Include="..\..\assets\logo-128.png" Pack="true" PackagePath="\"/>
   </ItemGroup>
