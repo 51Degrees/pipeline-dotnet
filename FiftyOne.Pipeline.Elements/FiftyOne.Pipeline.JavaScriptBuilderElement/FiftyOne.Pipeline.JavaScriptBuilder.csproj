@@ -57,8 +57,23 @@
   <ItemGroup>
     <ProjectReference Include="..\..\FiftyOne.Pipeline.Engines\FiftyOne.Pipeline.Engines.csproj" />
     <ProjectReference Include="..\FiftyOne.Pipeline.JsonBuilderElement\FiftyOne.Pipeline.JsonBuilder.csproj" />
-    <ProjectReference Include="..\..\vendor\Stubble\src\Stubble.Core\Stubble.Core.csproj" />
+    <!-- Stubble.Core is vendored and embedded into this package (its DLL is added to
+         lib/ by the IncludeStubbleCoreInPackage target below) instead of being an
+         external NuGet dependency. The public Stubble.Core is not strong-named, and no
+         Stubble.Core is published at the 51Degrees package version, so a normal package
+         dependency cannot resolve. PrivateAssets="all" stops that dependency being emitted. -->
+    <ProjectReference Include="..\..\vendor\Stubble\src\Stubble.Core\Stubble.Core.csproj" PrivateAssets="all" />
   </ItemGroup>
+
+  <!-- Add the embedded Stubble.Core.dll to lib/<tfm>/ in the package. -->
+  <PropertyGroup>
+    <TargetsForTfmSpecificBuildOutput>$(TargetsForTfmSpecificBuildOutput);IncludeStubbleCoreInPackage</TargetsForTfmSpecificBuildOutput>
+  </PropertyGroup>
+  <Target Name="IncludeStubbleCoreInPackage" DependsOnTargets="ResolveReferences">
+    <ItemGroup>
+      <BuildOutputInPackage Include="@(ReferenceCopyLocalPaths)" Condition="'%(Filename)' == 'Stubble.Core' And '%(Extension)' == '.dll'" />
+    </ItemGroup>
+  </Target>
 
   <ItemGroup>
     <Service Include="{508349b6-6b84-4df5-91f0-309beebad82d}" />
