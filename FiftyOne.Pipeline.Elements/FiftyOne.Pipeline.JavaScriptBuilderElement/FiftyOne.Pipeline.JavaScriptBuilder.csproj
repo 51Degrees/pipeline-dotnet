@@ -34,6 +34,15 @@
     <DebugSymbols>true</DebugSymbols>
   </PropertyGroup>
 
+  <!-- Embed the vendored Stubble.Core.dll inside this nupkg's lib/ folder.
+       Without this, the ProjectReference below would emit a Stubble.Core
+       NuGet dependency stamped with CI's $(Version) (the pipeline version),
+       which fails to resolve on nuget.org because Stubble.Core has no
+       matching release. PrivateAssets=all suppresses the dependency entry. -->
+  <PropertyGroup>
+    <TargetsForTfmSpecificBuildOutput>$(TargetsForTfmSpecificBuildOutput);_IncludeVendoredStubbleInPackage</TargetsForTfmSpecificBuildOutput>
+  </PropertyGroup>
+
   <ItemGroup>
     <None Include="..\..\README.md">
       <Pack>True</Pack>
@@ -57,8 +66,16 @@
   <ItemGroup>
     <ProjectReference Include="..\..\FiftyOne.Pipeline.Engines\FiftyOne.Pipeline.Engines.csproj" />
     <ProjectReference Include="..\FiftyOne.Pipeline.JsonBuilderElement\FiftyOne.Pipeline.JsonBuilder.csproj" />
-    <ProjectReference Include="..\..\vendor\Stubble\src\Stubble.Core\Stubble.Core.csproj" />
+    <ProjectReference Include="..\..\vendor\Stubble\src\Stubble.Core\Stubble.Core.csproj">
+      <PrivateAssets>all</PrivateAssets>
+    </ProjectReference>
   </ItemGroup>
+
+  <Target Name="_IncludeVendoredStubbleInPackage">
+    <ItemGroup>
+      <BuildOutputInPackage Include="$(OutputPath)Stubble.Core.dll" />
+    </ItemGroup>
+  </Target>
 
   <ItemGroup>
     <Service Include="{508349b6-6b84-4df5-91f0-309beebad82d}" />
