@@ -11,7 +11,7 @@
     <Company>Alex McAuliffe</Company>
     <Authors>Alex McAuliffe</Authors>
     <Copyright>Copyright © 2017</Copyright>
-    <Version>1.10.7</Version>
+    <Version>1.10.8</Version>
     <RepositoryUrl>https://github.com/stubbleorg/stubble</RepositoryUrl>
     <PackageIconUrl>https://raw.githubusercontent.com/StubbleOrg/Stubble/master/assets/logo-128.png</PackageIconUrl>
     <GenerateAssemblyVersionAttribute>false</GenerateAssemblyVersionAttribute>
