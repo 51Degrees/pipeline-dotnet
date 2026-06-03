@@ -32,6 +32,25 @@ The Web integration multi-targets the following:
 
 The [tested versions](https://51degrees.com/documentation/_info__tested_versions.html) page shows the .NET versions that we currently test against. The software may run fine against other versions, but additional caution should be applied.
 
+## Strong naming
+
+All NuGet packages published from this repository are strong-name signed so they can be referenced by strong-named consumer applications (notably .NET Framework hosts that enforce strong-name identity at assembly load).
+
+### How signing is wired
+
+The same `51Degrees.publickey` file is committed at the root of each shipping repo. Signing is configured once via [`Directory.Build.props`](Directory.Build.props) and applies to every project:
+
+- **Local developer builds** use the [PublicSign](https://learn.microsoft.com/en-us/dotnet/csharp/language-reference/compiler-options/security#publicsign) pattern — the compiler stamps the public key into each assembly so it is identified as strong-named, but no cryptographic signature is produced. Only `51Degrees.publickey` (committed) is needed, so contributors can build and test without any secrets.
+- **Production builds (CI only)** receive the matching private `.snk` from a GitHub organization secret, so the assemblies in the published NuGet packages carry a real cryptographic signature.
+
+The same public key token appears on every `FiftyOne.*` DLL shipped from this repo and its upstream library repos (`caching-dotnet`, `common-dotnet`), so the dependency chain remains consistent under strong-name identity checks.
+
+### Why `vendor/Stubble/` exists
+
+Strong-named assemblies can only reference other strong-named assemblies. `FiftyOne.Pipeline.JavaScriptBuilder` depends on [Stubble.Core](https://github.com/StubbleOrg/Stubble), and the upstream NuGet package is not strong-named. A request to publish a strong-named build has been open in that project since December 2019 — see [StubbleOrg/Stubble#85](https://github.com/StubbleOrg/Stubble/issues/85) — with no progress in over five years.
+
+Rather than wait, the Stubble source is vendored under [`vendor/Stubble/`](vendor/Stubble/) and built from source as a project reference. It inherits the strong-naming configuration from the repo root and ships strong-signed alongside our own assemblies. Stubble is MIT-licensed and the upstream copyright and licence notices are preserved unchanged in the vendored tree.
+
 ## Solutions and projects
 
 - **FiftyOne.Pipeline** - The core projects that comprise the Pipeline API.

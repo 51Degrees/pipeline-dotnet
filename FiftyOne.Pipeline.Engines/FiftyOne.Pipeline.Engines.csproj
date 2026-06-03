@@ -8,7 +8,7 @@
     <DocumentationFile>FiftyOne.Pipeline.Engines.xml</DocumentationFile>
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
     <WarningsAsErrors />
-	
+
 	  <!-- NuGet package properties -->
 	  <PackageId>FiftyOne.Pipeline.Engines</PackageId>
 	  <Title>Shared base classes for implementing engines for the 51Degrees Pipeline API</Title>
@@ -38,7 +38,7 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="FiftyOne.Caching" Version="4.4.23" />
+    <PackageReference Include="FiftyOne.Caching" Version="4.5.2" />
     <PackageReference Include="FiftyOne.Common" Version="5.1.7" />
     <PackageReference Include="Newtonsoft.Json" Version="13.0.4" />
   </ItemGroup>
