@@ -49,13 +49,13 @@ using System.Xml;
 namespace FiftyOne.Pipeline.Engines.FiftyOne.FlowElements
 {
     /// <summary>
-    /// Abstract base class for ShareUsage elements.
+    /// Abstract base class for ShareUsage elements. 
     /// See the <see href="https://github.com/51Degrees/specifications/blob/main/pipeline-specification/pipeline-elements/usage-sharing-element.md">Specification</see>
     /// </summary>
-    [System.Diagnostics.CodeAnalysis.SuppressMessage("Design",
-        "CA1054:Uri parameters should not be strings",
+    [System.Diagnostics.CodeAnalysis.SuppressMessage("Design", 
+        "CA1054:Uri parameters should not be strings", 
         Justification = "We do not wish to make this breaking change at this time.")]
-    public abstract class ShareUsageBase :
+    public abstract class ShareUsageBase : 
         FlowElementBase<IElementData, IElementPropertyMetaData>
     {
         /// <summary>
@@ -91,7 +91,7 @@ namespace FiftyOne.Pipeline.Engines.FiftyOne.FlowElements
             /// <summary>
             /// The evidence data from this event.
             /// The dictionary key is the first part of the evidence key.
-            /// The value is another dictionary containing the rest of
+            /// The value is another dictionary containing the rest of 
             /// the evidence key and the evidence value.
             /// For example, the evidence "header.user-agent"="ABC123"
             /// would become:
@@ -173,7 +173,7 @@ namespace FiftyOne.Pipeline.Engines.FiftyOne.FlowElements
         private List<string> _flowElements = null;
 
         /// <summary>
-        /// Return a list of <see cref="IFlowElement"/> in the pipeline.
+        /// Return a list of <see cref="IFlowElement"/> in the pipeline. 
         /// If the list is null then populate from the pipeline.
         /// If there are multiple or no pipelines then log a warning.
         /// </summary>
@@ -192,12 +192,12 @@ namespace FiftyOne.Pipeline.Engines.FiftyOne.FlowElements
                     }
                     else
                     {
-                        // This element has somehow been registered to too
+                        // This element has somehow been registered to too 
                         // many (or zero) pipelines.
                         // This means we cannot know the flow elements that
                         // make up the pipeline so a warning is logged
                         // but otherwise, the system can continue as normal.
-                        Logger.LogWarning(Pipelines.Count == 0 ?
+                        Logger.LogWarning(Pipelines.Count == 0 ? 
                             Messages.MessageShareUsageNoPipelines :
                             string.Format(CultureInfo.InvariantCulture,
                                 Messages.MessageShareUsageTooManyPipelines,
@@ -242,7 +242,7 @@ namespace FiftyOne.Pipeline.Engines.FiftyOne.FlowElements
         };
 
         /// <summary>
-        /// The default element data key that will be used for this element.
+        /// The default element data key that will be used for this element. 
         /// </summary>
 #pragma warning disable CA1707 // Identifiers should not contain underscores
         public const string DEFAULT_ELEMENT_DATA_KEY = "shareusage";
@@ -295,7 +295,7 @@ namespace FiftyOne.Pipeline.Engines.FiftyOne.FlowElements
         }
 
         /// <summary>
-        /// Get a list of the meta-data relating to the properties
+        /// Get a list of the meta-data relating to the properties 
         /// that this flow element will populate.
         /// For this share usage element, the list will always be empty
         /// as it does not populate any properties.
@@ -337,7 +337,7 @@ namespace FiftyOne.Pipeline.Engines.FiftyOne.FlowElements
         /// The <see cref="HttpClient"/> to use when sending request data.
         /// </param>
         /// <param name="sharePercentage">
-        /// The approximate proportion of requests to share.
+        /// The approximate proportion of requests to share. 
         /// 1 = 100%, 0.5 = 50%, etc.
         /// </param>
         /// <param name="minimumEntriesPerMessage">
@@ -357,7 +357,7 @@ namespace FiftyOne.Pipeline.Engines.FiftyOne.FlowElements
         /// item to the queue.
         /// </param>
         /// <param name="repeatEvidenceIntervalMinutes">
-        /// The interval (in minutes) which is used to decide if repeat
+        /// The interval (in minutes) which is used to decide if repeat 
         /// evidence is old enough to consider a new session.
         /// </param>
         /// <param name="trackSession">
@@ -371,7 +371,7 @@ namespace FiftyOne.Pipeline.Engines.FiftyOne.FlowElements
         /// not send to 51Degrees.
         /// </param>
         /// <param name="includedQueryStringParameters">
-        /// A list of the names of query string parameters that share
+        /// A list of the names of query string parameters that share 
         /// usage should send to 51Degrees.
         /// If this value is null, all query string parameters are shared.
         /// </param>
@@ -424,7 +424,7 @@ namespace FiftyOne.Pipeline.Engines.FiftyOne.FlowElements
         /// The <see cref="HttpClient"/> to use when sending request data.
         /// </param>
         /// <param name="sharePercentage">
-        /// The approximate proportion of requests to share.
+        /// The approximate proportion of requests to share. 
         /// 1 = 100%, 0.5 = 50%, etc.
         /// </param>
         /// <param name="minimumEntriesPerMessage">
@@ -444,7 +444,7 @@ namespace FiftyOne.Pipeline.Engines.FiftyOne.FlowElements
         /// item to the queue.
         /// </param>
         /// <param name="repeatEvidenceIntervalMinutes">
-        /// The interval (in minutes) which is used to decide if repeat
+        /// The interval (in minutes) which is used to decide if repeat 
         /// evidence is old enough to consider a new session.
         /// </param>
         /// <param name="trackSession">
@@ -458,7 +458,7 @@ namespace FiftyOne.Pipeline.Engines.FiftyOne.FlowElements
         /// not send to 51Degrees.
         /// </param>
         /// <param name="includedQueryStringParameters">
-        /// A list of the names of query string parameters that share
+        /// A list of the names of query string parameters that share 
         /// usage should send to 51Degrees.
         /// If this value is null, all query string parameters are shared.
         /// </param>
@@ -467,7 +467,7 @@ namespace FiftyOne.Pipeline.Engines.FiftyOne.FlowElements
         /// The name of the cookie that contains the asp.net session id.
         /// </param>
         /// <param name="tracker">
-        /// The <see cref="ITracker"/> to use to determine if a given
+        /// The <see cref="ITracker"/> to use to determine if a given 
         /// <see cref="IFlowData"/> instance should be shared or not.
         /// </param>
         protected ShareUsageBase(
@@ -516,7 +516,7 @@ namespace FiftyOne.Pipeline.Engines.FiftyOne.FlowElements
         /// <see cref="HttpClient"/> to use when sending request data.
         /// </param>
         /// <param name="sharePercentage">
-        /// The approximate proportion of requests to share.
+        /// The approximate proportion of requests to share. 
         /// 1 = 100%, 0.5 = 50%, etc.
         /// </param>
         /// <param name="minimumEntriesPerMessage">
@@ -536,7 +536,7 @@ namespace FiftyOne.Pipeline.Engines.FiftyOne.FlowElements
         /// item to the queue.
         /// </param>
         /// <param name="repeatEvidenceIntervalMinutes">
-        /// The interval (in minutes) which is used to decide if repeat
+        /// The interval (in minutes) which is used to decide if repeat 
         /// evidence is old enough to consider a new session.
         /// </param>
         /// <param name="trackSession">
@@ -550,7 +550,7 @@ namespace FiftyOne.Pipeline.Engines.FiftyOne.FlowElements
         /// not send to 51Degrees.
         /// </param>
         /// <param name="includedQueryStringParameters">
-        /// A list of the names of query string parameters that share
+        /// A list of the names of query string parameters that share 
         /// usage should send to 51Degrees.
         /// If this value is null, all query string parameters are shared.
         /// </param>
@@ -559,11 +559,11 @@ namespace FiftyOne.Pipeline.Engines.FiftyOne.FlowElements
         /// The name of the cookie that contains the asp.net session id.
         /// </param>
         /// <param name="tracker">
-        /// The <see cref="ITracker"/> to use to determine if a given
+        /// The <see cref="ITracker"/> to use to determine if a given 
         /// <see cref="IFlowData"/> instance should be shared or not.
         /// </param>
         /// <param name="shareAllEvidence">
-        /// If true, all evidence will be shared and
+        /// If true, all evidence will be shared and  
         /// the blockedHttpHeaders, includedQueryStringParameters and
         /// ignoreDataEvidenceFilter parameters will be ignored.
         /// </param>
@@ -621,7 +621,7 @@ namespace FiftyOne.Pipeline.Engines.FiftyOne.FlowElements
             _interval = TimeSpan.FromMinutes(repeatEvidenceIntervalMinutes);
             ShareUsageUri = new Uri(shareUsageUrl);
 
-            // Some data is going to stay the same on all requests so we can
+            // Some data is going to stay the same on all requests so we can 
             // gather that now.
             _languageVersion = Environment.Version.ToString();
             _osVersion = Environment.OSVersion.VersionString;
@@ -651,14 +651,14 @@ namespace FiftyOne.Pipeline.Engines.FiftyOne.FlowElements
                 _ignoreDataEvidenceFilter = ignoreDataEvidenceFilter;
 
                  trackerEvidenceFiler = new EvidenceKeyFilterShareUsageTracker(
-                     blockedHttpHeaders,
-                     includedQueryStringParameters,
-                     trackSession,
+                     blockedHttpHeaders, 
+                     includedQueryStringParameters, 
+                     trackSession, 
                      aspSessionCookieName);
             }
             else
             {
-                // Create evidence filters what will allow all
+                // Create evidence filters what will allow all 
                 // evidence to be shared
                 _evidenceKeyFilter = new EvidenceKeyFilterShareUsage();
                 _evidenceKeyFilterExclSession = new EvidenceKeyFilterShareUsage();
@@ -682,7 +682,7 @@ namespace FiftyOne.Pipeline.Engines.FiftyOne.FlowElements
         }
 
         /// <summary>
-        /// Add
+        /// Add 
         /// </summary>
         /// <param name="pipeline"></param>
         public override void AddPipeline(IPipeline pipeline)
@@ -823,8 +823,8 @@ namespace FiftyOne.Pipeline.Engines.FiftyOne.FlowElements
 
         /// <summary>
         /// Extract the desired data from the evidence.
-        /// In order to avoid problems with the evidence data being disposed
-        /// before it is sent, the data placed into a new object rather
+        /// In order to avoid problems with the evidence data being disposed 
+        /// before it is sent, the data placed into a new object rather 
         /// than being a reference to the existing evidence instance.
         /// </summary>
         /// <param name="evidence">
@@ -841,7 +841,7 @@ namespace FiftyOne.Pipeline.Engines.FiftyOne.FlowElements
 
             foreach (var entry in evidence.AsDictionary())
             {
-                if (entry.Key.Equals(Core.Constants.EVIDENCE_CLIENTIP_KEY,
+                if (entry.Key.Equals(Core.Constants.EVIDENCE_CLIENTIP_KEY, 
                     StringComparison.OrdinalIgnoreCase))
                 {
                     // The client IP is dealt with separately for backwards
@@ -886,7 +886,7 @@ namespace FiftyOne.Pipeline.Engines.FiftyOne.FlowElements
 
                         // Get the evidence value.
                         string evidenceValue = entry.Value.ToString();
-                        // If the value is longer than the permitted length
+                        // If the value is longer than the permitted length 
                         // then truncate it.
                         if (evidenceValue.Length > Constants.SHARE_USAGE_MAX_EVIDENCE_LENGTH)
                         {
@@ -1005,7 +1005,7 @@ namespace FiftyOne.Pipeline.Engines.FiftyOne.FlowElements
                 CultureInfo.InvariantCulture));
             // The UTC date/time this entry was written
             writer.WriteElementString("DateSent", DateTime.UtcNow.ToString(
-                "yyyy-MM-ddTHH:mm:ss",
+                "yyyy-MM-ddTHH:mm:ss", 
                 CultureInfo.InvariantCulture));
             // The client IP of the request
             writer.WriteElementString("ClientIP", data.ClientIP);
@@ -1038,7 +1038,7 @@ namespace FiftyOne.Pipeline.Engines.FiftyOne.FlowElements
         }
 
         /// <summary>
-        /// Get the part of the xml message that will be the same for every usage
+        /// Get the part of the xml message that will be the same for every usage 
         /// sharing event on this machine.
         /// This is written once to a string in memory and then re-used for
         /// future messages.
@@ -1078,8 +1078,8 @@ namespace FiftyOne.Pipeline.Engines.FiftyOne.FlowElements
                         _staticXml = result.ToString();
                     }
 
-                    // If it's still null for some reason, set it to the empty string
-                    // so that we don't keep hitting the lock every time evidence is
+                    // If it's still null for some reason, set it to the empty string 
+                    // so that we don't keep hitting the lock every time evidence is 
                     // processed.
                     if (_staticXml == null) { _staticXml = string.Empty; }
                 }
@@ -1116,7 +1116,7 @@ namespace FiftyOne.Pipeline.Engines.FiftyOne.FlowElements
         /// The text to encode
         /// </param>
         /// <param name="flagBadSchema">
-        /// A flag storing whether this usage message inculdes any invalid characters
+        /// A flag storing whether this usage message inculdes any invalid characters 
         /// that we have had to encod.
         /// </param>
         /// <returns>
@@ -1132,8 +1132,8 @@ namespace FiftyOne.Pipeline.Engines.FiftyOne.FlowElements
                 throw new ArgumentNullException(nameof(text));
             }
 
-            // Validate characters in string. If not valid check chars
-            // individually and build new string with encoded chars. Set _flag
+            // Validate characters in string. If not valid check chars 
+            // individually and build new string with encoded chars. Set _flag 
             // to add "bad schema" element into usage data.
 
             try
@@ -1152,7 +1152,7 @@ namespace FiftyOne.Pipeline.Engines.FiftyOne.FlowElements
                     }
                     else
                     {
-                        tmp.Append("\\x" + Convert.ToByte(c).ToString("x4",
+                        tmp.Append("\\x" + Convert.ToByte(c).ToString("x4", 
                             CultureInfo.InvariantCulture));
                     }
                 };
