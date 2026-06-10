@@ -740,7 +740,13 @@ namespace FiftyOne.Pipeline.Engines.FiftyOne.FlowElements
         /// </summary>
         protected override void ManagedResourcesCleanup()
         {
-            TrySendData();
+            // Only attempt a final flush if there is something to send. This avoids
+            // a needless network round-trip (and a logged error when offline) when
+            // the pipeline is disposed without any usage. See issue #224.
+            if (EvidenceCollection.Count > 0)
+            {
+                TrySendData();
+            }
             if (IsRunning)
             {
                 SendDataTask.Wait();
