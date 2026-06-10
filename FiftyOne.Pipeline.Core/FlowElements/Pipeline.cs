@@ -29,6 +29,7 @@ using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Globalization;
 using System.Linq;
+using System.Threading;
 
 namespace FiftyOne.Pipeline.Core.FlowElements
 {
@@ -64,7 +65,7 @@ namespace FiftyOne.Pipeline.Core.FlowElements
         /// A factory method that is used to create new 
         /// <see cref="IFlowData"/> instances.
         /// </summary>
-        private Func<IPipelineInternal, IFlowData> _flowDataFactory;
+        private Func<IPipelineInternal, CancellationToken, IFlowData> _flowDataFactory;
 
         /// <summary>
         /// The <see cref="IFlowElement"/>s that make up this pipeline.
@@ -317,7 +318,7 @@ namespace FiftyOne.Pipeline.Core.FlowElements
         /// </exception>
         internal Pipeline(
             ILogger<Pipeline> logger,
-            Func<IPipelineInternal, IFlowData> flowDataFactory,
+            Func<IPipelineInternal, CancellationToken, IFlowData> flowDataFactory,
             List<IFlowElement> flowElements,
             bool autoDisposeElements,
             bool suppressProcessExceptions)
@@ -343,7 +344,19 @@ namespace FiftyOne.Pipeline.Core.FlowElements
         /// <returns></returns>
         public IFlowData CreateFlowData()
         {
-            return _flowDataFactory(this);
+            return _flowDataFactory(this, CancellationToken.None);
+        }
+
+        /// <summary>
+        /// Create a new flow data that stops processing when the supplied
+        /// token is cancelled.
+        /// </summary>
+        /// <param name="cancellationToken">
+        /// Token that cancels processing of the created flow data.
+        /// </param>
+        public IFlowData CreateFlowData(CancellationToken cancellationToken)
+        {
+            return _flowDataFactory(this, cancellationToken);
         }
 
         /// <summary>
@@ -378,11 +391,7 @@ namespace FiftyOne.Pipeline.Core.FlowElements
                 try
                 {
                     element.Process(data);
-#pragma warning disable CS0618 // Type or member is obsolete
-                    // This usage will be replaced once the Cancellation Token
-                    // mechanism is available.
-                    if (data.Stop) break;
-#pragma warning restore CS0618 // Type or member is obsolete
+                    if (data.StopTokenSource?.IsCancellationRequested == true) { break; }
                 }
 #pragma warning disable CA1031 // Do not catch general exception types
                 // We want to catch any exception here so that the

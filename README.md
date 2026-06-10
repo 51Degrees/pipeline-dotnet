@@ -102,6 +102,29 @@ If you want examples that demonstrate how to use 51Degrees products such as devi
 | ResultCaching                             | Shows how the result caching feature works. |
 | UsageSharing                              | Shows how to share usage with 51Degrees. This helps us to keep our products up to date and accurate. |
 
+## Cancelling processing
+
+Pass a `CancellationToken` to `CreateFlowData` to stop processing when the token
+is cancelled. The pipeline checks the token between elements, so once it is
+cancelled no further elements run.
+
+```csharp
+using var cts = new CancellationTokenSource();
+using var flowData = pipeline.CreateFlowData(cts.Token);
+flowData.AddEvidence("key", "value");
+
+// Cancelling the token (for example when the web request is aborted)
+// stops the pipeline before the next element runs.
+flowData.Process();
+```
+
+In the ASP.NET Core integration the token is wired to `HttpContext.RequestAborted`,
+and in the .NET Framework integration to `HttpResponse.ClientDisconnectedToken`, so
+processing stops automatically when the client disconnects.
+
+An element with long-running work can check `flowData.StopTokenSource.Token` itself
+to stop sooner; elements that don't are simply skipped once the token is cancelled.
+
 ## Tests
 
 - **FiftyOne.Pipeline.CloudRequestEngine.Tests** - Tests for the CloudRequestEngine and builder.

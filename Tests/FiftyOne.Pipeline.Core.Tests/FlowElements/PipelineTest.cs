@@ -29,6 +29,7 @@ using Microsoft.VisualStudio.TestTools.UnitTesting;
 using Moq;
 using System;
 using System.Collections.Generic;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace FiftyOne.Pipeline.Core.Tests.FlowElements
@@ -48,6 +49,64 @@ namespace FiftyOne.Pipeline.Core.Tests.FlowElements
             element.SetupGet(e => e.ElementDataKey).Returns("test");
             element.Setup(e => e.Properties).Returns(new List<IElementPropertyMetaData>());
             return element;
+        }
+
+        /// <summary>
+        /// Test that the pipeline copes with a flow data that has no
+        /// StopTokenSource.
+        /// </summary>
+        [TestMethod]
+        public void Pipeline_Process_FlowDataWithoutStopTokenSource_RecordsNoError()
+        {
+            var element = GetMockFlowElement();
+            var data = new Mock<IFlowData>();
+            var pipeline = CreatePipeline(false, true, element.Object);
+
+            pipeline.Process(data.Object);
+
+            data.Verify(d => d.AddError(It.IsAny<Exception>(), It.IsAny<IFlowElement>()), Times.Never());
+        }
+
+        /// <summary>
+        /// Test that a flow element copes with a flow data that has no
+        /// StopTokenSource.
+        /// </summary>
+        [TestMethod]
+        public void FlowElementBase_Process_FlowDataWithoutStopTokenSource_DoesNotThrow()
+        {
+            var data = new Mock<IFlowData>();
+            var element = new StopElement();
+
+            element.Process(data.Object);
+        }
+
+        /// <summary>
+        /// Check that a token passed to CreateFlowData stops the created
+        /// flow data when cancelled.
+        /// </summary>
+        [TestMethod]
+        public void Pipeline_CreateFlowData_WithToken_LinksCancellation()
+        {
+            Func<IPipelineInternal, CancellationToken, IFlowData> factory =
+                (p, ct) => new FlowData(
+                    new Mock<ILogger<FlowData>>().Object,
+                    p,
+                    new Evidence(new Mock<ILogger<Evidence>>().Object),
+                    ct);
+
+            using var pipeline = new Core.FlowElements.Pipeline(
+                _logger.Object,
+                factory,
+                new List<IFlowElement>(),
+                false,
+                false);
+            using var cts = new CancellationTokenSource();
+
+            using var data = pipeline.CreateFlowData(cts.Token);
+
+            Assert.IsFalse(data.StopTokenSource.IsCancellationRequested);
+            cts.Cancel();
+            Assert.IsTrue(data.StopTokenSource.IsCancellationRequested);
         }
 
         /// <summary>

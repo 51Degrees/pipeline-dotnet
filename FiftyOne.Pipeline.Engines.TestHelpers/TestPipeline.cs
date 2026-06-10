@@ -24,6 +24,7 @@ using FiftyOne.Pipeline.Core.Data;
 using FiftyOne.Pipeline.Core.FlowElements;
 using System;
 using System.Collections.Generic;
+using System.Threading;
 
 namespace FiftyOne.Pipeline.Engines.TestHelpers
 {
@@ -58,6 +59,11 @@ namespace FiftyOne.Pipeline.Engines.TestHelpers
             public IFlowData CreateFlowData()
             {
                 return _pipeline.CreateFlowData();
+            }
+
+            public IFlowData CreateFlowData(CancellationToken cancellationToken)
+            {
+                return _pipeline.CreateFlowData(cancellationToken);
             }
 
             public void Dispose()
