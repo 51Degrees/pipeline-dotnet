@@ -24,6 +24,7 @@ using FiftyOne.Pipeline.Core.FlowElements;
 using FiftyOne.Pipeline.Core.TypedMap;
 using System;
 using System.Collections.Generic;
+using System.Threading;
 
 namespace FiftyOne.Pipeline.Core.Data
 {
@@ -37,12 +38,18 @@ namespace FiftyOne.Pipeline.Core.Data
         /// A boolean flag that can be used to stop further elements
         /// from executing.
         /// </summary>
-        [Obsolete("This property will be replaced with a more appropriate " +
-            "mechanism such as a CancellationToken in a future version.")]
+        [Obsolete("Use StopTokenSource instead.")]
 #pragma warning disable CA1716 // Identifiers should not match keywords
         // Marked as obsolete and will be removed in future.
         bool Stop { get; set; }
 #pragma warning restore CA1716 // Identifiers should not match keywords
+
+        /// <summary>
+        /// Source for the cancellation token that stops processing of this
+        /// flow data. Cancel it to stop the pipeline running any further
+        /// elements.
+        /// </summary>
+        CancellationTokenSource StopTokenSource { get; }
 
         /// <summary>
         /// The errors that have occurred during processing

@@ -32,6 +32,7 @@ using Moq;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading;
 
 namespace FiftyOne.Pipeline.Core.Tests.Data
 {
@@ -84,6 +85,52 @@ namespace FiftyOne.Pipeline.Core.Tests.Data
         {
             _flowData.Process();
             _pipeline.Verify(p => p.Process(_flowData));
+        }
+
+        /// <summary>
+        /// Check that cancelling the external token stops the flow data.
+        /// </summary>
+        [TestMethod]
+        public void FlowData_StopTokenSource_LinksExternalToken()
+        {
+            using var externalCts = new CancellationTokenSource();
+            using var flowData = new FlowData(_logger.Object, _pipeline.Object,
+                new Evidence(new Mock<ILogger<Evidence>>().Object), externalCts.Token);
+
+            Assert.IsFalse(flowData.StopTokenSource.IsCancellationRequested);
+            externalCts.Cancel();
+            Assert.IsTrue(flowData.StopTokenSource.IsCancellationRequested);
+#pragma warning disable CS0618 // Stop is obsolete
+            Assert.IsTrue(flowData.Stop);
+#pragma warning restore CS0618
+        }
+
+        /// <summary>
+        /// Check that setting the obsolete Stop flag cancels the token source.
+        /// </summary>
+        [TestMethod]
+        public void FlowData_SettingStop_CancelsTokenSource()
+        {
+            Assert.IsFalse(_flowData.StopTokenSource.IsCancellationRequested);
+#pragma warning disable CS0618 // Stop is obsolete
+            _flowData.Stop = true;
+#pragma warning restore CS0618
+            Assert.IsTrue(_flowData.StopTokenSource.IsCancellationRequested);
+        }
+
+        /// <summary>
+        /// Check that disposing the flow data disposes its StopTokenSource.
+        /// </summary>
+        [TestMethod]
+        public void FlowData_Dispose_DisposesStopTokenSource()
+        {
+            var flowData = new FlowData(_logger.Object, _pipeline.Object,
+                new Evidence(new Mock<ILogger<Evidence>>().Object));
+            var tokenSource = flowData.StopTokenSource;
+
+            flowData.Dispose();
+
+            Assert.ThrowsExactly<ObjectDisposedException>(() => _ = tokenSource.Token);
         }
 
         /// <summary>

@@ -38,6 +38,7 @@ using System;
 using System.Collections.Generic;
 using System.Collections.Specialized;
 using System.Linq;
+using System.Threading;
 using System.Web;
 
 namespace FiftyOne.Pipeline.Web.Framework
@@ -231,8 +232,18 @@ namespace FiftyOne.Pipeline.Web.Framework
         {
             if (request == null) throw new ArgumentNullException(nameof(request));
 
+            var clientDisconnectedToken = CancellationToken.None;
+            try
+            {
+                clientDisconnectedToken = request.RequestContext.HttpContext.Response.ClientDisconnectedToken;
+            }
+            catch (PlatformNotSupportedException)
+            {
+                // Only available on IIS 7.5+ in integrated mode.
+            }
+
             // Create a new FlowData instance.
-            var flowData = GetInstance().Pipeline.CreateFlowData();
+            var flowData = GetInstance().Pipeline.CreateFlowData(clientDisconnectedToken);
 
             try
             {

@@ -24,18 +24,43 @@ using FiftyOne.Pipeline.Core.Data;
 using FiftyOne.Pipeline.Core.FlowElements;
 using Microsoft.Extensions.Logging;
 using Moq;
+using System.Collections.Generic;
 using System.Threading;
 
 namespace FiftyOne.Pipeline.Core.Tests.HelperClasses
 {
-    internal class StaticFactories
+    /// <summary>
+    /// Test element that records the cancellation token it was given.
+    /// </summary>
+    public class TokenCapturingElement : FlowElementBase<TestElementData, IElementPropertyMetaData>
     {
-        public static IFlowData CreateFlowData(IPipelineInternal pipeline, CancellationToken cancellationToken = default)
+        private readonly EvidenceKeyFilterWhitelist _evidenceKeyFilter;
+
+        public CancellationToken SeenToken { get; private set; }
+
+        public override string ElementDataKey => "tokencapturing";
+
+        public override IEvidenceKeyFilter EvidenceKeyFilter => _evidenceKeyFilter;
+
+        public override IList<IElementPropertyMetaData> Properties => new List<IElementPropertyMetaData>();
+
+        public TokenCapturingElement() :
+            base(new Mock<ILogger<TokenCapturingElement>>().Object)
         {
-            var logger = new Mock<ILogger<FlowData>>();
-            var evidenceLogger = new Mock<ILogger<Evidence>>();
-            var evidence = new Evidence(evidenceLogger.Object);
-            return new FlowData(logger.Object, pipeline, evidence, cancellationToken);
+            _evidenceKeyFilter = new EvidenceKeyFilterWhitelist(new List<string>());
+        }
+
+        protected override void ProcessInternal(IFlowData data)
+        {
+            SeenToken = data.StopTokenSource.Token;
+        }
+
+        protected override void ManagedResourcesCleanup()
+        {
+        }
+
+        protected override void UnmanagedResourcesCleanup()
+        {
         }
     }
 }

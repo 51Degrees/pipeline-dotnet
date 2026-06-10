@@ -24,6 +24,7 @@ using FiftyOne.Pipeline.Core.Data;
 using FiftyOne.Pipeline.Core.Exceptions;
 using System;
 using System.Collections.Generic;
+using System.Threading;
 
 namespace FiftyOne.Pipeline.Core.FlowElements
 {
@@ -40,6 +41,18 @@ namespace FiftyOne.Pipeline.Core.FlowElements
         /// A new <see cref="IFlowData"/> instance.
         /// </returns>
         IFlowData CreateFlowData();
+
+        /// <summary>
+        /// Create a new flow data that stops processing when the supplied
+        /// token is cancelled.
+        /// </summary>
+        /// <param name="cancellationToken">
+        /// Token that cancels processing of the created flow data.
+        /// </param>
+        /// <returns>
+        /// A new <see cref="IFlowData"/> instance.
+        /// </returns>
+        IFlowData CreateFlowData(CancellationToken cancellationToken);
 
         /// <summary>
         /// Get a filter that will only include the evidence keys that can 

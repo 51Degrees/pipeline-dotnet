@@ -27,6 +27,7 @@ using Microsoft.Extensions.Logging;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using Moq;
 using System.Collections.Generic;
+using System.Threading;
 
 namespace FiftyOne.Pipeline.Core.Tests.Integration
 {
@@ -139,6 +140,55 @@ namespace FiftyOne.Pipeline.Core.Tests.Integration
             }
             // Check that the second element was never processed
             testElement.Verify(e => e.Process(It.IsAny<IFlowData>()), Times.Never());
+        }
+
+        /// <summary>
+        /// Check that cancelling an external token stops the pipeline before
+        /// the next element runs.
+        /// </summary>
+        [TestMethod]
+        public void PipelineIntegration_ExternalToken_StopsProcessing()
+        {
+            using var externalCts = new CancellationTokenSource();
+
+            var cancelElement = new ExternalCancelElement(externalCts);
+            var testElement = new Mock<IFlowElement>();
+            testElement.SetupGet(e => e.ElementDataKey).Returns("test");
+            testElement.SetupGet(e => e.Properties).Returns(new List<IElementPropertyMetaData>());
+
+            var pipeline = new PipelineBuilder(new LoggerFactory())
+                .AddFlowElement(cancelElement)
+                .AddFlowElement(testElement.Object)
+                .Build();
+
+            using (var flowData = pipeline.CreateFlowData(externalCts.Token))
+            {
+                flowData.Process();
+                Assert.IsTrue(flowData.StopTokenSource.IsCancellationRequested);
+            }
+            testElement.Verify(e => e.Process(It.IsAny<IFlowData>()), Times.Never());
+        }
+
+        /// <summary>
+        /// Check that an element sees a token linked to the external one.
+        /// </summary>
+        [TestMethod]
+        public void PipelineIntegration_ElementSeesTokenLinkedToExternalCancellation()
+        {
+            using var externalCts = new CancellationTokenSource();
+            var element = new TokenCapturingElement();
+            var pipeline = new PipelineBuilder(new LoggerFactory())
+                .AddFlowElement(element)
+                .Build();
+
+            // Keep the flow data alive past the asserts; disposing it would
+            // unlink the token from the external source.
+            using var flowData = pipeline.CreateFlowData(externalCts.Token);
+            flowData.Process();
+
+            Assert.IsFalse(element.SeenToken.IsCancellationRequested);
+            externalCts.Cancel();
+            Assert.IsTrue(element.SeenToken.IsCancellationRequested);
         }
     }
 }
