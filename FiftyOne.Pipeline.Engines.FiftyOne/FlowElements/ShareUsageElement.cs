@@ -99,6 +99,16 @@ namespace FiftyOne.Pipeline.Engines.FiftyOne.FlowElements
                 allData.Add(currentData);
             }
 
+            // Nothing was queued (e.g. the element was disposed without any usage,
+            // or a concurrent send already drained the queue). Do not open a
+            // connection or POST an empty <Devices/> document - doing so produces
+            // spurious "Unexpected failure while sharing usage data" errors on
+            // machines that cannot reach the usage-sharing endpoint. See issue #224.
+            if (allData.Count == 0)
+            {
+                return;
+            }
+
             // Create the zip stream and XML writer.
             using (MemoryStream memory = new MemoryStream())
             {
