@@ -38,6 +38,7 @@ using FiftyOne.Common.TestHelpers;
 using FiftyOne.Pipeline.Engines.TestHelpers;
 using System;
 using System.Linq;
+using System.Reflection;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -398,6 +399,131 @@ namespace FiftyOne.Pipeline.Engines.FiftyOne.Tests.FlowElements
             // Assert
             // Check that one HTTP message was sent during cleanup.
             _httpHandler.VerifySendCalled(1);
+        }
+
+        /// <summary>
+        /// Issue #224 regression: disposing a share usage element that was never
+        /// used (no Process call) must NOT attempt a network POST and must NOT log
+        /// an error - even when the transport would fail (offline / DNS failure).
+        /// </summary>
+        [TestMethod]
+        public void ShareUsageElement_NoSendOnCleanup_WhenNothingProcessed()
+        {
+            // Arrange - share usage element, but never call Process(...).
+            CreateShareUsage(1, 2, 1, new List<string>(), new List<string>(),
+                new List<KeyValuePair<string, string>>());
+
+            // Simulate an offline machine: any send throws like the reported
+            // SocketException 11004 / HttpRequestException (devices-v4.51degrees.com:443).
+            _httpHandler.SetupResponse(_ =>
+                throw new HttpRequestException(
+                    "simulated DNS failure (devices-v4.51degrees.com:443)"));
+
+            // Act - dispose without any usage.
+            _shareUsageElement.Dispose();
+            // Allow any (erroneously) started background task to run.
+            Thread.Sleep(200);
+
+            // Assert - no POST attempted and no error logged.
+            _httpHandler.VerifySendCalled(0);
+            _logger.AssertMaxErrors(0);
+        }
+
+        /// <summary>
+        /// Issue #224 regression: even when a background flush is triggered with an
+        /// empty queue (e.g. a race where the queue was already drained), no empty
+        /// payload should be sent.
+        /// </summary>
+        [TestMethod]
+        public void ShareUsageElement_NoSend_WhenQueueEmpty()
+        {
+            // Arrange.
+            CreateShareUsage(1, 2, 1, new List<string>(), new List<string>(),
+                new List<KeyValuePair<string, string>>());
+
+            // Act - force a send attempt with an empty queue via dispose.
+            _shareUsageElement.Dispose();
+            Thread.Sleep(200);
+
+            // Assert - nothing in the queue => nothing sent.
+            _httpHandler.VerifySendCalled(0);
+            Assert.IsEmpty(_xmlContent,
+                "No XML document should have been produced for an empty queue.");
+        }
+
+        /// <summary>
+        /// Guard test: the fix must NOT regress the real flush-on-dispose behaviour.
+        /// When data WAS processed, disposing must still send exactly one message.
+        /// (Equivalent intent to ShareUsageElement_SendOnCleanup; kept explicit so
+        /// the #224 fix is verified end-to-end.)
+        /// </summary>
+        [TestMethod]
+        public void ShareUsageElement_StillSendsOnCleanup_WhenDataProcessed()
+        {
+            // Arrange.
+            CreateShareUsage(1, 2, 1, new List<string>(), new List<string>(),
+                new List<KeyValuePair<string, string>>());
+
+            var evidenceData = new Dictionary<string, object>()
+            {
+                { Core.Constants.EVIDENCE_CLIENTIP_KEY, "1.2.3.4" },
+            };
+            var data = MockFlowData.CreateFromEvidence(evidenceData, false);
+
+            // Act - one item processed (below MinEntriesPerMessage so nothing sent yet).
+            _shareUsageElement.Process(data.Object);
+            _httpHandler.VerifySendCalled(0);
+
+            _shareUsageElement.Dispose();
+            Thread.Sleep(200);
+
+            // Assert - the queued item is flushed exactly once on dispose.
+            _httpHandler.VerifySendCalled(1);
+        }
+
+        /// <summary>
+        /// Issue #224 reproduction. This is the exact failure from the report:
+        /// a pipeline that was never used still triggers a usage-sharing send
+        /// with an EMPTY queue. On a machine that cannot reach the endpoint the
+        /// POST fails and the transport throws (the AggregateException wrapping
+        /// SocketException 11004 "The requested name is valid, but no data of the
+        /// requested type was found. (devices-v4.51degrees.com:443)").
+        ///
+        /// The send path is invoked directly here (this is what dispose does
+        /// internally via TrySendData) so the exception surfaces instead of being
+        /// swallowed and logged. This bypasses the dispose-time guard so the test
+        /// pins the behaviour of the send method itself:
+        ///   - WITHOUT the fix: BuildAndSendXmlAsync POSTs an empty &lt;Devices/&gt;
+        ///     document and the await rethrows the transport exception (test fails).
+        ///   - WITH the fix:    BuildAndSendXmlAsync skips the empty send, so it
+        ///     completes without throwing and never touches the network.
+        /// </summary>
+        [TestMethod]
+        public async Task ShareUsageElement_EmptyQueue_DoesNotThrowOrSend()
+        {
+            // Arrange - element with an empty evidence queue (nothing processed).
+            CreateShareUsage(1, 2, 1, new List<string>(), new List<string>(),
+                new List<KeyValuePair<string, string>>());
+
+            // Simulate the offline / DNS-failure machine from the issue: any
+            // attempt to send throws exactly like the reported failure.
+            _httpHandler.SetupResponse(_ =>
+                throw new HttpRequestException(
+                    "The requested name is valid, but no data of the requested " +
+                    "type was found. (devices-v4.51degrees.com:443)"));
+
+            // Act - invoke the send path directly with an empty queue. Without the
+            // fix this builds and POSTs an empty document, and awaiting the task
+            // rethrows the transport exception (reproducing the issue).
+            var buildAndSend = (Task)_shareUsageElement.GetType()
+                .GetMethod("BuildAndSendXmlAsync",
+                    BindingFlags.Instance | BindingFlags.NonPublic)
+                .Invoke(_shareUsageElement, null);
+            await buildAndSend;
+
+            // Assert - with the fix the send is skipped: no exception was thrown
+            // (we reached this line) and no network call was made.
+            _httpHandler.VerifySendCalled(0);
         }
 
         /// <summary>
