@@ -128,4 +128,29 @@ public class DidCloudEngineProcessingTests
         Assert.IsFalse(raw.ContainsKey(nameof(I51DidData.IdProbGlobal)));
         Assert.IsFalse(raw.ContainsKey(nameof(I51DidData.IdProbLic)));
     }
+
+    [TestMethod]
+    public void ProcessCloudEngine_PopulatesAllSixProperties()
+    {
+        var json = @"{
+            ""fodid"": {
+                ""idprobglobal"": ""pg"",
+                ""idproblic"": ""pl"",
+                ""idrandglobal"": ""rg"",
+                ""idrandlic"": ""rl"",
+                ""idhemglobal"": ""hg"",
+                ""idhemlic"": ""hl""
+            }
+        }";
+
+        var aspectData = NewAspectData();
+        _engine.ProcessCloudEngine(NewFlowData(), aspectData, json);
+
+        Assert.AreEqual("pg", aspectData.IdProbGlobal.Value);
+        Assert.AreEqual("pl", aspectData.IdProbLic.Value);
+        Assert.AreEqual("rg", aspectData.IdRandGlobal.Value);
+        Assert.AreEqual("rl", aspectData.IdRandLic.Value);
+        Assert.AreEqual("hg", aspectData.IdHemGlobal.Value);
+        Assert.AreEqual("hl", aspectData.IdHemLic.Value);
+    }
 }

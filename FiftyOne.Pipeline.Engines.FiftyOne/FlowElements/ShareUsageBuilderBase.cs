@@ -27,6 +27,7 @@ using Microsoft.Extensions.Logging;
 using System;
 using System.Collections.Generic;
 using System.Globalization;
+using System.Linq;
 using System.Runtime.CompilerServices;
 
 [assembly: InternalsVisibleTo("FiftyOne.Pipeline.Engines.FiftyOne.Tests, PublicKey=0024000004800000940000000602000000240000525341310004000001000100c3a631e6634ea697e19c6d2fedc285bdc7f0447a5583e1ac3c5ed3502b7633e691f899a265c42a5611122a23fd2bc882e4e412384a5d4183271782416cf016b06e6648273d44896e95ce482bb8b13054ba6a6f41d393c3f3f2e5780d620e50cb67c248882e4427bf007b7c77fdd65f832c7f4a3fef9dc18e39f792d1a37cc980")]
@@ -126,6 +127,11 @@ namespace FiftyOne.Pipeline.Engines.FiftyOne.FlowElements
         /// A list of query string parameters to be shared.
         /// </summary>
         protected List<string> IncludedQueryStringParameters { get; private set; } = new List<string>();
+        /// <summary>
+        /// Evidence keys that must never be shared, even when
+        /// share-all-evidence is enabled.
+        /// </summary>
+        protected List<string> NeverSharedEvidenceKeys { get; private set; } = new List<string>();
         /// <summary>
         /// A collection of evidence keys and values which, if present,
         /// cause the event to be ignored for the purposes of usage sharing.
@@ -344,6 +350,47 @@ namespace FiftyOne.Pipeline.Engines.FiftyOne.FlowElements
         {
             BlockedHttpHeaders.Add(blockedHeader);
             return this;
+        }
+
+        /// <summary>
+        /// Evidence keys listed here are never shared, even when
+        /// share-all-evidence is enabled. Use for values that must not
+        /// leave the server, such as personal data supplied in evidence.
+        /// </summary>
+        /// <param name="neverSharedKeys">
+        /// The (case insensitive) full evidence keys that must never be shared,
+        /// e.g. 'query.id.email'.
+        /// </param>
+        /// <exception cref="ArgumentNullException">
+        /// Thrown if the parameter is null
+        /// </exception>
+        [DefaultValue("No keys are excluded")]
+        public ShareUsageBuilderBase<T> SetNeverSharedEvidenceKeys(List<string> neverSharedKeys)
+        {
+            NeverSharedEvidenceKeys = neverSharedKeys;
+            return this;
+        }
+
+        /// <summary>
+        /// Evidence keys listed here are never shared, even when
+        /// share-all-evidence is enabled.
+        /// </summary>
+        /// <param name="neverSharedKeys">
+        /// Comma separated (case insensitive) full evidence keys that must never be shared,
+        /// e.g. 'query.id.email,header.id.email'.
+        /// </param>
+        /// <exception cref="ArgumentNullException">
+        /// Thrown if the parameter is null
+        /// </exception>
+        [DefaultValue("No keys are excluded")]
+        public ShareUsageBuilderBase<T> SetNeverSharedEvidenceKeys(string neverSharedKeys)
+        {
+            if (neverSharedKeys == null)
+            {
+                throw new ArgumentNullException(nameof(neverSharedKeys));
+            }
+            return SetNeverSharedEvidenceKeys(new List<string>(
+                neverSharedKeys.Split(',').Select(s => s.Trim())));
         }
 
         /// <summary>

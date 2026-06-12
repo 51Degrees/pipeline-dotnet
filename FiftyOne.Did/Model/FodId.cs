@@ -26,8 +26,8 @@ namespace FiftyOne.Did.Model
 {
     /// <summary>
     /// An OWID whose payload encodes the three fields of a 51Did: a 1-byte
-    /// usage flags bitmask, a 4-byte little-endian License Id, and the
-    /// 32-byte SHA-256 probabilistic value.
+    /// flags bitmask (usage tier and identifier type), a 4-byte
+    /// little-endian License Id, and the identifier value.
     /// </summary>
     /// <remarks>
     /// <para>
@@ -40,13 +40,16 @@ namespace FiftyOne.Did.Model
     /// never full identifiers.
     /// </para>
     /// <para>
-    /// Payload layout (37 bytes):
+    /// Payload layout. The header (offsets 0-4) is shared by every
+    /// identifier type; bits 6-7 of Flags select the type and the length
+    /// of the value that follows:
     /// </para>
     /// <list type="table">
     ///   <listheader><term>Offset</term><term>Length</term><term>Field</term></listheader>
-    ///   <item><term>0</term><term>1</term><term>Flags (uint8 bit-mask)</term></item>
+    ///   <item><term>0</term><term>1</term><term>Flags (bits 0-2 usage, bits 6-7 type)</term></item>
     ///   <item><term>1</term><term>4</term><term>LicenseId (uint32 LE)</term></item>
-    ///   <item><term>5</term><term>32</term><term>Hash (SHA-256)</term></item>
+    ///   <item><term>5</term><term>32</term><term>Value: SHA-256 (Probabilistic, HashedEmail)</term></item>
+    ///   <item><term>5</term><term>16</term><term>Value: GUID (Random)</term></item>
     /// </list>
     /// <para>
     /// Inherits <see cref="Owid"/> so callers can use OWID-level features
@@ -87,7 +90,26 @@ namespace FiftyOne.Did.Model
         public const int HashLength = 32;
 
         /// <summary>
-        /// Minimum byte length of a 51Did payload (Flags + LicenseId + Hash).
+        /// Byte length of the payload header (Flags + LicenseId) that is
+        /// common to every identifier type.
+        /// </summary>
+        public const int HeaderLength = HashOffset;
+
+        /// <summary>
+        /// Byte length of the GUID value carried by Random identifiers.
+        /// </summary>
+        public const int GuidLength = 16;
+
+        /// <summary>
+        /// Minimum byte length of a Random 51Did payload
+        /// (Flags + LicenseId + GUID).
+        /// </summary>
+        public const int RandomPayloadLength = HeaderLength + GuidLength;
+
+        /// <summary>
+        /// Minimum byte length of a Probabilistic or HashedEmail 51Did
+        /// payload (Flags + LicenseId + Hash). Random payloads are
+        /// shorter - see <see cref="RandomPayloadLength"/>.
         /// </summary>
         public const int PayloadLength = HashOffset + HashLength;
 
@@ -97,12 +119,19 @@ namespace FiftyOne.Did.Model
         public byte Flags { get; private set; }
 
         /// <summary>
+        /// The identifier type carried in bits 6-7 of <see cref="Flags"/>.
+        /// </summary>
+        public IdType Type => (IdType)((Flags >> 6) & 0b11);
+
+        /// <summary>
         /// The 4-byte little-endian License Id from the payload.
         /// </summary>
         public uint LicenseId { get; private set; }
 
         /// <summary>
-        /// The 32-byte SHA-256 probabilistic value from the payload.
+        /// The value bytes from the payload: a 32-byte SHA-256 for
+        /// Probabilistic and HashedEmail identifiers, 16 GUID bytes for
+        /// Random ones.
         /// This is the stable field for comparing two 51Did identifiers:
         /// two identifiers for the same device + IP + usage share the
         /// same probabilistic value even though their wrapping envelopes
@@ -128,8 +157,8 @@ namespace FiftyOne.Did.Model
         /// is not valid Base64.
         /// </exception>
         /// <exception cref="ArgumentException">
-        /// Thrown when the decoded payload is shorter than
-        /// <see cref="PayloadLength"/> bytes.
+        /// Thrown when the decoded payload is shorter than the minimum
+        /// for its identifier type.
         /// </exception>
         public FodId(string base64) : base(base64) => Unpack(nameof(base64));
 
@@ -141,8 +170,8 @@ namespace FiftyOne.Did.Model
         /// Thrown when <paramref name="buffer"/> is <c>null</c>.
         /// </exception>
         /// <exception cref="ArgumentException">
-        /// Thrown when the payload is shorter than <see cref="PayloadLength"/>
-        /// bytes.
+        /// Thrown when the payload is shorter than the minimum for its
+        /// identifier type.
         /// </exception>
         public FodId(byte[] buffer) : base(buffer) => Unpack(nameof(buffer));
 
@@ -157,7 +186,7 @@ namespace FiftyOne.Did.Model
         /// </exception>
         /// <exception cref="ArgumentException">
         /// Thrown when <paramref name="owid"/>'s payload is shorter than
-        /// <see cref="PayloadLength"/> bytes.
+        /// the minimum for its identifier type.
         /// </exception>
         public FodId(Owid.Client.Model.Owid owid) : base()
         {
@@ -175,10 +204,10 @@ namespace FiftyOne.Did.Model
 
         private void Unpack(string paramName)
         {
-            if (Payload == null || Payload.Length < PayloadLength)
+            if (Payload == null || Payload.Length < HeaderLength)
             {
                 throw new ArgumentException(
-                    $"51Did payload must be at least {PayloadLength} bytes; " +
+                    $"51Did payload must be at least {HeaderLength} bytes; " +
                     $"got {Payload?.Length ?? 0}.",
                     paramName);
             }
@@ -188,8 +217,21 @@ namespace FiftyOne.Did.Model
                 | (Payload[LicenseIdOffset + 1] << 8)
                 | (Payload[LicenseIdOffset + 2] << 16)
                 | (Payload[LicenseIdOffset + 3] << 24));
-            Hash = new byte[HashLength];
-            Array.Copy(Payload, HashOffset, Hash, 0, HashLength);
+            var valueLength = Type switch
+            {
+                IdType.Random => GuidLength,
+                IdType.Reserved => Payload.Length - HeaderLength,
+                _ => HashLength,
+            };
+            if (Payload.Length < HeaderLength + valueLength)
+            {
+                throw new ArgumentException(
+                    $"51Did payload for the {Type} type must be at least " +
+                    $"{HeaderLength + valueLength} bytes; got {Payload.Length}.",
+                    paramName);
+            }
+            Hash = new byte[valueLength];
+            Array.Copy(Payload, HashOffset, Hash, 0, valueLength);
         }
     }
 }
