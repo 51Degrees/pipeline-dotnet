@@ -102,6 +102,8 @@ If you want examples that demonstrate how to use 51Degrees products such as devi
 | ResultCaching                             | Shows how the result caching feature works. |
 | UsageSharing                              | Shows how to share usage with 51Degrees. This helps us to keep our products up to date and accurate. |
 
+The CloudRequestEngine\GettingStarted example requires a resource key. It reads the aligned `51DEGREES_RESOURCE_KEY` environment variable first, then the legacy `RESOURCE_KEY` variable. A resource key with the free properties used by the examples can be created at https://configure.51degrees.com/Wkqxf3Bs.
+
 ## Tests
 
 - **FiftyOne.Pipeline.CloudRequestEngine.Tests** - Tests for the CloudRequestEngine and builder.
