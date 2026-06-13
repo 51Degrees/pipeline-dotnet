@@ -133,7 +133,7 @@
     <value>Failed to increment usage sequence number</value>
   </data>
   <data name="MessageFailSequenceNumberParse" xml:space="preserve">
-    <value>The value for the ‘sequence’ parameter is not valid. See https://51degrees.com/documentation/_info__error_messages.html#Sequence_value_invalid for more information.</value>
+    <value>The value for the ‘sequence’ parameter is not valid. See https://51degrees.com/documentation/_info__error_messages.html?utm_source=code&amp;utm_medium=comment&amp;utm_campaign=pipeline-dotnet&amp;utm_content=fiftyone.pipeline.engines.fiftyone-messages.resx&amp;utm_term=messagefailsequencenumberparse#Sequence_value_invalid for more information.</value>
   </data>
   <data name="MessageFailSequenceNumberRetreive" xml:space="preserve">
     <value>Failed to retrieve sequence number</value>

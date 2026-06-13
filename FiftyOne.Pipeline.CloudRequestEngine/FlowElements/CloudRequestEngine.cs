@@ -78,7 +78,7 @@ namespace FiftyOne.Pipeline.CloudRequestEngine.FlowElements
             /// A resource key encapsulates details such as any license keys,
             /// the properties that should be returned and the domains that
             /// requests are permitted from. A new resource key can be
-            /// generated for free at https://configure.51degrees.com
+            /// generated for free at https://configure.51degrees.com?utm_source=code&amp;utm_medium=comment&amp;utm_campaign=pipeline-dotnet&amp;utm_content=fiftyone.pipeline.cloudrequestengine-flowelements-cloudrequestengine.cs&amp;utm_term=resourcekey
             /// </summary>
             public string ResourceKey;
 
@@ -143,7 +143,7 @@ namespace FiftyOne.Pipeline.CloudRequestEngine.FlowElements
         /// A resource key encapsulates details such as any license keys,
         /// the properties that should be returned and the domains that
         /// requests are permitted from. A new resource key can be
-        /// generated for free at https://configure.51degrees.com
+        /// generated for free at https://configure.51degrees.com?utm_source=code&amp;utm_medium=comment&amp;utm_campaign=pipeline-dotnet&amp;utm_content=fiftyone.pipeline.cloudrequestengine-flowelements-cloudrequestengine.cs&amp;utm_term=cloudrequestengine
         /// </param>
         /// <param name="dataEndpoint">
         /// The URL for the cloud endpoint that will take the supplied

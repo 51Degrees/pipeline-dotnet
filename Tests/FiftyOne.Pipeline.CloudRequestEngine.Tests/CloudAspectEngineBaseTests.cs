@@ -54,7 +54,7 @@ namespace FiftyOne.Pipeline.CloudRequestEngine.Tests
             "Failed to load aspect properties for element '{0}'. This is " +
             "because your resource key does not include access to any " +
             "properties under '{0}'. For more details on resource keys, " +
-            "see our explainer: https://51degrees.com/documentation/_info__resource_keys.html";
+            "see our explainer: https://51degrees.com/documentation/_info__resource_keys.html?utm_source=code&utm_medium=comment&utm_campaign=pipeline-dotnet&utm_content=fiftyone.pipeline.cloudrequestengine-messages.resx&utm_term=exceptionfailedtoloadproperties";
 
         #region Test Classes
 

@@ -95,7 +95,7 @@ namespace FiftyOne.Pipeline.JavaScriptBuilder.FlowElement
         /// processing in cookies.
         /// This can also be set per request, using the "query.fod-js-enable-cookies"
         /// evidence key.
-        /// For more details on personal data policy, see http://51degrees.com/terms/client-services-privacy-policy/
+        /// For more details on personal data policy, see https://51degrees.com/terms/client-services-privacy-policy/?utm_source=code&amp;utm_medium=comment&amp;utm_campaign=pipeline-dotnet&amp;utm_content=fiftyone.pipeline.elements-fiftyone.pipeline.javascriptbuilderelement-flowelement-javascriptbuilderelementbuilder.cs&amp;utm_term=setenablecookies
         /// </summary>
         /// <param name="enableCookies">Should enable cookies?</param>
         /// <returns></returns>

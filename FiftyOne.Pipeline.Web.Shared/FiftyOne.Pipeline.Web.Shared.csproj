@@ -14,7 +14,7 @@
     <Authors>51Degrees Engineering</Authors>
     <Copyright>51Degrees Mobile Experts Limited</Copyright>
     <PackageLicenseExpression>EUPL-1.2</PackageLicenseExpression>
-    <PackageProjectUrl>https://51degrees.com</PackageProjectUrl>
+    <PackageProjectUrl>https://51degrees.com?utm_source=nuget&amp;utm_medium=package&amp;utm_campaign=pipeline-dotnet&amp;utm_content=fiftyone.pipeline.web.shared-fiftyone.pipeline.web.shared.csproj&amp;utm_term=packageprojecturl</PackageProjectUrl>
     <PackageIcon>51d-logo.png</PackageIcon>
     <PackageIconUrl>https://51degrees.com/portals/0/Logos/Square%20Logo.png?width=64</PackageIconUrl>
     <RepositoryUrl>https://github.com/51Degrees/pipeline-dotnet</RepositoryUrl>

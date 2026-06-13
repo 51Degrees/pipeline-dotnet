@@ -13,4 +13,4 @@ Requires a valid 51Degrees resource key for cloud API access.
 
 ## Links
 
-- [Documentation](https://51degrees.com/documentation)
+- [Documentation](https://51degrees.com/documentation?utm_source=github&utm_medium=readme&utm_campaign=pipeline-dotnet&utm_content=fiftyone.did.cloud-readme.md&utm_term=links)

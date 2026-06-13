@@ -8,7 +8,7 @@
     <DocumentationFile>FiftyOne.Pipeline.Web.xml</DocumentationFile>
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
     <WarningsAsErrors />
-    <PackageProjectUrl>https://51degrees.com</PackageProjectUrl>
+    <PackageProjectUrl>https://51degrees.com?utm_source=nuget&amp;utm_medium=package&amp;utm_campaign=pipeline-dotnet&amp;utm_content=web-integration-fiftyone.pipeline.web-fiftyone.pipeline.web.csproj&amp;utm_term=packageprojecturl</PackageProjectUrl>
     <Description>The 51Degrees Pipeline API provides a fast, modern architecture for consuming real-time digital data services. This package contains components that integrate the 51Degrees Pipeline API into ASP.NET and ASP.NET Core web projects.</Description>
     <PackageReadmeFile>README.md</PackageReadmeFile>
   </PropertyGroup>
