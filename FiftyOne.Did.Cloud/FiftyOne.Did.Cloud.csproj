@@ -19,7 +19,7 @@
     <PackageTags>51degrees,device-identification,did,pipeline,cloud,owid,51Did</PackageTags>
     <RepositoryUrl>https://github.com/51Degrees/pipeline-dotnet</RepositoryUrl>
     <PackageIcon>51d-logo.png</PackageIcon>
-    <PackageProjectUrl>https://51degrees.com</PackageProjectUrl>
+    <PackageProjectUrl>https://51degrees.com?utm_source=nuget&amp;utm_medium=package&amp;utm_campaign=pipeline-dotnet&amp;utm_content=fiftyone.did.cloud-fiftyone.did.cloud.csproj&amp;utm_term=packageprojecturl</PackageProjectUrl>
     <Description>Cloud device identification engine for 51Degrees Did. Enables local device identification processing using the 51Degrees Pipeline API with OWID client support.</Description>
     <RepositoryType>git</RepositoryType>
     <NeutralLanguage>en</NeutralLanguage>

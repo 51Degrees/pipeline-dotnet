@@ -44,7 +44,7 @@ namespace GettingStarted
             var engine = new CloudRequestEngineBuilder(_loggerFactory, _httpClient)
                 .SetEndPoint("https://cloud.51degrees.com/api/v4/json")
                 // A resource key with the properties needed by the examples
-                // can be created at https://configure.51degrees.com/Wkqxf3Bs.
+                // can be created at https://configure.51degrees.com/Wkqxf3Bs?utm_source=code&utm_medium=example&utm_campaign=pipeline-dotnet&utm_content=examples-cloudrequestengine-gettingstarted-program.cs&utm_term=main.
                 // The aligned 51DEGREES_RESOURCE_KEY environment variable is
                 // checked first, then the legacy RESOURCE_KEY variable.
                 .SetResourceKey(GetResourceKey())

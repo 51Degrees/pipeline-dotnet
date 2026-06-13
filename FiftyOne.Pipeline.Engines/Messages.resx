@@ -181,13 +181,13 @@
     <value>Property '{0}' not found in data for element '{1}'. </value>
   </data>
   <data name="MissingPropertyMessageProductNotInCloudResource" xml:space="preserve">
-    <value>This is because your resource key does not include access to any properties under '{0}'. For more details on resource keys, see our explainer: https://51degrees.com/documentation/_info__resource_keys.html</value>
+    <value>This is because your resource key does not include access to any properties under '{0}'. For more details on resource keys, see our explainer: https://51degrees.com/documentation/_info__resource_keys.html?utm_source=code&amp;utm_medium=comment&amp;utm_campaign=pipeline-dotnet&amp;utm_content=fiftyone.pipeline.engines-messages.resx&amp;utm_term=missingpropertymessageproductnotincloudresource</value>
   </data>
   <data name="MissingPropertyMessagePropertyExcluded" xml:space="preserve">
     <value>This is because the property has been excluded when configuring the engine.</value>
   </data>
   <data name="MissingPropertyMessagePropertyNotInCloudResource" xml:space="preserve">
-    <value>This is because your resource key does not include access to this property. Properties that are included for this key under '{0}' are {1}. For more details on resource keys, see our explainer: https://51degrees.com/documentation/_info__resource_keys.html</value>
+    <value>This is because your resource key does not include access to this property. Properties that are included for this key under '{0}' are {1}. For more details on resource keys, see our explainer: https://51degrees.com/documentation/_info__resource_keys.html?utm_source=code&amp;utm_medium=comment&amp;utm_campaign=pipeline-dotnet&amp;utm_content=fiftyone.pipeline.engines-messages.resx&amp;utm_term=missingpropertymessagepropertynotincloudresource</value>
   </data>
   <data name="MissingPropertyMessageUnknown" xml:space="preserve">
     <value>The reason for this is unknown. Please check that the aspect and property name are correct.</value>

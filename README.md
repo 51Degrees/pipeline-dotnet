@@ -2,7 +2,7 @@
 
 ![51Degrees](https://raw.githubusercontent.com/51Degrees/common-ci/main/images/logo/360x67.png "Data rewards the curious") **Pipeline API**
 
-[Developer Documentation](https://51degrees.com/pipeline-dotnet/index.html?utm_source=github&utm_medium=repository&utm_content=documentation&utm_campaign=dotnet-open-source "developer documentation")
+[Developer Documentation](https://51degrees.com/pipeline-dotnet/index.html?utm_source=github&utm_medium=readme&utm_campaign=pipeline-dotnet&utm_content=readme.md&utm_term=top "developer documentation")
 | NuGet | Package | NuGet | Package |
 | --- | --- | --- | --- |
 | [![NuGet](https://img.shields.io/nuget/v/FiftyOne.Pipeline.CloudRequestEngine.svg)](https://www.nuget.org/packages/FiftyOne.Pipeline.CloudRequestEngine) | CloudRequestEngine | [![NuGet](https://img.shields.io/nuget/v/FiftyOne.Pipeline.Examples.Shared.svg)](https://www.nuget.org/packages/FiftyOne.Pipeline.Examples.Shared) | Examples.Shared |
@@ -30,7 +30,7 @@ The Web integration multi-targets the following:
     - .NET Core 8.0
     - .NET Framework 4.6.2
 
-The [tested versions](https://51degrees.com/documentation/_info__tested_versions.html) page shows the .NET versions that we currently test against. The software may run fine against other versions, but additional caution should be applied.
+The [tested versions](https://51degrees.com/documentation/_info__tested_versions.html?utm_source=github&utm_medium=readme&utm_campaign=pipeline-dotnet&utm_content=readme.md&utm_term=dependencies) page shows the .NET versions that we currently test against. The software may run fine against other versions, but additional caution should be applied.
 
 ## Strong naming
 
@@ -91,7 +91,7 @@ For example, Installing `FiftyOne.Pipeline.Engines.FiftyOne` will automatically 
 ### Pipeline Examples
 
 There are several examples available that demonstrate how to make use of the Pipeline API in isolation. These are described in the table below.
-If you want examples that demonstrate how to use 51Degrees products such as device detection, then these are available in the corresponding [repository](https://github.com/51Degrees/device-detection-dotnet) and on our [website](https://51degrees.com/documentation/_examples__device_detection__index.html).
+If you want examples that demonstrate how to use 51Degrees products such as device detection, then these are available in the corresponding [repository](https://github.com/51Degrees/device-detection-dotnet) and on our [website](https://51degrees.com/documentation/_examples__device_detection__index.html?utm_source=github&utm_medium=readme&utm_campaign=pipeline-dotnet&utm_content=readme.md&utm_term=pipeline-examples).
 
 | Example                                   | Description |
 |-------------------------------------------|-------------|
@@ -102,7 +102,7 @@ If you want examples that demonstrate how to use 51Degrees products such as devi
 | ResultCaching                             | Shows how the result caching feature works. |
 | UsageSharing                              | Shows how to share usage with 51Degrees. This helps us to keep our products up to date and accurate. |
 
-The CloudRequestEngine\GettingStarted example requires a resource key. It reads the aligned `51DEGREES_RESOURCE_KEY` environment variable first, then the legacy `RESOURCE_KEY` variable. A resource key with the free properties used by the examples can be created at https://configure.51degrees.com/Wkqxf3Bs.
+The CloudRequestEngine\GettingStarted example requires a resource key. It reads the aligned `51DEGREES_RESOURCE_KEY` environment variable first, then the legacy `RESOURCE_KEY` variable. A resource key with the free properties used by the examples can be created at https://configure.51degrees.com/Wkqxf3Bs?utm_source=github&utm_medium=readme&utm_campaign=pipeline-dotnet&utm_content=readme.md&utm_term=pipeline-examples.
 
 ## Tests
 
@@ -119,5 +119,5 @@ The tests can be run from within Visual Studio or (in most cases) by using the `
 
 For complete documentation on the Pipeline API and associated engines, see the [51Degrees documentation site][Documentation].
 
-[Documentation]: https://51degrees.com/documentation/index.html
+[Documentation]: https://51degrees.com/documentation/index.html?utm_source=github&utm_medium=readme&utm_campaign=pipeline-dotnet&utm_content=readme.md&utm_term=project-documentation
 [nuget]: https://www.nuget.org/profiles/51Degrees

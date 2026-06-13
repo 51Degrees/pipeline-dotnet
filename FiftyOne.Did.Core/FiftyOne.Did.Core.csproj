@@ -19,7 +19,7 @@
     <PackageTags>51degrees,device-identification,did,pipeline,core</PackageTags>
     <RepositoryUrl>https://github.com/51Degrees/pipeline-dotnet</RepositoryUrl>
     <PackageIcon>51d-logo.png</PackageIcon>
-    <PackageProjectUrl>https://51degrees.com</PackageProjectUrl>
+    <PackageProjectUrl>https://51degrees.com?utm_source=nuget&amp;utm_medium=package&amp;utm_campaign=pipeline-dotnet&amp;utm_content=fiftyone.did.core-fiftyone.did.core.csproj&amp;utm_term=packageprojecturl</PackageProjectUrl>
     <Description>Core library for 51Degrees Device Identification (Did). Provides foundational components and data structures for device identification within the 51Degrees Pipeline API.</Description>
     <RepositoryType>git</RepositoryType>
     <NeutralLanguage>en</NeutralLanguage>

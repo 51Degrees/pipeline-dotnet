@@ -22,7 +22,7 @@
     <PackageTags>51degrees,51did,fodid,did,pipeline,owid</PackageTags>
     <RepositoryUrl>https://github.com/51Degrees/pipeline-dotnet</RepositoryUrl>
     <PackageIcon>51d-logo.png</PackageIcon>
-    <PackageProjectUrl>https://51degrees.com</PackageProjectUrl>
+    <PackageProjectUrl>https://51degrees.com?utm_source=nuget&amp;utm_medium=package&amp;utm_campaign=pipeline-dotnet&amp;utm_content=fiftyone.did-fiftyone.did.csproj&amp;utm_term=packageprojecturl</PackageProjectUrl>
     <Description>Parses the 51Degrees device identifier (51Did) returned by the 51Degrees Cloud service.</Description>
     <RepositoryType>git</RepositoryType>
     <NeutralLanguage>en</NeutralLanguage>

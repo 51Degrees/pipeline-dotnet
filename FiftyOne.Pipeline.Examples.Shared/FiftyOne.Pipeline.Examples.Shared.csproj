@@ -14,7 +14,7 @@
 	<Copyright>51Degrees Mobile Experts Limited</Copyright>
 	<PackageTags>51degrees,pipeline,data service</PackageTags>
 	<RepositoryUrl>https://github.com/51Degrees/pipeline-dotnet</RepositoryUrl>
-	<PackageProjectUrl>https://51degrees.com</PackageProjectUrl>
+	<PackageProjectUrl>https://51degrees.com?utm_source=nuget&amp;utm_medium=package&amp;utm_campaign=pipeline-dotnet&amp;utm_content=fiftyone.pipeline.examples.shared-fiftyone.pipeline.examples.shared.csproj&amp;utm_term=packageprojecturl</PackageProjectUrl>
 	<Description>The 51Degrees Pipeline API provides a fast, modern architecture for consuming real-time digital data services. This package contains helper classes to make writing examples easier.</Description>
 	<PackageReadmeFile>README.md</PackageReadmeFile>
   </PropertyGroup>
