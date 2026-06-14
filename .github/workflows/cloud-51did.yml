@@ -1,0 +1,56 @@
+name: Cloud 51Did Tests
+
+# Runs the live cloud 51Did integration test (Tests/FiftyOne.Did.Tests,
+# CloudFodIdTests) once for every resource key held in the
+# _51DEGREES_RESOURCE_KEY* secrets (free, paid and any added later). Each run
+# sets the single 51DEGREES_RESOURCE_KEY variable the test reads. To cover a new
+# key, add it to the secrets and to the env block below.
+
+on:
+  workflow_dispatch:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'FiftyOne.Did/**'
+      - 'Tests/FiftyOne.Did.Tests/**'
+      - 'owid-dotnet/**'
+      - '.github/workflows/cloud-51did.yml'
+
+jobs:
+  cloud-51did:
+    name: Cloud 51Did
+    runs-on: ubuntu-latest
+    env:
+      _51DEGREES_RESOURCE_KEY_FREE: ${{ secrets._51DEGREES_RESOURCE_KEY_FREE }}
+      _51DEGREES_RESOURCE_KEY_PAID: ${{ secrets._51DEGREES_RESOURCE_KEY_PAID }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # FiftyOne.Did compiles the owid-dotnet submodule source directly.
+          submodules: recursive
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.0.x
+      - name: Cloud 51Did test for each resource key secret
+        shell: pwsh
+        run: |
+          $project = 'Tests/FiftyOne.Did.Tests/FiftyOne.Did.Tests.csproj'
+          $keys = Get-ChildItem env: |
+            Where-Object { $_.Name -like '_51DEGREES_RESOURCE_KEY*' -and $_.Value }
+          if (-not $keys) {
+            Write-Host 'No _51DEGREES_RESOURCE_KEY* secrets available; skipping.'
+            exit 0
+          }
+          dotnet build $project -c Release --nologo
+          if ($LASTEXITCODE -ne 0) { exit 1 }
+          $failed = $false
+          foreach ($k in $keys) {
+            Write-Host "::group::CloudFodIdTests with $($k.Name)"
+            ${env:51DEGREES_RESOURCE_KEY} = $k.Value
+            dotnet test $project -c Release --no-build --nologo `
+              --filter 'FullyQualifiedName~CloudFodIdTests' `
+              --logger 'console;verbosity=normal'
+            if ($LASTEXITCODE -ne 0) { $failed = $true }
+            Write-Host '::endgroup::'
+          }
+          if ($failed) { exit 1 }
