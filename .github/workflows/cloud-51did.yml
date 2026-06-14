@@ -1,10 +1,11 @@
 name: Cloud 51Did Tests
 
 # Runs the live cloud 51Did integration test (Tests/FiftyOne.Did.Tests,
-# CloudFodIdTests) once for every resource key held in the
-# _51DEGREES_RESOURCE_KEY* secrets (free, paid and any added later). Each run
-# sets the single 51DEGREES_RESOURCE_KEY variable the test reads. To cover a new
-# key, add it to the secrets and to the env block below.
+# CloudFodIdTests) once for every resource key the central common-ci script
+# exports from the _51DEGREES_RESOURCE_KEY* secrets (free, paid and any added
+# later). Each run sets the single 51DEGREES_RESOURCE_KEY the test reads. New
+# resource keys are added once at the organisation level; this workflow needs
+# no change.
 
 on:
   workflow_dispatch:
@@ -20,20 +21,28 @@ jobs:
   cloud-51did:
     name: Cloud 51Did
     runs-on: ubuntu-latest
-    env:
-      _51DEGREES_RESOURCE_KEY_FREE: ${{ secrets._51DEGREES_RESOURCE_KEY_FREE }}
-      _51DEGREES_RESOURCE_KEY_PAID: ${{ secrets._51DEGREES_RESOURCE_KEY_PAID }}
     steps:
       - uses: actions/checkout@v4
         with:
           # FiftyOne.Did compiles the owid-dotnet submodule source directly.
           submodules: recursive
+      - name: Checkout common-ci
+        uses: actions/checkout@v4
+        with:
+          # Provides steps/set-resource-keys.ps1, the central script that
+          # exports the _51DEGREES_RESOURCE_KEY* secrets as environment
+          # variables.
+          repository: 51Degrees/common-ci
+          path: common-ci
       - uses: actions/setup-dotnet@v4
         with:
           dotnet-version: 8.0.x
       - name: Cloud 51Did test for each resource key secret
         shell: pwsh
+        env:
+          SECRETS: ${{ toJSON(secrets) }}
         run: |
+          ./common-ci/steps/set-resource-keys.ps1 -Keys (ConvertFrom-Json -AsHashtable $env:SECRETS)
           $project = 'Tests/FiftyOne.Did.Tests/FiftyOne.Did.Tests.csproj'
           $keys = Get-ChildItem env: |
             Where-Object { $_.Name -like '_51DEGREES_RESOURCE_KEY*' -and $_.Value }
