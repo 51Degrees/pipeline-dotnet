@@ -570,6 +570,10 @@ namespace FiftyOne.Pipeline.Engines.FiftyOne.FlowElements
         /// <param name="failHandler">
         /// Obsolete. This parameter is no longer used.
         /// </param>
+        /// <param name="neverSharedEvidenceKeys">
+        /// Evidence keys that must never be shared, even when
+        /// shareAllEvidence is true.
+        /// </param>
         /// <exception cref="ArgumentNullException">
         /// Thrown if certain arguments are null.
         /// </exception>
@@ -593,7 +597,8 @@ namespace FiftyOne.Pipeline.Engines.FiftyOne.FlowElements
             string aspSessionCookieName,
             ITracker tracker,
             bool shareAllEvidence,
-            IFailHandler failHandler = null)
+            IFailHandler failHandler = null,
+            List<string> neverSharedEvidenceKeys = null)
             : base(logger)
         {
             if (blockedHttpHeaders == null)
@@ -644,9 +649,11 @@ namespace FiftyOne.Pipeline.Engines.FiftyOne.FlowElements
                 }
 
                 _evidenceKeyFilter = new EvidenceKeyFilterShareUsage(
-                    blockedHttpHeaders, includedQueryStringParameters, true, aspSessionCookieName);
+                    blockedHttpHeaders, includedQueryStringParameters, true,
+                    aspSessionCookieName, neverSharedEvidenceKeys);
                 _evidenceKeyFilterExclSession = new EvidenceKeyFilterShareUsage(
-                    blockedHttpHeaders, includedQueryStringParameters, false, aspSessionCookieName);
+                    blockedHttpHeaders, includedQueryStringParameters, false,
+                    aspSessionCookieName, neverSharedEvidenceKeys);
 
                 _ignoreDataEvidenceFilter = ignoreDataEvidenceFilter;
 
@@ -660,8 +667,8 @@ namespace FiftyOne.Pipeline.Engines.FiftyOne.FlowElements
             {
                 // Create evidence filters what will allow all 
                 // evidence to be shared
-                _evidenceKeyFilter = new EvidenceKeyFilterShareUsage();
-                _evidenceKeyFilterExclSession = new EvidenceKeyFilterShareUsage();
+                _evidenceKeyFilter = new EvidenceKeyFilterShareUsage(neverSharedEvidenceKeys);
+                _evidenceKeyFilterExclSession = new EvidenceKeyFilterShareUsage(neverSharedEvidenceKeys);
                 trackerEvidenceFiler = new EvidenceKeyFilterShareUsageTracker();
             }
 

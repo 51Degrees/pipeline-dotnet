@@ -31,6 +31,18 @@
         <member name="P:FiftyOne.Did.Cloud.Data.Cloud51DidData.IdProbLic">
             <inheritdoc/>
         </member>
+        <member name="P:FiftyOne.Did.Cloud.Data.Cloud51DidData.IdRandGlobal">
+            <inheritdoc/>
+        </member>
+        <member name="P:FiftyOne.Did.Cloud.Data.Cloud51DidData.IdRandLic">
+            <inheritdoc/>
+        </member>
+        <member name="P:FiftyOne.Did.Cloud.Data.Cloud51DidData.IdHemGlobal">
+            <inheritdoc/>
+        </member>
+        <member name="P:FiftyOne.Did.Cloud.Data.Cloud51DidData.IdHemLic">
+            <inheritdoc/>
+        </member>
         <member name="T:FiftyOne.Did.Cloud.FlowElements.DidCloudEngine">
             <summary>
             Cloud engine for 51Did

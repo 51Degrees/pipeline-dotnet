@@ -79,13 +79,26 @@ namespace FiftyOne.Pipeline.Engines.FiftyOne.Data
         private HashSet<string> _includedQueryStringParams = new HashSet<string>();
 
         /// <summary>
+        /// Evidence keys that must never be shared, regardless of the
+        /// share-all setting or the header / query rules.
+        /// </summary>
+        private readonly HashSet<string> _neverSharedEvidenceKeys =
+            new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+        /// <summary>
         /// Constructor
         /// Using this constructor will create a filter that allows all 
-        /// evidence. I.e. All evidence will be shared.
+        /// evidence. I.e. All evidence will be shared, except the keys
+        /// passed here.
         /// </summary>
-        public EvidenceKeyFilterShareUsage()
+        /// <param name="neverSharedEvidenceKeys">
+        /// The (case insensitive) evidence keys that must never be shared.
+        /// </param>
+        public EvidenceKeyFilterShareUsage(
+            List<string> neverSharedEvidenceKeys = null)
         {
             _shareAll = true;
+            AddNeverSharedEvidenceKeys(neverSharedEvidenceKeys);
         }
 
         /// <summary>
@@ -107,6 +120,9 @@ namespace FiftyOne.Pipeline.Engines.FiftyOne.Data
         /// <param name="aspSessionCookieName">
         /// The name of the cookie that contains the asp.net session id. 
         /// </param>
+        /// <param name="neverSharedEvidenceKeys">
+        /// The (case insensitive) evidence keys that must never be shared.
+        /// </param>
         [System.Diagnostics.CodeAnalysis.SuppressMessage("Globalization", 
             "CA1308:Normalize strings to uppercase", 
             Justification = "Pipeline specification requires keys to be " +
@@ -115,7 +131,8 @@ namespace FiftyOne.Pipeline.Engines.FiftyOne.Data
             List<string> blockedHttpHeaders,
             List<string> includedQueryStringParams,
             bool includeSession,
-            string aspSessionCookieName)
+            string aspSessionCookieName,
+            List<string> neverSharedEvidenceKeys = null)
         {
             if(blockedHttpHeaders == null)
             {
@@ -151,6 +168,16 @@ namespace FiftyOne.Pipeline.Engines.FiftyOne.Data
                     }
                 }
             }
+            AddNeverSharedEvidenceKeys(neverSharedEvidenceKeys);
+        }
+
+        private void AddNeverSharedEvidenceKeys(List<string> neverSharedEvidenceKeys)
+        {
+            if (neverSharedEvidenceKeys == null) { return; }
+            foreach (var key in neverSharedEvidenceKeys)
+            {
+                _neverSharedEvidenceKeys.Add(key);
+            }
         }
 
         /// <summary>
@@ -170,6 +197,11 @@ namespace FiftyOne.Pipeline.Engines.FiftyOne.Data
             if(key == null)
             {
                 throw new ArgumentNullException(nameof(key));
+            }
+
+            if (_neverSharedEvidenceKeys.Contains(key))
+            {
+                return false;
             }
 
             bool result = _shareAll;

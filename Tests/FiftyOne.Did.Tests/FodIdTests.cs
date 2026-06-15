@@ -79,6 +79,26 @@ namespace FiftyOne.Did.Tests
         }
 
         /// <summary>
+        /// A canonical 21-byte Random payload: type tag 01 in bits 6-7,
+        /// usage bits 0b001, licenseId = 0x12345678 (little-endian),
+        /// and a stable 16-byte GUID block (0x40..0x4F).
+        /// </summary>
+        private static byte[] CanonicalRandomPayload()
+        {
+            var payload = new byte[FodId.RandomPayloadLength];
+            payload[FodId.FlagsOffset] = (byte)((byte)IdType.Random << 6 | 0b001);
+            payload[FodId.LicenseIdOffset + 0] = 0x78;
+            payload[FodId.LicenseIdOffset + 1] = 0x56;
+            payload[FodId.LicenseIdOffset + 2] = 0x34;
+            payload[FodId.LicenseIdOffset + 3] = 0x12;
+            for (int i = 0; i < FodId.GuidLength; i++)
+            {
+                payload[FodId.HashOffset + i] = (byte)(0x40 + i);
+            }
+            return payload;
+        }
+
+        /// <summary>
         /// Create and sign a real OWID with the given payload using a freshly
         /// generated ECDsa P-256 key pair.
         /// </summary>
@@ -334,6 +354,102 @@ namespace FiftyOne.Did.Tests
             Assert.AreEqual(fodId1.LicenseId, fodId2.LicenseId);
             CollectionAssert.AreEqual(fodId1.Hash, fodId2.Hash);
             Assert.AreEqual(fodId1.Domain, fodId2.Domain);
+        }
+
+        [TestMethod]
+        [DataRow((byte)0b0000_0101, IdType.Probabilistic)]
+        [DataRow((byte)0b1000_0101, IdType.HashedEmail)]
+        [DataRow((byte)0b1100_0101, IdType.Reserved)]
+        public void Type_DecodedFromTopTwoFlagBits(byte flags, IdType expected)
+        {
+            var payload = CanonicalPayload();
+            payload[FodId.FlagsOffset] = flags;
+
+            var fodId = new FodId(SignedOwidBase64(payload));
+
+            Assert.AreEqual(expected, fodId.Type);
+        }
+
+        [TestMethod]
+        public void Type_RandomWhenBits01()
+        {
+            var fodId = new FodId(SignedOwidBase64(CanonicalRandomPayload()));
+
+            Assert.AreEqual(IdType.Random, fodId.Type);
+        }
+
+        [TestMethod]
+        public void Constructor_RandomPayload21Bytes_Parses()
+        {
+            var fodId = new FodId(SignedOwidBase64(CanonicalRandomPayload()));
+
+            Assert.AreEqual(CanonicalLicenseId, fodId.LicenseId);
+            Assert.AreEqual(FodId.GuidLength, fodId.Hash.Length);
+            CollectionAssert.AreEqual(
+                Enumerable.Range(0x40, FodId.GuidLength)
+                    .Select(i => (byte)i).ToArray(),
+                fodId.Hash);
+        }
+
+        [TestMethod]
+        public void Constructor_RandomPayloadOneByteShort_Throws()
+        {
+            var payload = CanonicalRandomPayload()
+                .Take(FodId.RandomPayloadLength - 1).ToArray();
+
+            Assert.ThrowsExactly<ArgumentException>(
+                () => new FodId(SignedOwidBase64(payload)));
+        }
+
+        [TestMethod]
+        public void Constructor_RandomPayloadLargerThanSpec_UsesFirst16ValueBytes()
+        {
+            var payload = new byte[FodId.PayloadLength];
+            Array.Copy(
+                CanonicalRandomPayload(), payload, FodId.RandomPayloadLength);
+            for (int i = FodId.RandomPayloadLength; i < payload.Length; i++)
+            {
+                payload[i] = 0xCC;
+            }
+
+            var fodId = new FodId(SignedOwidBase64(payload));
+
+            Assert.AreEqual(IdType.Random, fodId.Type);
+            Assert.AreEqual(FodId.GuidLength, fodId.Hash.Length);
+        }
+
+        [TestMethod]
+        public void Constructor_HemPayloadOneByteShort_Throws()
+        {
+            // CanonicalFlags (0xA5) carries the HashedEmail tag in bits 6-7,
+            // so the 37-byte minimum still applies to this payload.
+            var payload = CanonicalPayload()
+                .Take(FodId.PayloadLength - 1).ToArray();
+
+            Assert.ThrowsExactly<ArgumentException>(
+                () => new FodId(SignedOwidBase64(payload)));
+        }
+
+        [TestMethod]
+        public void Constructor_ReservedHeaderOnly_Parses()
+        {
+            var payload = new byte[FodId.HashOffset];
+            payload[FodId.FlagsOffset] = 0b1100_0000;
+
+            var fodId = new FodId(SignedOwidBase64(payload));
+
+            Assert.AreEqual(IdType.Reserved, fodId.Type);
+            Assert.AreEqual(0, fodId.Hash.Length);
+        }
+
+        [TestMethod]
+        public void Constants_RandomLength_IsInternallyConsistent()
+        {
+#pragma warning disable MSTEST0032
+            Assert.AreEqual(
+                FodId.HashOffset + FodId.GuidLength,
+                FodId.RandomPayloadLength);
+#pragma warning restore MSTEST0032
         }
     }
 }

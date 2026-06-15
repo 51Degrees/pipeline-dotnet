@@ -68,5 +68,33 @@ namespace FiftyOne.Did.Cloud.Data
             get => GetAs<IAspectPropertyValue<string>>(nameof(IdProbLic));
             set => this[nameof(IdProbLic)] = value;
         }
+
+        /// <inheritdoc/>
+        public IAspectPropertyValue<string> IdRandGlobal
+        {
+            get => GetAs<IAspectPropertyValue<string>>(nameof(IdRandGlobal));
+            set => this[nameof(IdRandGlobal)] = value;
+        }
+
+        /// <inheritdoc/>
+        public IAspectPropertyValue<string> IdRandLic
+        {
+            get => GetAs<IAspectPropertyValue<string>>(nameof(IdRandLic));
+            set => this[nameof(IdRandLic)] = value;
+        }
+
+        /// <inheritdoc/>
+        public IAspectPropertyValue<string> IdHemGlobal
+        {
+            get => GetAs<IAspectPropertyValue<string>>(nameof(IdHemGlobal));
+            set => this[nameof(IdHemGlobal)] = value;
+        }
+
+        /// <inheritdoc/>
+        public IAspectPropertyValue<string> IdHemLic
+        {
+            get => GetAs<IAspectPropertyValue<string>>(nameof(IdHemLic));
+            set => this[nameof(IdHemLic)] = value;
+        }
     }
 }
