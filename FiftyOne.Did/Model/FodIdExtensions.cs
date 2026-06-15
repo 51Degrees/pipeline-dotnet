@@ -21,6 +21,7 @@
  * ********************************************************************* */
 
 using FiftyOne.Pipeline.Engines.Data;
+using FiftyOne.Pipeline.Engines.Exceptions;
 using System;
 
 namespace FiftyOne.Did.Model
@@ -83,11 +84,12 @@ namespace FiftyOne.Did.Model
         /// <exception cref="ArgumentNullException">
         /// Thrown when <paramref name="value"/> itself is <c>null</c>.
         /// </exception>
-        /// <exception cref="FiftyOne.Pipeline.Engines.Exceptions.NoValueException">
-        /// Thrown (by <c>IAspectPropertyValue&lt;string&gt;.Value</c>) when the
-        /// engine determined no value for this identifier, for example because
-        /// the usage policy or resource key did not permit it. The exception
-        /// message relays the cloud's reason.
+        /// <exception cref="NoValueException">
+        /// Thrown when the engine determined no value for this identifier
+        /// (<see cref="IAspectPropertyValue.HasValue"/> is <c>false</c>), for
+        /// example because the usage policy or resource key did not permit it.
+        /// The exception message relays the cloud's reason
+        /// (<see cref="IAspectPropertyValue.NoValueMessage"/>).
         /// </exception>
         /// <exception cref="FormatException">
         /// Thrown when the resolved value is not valid Base64.
@@ -99,9 +101,16 @@ namespace FiftyOne.Did.Model
         public static FodId As51Did(this IAspectPropertyValue<string> value)
         {
             ArgumentNullException.ThrowIfNull(value);
-            // Accessing Value throws NoValueException (carrying the cloud's
-            // reason) when no value was determined; the string overload then
-            // relays the FodId constructor's exceptions for a malformed value.
+            if (!value.HasValue)
+            {
+                // No value was determined (for example the usage policy or
+                // resource key did not permit this identifier). Surface the
+                // cloud's reason explicitly rather than relying on the value
+                // accessor to throw.
+                throw new NoValueException(value.NoValueMessage);
+            }
+            // The value is present; the string overload relays the FodId
+            // constructor's exceptions for a malformed value.
             return value.Value.As51Did();
         }
     }

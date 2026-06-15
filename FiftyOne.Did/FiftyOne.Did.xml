@@ -224,10 +224,11 @@
             Thrown when <paramref name="value"/> itself is <c>null</c>.
             </exception>
             <exception cref="T:FiftyOne.Pipeline.Engines.Exceptions.NoValueException">
-            Thrown (by <c>IAspectPropertyValue&lt;string&gt;.Value</c>) when the
-            engine determined no value for this identifier, for example because
-            the usage policy or resource key did not permit it. The exception
-            message relays the cloud's reason.
+            Thrown when the engine determined no value for this identifier
+            (<see cref="P:FiftyOne.Pipeline.Engines.Data.IAspectPropertyValue.HasValue"/> is <c>false</c>), for
+            example because the usage policy or resource key did not permit it.
+            The exception message relays the cloud's reason
+            (<see cref="P:FiftyOne.Pipeline.Engines.Data.IAspectPropertyValue.NoValueMessage"/>).
             </exception>
             <exception cref="T:System.FormatException">
             Thrown when the resolved value is not valid Base64.
