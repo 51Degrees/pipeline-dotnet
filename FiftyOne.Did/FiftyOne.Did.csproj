@@ -44,6 +44,13 @@
              LinkBase="Owid" />
   </ItemGroup>
 
+  <!-- Referenced only for the IAspectPropertyValue<string> overload of the
+       As51Did extension, which resolves a 51Did pipeline property value into a
+       FodId. The string overload, and FodId itself, remain pipeline-free. -->
+  <ItemGroup>
+    <ProjectReference Include="..\FiftyOne.Pipeline.Engines\FiftyOne.Pipeline.Engines.csproj" />
+  </ItemGroup>
+
   <ItemGroup>
     <None Include="README.md">
       <Pack>True</Pack>

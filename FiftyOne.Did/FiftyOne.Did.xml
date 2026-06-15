@@ -90,7 +90,7 @@
             <summary>
             Minimum byte length of a Probabilistic or HashedEmail 51Did
             payload (Flags + LicenseId + Hash). Random payloads are
-            shorter — see <see cref="F:FiftyOne.Did.Model.FodId.RandomPayloadLength"/>.
+            shorter - see <see cref="F:FiftyOne.Did.Model.FodId.RandomPayloadLength"/>.
             </summary>
         </member>
         <member name="P:FiftyOne.Did.Model.FodId.Flags">
@@ -168,6 +168,73 @@
             <exception cref="T:System.ArgumentException">
             Thrown when <paramref name="owid"/>'s payload is shorter than
             the minimum for its identifier type.
+            </exception>
+        </member>
+        <member name="T:FiftyOne.Did.Model.FodIdExtensions">
+            <summary>
+            Extension methods for resolving a 51Did value into a <see cref="T:FiftyOne.Did.Model.FodId"/>
+            in a single call.
+            </summary>
+            <remarks>
+            The 51Did cloud engine surfaces each identifier as a raw base64 string
+            (<c>IAspectPropertyValue&lt;string&gt;</c>). These overloads turn that
+            value, or the unwrapped string, into a parsed <see cref="T:FiftyOne.Did.Model.FodId"/> so a
+            consumer can write, for example,
+            <c>data.IdProbGlobal.As51Did()</c> or <c>idString.As51Did()</c>.
+            <para>
+            Error handling is delegated to the existing types rather than reinvented:
+            a missing value surfaces the pipeline's own no-value exception (carrying
+            the cloud's reason), and a value that is not a valid 51Did surfaces the
+            <see cref="T:FiftyOne.Did.Model.FodId"/> constructor's own exceptions. See the per-method
+            remarks for the exact types.
+            </para>
+            </remarks>
+        </member>
+        <member name="M:FiftyOne.Did.Model.FodIdExtensions.As51Did(System.String)">
+            <summary>
+            Parse a base64-encoded 51Did string into a <see cref="T:FiftyOne.Did.Model.FodId"/>.
+            </summary>
+            <param name="value">
+            The base64 OWID envelope string, as returned by the cloud service.
+            </param>
+            <returns>The parsed <see cref="T:FiftyOne.Did.Model.FodId"/>.</returns>
+            <exception cref="T:System.ArgumentNullException">
+            Thrown (by the <see cref="T:FiftyOne.Did.Model.FodId"/> constructor) when
+            <paramref name="value"/> is <c>null</c>.
+            </exception>
+            <exception cref="T:System.FormatException">
+            Thrown (by the <see cref="T:FiftyOne.Did.Model.FodId"/> constructor) when
+            <paramref name="value"/> is not valid Base64.
+            </exception>
+            <exception cref="T:System.ArgumentException">
+            Thrown (by the <see cref="T:FiftyOne.Did.Model.FodId"/> constructor) when the decoded
+            payload is shorter than the minimum for its identifier type.
+            </exception>
+        </member>
+        <member name="M:FiftyOne.Did.Model.FodIdExtensions.As51Did(FiftyOne.Pipeline.Engines.Data.IAspectPropertyValue{System.String})">
+            <summary>
+            Resolve a 51Did property value into a <see cref="T:FiftyOne.Did.Model.FodId"/>.
+            </summary>
+            <param name="value">
+            The property value produced by the 51Did engine, for example
+            <c>data.IdProbGlobal</c>.
+            </param>
+            <returns>The parsed <see cref="T:FiftyOne.Did.Model.FodId"/>.</returns>
+            <exception cref="T:System.ArgumentNullException">
+            Thrown when <paramref name="value"/> itself is <c>null</c>.
+            </exception>
+            <exception cref="T:FiftyOne.Pipeline.Engines.Exceptions.NoValueException">
+            Thrown (by <c>IAspectPropertyValue&lt;string&gt;.Value</c>) when the
+            engine determined no value for this identifier, for example because
+            the usage policy or resource key did not permit it. The exception
+            message relays the cloud's reason.
+            </exception>
+            <exception cref="T:System.FormatException">
+            Thrown when the resolved value is not valid Base64.
+            </exception>
+            <exception cref="T:System.ArgumentException">
+            Thrown when the resolved value's payload is shorter than the minimum
+            for its identifier type.
             </exception>
         </member>
         <member name="T:FiftyOne.Did.Model.IdType">
