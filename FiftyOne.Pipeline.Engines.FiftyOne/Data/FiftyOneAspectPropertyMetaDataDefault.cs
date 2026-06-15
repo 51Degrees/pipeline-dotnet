@@ -91,7 +91,7 @@ namespace FiftyOne.Pipeline.Engines.FiftyOne.Data
         /// </summary>
         /// <remarks>
         /// This is used by the 51Degrees Property Dictionary: 
-        /// https://51degrees.com/resources/property-dictionary and is 
+        /// https://51degrees.com/resources/property-dictionary?utm_source=code&amp;utm_medium=comment&amp;utm_campaign=pipeline-dotnet&amp;utm_content=fiftyone.pipeline.engines.fiftyone-data-fiftyoneaspectpropertymetadatadefault.cs&amp;utm_term=show and is 
         /// made available for customers should they wish to make use of it.
         /// </remarks>
         public bool Show { get; }
@@ -103,7 +103,7 @@ namespace FiftyOne.Pipeline.Engines.FiftyOne.Data
         /// </summary>
         /// <remarks>
         /// This is used by the 51Degrees Property Dictionary: 
-        /// https://51degrees.com/resources/property-dictionary and is 
+        /// https://51degrees.com/resources/property-dictionary?utm_source=code&amp;utm_medium=comment&amp;utm_campaign=pipeline-dotnet&amp;utm_content=fiftyone.pipeline.engines.fiftyone-data-fiftyoneaspectpropertymetadatadefault.cs&amp;utm_term=showvalues and is 
         /// made available for customers should they wish to make use of it.
         /// </remarks>
         public bool ShowValues { get; }

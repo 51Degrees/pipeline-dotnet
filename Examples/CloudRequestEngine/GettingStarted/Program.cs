@@ -43,8 +43,11 @@ namespace GettingStarted
 
             var engine = new CloudRequestEngineBuilder(_loggerFactory, _httpClient)
                 .SetEndPoint("https://cloud.51degrees.com/api/v4/json")
-                // Obtain a resource key from https://configure.51degrees.com
-                .SetResourceKey("AQS5HKcyHJbECm6E10g")
+                // A resource key with the properties needed by the examples
+                // can be created at https://configure.51degrees.com/Wkqxf3Bs?utm_source=code&utm_medium=example&utm_campaign=pipeline-dotnet&utm_content=examples-cloudrequestengine-gettingstarted-program.cs&utm_term=main.
+                // The aligned 51DEGREES_RESOURCE_KEY environment variable is
+                // checked first, then the legacy RESOURCE_KEY variable.
+                .SetResourceKey(GetResourceKey())
                 .SetLazyLoading(cfg)
                 .Build();
                 
@@ -59,6 +62,28 @@ namespace GettingStarted
             }
 
             Console.ReadKey();
+        }
+
+        /// <summary>
+        /// Get the resource key to use for this example. The aligned
+        /// 51DEGREES_RESOURCE_KEY environment variable is checked first,
+        /// then the legacy RESOURCE_KEY variable. If neither is set then
+        /// the hard-coded key below is used, preserving the previous
+        /// behaviour of this example.
+        /// </summary>
+        private static string GetResourceKey()
+        {
+            var resourceKey =
+                Environment.GetEnvironmentVariable("51DEGREES_RESOURCE_KEY");
+            if (string.IsNullOrEmpty(resourceKey))
+            {
+                resourceKey = Environment.GetEnvironmentVariable("RESOURCE_KEY");
+            }
+            if (string.IsNullOrEmpty(resourceKey))
+            {
+                resourceKey = "AQS5HKcyHJbECm6E10g";
+            }
+            return resourceKey;
         }
     }
 }

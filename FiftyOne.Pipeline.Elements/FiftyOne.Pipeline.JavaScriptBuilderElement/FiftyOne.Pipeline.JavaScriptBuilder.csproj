@@ -26,7 +26,7 @@
     <PackageTags>51degrees,pipeline,data service</PackageTags>
     <RepositoryUrl>https://github.com/51Degrees/pipeline-dotnet</RepositoryUrl>
     <PackageIcon>51d-logo.png</PackageIcon>
-    <PackageProjectUrl>https://51degrees.com</PackageProjectUrl>
+    <PackageProjectUrl>https://51degrees.com?utm_source=nuget&amp;utm_medium=package&amp;utm_campaign=pipeline-dotnet&amp;utm_content=fiftyone.pipeline.elements-fiftyone.pipeline.javascriptbuilderelement-fiftyone.pipeline.javascriptbuilder.csproj&amp;utm_term=packageprojecturl</PackageProjectUrl>
     <Description>The 51Degrees Pipeline API provides a fast, modern architecture for consuming real-time digital data services. This package contains an element that produces JavaScript code used to access Pipeline results in client-side code and provide additional evidence that is not available from the initial request to the web server.</Description>
     <NeutralLanguage>en</NeutralLanguage>
     <RepositoryType>git</RepositoryType>

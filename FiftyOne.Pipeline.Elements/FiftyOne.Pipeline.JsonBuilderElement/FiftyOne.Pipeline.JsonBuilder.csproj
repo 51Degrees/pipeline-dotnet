@@ -23,7 +23,7 @@
     <RepositoryType>git</RepositoryType>
     <NeutralLanguage>en</NeutralLanguage>
     <Description>The 51Degrees Pipeline API provides a fast, modern architecture for consuming real-time digital data services. This package contains an element that serializes all values in flowdata into a JSON formatted string.</Description>
-    <PackageProjectUrl>https://51degrees.com</PackageProjectUrl>
+    <PackageProjectUrl>https://51degrees.com?utm_source=nuget&amp;utm_medium=package&amp;utm_campaign=pipeline-dotnet&amp;utm_content=fiftyone.pipeline.elements-fiftyone.pipeline.jsonbuilderelement-fiftyone.pipeline.jsonbuilder.csproj&amp;utm_term=packageprojecturl</PackageProjectUrl>
     <PackageReadmeFile>README.md</PackageReadmeFile>
   </PropertyGroup>
 

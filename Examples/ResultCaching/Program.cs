@@ -34,7 +34,7 @@ using System.Diagnostics;
 /// 
 /// If you want to know more about how result caching works, a complete
 /// explanation can be found in the 
-/// [documentation](https://51degrees.com/documentation/_features__result_caching.html).
+/// [documentation](https://51degrees.com/documentation/_features__result_caching.html?utm_source=code&amp;utm_medium=example&amp;utm_campaign=pipeline-dotnet&amp;utm_content=examples-resultcaching-program.cs&amp;utm_term=header).
 /// 
 /// This example is available in full on [GitHub](https://github.com/51Degrees/pipeline-dotnet/blob/master/Examples/ResultCaching/Program.cs).
 /// 

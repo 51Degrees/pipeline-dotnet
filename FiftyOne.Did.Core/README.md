@@ -16,4 +16,4 @@ This is a shared dependency library. Most consumers should reference one of the 
 
 ## Links
 
-- [Documentation](https://51degrees.com/documentation)
+- [Documentation](https://51degrees.com/documentation?utm_source=github&utm_medium=readme&utm_campaign=pipeline-dotnet&utm_content=fiftyone.did.core-readme.md&utm_term=links)

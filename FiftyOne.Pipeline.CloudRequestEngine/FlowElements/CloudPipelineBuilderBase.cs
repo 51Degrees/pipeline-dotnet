@@ -172,7 +172,7 @@ namespace FiftyOne.Pipeline.CloudRequestEngine.FlowElements
 
         /// <summary>
         /// Set the resource key which will be used to query the cloud service.
-        /// Obtain a resource key @ https://configure.51degrees.com
+        /// Obtain a resource key @ https://configure.51degrees.com?utm_source=code&amp;utm_medium=comment&amp;utm_campaign=pipeline-dotnet&amp;utm_content=fiftyone.pipeline.cloudrequestengine-flowelements-cloudpipelinebuilderbase.cs&amp;utm_term=setresourcekey
         /// </summary>
         /// <param name="key">The resource key to use</param>
         /// <returns>This builder</returns>
