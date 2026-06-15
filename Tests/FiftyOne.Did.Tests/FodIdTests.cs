@@ -28,6 +28,7 @@ using System;
 using System.Linq;
 using System.Security.Cryptography;
 using System.Threading.Tasks;
+using static FiftyOne.Did.Tests.FodIdTestFactory;
 
 namespace FiftyOne.Did.Tests
 {
@@ -37,87 +38,13 @@ namespace FiftyOne.Did.Tests
     [TestClass]
     public class FodIdTests
     {
-        private const string TestDomain = "51degrees.com";
-
-        private static readonly byte[] CanonicalHash = Enumerable
-            .Range(0, FodId.HashLength)
-            .Select(i => (byte)(0x20 + i))
-            .ToArray();
-
-        private const byte CanonicalFlags = 0b1010_0101;
-        private const uint CanonicalLicenseId = 0x12345678u;
-
-        private string PublicPem = string.Empty;
-        private string PrivatePem = string.Empty;
+        private FodIdTestFactory _factory = null!;
 
         [TestInitialize]
         public void TestInitialize()
         {
-            using var crypto = ECDsa.Create(ECCurve.NamedCurves.nistP256);
-            PublicPem = new string(PemEncoding.Write(
-                "PUBLIC KEY", crypto.ExportSubjectPublicKeyInfo()));
-            PrivatePem = new string(PemEncoding.Write(
-                "PRIVATE KEY", crypto.ExportPkcs8PrivateKey()));
+            _factory = new FodIdTestFactory();
         }
-
-        /// <summary>
-        /// A canonical 37-byte 51Did payload with flags = 0xA5,
-        /// licenseId = 0x12345678 (little-endian), and a stable 32-byte hash
-        /// (0x20..0x3F). All field-level assertions key off these values.
-        /// </summary>
-        private static byte[] CanonicalPayload()
-        {
-            var payload = new byte[FodId.PayloadLength];
-            payload[FodId.FlagsOffset] = CanonicalFlags;
-            // Little-endian: low byte first
-            payload[FodId.LicenseIdOffset + 0] = 0x78;
-            payload[FodId.LicenseIdOffset + 1] = 0x56;
-            payload[FodId.LicenseIdOffset + 2] = 0x34;
-            payload[FodId.LicenseIdOffset + 3] = 0x12;
-            Array.Copy(CanonicalHash, 0, payload, FodId.HashOffset, FodId.HashLength);
-            return payload;
-        }
-
-        /// <summary>
-        /// A canonical 21-byte Random payload: type tag 01 in bits 6-7,
-        /// usage bits 0b001, licenseId = 0x12345678 (little-endian),
-        /// and a stable 16-byte GUID block (0x40..0x4F).
-        /// </summary>
-        private static byte[] CanonicalRandomPayload()
-        {
-            var payload = new byte[FodId.RandomPayloadLength];
-            payload[FodId.FlagsOffset] = (byte)((byte)IdType.Random << 6 | 0b001);
-            payload[FodId.LicenseIdOffset + 0] = 0x78;
-            payload[FodId.LicenseIdOffset + 1] = 0x56;
-            payload[FodId.LicenseIdOffset + 2] = 0x34;
-            payload[FodId.LicenseIdOffset + 3] = 0x12;
-            for (int i = 0; i < FodId.GuidLength; i++)
-            {
-                payload[FodId.HashOffset + i] = (byte)(0x40 + i);
-            }
-            return payload;
-        }
-
-        /// <summary>
-        /// Create and sign a real OWID with the given payload using a freshly
-        /// generated ECDsa P-256 key pair.
-        /// </summary>
-        private Owid.Client.Model.Owid SignedOwid(byte[] payload)
-        {
-            using var crypto = ECDsa.Create();
-            crypto.ImportFromPem(PrivatePem);
-            var creator = new Creator(TestDomain, crypto);
-            var owid = new Owid.Client.Model.Owid
-            {
-                Date = DateTime.UtcNow,
-                Payload = payload,
-            };
-            creator.Sign(owid);
-            return owid;
-        }
-
-        private string SignedOwidBase64(byte[] payload) =>
-            SignedOwid(payload).AsBase64();
 
         [TestMethod]
         public void Constants_AreInternallyConsistent()
@@ -138,7 +65,7 @@ namespace FiftyOne.Did.Tests
         [TestMethod]
         public void FodId_IsAnOwid()
         {
-            var fodId = new FodId(SignedOwidBase64(CanonicalPayload()));
+            var fodId = new FodId(_factory.SignedOwidBase64(CanonicalPayload()));
 
             Assert.IsInstanceOfType<Owid.Client.Model.Owid>(fodId);
         }
@@ -146,7 +73,7 @@ namespace FiftyOne.Did.Tests
         [TestMethod]
         public void Constructor_FromBase64_UnpacksAllThreeFields()
         {
-            var base64 = SignedOwidBase64(CanonicalPayload());
+            var base64 = _factory.SignedOwidBase64(CanonicalPayload());
 
             var fodId = new FodId(base64);
 
@@ -159,7 +86,7 @@ namespace FiftyOne.Did.Tests
         [TestMethod]
         public void Constructor_FromBytes_UnpacksAllThreeFields()
         {
-            var base64 = SignedOwidBase64(CanonicalPayload());
+            var base64 = _factory.SignedOwidBase64(CanonicalPayload());
             var bytes = Convert.FromBase64String(base64);
 
             var fodId = new FodId(bytes);
@@ -173,7 +100,7 @@ namespace FiftyOne.Did.Tests
         [TestMethod]
         public void Constructor_FromOwid_UnpacksAllThreeFields()
         {
-            var owid = SignedOwid(CanonicalPayload());
+            var owid = _factory.SignedOwid(CanonicalPayload());
 
             var fodId = new FodId(owid);
 
@@ -205,7 +132,7 @@ namespace FiftyOne.Did.Tests
             payload[FodId.LicenseIdOffset + 2] = 0x00;
             payload[FodId.LicenseIdOffset + 3] = 0x00;
 
-            var fodId = new FodId(SignedOwidBase64(payload));
+            var fodId = new FodId(_factory.SignedOwidBase64(payload));
 
             Assert.AreEqual(1u, fodId.LicenseId);
         }
@@ -219,7 +146,7 @@ namespace FiftyOne.Did.Tests
             payload[FodId.LicenseIdOffset + 2] = 0xFF;
             payload[FodId.LicenseIdOffset + 3] = 0xFF;
 
-            var fodId = new FodId(SignedOwidBase64(payload));
+            var fodId = new FodId(_factory.SignedOwidBase64(payload));
 
             Assert.AreEqual(uint.MaxValue, fodId.LicenseId);
         }
@@ -234,7 +161,7 @@ namespace FiftyOne.Did.Tests
             payload[FodId.LicenseIdOffset + 2] = 0x00;
             payload[FodId.LicenseIdOffset + 3] = 0x80;
 
-            var fodId = new FodId(SignedOwidBase64(payload));
+            var fodId = new FodId(_factory.SignedOwidBase64(payload));
 
             Assert.AreEqual(0x8000_0000u, fodId.LicenseId);
         }
@@ -245,7 +172,7 @@ namespace FiftyOne.Did.Tests
             var payload = CanonicalPayload();
             payload[FodId.FlagsOffset] = 0x00;
 
-            var fodId = new FodId(SignedOwidBase64(payload));
+            var fodId = new FodId(_factory.SignedOwidBase64(payload));
 
             Assert.AreEqual(0x00, fodId.Flags);
         }
@@ -256,7 +183,7 @@ namespace FiftyOne.Did.Tests
             var payload = CanonicalPayload();
             payload[FodId.FlagsOffset] = 0xFF;
 
-            var fodId = new FodId(SignedOwidBase64(payload));
+            var fodId = new FodId(_factory.SignedOwidBase64(payload));
 
             Assert.AreEqual(0xFF, fodId.Flags);
         }
@@ -264,7 +191,7 @@ namespace FiftyOne.Did.Tests
         [TestMethod]
         public void Hash_IsDefensiveCopy()
         {
-            var fodId = new FodId(SignedOwidBase64(CanonicalPayload()));
+            var fodId = new FodId(_factory.SignedOwidBase64(CanonicalPayload()));
 
             fodId.Hash[0] = 0x00;
             fodId.Hash[FodId.HashLength - 1] = 0x00;
@@ -280,7 +207,7 @@ namespace FiftyOne.Did.Tests
         public void Constructor_PayloadOneByteShort_Throws()
         {
             // 36 bytes — one short of the minimum 37.
-            var base64 = SignedOwidBase64(new byte[FodId.PayloadLength - 1]);
+            var base64 = _factory.SignedOwidBase64(new byte[FodId.PayloadLength - 1]);
 
             Assert.ThrowsExactly<ArgumentException>(() => new FodId(base64));
         }
@@ -288,7 +215,7 @@ namespace FiftyOne.Did.Tests
         [TestMethod]
         public void Constructor_PayloadEmpty_Throws()
         {
-            var base64 = SignedOwidBase64(Array.Empty<byte>());
+            var base64 = _factory.SignedOwidBase64(Array.Empty<byte>());
 
             Assert.ThrowsExactly<ArgumentException>(() => new FodId(base64));
         }
@@ -326,7 +253,7 @@ namespace FiftyOne.Did.Tests
                 payload[i] = 0xCC;
             }
 
-            var fodId = new FodId(SignedOwidBase64(payload));
+            var fodId = new FodId(_factory.SignedOwidBase64(payload));
 
             Assert.AreEqual(CanonicalFlags, fodId.Flags);
             Assert.AreEqual(CanonicalLicenseId, fodId.LicenseId);
@@ -337,17 +264,17 @@ namespace FiftyOne.Did.Tests
         [TestMethod]
         public async Task FodId_IsCryptographicallyVerifiable()
         {
-            var fodId = new FodId(SignedOwidBase64(CanonicalPayload()));
+            var fodId = new FodId(_factory.SignedOwidBase64(CanonicalPayload()));
 
             using var verifyKey = ECDsa.Create();
-            verifyKey.ImportFromPem(PublicPem);
+            verifyKey.ImportFromPem(_factory.PublicPem);
             Assert.IsTrue(await fodId.VerifyAsync(verifyKey));
         }
 
         [TestMethod]
         public void Base64Roundtrip_PreservesAllFields()
         {
-            var fodId1 = new FodId(SignedOwidBase64(CanonicalPayload()));
+            var fodId1 = new FodId(_factory.SignedOwidBase64(CanonicalPayload()));
             var fodId2 = new FodId(fodId1.AsBase64());
 
             Assert.AreEqual(fodId1.Flags, fodId2.Flags);
@@ -365,7 +292,7 @@ namespace FiftyOne.Did.Tests
             var payload = CanonicalPayload();
             payload[FodId.FlagsOffset] = flags;
 
-            var fodId = new FodId(SignedOwidBase64(payload));
+            var fodId = new FodId(_factory.SignedOwidBase64(payload));
 
             Assert.AreEqual(expected, fodId.Type);
         }
@@ -373,7 +300,7 @@ namespace FiftyOne.Did.Tests
         [TestMethod]
         public void Type_RandomWhenBits01()
         {
-            var fodId = new FodId(SignedOwidBase64(CanonicalRandomPayload()));
+            var fodId = new FodId(_factory.SignedOwidBase64(CanonicalRandomPayload()));
 
             Assert.AreEqual(IdType.Random, fodId.Type);
         }
@@ -381,7 +308,7 @@ namespace FiftyOne.Did.Tests
         [TestMethod]
         public void Constructor_RandomPayload21Bytes_Parses()
         {
-            var fodId = new FodId(SignedOwidBase64(CanonicalRandomPayload()));
+            var fodId = new FodId(_factory.SignedOwidBase64(CanonicalRandomPayload()));
 
             Assert.AreEqual(CanonicalLicenseId, fodId.LicenseId);
             Assert.AreEqual(FodId.GuidLength, fodId.Hash.Length);
@@ -398,7 +325,7 @@ namespace FiftyOne.Did.Tests
                 .Take(FodId.RandomPayloadLength - 1).ToArray();
 
             Assert.ThrowsExactly<ArgumentException>(
-                () => new FodId(SignedOwidBase64(payload)));
+                () => new FodId(_factory.SignedOwidBase64(payload)));
         }
 
         [TestMethod]
@@ -412,7 +339,7 @@ namespace FiftyOne.Did.Tests
                 payload[i] = 0xCC;
             }
 
-            var fodId = new FodId(SignedOwidBase64(payload));
+            var fodId = new FodId(_factory.SignedOwidBase64(payload));
 
             Assert.AreEqual(IdType.Random, fodId.Type);
             Assert.AreEqual(FodId.GuidLength, fodId.Hash.Length);
@@ -427,7 +354,7 @@ namespace FiftyOne.Did.Tests
                 .Take(FodId.PayloadLength - 1).ToArray();
 
             Assert.ThrowsExactly<ArgumentException>(
-                () => new FodId(SignedOwidBase64(payload)));
+                () => new FodId(_factory.SignedOwidBase64(payload)));
         }
 
         [TestMethod]
@@ -436,7 +363,7 @@ namespace FiftyOne.Did.Tests
             var payload = new byte[FodId.HashOffset];
             payload[FodId.FlagsOffset] = 0b1100_0000;
 
-            var fodId = new FodId(SignedOwidBase64(payload));
+            var fodId = new FodId(_factory.SignedOwidBase64(payload));
 
             Assert.AreEqual(IdType.Reserved, fodId.Type);
             Assert.AreEqual(0, fodId.Hash.Length);

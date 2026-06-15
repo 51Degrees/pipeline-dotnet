@@ -24,10 +24,8 @@ using FiftyOne.Did.Model;
 using FiftyOne.Pipeline.Engines.Data;
 using FiftyOne.Pipeline.Engines.Exceptions;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
-using Owid.Client;
-using Owid.Client.Model;
 using System;
-using System.Security.Cryptography;
+using static FiftyOne.Did.Tests.FodIdTestFactory;
 
 namespace FiftyOne.Did.Tests
 {
@@ -39,49 +37,21 @@ namespace FiftyOne.Did.Tests
     [TestClass]
     public class FodIdExtensionsTests
     {
-        private const string TestDomain = "51degrees.com";
-        private const uint CanonicalLicenseId = 0x12345678u;
+        private FodIdTestFactory _factory = null!;
 
-        /// <summary>
-        /// Mint a real signed probabilistic 51Did and return its base64 form.
-        /// </summary>
-        private static string SignedProbabilistic51Did()
+        [TestInitialize]
+        public void TestInitialize()
         {
-            using var crypto = ECDsa.Create(ECCurve.NamedCurves.nistP256);
-            var privatePem = new string(PemEncoding.Write(
-                "PRIVATE KEY", crypto.ExportPkcs8PrivateKey()));
-
-            using var signer = ECDsa.Create();
-            signer.ImportFromPem(privatePem);
-            var creator = new Creator(TestDomain, signer);
-
-            var payload = new byte[FodId.PayloadLength];
-            // Flags 0x01: bits 6-7 = 00 -> Probabilistic, usage bit set.
-            payload[FodId.FlagsOffset] = 0x01;
-            payload[FodId.LicenseIdOffset + 0] = 0x78;
-            payload[FodId.LicenseIdOffset + 1] = 0x56;
-            payload[FodId.LicenseIdOffset + 2] = 0x34;
-            payload[FodId.LicenseIdOffset + 3] = 0x12;
-            for (var i = 0; i < FodId.HashLength; i++)
-            {
-                payload[FodId.HashOffset + i] = (byte)(0x20 + i);
-            }
-
-            var owid = new Owid.Client.Model.Owid
-            {
-                Date = DateTime.UtcNow,
-                Payload = payload,
-            };
-            creator.Sign(owid);
-            return owid.AsBase64();
+            _factory = new FodIdTestFactory();
         }
 
         [TestMethod]
         public void StringAs51Did_ParsesAValidIdentifier()
         {
-            var fodId = SignedProbabilistic51Did().As51Did();
+            var fodId = _factory.SignedOwidBase64(CanonicalPayload()).As51Did();
 
-            Assert.AreEqual(IdType.Probabilistic, fodId.Type);
+            // The canonical payload carries the HashedEmail type tag in its flags.
+            Assert.AreEqual(IdType.HashedEmail, fodId.Type);
             Assert.AreEqual(CanonicalLicenseId, fodId.LicenseId);
             Assert.AreEqual(TestDomain, fodId.Domain);
             Assert.AreEqual(FodId.HashLength, fodId.Hash.Length);
@@ -100,11 +70,11 @@ namespace FiftyOne.Did.Tests
         public void PropertyValueAs51Did_ParsesAValidIdentifier()
         {
             IAspectPropertyValue<string> value =
-                new AspectPropertyValue<string>(SignedProbabilistic51Did());
+                new AspectPropertyValue<string>(_factory.SignedOwidBase64(CanonicalPayload()));
 
             var fodId = value.As51Did();
 
-            Assert.AreEqual(IdType.Probabilistic, fodId.Type);
+            Assert.AreEqual(IdType.HashedEmail, fodId.Type);
             Assert.AreEqual(CanonicalLicenseId, fodId.LicenseId);
         }
 
