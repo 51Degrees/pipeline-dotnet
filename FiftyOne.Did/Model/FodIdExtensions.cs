@@ -20,8 +20,6 @@
  * such notice(s) shall fulfill the requirements of that article.
  * ********************************************************************* */
 
-using FiftyOne.Pipeline.Engines.Data;
-using FiftyOne.Pipeline.Engines.Exceptions;
 using System;
 
 namespace FiftyOne.Did.Model
@@ -31,17 +29,20 @@ namespace FiftyOne.Did.Model
     /// in a single call.
     /// </summary>
     /// <remarks>
-    /// The 51Did cloud engine surfaces each identifier as a raw base64 string
-    /// (<c>IAspectPropertyValue&lt;string&gt;</c>). These overloads turn that
-    /// value, or the unwrapped string, into a parsed <see cref="FodId"/> so a
-    /// consumer can write, for example,
-    /// <c>data.IdProbGlobal.As51Did()</c> or <c>idString.As51Did()</c>.
+    /// The 51Did cloud engine surfaces each identifier as a raw base64 string.
+    /// This overload turns that string into a parsed <see cref="FodId"/> so a
+    /// consumer can write, for example, <c>idString.As51Did()</c>.
     /// <para>
     /// Error handling is delegated to the existing types rather than reinvented:
-    /// a missing value surfaces the pipeline's own no-value exception (carrying
-    /// the cloud's reason), and a value that is not a valid 51Did surfaces the
-    /// <see cref="FodId"/> constructor's own exceptions. See the per-method
-    /// remarks for the exact types.
+    /// a value that is not a valid 51Did surfaces the <see cref="FodId"/>
+    /// constructor's own exceptions. See the per-method remarks for the exact
+    /// types.
+    /// </para>
+    /// <para>
+    /// Note this type intentionally takes no dependency on the pipeline: a
+    /// caller holding an <c>IAspectPropertyValue&lt;string&gt;</c> already
+    /// references the engines assembly and can unwrap it with its own no-value
+    /// handling, e.g. <c>data.IdProbGlobal.Value.As51Did()</c>.
     /// </para>
     /// </remarks>
     public static class FodIdExtensions
@@ -71,47 +72,6 @@ namespace FiftyOne.Did.Model
             // value, FormatException for invalid Base64 and ArgumentException for
             // a payload that is too short. Relay those rather than reinvent them.
             return new FodId(value);
-        }
-
-        /// <summary>
-        /// Resolve a 51Did property value into a <see cref="FodId"/>.
-        /// </summary>
-        /// <param name="value">
-        /// The property value produced by the 51Did engine, for example
-        /// <c>data.IdProbGlobal</c>.
-        /// </param>
-        /// <returns>The parsed <see cref="FodId"/>.</returns>
-        /// <exception cref="ArgumentNullException">
-        /// Thrown when <paramref name="value"/> itself is <c>null</c>.
-        /// </exception>
-        /// <exception cref="NoValueException">
-        /// Thrown when the engine determined no value for this identifier
-        /// (<see cref="IAspectPropertyValue.HasValue"/> is <c>false</c>), for
-        /// example because the usage policy or resource key did not permit it.
-        /// The exception message relays the cloud's reason
-        /// (<see cref="IAspectPropertyValue.NoValueMessage"/>).
-        /// </exception>
-        /// <exception cref="FormatException">
-        /// Thrown when the resolved value is not valid Base64.
-        /// </exception>
-        /// <exception cref="ArgumentException">
-        /// Thrown when the resolved value's payload is shorter than the minimum
-        /// for its identifier type.
-        /// </exception>
-        public static FodId As51Did(this IAspectPropertyValue<string> value)
-        {
-            ArgumentNullException.ThrowIfNull(value);
-            if (!value.HasValue)
-            {
-                // No value was determined (for example the usage policy or
-                // resource key did not permit this identifier). Surface the
-                // cloud's reason explicitly rather than relying on the value
-                // accessor to throw.
-                throw new NoValueException(value.NoValueMessage);
-            }
-            // The value is present; the string overload relays the FodId
-            // constructor's exceptions for a malformed value.
-            return value.Value.As51Did();
         }
     }
 }

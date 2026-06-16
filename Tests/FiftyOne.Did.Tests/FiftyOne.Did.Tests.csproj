@@ -21,7 +21,6 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\FiftyOne.Did\FiftyOne.Did.csproj" />
-    <ProjectReference Include="..\..\FiftyOne.Pipeline.Engines\FiftyOne.Pipeline.Engines.csproj" />
   </ItemGroup>
 
 </Project>

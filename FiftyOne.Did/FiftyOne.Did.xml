@@ -176,17 +176,20 @@
             in a single call.
             </summary>
             <remarks>
-            The 51Did cloud engine surfaces each identifier as a raw base64 string
-            (<c>IAspectPropertyValue&lt;string&gt;</c>). These overloads turn that
-            value, or the unwrapped string, into a parsed <see cref="T:FiftyOne.Did.Model.FodId"/> so a
-            consumer can write, for example,
-            <c>data.IdProbGlobal.As51Did()</c> or <c>idString.As51Did()</c>.
+            The 51Did cloud engine surfaces each identifier as a raw base64 string.
+            This overload turns that string into a parsed <see cref="T:FiftyOne.Did.Model.FodId"/> so a
+            consumer can write, for example, <c>idString.As51Did()</c>.
             <para>
             Error handling is delegated to the existing types rather than reinvented:
-            a missing value surfaces the pipeline's own no-value exception (carrying
-            the cloud's reason), and a value that is not a valid 51Did surfaces the
-            <see cref="T:FiftyOne.Did.Model.FodId"/> constructor's own exceptions. See the per-method
-            remarks for the exact types.
+            a value that is not a valid 51Did surfaces the <see cref="T:FiftyOne.Did.Model.FodId"/>
+            constructor's own exceptions. See the per-method remarks for the exact
+            types.
+            </para>
+            <para>
+            Note this type intentionally takes no dependency on the pipeline: a
+            caller holding an <c>IAspectPropertyValue&lt;string&gt;</c> already
+            references the engines assembly and can unwrap it with its own no-value
+            handling, e.g. <c>data.IdProbGlobal.Value.As51Did()</c>.
             </para>
             </remarks>
         </member>
@@ -209,33 +212,6 @@
             <exception cref="T:System.ArgumentException">
             Thrown (by the <see cref="T:FiftyOne.Did.Model.FodId"/> constructor) when the decoded
             payload is shorter than the minimum for its identifier type.
-            </exception>
-        </member>
-        <member name="M:FiftyOne.Did.Model.FodIdExtensions.As51Did(FiftyOne.Pipeline.Engines.Data.IAspectPropertyValue{System.String})">
-            <summary>
-            Resolve a 51Did property value into a <see cref="T:FiftyOne.Did.Model.FodId"/>.
-            </summary>
-            <param name="value">
-            The property value produced by the 51Did engine, for example
-            <c>data.IdProbGlobal</c>.
-            </param>
-            <returns>The parsed <see cref="T:FiftyOne.Did.Model.FodId"/>.</returns>
-            <exception cref="T:System.ArgumentNullException">
-            Thrown when <paramref name="value"/> itself is <c>null</c>.
-            </exception>
-            <exception cref="T:FiftyOne.Pipeline.Engines.Exceptions.NoValueException">
-            Thrown when the engine determined no value for this identifier
-            (<see cref="P:FiftyOne.Pipeline.Engines.Data.IAspectPropertyValue.HasValue"/> is <c>false</c>), for
-            example because the usage policy or resource key did not permit it.
-            The exception message relays the cloud's reason
-            (<see cref="P:FiftyOne.Pipeline.Engines.Data.IAspectPropertyValue.NoValueMessage"/>).
-            </exception>
-            <exception cref="T:System.FormatException">
-            Thrown when the resolved value is not valid Base64.
-            </exception>
-            <exception cref="T:System.ArgumentException">
-            Thrown when the resolved value's payload is shorter than the minimum
-            for its identifier type.
             </exception>
         </member>
         <member name="T:FiftyOne.Did.Model.IdType">

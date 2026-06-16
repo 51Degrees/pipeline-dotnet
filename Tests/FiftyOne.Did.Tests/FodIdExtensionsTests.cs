@@ -21,8 +21,6 @@
  * ********************************************************************* */
 
 using FiftyOne.Did.Model;
-using FiftyOne.Pipeline.Engines.Data;
-using FiftyOne.Pipeline.Engines.Exceptions;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using System;
 using static FiftyOne.Did.Tests.FodIdTestFactory;
@@ -30,9 +28,8 @@ using static FiftyOne.Did.Tests.FodIdTestFactory;
 namespace FiftyOne.Did.Tests
 {
     /// <summary>
-    /// Tests for the <see cref="FodIdExtensions"/> one-line resolution helpers
-    /// (<c>As51Did</c>), on both <c>IAspectPropertyValue&lt;string&gt;</c> and a
-    /// raw <see cref="string"/>.
+    /// Tests for the <see cref="FodIdExtensions"/> one-line resolution helper
+    /// (<c>As51Did</c>) on a raw <see cref="string"/>.
     /// </summary>
     [TestClass]
     public class FodIdExtensionsTests
@@ -63,48 +60,6 @@ namespace FiftyOne.Did.Tests
             Assert.ThrowsExactly<FormatException>(() =>
             {
                 _ = "this is not a valid base64 51Did".As51Did();
-            });
-        }
-
-        [TestMethod]
-        public void PropertyValueAs51Did_ParsesAValidIdentifier()
-        {
-            IAspectPropertyValue<string> value =
-                new AspectPropertyValue<string>(_factory.SignedOwidBase64(CanonicalPayload()));
-
-            var fodId = value.As51Did();
-
-            Assert.AreEqual(IdType.HashedEmail, fodId.Type);
-            Assert.AreEqual(CanonicalLicenseId, fodId.LicenseId);
-        }
-
-        [TestMethod]
-        public void PropertyValueAs51Did_NoValueThrowsNoValueException()
-        {
-            // The engine determined no value for this identifier (for example the
-            // usage policy did not permit it).
-            IAspectPropertyValue<string> value = new AspectPropertyValue<string>
-            {
-                NoValueMessage = "The usage policy does not permit this identifier.",
-            };
-
-            var ex = Assert.ThrowsExactly<NoValueException>(() =>
-            {
-                _ = value.As51Did();
-            });
-            Assert.AreEqual(
-                "The usage policy does not permit this identifier.",
-                ex.Message);
-        }
-
-        [TestMethod]
-        public void PropertyValueAs51Did_NullThrowsArgumentNullException()
-        {
-            IAspectPropertyValue<string> value = null!;
-
-            Assert.ThrowsExactly<ArgumentNullException>(() =>
-            {
-                _ = value.As51Did();
             });
         }
     }
