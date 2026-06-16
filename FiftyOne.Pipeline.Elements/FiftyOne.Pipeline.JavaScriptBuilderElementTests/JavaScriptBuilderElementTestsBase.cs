@@ -47,6 +47,12 @@ namespace FiftyOne.Pipeline.JavaScript.Tests
 
         public static Task ClassInit(TestContext context)
         {
+            CreateDriver();
+            return Task.CompletedTask;
+        }
+
+        private static void CreateDriver()
+        {
             var chromeOptions = new ChromeOptions();
             chromeOptions.SetLoggingPreference(LogType.Browser, OpenQA.Selenium.LogLevel.Info);
             chromeOptions.AcceptInsecureCertificates = true;
@@ -61,17 +67,44 @@ namespace FiftyOne.Pipeline.JavaScript.Tests
             try
             {
                 Driver = new ChromeDriver(chromeOptions);
+                // Bound a stuck navigation so GoToUrl throws quickly instead of
+                // blocking until the runner's hang-dump aborts the thread and
+                // crashes the tab.
+                Driver.Manage().Timeouts().PageLoad = TimeSpan.FromSeconds(60);
             }
             catch (WebDriverException)
             {
                 Assert.Inconclusive("Could not create a ChromeDriver, check " +
                                     "that the Chromium driver is installed");
             }
-
-            return Task.CompletedTask;
         }
-        
+
+        /// <summary>
+        /// The <see cref="Driver"/> is shared across the whole class, so a test
+        /// that leaves Chrome in a crashed state ("tab crashed") would otherwise
+        /// cascade into a failure for every remaining test. Probe the session and
+        /// recreate the driver if it has died.
+        /// </summary>
+        private static void EnsureDriverAlive()
+        {
+            try
+            {
+                _ = Driver?.CurrentWindowHandle;
+            }
+            catch (WebDriverException)
+            {
+                try { Driver?.Quit(); } catch (WebDriverException) { /* already gone */ }
+                Driver = null;
+            }
+
+            if (Driver == null)
+            {
+                CreateDriver();
+            }
+        }
+
         public virtual Task Init() {
+            EnsureDriverAlive();
             ClientServerUrl = $"http://localhost:{TestHttpListener.GetRandomUnusedPort()}/";
             
             _mockjsonBuilderElement = new Mock<IJsonBuilderElement>();
