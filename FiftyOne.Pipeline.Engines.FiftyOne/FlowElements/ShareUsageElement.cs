@@ -64,8 +64,7 @@ namespace FiftyOne.Pipeline.Engines.FiftyOne.FlowElements
             string aspSessionCookieName,
             ITracker tracker,
             bool shareAllEvidence,
-            IFailHandler failHandler = null,
-            List<string> neverSharedEvidenceKeys = null)
+            IFailHandler failHandler = null)
             : base(logger,
                   httpClient,
                   sharePercentage,
@@ -82,8 +81,7 @@ namespace FiftyOne.Pipeline.Engines.FiftyOne.FlowElements
                   aspSessionCookieName,
                   tracker,
                   shareAllEvidence,
-                  failHandler,
-                  neverSharedEvidenceKeys)
+                  failHandler)
         {
         }
 

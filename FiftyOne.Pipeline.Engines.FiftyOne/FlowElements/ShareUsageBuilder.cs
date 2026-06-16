@@ -102,9 +102,7 @@ namespace FiftyOne.Pipeline.Engines.FiftyOne.FlowElements
                 IgnoreDataEvidenceFilter,
                 AspSessionCookieName,
                 null,
-                ShareAllEvidence,
-                null,
-                NeverSharedEvidenceKeys);
+                ShareAllEvidence);
         }
     }
 }

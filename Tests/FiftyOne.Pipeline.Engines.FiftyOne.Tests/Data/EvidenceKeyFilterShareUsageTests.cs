@@ -26,23 +26,18 @@ using System.Collections.Generic;
 
 namespace FiftyOne.Pipeline.Engines.FiftyOne.Tests.Data
 {
+    /// <summary>
+    /// Tests that the raw email address evidence (the 'id.email' key
+    /// supplied for hashed-email identifiers) is never shared, regardless
+    /// of the share-all setting.
+    /// </summary>
     [TestClass]
     public class EvidenceKeyFilterShareUsageTests
     {
         [TestMethod]
-        public void ShareAll_NoNeverSharedKeys_IncludesEverything()
+        public void ShareAll_IncludesEverythingExceptTheEmailKey()
         {
             var filter = new EvidenceKeyFilterShareUsage();
-
-            Assert.IsTrue(filter.Include("query.id.email"));
-            Assert.IsTrue(filter.Include("header.user-agent"));
-        }
-
-        [TestMethod]
-        public void ShareAll_NeverSharedKeys_Excluded()
-        {
-            var filter = new EvidenceKeyFilterShareUsage(
-                new List<string> { "query.id.email", "header.id.email" });
 
             Assert.IsFalse(filter.Include("query.id.email"));
             Assert.IsFalse(filter.Include("header.id.email"));
@@ -51,23 +46,32 @@ namespace FiftyOne.Pipeline.Engines.FiftyOne.Tests.Data
         }
 
         [TestMethod]
-        public void ShareAll_NeverSharedKeys_CaseInsensitive()
+        public void ShareAll_EmailKey_IsCaseInsensitive()
         {
-            var filter = new EvidenceKeyFilterShareUsage(
-                new List<string> { "query.id.email" });
+            var filter = new EvidenceKeyFilterShareUsage();
 
             Assert.IsFalse(filter.Include("QUERY.ID.EMAIL"));
         }
 
         [TestMethod]
-        public void Filtered_NeverSharedKeys_ExcludedBeforeOtherRules()
+        public void ShareAll_SuffixIsAnchoredToASegmentBoundary()
+        {
+            // 'valid.email' ends with the literal string 'id.email' but the
+            // leading separator in the suffix prevents it being treated as a
+            // never-shared key.
+            var filter = new EvidenceKeyFilterShareUsage();
+
+            Assert.IsTrue(filter.Include("query.valid.email"));
+        }
+
+        [TestMethod]
+        public void Filtered_EmailKey_ExcludedBeforeOtherRules()
         {
             var filter = new EvidenceKeyFilterShareUsage(
                 blockedHttpHeaders: new List<string>(),
                 includedQueryStringParams: null,
                 includeSession: false,
-                aspSessionCookieName: "asp.net_sessionid",
-                neverSharedEvidenceKeys: new List<string> { "query.id.email" });
+                aspSessionCookieName: "asp.net_sessionid");
 
             Assert.IsFalse(filter.Include("query.id.email"));
             Assert.IsTrue(filter.Include("query.id.usage"));

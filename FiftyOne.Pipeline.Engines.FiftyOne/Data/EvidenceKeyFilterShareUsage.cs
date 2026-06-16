@@ -79,26 +79,15 @@ namespace FiftyOne.Pipeline.Engines.FiftyOne.Data
         private HashSet<string> _includedQueryStringParams = new HashSet<string>();
 
         /// <summary>
-        /// Evidence keys that must never be shared, regardless of the
-        /// share-all setting or the header / query rules.
-        /// </summary>
-        private readonly HashSet<string> _neverSharedEvidenceKeys =
-            new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-
-        /// <summary>
         /// Constructor
-        /// Using this constructor will create a filter that allows all 
-        /// evidence. I.e. All evidence will be shared, except the keys
-        /// passed here.
+        /// Using this constructor will create a filter that allows all
+        /// evidence. I.e. All evidence will be shared, except for the
+        /// hard-coded exceptions that <see cref="Include"/> never shares
+        /// regardless of this setting (such as caller-supplied personal data).
         /// </summary>
-        /// <param name="neverSharedEvidenceKeys">
-        /// The (case insensitive) evidence keys that must never be shared.
-        /// </param>
-        public EvidenceKeyFilterShareUsage(
-            List<string> neverSharedEvidenceKeys = null)
+        public EvidenceKeyFilterShareUsage()
         {
             _shareAll = true;
-            AddNeverSharedEvidenceKeys(neverSharedEvidenceKeys);
         }
 
         /// <summary>
@@ -118,21 +107,17 @@ namespace FiftyOne.Pipeline.Engines.FiftyOne.Data
         /// the filter.
         /// </param>
         /// <param name="aspSessionCookieName">
-        /// The name of the cookie that contains the asp.net session id. 
+        /// The name of the cookie that contains the asp.net session id.
         /// </param>
-        /// <param name="neverSharedEvidenceKeys">
-        /// The (case insensitive) evidence keys that must never be shared.
-        /// </param>
-        [System.Diagnostics.CodeAnalysis.SuppressMessage("Globalization", 
-            "CA1308:Normalize strings to uppercase", 
+        [System.Diagnostics.CodeAnalysis.SuppressMessage("Globalization",
+            "CA1308:Normalize strings to uppercase",
             Justification = "Pipeline specification requires keys to be " +
                 "all lower-case")]
         public EvidenceKeyFilterShareUsage(
             List<string> blockedHttpHeaders,
             List<string> includedQueryStringParams,
             bool includeSession,
-            string aspSessionCookieName,
-            List<string> neverSharedEvidenceKeys = null)
+            string aspSessionCookieName)
         {
             if(blockedHttpHeaders == null)
             {
@@ -168,16 +153,6 @@ namespace FiftyOne.Pipeline.Engines.FiftyOne.Data
                     }
                 }
             }
-            AddNeverSharedEvidenceKeys(neverSharedEvidenceKeys);
-        }
-
-        private void AddNeverSharedEvidenceKeys(List<string> neverSharedEvidenceKeys)
-        {
-            if (neverSharedEvidenceKeys == null) { return; }
-            foreach (var key in neverSharedEvidenceKeys)
-            {
-                _neverSharedEvidenceKeys.Add(key);
-            }
         }
 
         /// <summary>
@@ -199,7 +174,12 @@ namespace FiftyOne.Pipeline.Engines.FiftyOne.Data
                 throw new ArgumentNullException(nameof(key));
             }
 
-            if (_neverSharedEvidenceKeys.Contains(key))
+            // Caller-supplied personal data (a raw email address) must never
+            // leave the server, even when every other piece of evidence is
+            // shared. This is checked before the share-all short-circuit below
+            // so it applies in every mode.
+            if (key.EndsWith(Engines.Constants.EVIDENCE_ID_EMAIL_SUFFIX,
+                StringComparison.OrdinalIgnoreCase))
             {
                 return false;
             }
