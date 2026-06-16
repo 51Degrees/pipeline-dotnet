@@ -119,17 +119,18 @@ namespace FiftyOne.Pipeline.Core.Tests.Data
         }
 
         /// <summary>
-        /// Check that disposing the flow data disposes its StopTokenSource.
+        /// GetStopToken must stay safe after Dispose: processing already
+        /// disposed flow data must not throw ObjectDisposedException.
         /// </summary>
         [TestMethod]
-        public void FlowData_Dispose_DisposesStopTokenSource()
+        public void FlowData_GetStopToken_AfterDispose_ReturnsNone()
         {
             var flowData = new FlowData(_logger.Object, _pipeline.Object,
                 new Evidence(new Mock<ILogger<Evidence>>().Object));
 
             flowData.Dispose();
 
-            Assert.ThrowsExactly<ObjectDisposedException>(() => _ = flowData.GetStopToken());
+            Assert.AreEqual(CancellationToken.None, flowData.GetStopToken());
         }
 
         /// <summary>

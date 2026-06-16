@@ -170,7 +170,11 @@ namespace FiftyOne.Pipeline.Core.Data
         }
 
         /// <inheritdoc/>
-        public CancellationToken GetStopToken() => _stopTokenSource.Token;
+        public CancellationToken GetStopToken()
+            // The Token getter throws once the source is disposed, so report no
+            // stop token for disposed flow data. This keeps the pipeline's stop
+            // check safe when already-processed data is reused (e.g. perf tests).
+            => disposedValue ? CancellationToken.None : _stopTokenSource.Token;
 
         /// <inheritdoc/>
         public bool ShouldRun() => _stopTokenSource.IsCancellationRequested == false;
