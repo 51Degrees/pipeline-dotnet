@@ -79,6 +79,18 @@ namespace FiftyOne.Pipeline.Engines.FiftyOne.Data
         private HashSet<string> _includedQueryStringParams = new HashSet<string>();
 
         /// <summary>
+        /// Evidence key suffixes that are never shared, regardless of the
+        /// share-all setting. These carry caller-supplied secrets (the raw
+        /// email and salt used to derive hashed-email identifiers) that must
+        /// not leave the server.
+        /// </summary>
+        private static readonly string[] _neverSharedEvidenceSuffixes = new[]
+        {
+            Engines.Constants.EVIDENCE_ID_EMAIL_SUFFIX,
+            Engines.Constants.EVIDENCE_ID_SALT_SUFFIX,
+        };
+
+        /// <summary>
         /// Constructor
         /// Using this constructor will create a filter that allows all
         /// evidence. I.e. All evidence will be shared, except for the
@@ -174,12 +186,12 @@ namespace FiftyOne.Pipeline.Engines.FiftyOne.Data
                 throw new ArgumentNullException(nameof(key));
             }
 
-            // Caller-supplied personal data (a raw email address) must never
+            // Caller-supplied secrets (the raw email and salt) must never
             // leave the server, even when every other piece of evidence is
             // shared. This is checked before the share-all short-circuit below
             // so it applies in every mode.
-            if (key.EndsWith(Engines.Constants.EVIDENCE_ID_EMAIL_SUFFIX,
-                StringComparison.OrdinalIgnoreCase))
+            if (Array.Exists(_neverSharedEvidenceSuffixes,
+                suffix => key.EndsWith(suffix, StringComparison.OrdinalIgnoreCase)))
             {
                 return false;
             }

@@ -27,30 +27,33 @@ using System.Collections.Generic;
 namespace FiftyOne.Pipeline.Engines.FiftyOne.Tests.Data
 {
     /// <summary>
-    /// Tests that the raw email address evidence (the 'id.email' key
-    /// supplied for hashed-email identifiers) is never shared, regardless
-    /// of the share-all setting.
+    /// Tests that the caller-supplied secrets used to derive hashed-email
+    /// identifiers (the 'id.email' and 'id.salt' keys) are never shared,
+    /// regardless of the share-all setting.
     /// </summary>
     [TestClass]
     public class EvidenceKeyFilterShareUsageTests
     {
         [TestMethod]
-        public void ShareAll_IncludesEverythingExceptTheEmailKey()
+        public void ShareAll_IncludesEverythingExceptTheEmailAndSaltKeys()
         {
             var filter = new EvidenceKeyFilterShareUsage();
 
             Assert.IsFalse(filter.Include("query.id.email"));
             Assert.IsFalse(filter.Include("header.id.email"));
+            Assert.IsFalse(filter.Include("query.id.salt"));
+            Assert.IsFalse(filter.Include("header.id.salt"));
             Assert.IsTrue(filter.Include("query.id.usage"));
             Assert.IsTrue(filter.Include("header.user-agent"));
         }
 
         [TestMethod]
-        public void ShareAll_EmailKey_IsCaseInsensitive()
+        public void ShareAll_NeverSharedKeys_AreCaseInsensitive()
         {
             var filter = new EvidenceKeyFilterShareUsage();
 
             Assert.IsFalse(filter.Include("QUERY.ID.EMAIL"));
+            Assert.IsFalse(filter.Include("QUERY.ID.SALT"));
         }
 
         [TestMethod]
@@ -65,7 +68,7 @@ namespace FiftyOne.Pipeline.Engines.FiftyOne.Tests.Data
         }
 
         [TestMethod]
-        public void Filtered_EmailKey_ExcludedBeforeOtherRules()
+        public void Filtered_NeverSharedKeys_ExcludedBeforeOtherRules()
         {
             var filter = new EvidenceKeyFilterShareUsage(
                 blockedHttpHeaders: new List<string>(),
@@ -74,6 +77,7 @@ namespace FiftyOne.Pipeline.Engines.FiftyOne.Tests.Data
                 aspSessionCookieName: "asp.net_sessionid");
 
             Assert.IsFalse(filter.Include("query.id.email"));
+            Assert.IsFalse(filter.Include("query.id.salt"));
             Assert.IsTrue(filter.Include("query.id.usage"));
             Assert.IsTrue(filter.Include("header.user-agent"));
         }
