@@ -79,15 +79,18 @@ namespace FiftyOne.Pipeline.Engines.FiftyOne.Data
         private HashSet<string> _includedQueryStringParams = new HashSet<string>();
 
         /// <summary>
-        /// Evidence key suffixes that are never shared, regardless of the
-        /// share-all setting. These carry caller-supplied secrets (the raw
-        /// email and salt used to derive hashed-email identifiers) that must
-        /// not leave the server.
+        /// Evidence keys that are never shared, regardless of the share-all
+        /// setting. These carry caller-supplied secrets (the raw email and
+        /// salt used to derive hashed-email identifiers) that must not leave
+        /// the server. They are matched on a whole-segment boundary by
+        /// <see cref="Include"/>, so both the bare key and any prefixed form
+        /// ('id.email', 'query.id.email', 'header.id.email') are excluded
+        /// while an unrelated key such as 'query.valid.email' is not.
         /// </summary>
-        private static readonly string[] _neverSharedEvidenceSuffixes = new[]
+        private static readonly string[] _neverSharedEvidenceKeys = new[]
         {
-            Engines.Constants.EVIDENCE_ID_EMAIL_SUFFIX,
-            Engines.Constants.EVIDENCE_ID_SALT_SUFFIX,
+            "id.email",
+            "id.salt",
         };
 
         /// <summary>
@@ -188,10 +191,14 @@ namespace FiftyOne.Pipeline.Engines.FiftyOne.Data
 
             // Caller-supplied secrets (the raw email and salt) must never
             // leave the server, even when every other piece of evidence is
-            // shared. This is checked before the share-all short-circuit below
-            // so it applies in every mode.
-            if (Array.Exists(_neverSharedEvidenceSuffixes,
-                suffix => key.EndsWith(suffix, StringComparison.OrdinalIgnoreCase)))
+            // shared. Matched on a whole-segment boundary - the bare key or
+            // a separator-prefixed form - so 'query.valid.email' is not
+            // mistaken for the 'id.email' secret. Checked before the
+            // share-all short-circuit below so it applies in every mode.
+            if (Array.Exists(_neverSharedEvidenceKeys, neverShared =>
+                key.Equals(neverShared, StringComparison.OrdinalIgnoreCase)
+                || key.EndsWith(Core.Constants.EVIDENCE_SEPERATOR + neverShared,
+                    StringComparison.OrdinalIgnoreCase)))
             {
                 return false;
             }

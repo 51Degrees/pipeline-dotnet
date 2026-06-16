@@ -47,23 +47,6 @@ namespace FiftyOne.Pipeline.Engines
         public const string FIFTYONE_COOKIE_PREFIX = "51d_";
 
         /// <summary>
-        /// The evidence key suffix that carries a caller-supplied raw email
-        /// address (used to derive hashed-email identifiers). The leading
-        /// separator anchors the match to a whole key segment, so it matches
-        /// 'query.id.email' and 'header.id.email' but not an unrelated
-        /// 'query.valid.email'.
-        /// </summary>
-        public const string EVIDENCE_ID_EMAIL_SUFFIX = ".id.email";
-
-        /// <summary>
-        /// The evidence key suffix that carries the caller-supplied salt
-        /// used (with the email) to derive hashed-email identifiers. The
-        /// leading separator anchors the match to a whole key segment, so it
-        /// matches 'query.id.salt' and 'header.id.salt'.
-        /// </summary>
-        public const string EVIDENCE_ID_SALT_SUFFIX = ".id.salt";
-
-        /// <summary>
         /// The default name of the cookie that holds the ID for the
         /// ASP.NET session.
         /// </summary>

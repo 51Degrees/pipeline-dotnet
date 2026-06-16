@@ -60,11 +60,22 @@ namespace FiftyOne.Pipeline.Engines.FiftyOne.Tests.Data
         public void ShareAll_SuffixIsAnchoredToASegmentBoundary()
         {
             // 'valid.email' ends with the literal string 'id.email' but the
-            // leading separator in the suffix prevents it being treated as a
+            // segment-boundary match prevents it being treated as a
             // never-shared key.
             var filter = new EvidenceKeyFilterShareUsage();
 
             Assert.IsTrue(filter.Include("query.valid.email"));
+        }
+
+        [TestMethod]
+        public void ShareAll_NeverSharedKeys_MatchWithoutACategoryPrefix()
+        {
+            // The secret keys must be excluded even when supplied as a bare
+            // segment with no 'query.'/'header.' category prefix.
+            var filter = new EvidenceKeyFilterShareUsage();
+
+            Assert.IsFalse(filter.Include("id.email"));
+            Assert.IsFalse(filter.Include("id.salt"));
         }
 
         [TestMethod]
