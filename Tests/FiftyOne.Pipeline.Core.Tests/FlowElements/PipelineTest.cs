@@ -52,11 +52,11 @@ namespace FiftyOne.Pipeline.Core.Tests.FlowElements
         }
 
         /// <summary>
-        /// Test that the pipeline copes with a flow data that has no
-        /// StopTokenSource.
+        /// Test that the pipeline copes with a flow data whose stop token is
+        /// not configured (an unconfigured mock).
         /// </summary>
         [TestMethod]
-        public void Pipeline_Process_FlowDataWithoutStopTokenSource_RecordsNoError()
+        public void Pipeline_Process_FlowDataWithUnconfiguredStopToken_RecordsNoError()
         {
             var element = GetMockFlowElement();
             var data = new Mock<IFlowData>();
@@ -68,11 +68,11 @@ namespace FiftyOne.Pipeline.Core.Tests.FlowElements
         }
 
         /// <summary>
-        /// Test that a flow element copes with a flow data that has no
-        /// StopTokenSource.
+        /// Test that a flow element copes with a flow data whose stop token is
+        /// not configured (an unconfigured mock).
         /// </summary>
         [TestMethod]
-        public void FlowElementBase_Process_FlowDataWithoutStopTokenSource_DoesNotThrow()
+        public void FlowElementBase_Process_FlowDataWithUnconfiguredStopToken_DoesNotThrow()
         {
             var data = new Mock<IFlowData>();
             var element = new StopElement();
@@ -104,9 +104,9 @@ namespace FiftyOne.Pipeline.Core.Tests.FlowElements
 
             using var data = pipeline.CreateFlowData(cts.Token);
 
-            Assert.IsFalse(data.StopTokenSource.IsCancellationRequested);
+            Assert.IsFalse(data.GetStopToken().IsCancellationRequested);
             cts.Cancel();
-            Assert.IsTrue(data.StopTokenSource.IsCancellationRequested);
+            Assert.IsTrue(data.GetStopToken().IsCancellationRequested);
         }
 
         /// <summary>

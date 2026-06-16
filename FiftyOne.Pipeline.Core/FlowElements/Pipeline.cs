@@ -391,7 +391,7 @@ namespace FiftyOne.Pipeline.Core.FlowElements
                 try
                 {
                     element.Process(data);
-                    if (data.StopTokenSource?.IsCancellationRequested == true) { break; }
+                    if (data.GetStopToken().IsCancellationRequested) { break; }
                 }
 #pragma warning disable CA1031 // Do not catch general exception types
                 // We want to catch any exception here so that the

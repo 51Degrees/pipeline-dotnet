@@ -208,7 +208,7 @@ namespace FiftyOne.Pipeline.Core.FlowElements
             }
 
             Stopwatch sw = null;
-            if (data.StopTokenSource?.IsCancellationRequested != true)
+            if (data.GetStopToken().IsCancellationRequested == false)
             {
                 bool log = Logger.IsEnabled(LogLevel.Debug);
                 if (log)

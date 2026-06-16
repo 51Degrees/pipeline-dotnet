@@ -38,18 +38,33 @@ namespace FiftyOne.Pipeline.Core.Data
         /// A boolean flag that can be used to stop further elements
         /// from executing.
         /// </summary>
-        [Obsolete("Use StopTokenSource instead.")]
+        [Obsolete("Use SetStopToken/GetStopToken instead.")]
 #pragma warning disable CA1716 // Identifiers should not match keywords
         // Marked as obsolete and will be removed in future.
         bool Stop { get; set; }
 #pragma warning restore CA1716 // Identifiers should not match keywords
 
         /// <summary>
-        /// Source for the cancellation token that stops processing of this
-        /// flow data. Cancel it to stop the pipeline running any further
-        /// elements.
+        /// Stop processing this flow data when the supplied token is, or
+        /// becomes, cancelled. Used to link an external cancellation source
+        /// (for example an aborted web request) to this flow data.
         /// </summary>
-        CancellationTokenSource StopTokenSource { get; }
+        /// <param name="stopToken">The token that triggers the stop.</param>
+        void SetStopToken(CancellationToken stopToken);
+
+        /// <summary>
+        /// The token that is cancelled when processing of this flow data
+        /// should stop.
+        /// </summary>
+        /// <returns>The stop token for this flow data.</returns>
+        CancellationToken GetStopToken();
+
+        /// <summary>
+        /// Whether elements should still run. False once this flow data has
+        /// been told to stop.
+        /// </summary>
+        /// <returns><see langword="true"/> while processing should continue.</returns>
+        bool ShouldRun();
 
         /// <summary>
         /// The errors that have occurred during processing

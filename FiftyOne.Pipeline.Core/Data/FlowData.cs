@@ -101,15 +101,15 @@ namespace FiftyOne.Pipeline.Core.Data
         /// </summary>
         public bool Stop
         {
-            get => StopTokenSource.IsCancellationRequested;
-            set { if (value) { StopTokenSource.Cancel(); } }
+            get => _stopTokenSource.IsCancellationRequested;
+            set { if (value) { _stopTokenSource.Cancel(); } }
         }
 
         /// <summary>
         /// Source for the cancellation token that stops processing of this
         /// flow data. Linked to the token passed to the constructor.
         /// </summary>
-        public CancellationTokenSource StopTokenSource { get; }
+        private readonly CancellationTokenSource _stopTokenSource;
 
         /// <summary>
         /// Get a filter that will only include the evidence keys that can 
@@ -138,7 +138,7 @@ namespace FiftyOne.Pipeline.Core.Data
         /// </param>
         /// <param name="cancellationToken">
         /// Token that, when cancelled, stops the pipeline processing this
-        /// flow data. Linked to <see cref="StopTokenSource"/>.
+        /// flow data. Linked to the flow data's stop token.
         /// </param>
         internal FlowData(
             ILogger<FlowData> logger,
@@ -150,7 +150,7 @@ namespace FiftyOne.Pipeline.Core.Data
             PipelineInternal = pipeline;
             _data = new TypedKeyMap(pipeline?.IsConcurrent ?? false);
             _evidence = evidence;
-            StopTokenSource = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+            _stopTokenSource = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
 
             if (_logger != null && _logger.IsEnabled(LogLevel.Debug))
             {
@@ -158,8 +158,25 @@ namespace FiftyOne.Pipeline.Core.Data
             }
         }
 
+        /// <inheritdoc/>
+        public void SetStopToken(CancellationToken stopToken)
+        {
+            if (stopToken.IsCancellationRequested)
+            {
+                _stopTokenSource.Cancel();
+                return;
+            }
+            stopToken.Register(o => ((CancellationTokenSource)o).Cancel(), _stopTokenSource);
+        }
+
+        /// <inheritdoc/>
+        public CancellationToken GetStopToken() => _stopTokenSource.Token;
+
+        /// <inheritdoc/>
+        public bool ShouldRun() => _stopTokenSource.IsCancellationRequested == false;
+
         /// <summary>
-        /// Register an error that occurred while working with this 
+        /// Register an error that occurred while working with this
         /// instance.
         /// </summary>
         /// <param name="ex">
@@ -860,7 +877,7 @@ namespace FiftyOne.Pipeline.Core.Data
                             ((IDisposable)elementData).Dispose();
                         }
                     }
-                    StopTokenSource.Dispose();
+                    _stopTokenSource.Dispose();
                 }
 
                 disposedValue = true;
