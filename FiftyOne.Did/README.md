@@ -25,11 +25,24 @@ identifier" is the same conflation in a different costume.
 
 ## Payload layout
 
-| Offset | Length | Field      | Type                                  |
-|-------:|-------:|------------|---------------------------------------|
-|      0 |      1 | Flags      | uint8 usage-flags bit-mask            |
-|      1 |      4 | LicenseId  | uint32 (little-endian)                |
-|      5 |     32 | Hash       | 32 bytes, SHA-256 probabilistic value |
+The header is shared by every identifier type; bits 6-7 of Flags
+select the type and the length of the value that follows.
+
+| Offset | Length | Field      | Type                                            |
+|-------:|-------:|------------|-------------------------------------------------|
+|      0 |      1 | Flags      | uint8: bits 0-2 usage, bits 6-7 identifier type |
+|      1 |      4 | LicenseId  | uint32 (little-endian)                          |
+|      5 |  16/32 | Value      | SHA-256 (Probabilistic, HashedEmail) or GUID bytes (Random) |
+
+| Bits 7-6 | `FodId.Type`    | Value length | Minimum payload |
+|---------:|-----------------|-------------:|----------------:|
+|     `00` | `Probabilistic` |           32 |              37 |
+|     `01` | `Random`        |           16 |              21 |
+|     `10` | `HashedEmail`   |           32 |              37 |
+|     `11` | `Reserved`      |    remainder |               5 |
+
+Identifiers issued before the type tag existed have bits 6-7 zeroed
+and decode as `Probabilistic`.
 
 `FodId` inherits from `Owid.Client.Model.Owid` (see
 [SWAN-community/owid-dotnet](https://github.com/SWAN-community/owid-dotnet)),
@@ -46,8 +59,9 @@ using FiftyOne.Did.Model;
 var fodId = new FodId(base64FromCloudService);
 
 byte    flags     = fodId.Flags;
+IdType  type      = fodId.Type;        // Probabilistic / Random / HashedEmail
 uint    licenseId = fodId.LicenseId;
-byte[]  hash      = fodId.Hash;        // 32-byte probabilistic value
+byte[]  hash      = fodId.Hash;        // SHA-256 or GUID bytes, see Type
 
 // Inherited OWID-level fields.
 string   domain   = fodId.Domain;
