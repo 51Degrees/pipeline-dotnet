@@ -1,27 +1,29 @@
 # FiftyOne.Did
 
-Strongly-typed .NET parser for the 51Did (51Degrees device identifier)
+Strongly-typed .NET parser for the 51Did (51Degrees Identifier)
 returned by the 51Degrees Cloud service.
 
 ## Terminology
 
-The 51Did has two layers. The wording below treats them as distinct.
+A 51Did is described at three levels, and the wording below is used
+deliberately.
 
-- The **51Did** is the **identifier**. The whole base64 OWID envelope
-  (version, domain, date, payload, signature). It changes byte-for-byte
-  every time the cloud issues one, even for the same inputs, because
-  the date and signature change with each call.
-- The **probabilistic value** is one of the fields *inside* the payload
-  (a 32-byte SHA-256 hash). It is stable across reissues for the same
-  device + IP + usage: if two 51Dids were issued for the same inputs,
-  their probabilistic values are equal even though the wrapping
-  identifiers differ.
+- The **51Did** (51Degrees Identifier) is the identifier as a whole,
+  meaning the concept together with the rules for how it is issued,
+  compared and licensed. "A 51Did" means the identifier in this complete
+  sense, not any single field.
+- The **envelope** (also called the **wrapper**) is the data model that
+  carries a 51Did. It is a signed OWID holding the version, domain, date,
+  payload and signature, and it changes byte-for-byte every time the cloud
+  issues one, even for the same inputs, because the date and signature
+  change with each call.
+- The **value** is the part of the envelope that is stable and comparable.
+  It is the payload bytes after Flags and LicenseId, a 32-byte SHA-256 for
+  Probabilistic and HashedEmail identifiers, or a 16-byte GUID for Random.
+  Two 51Dids for the same inputs share the same value even though their
+  envelopes differ.
 
-Comparing two browsers means comparing the probabilistic values
-carried inside their identifiers, never the identifiers themselves.
-Calling either layer "the identifier" without qualification leads to
-incorrect comparisons; calling the inner field "the probabilistic
-identifier" is the same conflation in a different costume.
+Comparing two 51Dids means comparing their values, never their envelopes.
 
 ## Payload layout
 
@@ -78,13 +80,13 @@ string   roundTrip = fodId.AsBase64();
 var a = new FodId(idprobglobalA);
 var b = new FodId(idprobglobalB);
 
-// Wrapper bytes (Domain, Date, Signature) ARE different; the
-// identifier itself is not stable across reissues:
+// Envelope bytes (Domain, Date, Signature) ARE different. The
+// envelope is not stable across reissues:
 bool sameDate = a.Date == b.Date;                           // false
 bool sameSig  = a.Signature.SequenceEqual(b.Signature);     // false
 
-// The probabilistic value inside the payload IS stable; this is
-// what you actually compare:
+// The value inside the payload IS stable. This is what you
+// actually compare:
 bool sameValue = a.Hash.SequenceEqual(b.Hash);              // true
 ```
 
@@ -109,4 +111,4 @@ Key (for `idproblic`) or across all callers (for `idprobglobal`).
   with signature verification and a "Live 51d.es v3" sample.
 - The [51Did comparer](https://51degrees.com/developers/51did-comparer?utm_source=github&utm_medium=readme&utm_campaign=pipeline-dotnet&utm_content=fiftyone.did-readme.md&utm_term=see-also)
   for a side-by-side, byte-by-byte comparison of two 51Dids that
-  highlights the wrapper-vs-value distinction in action.
+  highlights the envelope-vs-value distinction in action.
