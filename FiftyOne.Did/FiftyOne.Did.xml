@@ -12,13 +12,16 @@
             </summary>
             <remarks>
             <para>
-            Terminology. The 51Did itself (this OWID envelope) is the
-            identifier. The 32-byte SHA-256 hash inside the payload is the
-            probabilistic value carried by that identifier; two responses for
-            the same device + IP + usage share the same probabilistic value
-            but differ at the byte level because the envelope embeds a fresh
-            date and signature on each call. Compare probabilistic values,
-            never full identifiers.
+            Terminology. A 51Did is described at three levels. The 51Did is
+            the identifier as a whole, meaning the concept and its rules. The
+            envelope is the data model that carries it, this OWID, holding the
+            version, domain, date, payload and signature, re-issued fresh on
+            every call. The value is the part of the envelope that is stable
+            and comparable, the payload bytes after Flags and LicenseId,
+            exposed as <see cref="P:FiftyOne.Did.Model.FodId.Hash"/>. Two responses for the same inputs
+            share the same value but differ at the byte level because the
+            envelope embeds a fresh date and signature on each call. Compare
+            values, never envelopes.
             </para>
             <para>
             Payload layout. The header (offsets 0-4) is shared by every
@@ -110,15 +113,14 @@
         </member>
         <member name="P:FiftyOne.Did.Model.FodId.Hash">
             <summary>
-            The value bytes from the payload: a 32-byte SHA-256 for
-            Probabilistic and HashedEmail identifiers, 16 GUID bytes for
-            Random ones.
-            This is the stable field for comparing two 51Did identifiers:
-            two identifiers for the same device + IP + usage share the
-            same probabilistic value even though their wrapping envelopes
-            (date, signature) differ on every issue. Treat as the cache /
-            dedup key. SHA-256 is the underlying hash function; the
-            property is named Hash to reflect that implementation detail.
+            The value bytes from the payload, a 32-byte SHA-256 for
+            Probabilistic and HashedEmail identifiers, or 16 GUID bytes for
+            Random ones. This is the stable, comparable part of the
+            envelope. Two 51Dids for the same inputs share the same value
+            even though their envelopes (date, signature) differ on every
+            issue. Treat it as the cache / dedup key. SHA-256 is the
+            underlying hash function for the probabilistic and hashed-email
+            types, and the property is named Hash to reflect that.
             </summary>
         </member>
         <member name="M:FiftyOne.Did.Model.FodId.#ctor(System.String)">
@@ -172,8 +174,8 @@
         </member>
         <member name="T:FiftyOne.Did.Model.FodIdExtensions">
             <summary>
-            Extension methods for resolving a 51Did value into a <see cref="T:FiftyOne.Did.Model.FodId"/>
-            in a single call.
+            Extension methods for resolving a base64-encoded 51Did into a
+            <see cref="T:FiftyOne.Did.Model.FodId"/> in a single call.
             </summary>
             <remarks>
             The 51Did cloud engine surfaces each identifier as a raw base64 string.

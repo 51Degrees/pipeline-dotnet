@@ -25,8 +25,8 @@ using System;
 namespace FiftyOne.Did.Model
 {
     /// <summary>
-    /// Extension methods for resolving a 51Did value into a <see cref="FodId"/>
-    /// in a single call.
+    /// Extension methods for resolving a base64-encoded 51Did into a
+    /// <see cref="FodId"/> in a single call.
     /// </summary>
     /// <remarks>
     /// The 51Did cloud engine surfaces each identifier as a raw base64 string.

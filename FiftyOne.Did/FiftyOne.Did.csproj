@@ -13,8 +13,8 @@
 
     <!-- NuGet package properties -->
     <PackageId>FiftyOne.Did</PackageId>
-    <Title>51Degrees Device Identifier (51Did) parser</Title>
-    <PackageDescription>Parses the 51Degrees device identifier (51Did) returned by the 51Degrees Cloud service. The 51Did is an OWID envelope (the identifier) whose payload carries a 1-byte flags bit-mask (usage tier and identifier type), a 4-byte little-endian License Id, and the identifier value: a 32-byte SHA-256 for probabilistic and hashed-email identifiers or 16 GUID bytes for random ones. Compare probabilistic values, never full identifiers: two 51Dids for the same device share the same value even though their envelopes differ on every issue. The FodId type inherits from Owid.Client.Model.Owid (SWAN-community/owid-dotnet) and unpacks those three payload fields.</PackageDescription>
+    <Title>51Degrees Identifier (51Did) parser</Title>
+    <PackageDescription>Parses the 51Degrees Identifier (51Did) returned by the 51Degrees Cloud service. A 51Did is carried in an envelope (a signed OWID) whose payload holds a 1-byte flags bit-mask (usage tier and identifier type), a 4-byte little-endian License Id, and the value. The value is a 32-byte SHA-256 for probabilistic and hashed-email identifiers, or 16 GUID bytes for random ones, and it is the stable part you compare. Two 51Dids for the same inputs share the same value even though their envelopes differ on every issue. The FodId type inherits from Owid.Client.Model.Owid (SWAN-community/owid-dotnet) and unpacks those payload fields. Compare values, never envelopes.</PackageDescription>
     <Authors>51Degrees Engineering</Authors>
     <PackageLicenseExpression>EUPL-1.2</PackageLicenseExpression>
     <PackageIconUrl>https://51degrees.com/portals/0/Logos/Square%20Logo.png?width=64</PackageIconUrl>
@@ -23,7 +23,7 @@
     <RepositoryUrl>https://github.com/51Degrees/pipeline-dotnet</RepositoryUrl>
     <PackageIcon>51d-logo.png</PackageIcon>
     <PackageProjectUrl>https://51degrees.com?utm_source=nuget&amp;utm_medium=package&amp;utm_campaign=pipeline-dotnet&amp;utm_content=fiftyone.did-fiftyone.did.csproj&amp;utm_term=packageprojecturl</PackageProjectUrl>
-    <Description>Parses the 51Degrees device identifier (51Did) returned by the 51Degrees Cloud service.</Description>
+    <Description>Parses the 51Degrees Identifier (51Did) returned by the 51Degrees Cloud service.</Description>
     <RepositoryType>git</RepositoryType>
     <NeutralLanguage>en</NeutralLanguage>
     <PackageReadmeFile>README.md</PackageReadmeFile>
