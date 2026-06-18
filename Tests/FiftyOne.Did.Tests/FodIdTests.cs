@@ -378,5 +378,85 @@ namespace FiftyOne.Did.Tests
                 FodId.RandomPayloadLength);
 #pragma warning restore MSTEST0032
         }
+
+        // ----------------------------------------------------------------
+        // Additional coverage for the reader's semantic guarantees, which the
+        // cases above do not exercise: comparison by value, construction
+        // without verification, a failing verification, and a bytes-first
+        // round trip.
+        // ----------------------------------------------------------------
+
+        /// <summary>
+        /// Two 51Dids issued for the same payload carry the same probabilistic
+        /// value (Hash) even though their envelopes differ. This is the whole
+        /// reason the reader exists, so compare hashes, never identifiers.
+        /// </summary>
+        [TestMethod]
+        public void SamePayload_SameHash_DifferentEnvelope()
+        {
+            var a = new FodId(_factory.SignedOwidBase64(CanonicalPayload()));
+            var b = new FodId(_factory.SignedOwidBase64(CanonicalPayload()));
+
+            // The probabilistic value is stable across reissues.
+            CollectionAssert.AreEqual(a.Hash, b.Hash);
+            // The wrapping envelope is not (the signature is regenerated).
+            Assert.IsFalse(a.Signature.SequenceEqual(b.Signature));
+            Assert.AreNotEqual(a.AsBase64(), b.AsBase64());
+            // The domain is part of the envelope but is stable here.
+            Assert.AreEqual(a.Domain, b.Domain);
+        }
+
+        /// <summary>
+        /// Constructing a <see cref="FodId"/> does not verify the signature.
+        /// An unsigned OWID still constructs and exposes all three fields, so a
+        /// later "verify on construction" change would be caught here.
+        /// </summary>
+        [TestMethod]
+        public void Construction_DoesNotVerifySignature()
+        {
+            var unsigned = new Owid.Client.Model.Owid
+            {
+                Date = DateTime.UtcNow,
+                Payload = CanonicalPayload(),
+            };
+
+            var fodId = new FodId(unsigned);
+
+            Assert.AreEqual(CanonicalFlags, fodId.Flags);
+            Assert.AreEqual(CanonicalLicenseId, fodId.LicenseId);
+            CollectionAssert.AreEqual(CanonicalHash, fodId.Hash);
+        }
+
+        /// <summary>
+        /// Verifying a 51Did against the wrong public key returns false rather
+        /// than throwing. The existing verify test only covers the happy path.
+        /// </summary>
+        [TestMethod]
+        public async Task Verify_WithWrongKey_ReturnsFalse()
+        {
+            var fodId = new FodId(_factory.SignedOwidBase64(CanonicalPayload()));
+
+            // A freshly generated key that did not sign this 51Did.
+            using var wrongKey = ECDsa.Create(ECCurve.NamedCurves.nistP256);
+            Assert.IsFalse(await fodId.VerifyAsync(wrongKey));
+        }
+
+        /// <summary>
+        /// A 51Did parsed from raw bytes round-trips through base64 with all
+        /// fields preserved. The other round-trip test starts from base64.
+        /// </summary>
+        [TestMethod]
+        public void BytesConstructor_RoundTripsThroughBase64()
+        {
+            var bytes = Convert.FromBase64String(
+                _factory.SignedOwidBase64(CanonicalPayload()));
+
+            var fromBytes = new FodId(bytes);
+            var roundTripped = new FodId(fromBytes.AsBase64());
+
+            Assert.AreEqual(CanonicalFlags, roundTripped.Flags);
+            Assert.AreEqual(CanonicalLicenseId, roundTripped.LicenseId);
+            CollectionAssert.AreEqual(CanonicalHash, roundTripped.Hash);
+        }
     }
 }
