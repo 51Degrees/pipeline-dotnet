@@ -23,7 +23,7 @@ the concepts and design of this API.
 ## Dependencies
 
 Visual Studio 2022 or later is recommended. Although Visual Studio Code can be used for working with most of the projects.
- 
+
 The Pipeline projects are written in C# and target .NET Standard 2.0.3
 The Web integration multi-targets the following:
     - .NET Core 3.1
@@ -55,7 +55,7 @@ Rather than wait, the Stubble source is vendored under [`vendor/Stubble/`](vendo
 
 - **FiftyOne.Pipeline** - The core projects that comprise the Pipeline API.
   - *FiftyOne.Pipeline.Core* - The core Pipeline classes such as Pipeline, FlowData, FlowElement and Evidence.
-  - *FiftyOne.Pipeline.Engines* - Functionality for AspectEngines, a specialized FlowElement with additional features. 
+  - *FiftyOne.Pipeline.Engines* - Functionality for AspectEngines, a specialized FlowElement with additional features.
   - *FiftyOne.Pipeline.Engines.FiftyOne* - Functionality that is specific to 51Degrees aspect engines.
 - **FiftyOne.Pipeline.Web** - Projects that are relevant to the Pipeline API ASP.NET integration.
   - *FiftyOne.Pipeline.Web* - ASP.NET Core integration.
@@ -102,7 +102,7 @@ If you want examples that demonstrate how to use 51Degrees products such as devi
 | ResultCaching                             | Shows how the result caching feature works. |
 | UsageSharing                              | Shows how to share usage with 51Degrees. This helps us to keep our products up to date and accurate. |
 
-The CloudRequestEngine\GettingStarted example requires a resource key. It reads the aligned `51DEGREES_RESOURCE_KEY` environment variable first, then the legacy `RESOURCE_KEY` variable. A resource key with the free properties used by the examples can be created at https://configure.51degrees.com/Wkqxf3Bs?utm_source=github&utm_medium=readme&utm_campaign=pipeline-dotnet&utm_content=readme.md&utm_term=pipeline-examples.
+The CloudRequestEngine\GettingStarted example requires a resource key. It reads the aligned `_51DEGREES_RESOURCE_KEY` environment variable first, then the legacy `RESOURCE_KEY` variable. A resource key with the free properties used by the examples can be created at https://configure.51degrees.com/Wkqxf3Bs?utm_source=github&utm_medium=readme&utm_campaign=pipeline-dotnet&utm_content=readme.md&utm_term=pipeline-examples.
 
 ## Tests
 
@@ -113,7 +113,7 @@ The CloudRequestEngine\GettingStarted example requires a resource key. It reads 
 - **FiftyOne.Pipeline.Examples.Tests** - Tests for developer examples. This will automatically run all the examples and ensure they do not crash.
 - **FiftyOne.Pipeline.Web.Tests** - Tests for web integration functionality.
 
-The tests can be run from within Visual Studio or (in most cases) by using the `dotnet test` command line tool. 
+The tests can be run from within Visual Studio or (in most cases) by using the `dotnet test` command line tool.
 
 ## Project documentation
 

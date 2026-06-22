@@ -37,14 +37,14 @@ namespace FiftyOne.Did.Tests
     /// <remarks>
     /// <para>
     /// The test uses a single resource key from the environment. Set
-    /// <c>51DEGREES_RESOURCE_KEY</c> (or the legacy <c>SUPER_RESOURCE_KEY</c>)
+    /// <c>_51DEGREES_RESOURCE_KEY</c> (or the legacy <c>SUPER_RESOURCE_KEY</c>)
     /// to a key whose properties include <c>fodid.*</c>. With no key set the
     /// test is inconclusive.
     /// </para>
     /// <para>
     /// To exercise more than one key (for example a free key and a paid key),
     /// the CI workflow runs this test once per <c>_51DEGREES_RESOURCE_KEY*</c>
-    /// secret, setting <c>51DEGREES_RESOURCE_KEY</c> to each in turn. The test
+    /// secret, setting <c>_51DEGREES_RESOURCE_KEY</c> to each in turn. The test
     /// itself only ever reads the single variable.
     /// </para>
     /// <para>
@@ -68,7 +68,7 @@ namespace FiftyOne.Did.Tests
         /// The aligned environment variable name used to supply the resource
         /// key. Checked before the legacy name.
         /// </summary>
-        private const string ResourceKeyEnvVar = "51DEGREES_RESOURCE_KEY";
+        private const string ResourceKeyEnvVar = "_51DEGREES_RESOURCE_KEY";
 
         /// <summary>
         /// The legacy environment variable name, checked when
