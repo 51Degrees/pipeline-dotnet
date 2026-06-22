@@ -3,7 +3,7 @@ name: Cloud 51Did Tests
 # Runs the live cloud 51Did integration test (Tests/FiftyOne.Did.Tests,
 # CloudFodIdTests) once for every resource key the central common-ci script
 # exports from the _51DEGREES_RESOURCE_KEY* secrets (free, paid and any added
-# later). Each run sets the single 51DEGREES_RESOURCE_KEY the test reads. New
+# later). Each run sets the single _51DEGREES_RESOURCE_KEY the test reads. New
 # resource keys are added once at the organisation level; this workflow needs
 # no change.
 
@@ -55,7 +55,7 @@ jobs:
           $failed = $false
           foreach ($k in $keys) {
             Write-Host "::group::CloudFodIdTests with $($k.Name)"
-            ${env:51DEGREES_RESOURCE_KEY} = $k.Value
+            $env:_51DEGREES_RESOURCE_KEY = $k.Value
             dotnet test $project -c Release --no-build --nologo `
               --filter 'FullyQualifiedName~CloudFodIdTests' `
               --logger 'console;verbosity=normal'
