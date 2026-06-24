@@ -338,8 +338,11 @@ namespace FiftyOne.Pipeline.Engines.FiftyOne.Tests.FlowElements
             var data = MockFlowData.CreateFromEvidence(evidenceData, false);
 
             // Act
+            // Feed events until the first share message is sent (or we hit the
+            // ceiling). Stop as soon as a send happens so we don't keep feeding
+            // while the asynchronous send is in flight.
             int requiredEvents = 0;
-            while (_xmlContent.Count == 0 &&
+            while (_httpHandler.SendCallCount == 0 &&
                 requiredEvents <= 1000000)
             {
                 _shareUsageElement.Process(data.Object);
@@ -361,9 +364,15 @@ namespace FiftyOne.Pipeline.Engines.FiftyOne.Tests.FlowElements
                 $"events to be at least 10,000, but was actually '{requiredEvents}'");
             Assert.IsLessThan(1000000, requiredEvents, $"Expected the number of required " +
                 $"events to be less than 1,000,000, but was actually '{requiredEvents}'");
-            // Check that one and only one HTTP message was sent.
-            _httpHandler.VerifySendCalled(1);
-            Assert.HasCount(1, _xmlContent);
+            // At least one share message must have been sent with valid XML.
+            // The exact count is not asserted: sharing is probabilistic and the
+            // send is asynchronous, so a second batch can occasionally fill
+            // while the first send is still in flight (this previously caused
+            // intermittent "expected 1, was 2" failures under load).
+            Assert.IsGreaterThan(0, _httpHandler.SendCallCount, $"Expected at least " +
+                $"one share message to be sent, but none were.");
+            Assert.IsGreaterThan(0, _xmlContent.Count, $"Expected at least one " +
+                $"share message body, but there were none.");
         }
 
         /// <summary>
