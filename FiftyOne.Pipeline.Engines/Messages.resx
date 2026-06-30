@@ -172,7 +172,7 @@
     <value>An unhandled error occurred while checking for automatic updates for engine '{0}'</value>
   </data>
   <data name="MissingPropertyMessageDataUpgradeRequired" xml:space="preserve">
-    <value>This is because your license and/or data file does not include this property. The property is available with the {0} license/data for the {1}</value>
+    <value>This is because your license or data file does not include this property. It is available with the {0} license/data for the {1}. To upgrade, see https://51degrees.com/pricing.</value>
   </data>
   <data name="MissingPropertyMessageCloudRequestFailed" xml:space="preserve">
     <value>This is because an upstream cloud request failed, so no data was available to populate the property.</value>
@@ -181,13 +181,13 @@
     <value>Property '{0}' not found in data for element '{1}'. </value>
   </data>
   <data name="MissingPropertyMessageProductNotInCloudResource" xml:space="preserve">
-    <value>This is because your resource key does not include access to any properties under '{0}'. For more details on resource keys, see our explainer: https://51degrees.com/documentation/_info__resource_keys.html</value>
+    <value>This is because your resource key does not include access to any properties under '{0}'. Check which properties your key includes at https://configure.51degrees.com/YOUR_RESOURCE_KEY, or create a new key at https://configure.51degrees.com.</value>
   </data>
   <data name="MissingPropertyMessagePropertyExcluded" xml:space="preserve">
     <value>This is because the property has been excluded when configuring the engine.</value>
   </data>
   <data name="MissingPropertyMessagePropertyNotInCloudResource" xml:space="preserve">
-    <value>This is because your resource key does not include access to this property. Properties that are included for this key under '{0}' are {1}. For more details on resource keys, see our explainer: https://51degrees.com/documentation/_info__resource_keys.html</value>
+    <value>This is because your resource key does not include access to this property. The properties included for your key under '{0}' are {1}. To inspect or change your key, visit https://configure.51degrees.com/YOUR_RESOURCE_KEY.</value>
   </data>
   <data name="MissingPropertyMessageUnknown" xml:space="preserve">
     <value>The reason for this is unknown. Please check that the aspect and property name are correct.</value>

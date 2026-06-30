@@ -133,7 +133,7 @@
     <value>Failed to increment usage sequence number</value>
   </data>
   <data name="MessageFailSequenceNumberParse" xml:space="preserve">
-    <value>The value for the ‘sequence’ parameter is not valid. See https://51degrees.com/documentation/_info__error_messages.html#Sequence_value_invalid for more information.</value>
+    <value>The value for the 'sequence' parameter is not valid. See https://51degrees.com/documentation/4.5/_services__cloud__error_messages.html for more information.</value>
   </data>
   <data name="MessageFailSequenceNumberRetreive" xml:space="preserve">
     <value>Failed to retrieve sequence number</value>
