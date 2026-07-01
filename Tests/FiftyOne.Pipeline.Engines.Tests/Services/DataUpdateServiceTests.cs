@@ -53,7 +53,12 @@ namespace FiftyOne.Pipeline.Engines.Tests.Services
 
         private int _ignoreWranings = 0;
         private int _ignoreErrors = 0;
-        private const int TEST_TIMEOUT_MS = 3000;
+        // The update callback fires on a threadpool thread. When the CI runner
+        // runs many test assemblies in parallel the threadpool can be starved,
+        // delaying the callback well past a few seconds. The wait short-circuits
+        // as soon as the event fires, so a generous ceiling costs passing runs
+        // nothing and only avoids spurious timeouts under load.
+        private const int TEST_TIMEOUT_MS = 30000;
         private const int LOGGER_UNLOCK_TIMEOUT_MS = 5000;
 
         private bool _didDumpLogs;
