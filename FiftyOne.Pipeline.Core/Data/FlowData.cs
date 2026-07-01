@@ -28,6 +28,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Runtime.CompilerServices;
+using System.Threading;
 
 [assembly: InternalsVisibleTo("FiftyOne.Pipeline.Web.Tests, PublicKey=0024000004800000940000000602000000240000525341310004000001000100c3a631e6634ea697e19c6d2fedc285bdc7f0447a5583e1ac3c5ed3502b7633e691f899a265c42a5611122a23fd2bc882e4e412384a5d4183271782416cf016b06e6648273d44896e95ce482bb8b13054ba6a6f41d393c3f3f2e5780d620e50cb67c248882e4427bf007b7c77fdd65f832c7f4a3fef9dc18e39f792d1a37cc980")]
 [assembly: InternalsVisibleTo("FiftyOne.Pipeline.Core.Tests, PublicKey=0024000004800000940000000602000000240000525341310004000001000100c3a631e6634ea697e19c6d2fedc285bdc7f0447a5583e1ac3c5ed3502b7633e691f899a265c42a5611122a23fd2bc882e4e412384a5d4183271782416cf016b06e6648273d44896e95ce482bb8b13054ba6a6f41d393c3f3f2e5780d620e50cb67c248882e4427bf007b7c77fdd65f832c7f4a3fef9dc18e39f792d1a37cc980")]
@@ -98,8 +99,17 @@ namespace FiftyOne.Pipeline.Core.Data
         /// A boolean flag that can be used to stop further elements
         /// from executing.
         /// </summary>
-        public bool Stop { get; set; }
+        public bool Stop
+        {
+            get => _stopTokenSource.IsCancellationRequested;
+            set { if (value) { _stopTokenSource.Cancel(); } }
+        }
 
+        /// <summary>
+        /// Source for the cancellation token that stops processing of this
+        /// flow data. Linked to the token passed to the constructor.
+        /// </summary>
+        private readonly CancellationTokenSource _stopTokenSource;
 
         /// <summary>
         /// Get a filter that will only include the evidence keys that can 
@@ -126,15 +136,21 @@ namespace FiftyOne.Pipeline.Core.Data
         /// <param name="evidence">
         /// The initial evidence.
         /// </param>
+        /// <param name="cancellationToken">
+        /// Token that, when cancelled, stops the pipeline processing this
+        /// flow data. Linked to the flow data's stop token.
+        /// </param>
         internal FlowData(
             ILogger<FlowData> logger,
             IPipelineInternal pipeline,
-            Evidence evidence)
+            Evidence evidence,
+            CancellationToken cancellationToken = default)
         {
             _logger = logger;
             PipelineInternal = pipeline;
             _data = new TypedKeyMap(pipeline?.IsConcurrent ?? false);
             _evidence = evidence;
+            _stopTokenSource = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
 
             if (_logger != null && _logger.IsEnabled(LogLevel.Debug))
             {
@@ -142,8 +158,27 @@ namespace FiftyOne.Pipeline.Core.Data
             }
         }
 
+        /// <inheritdoc/>
+        public void SetStopToken(CancellationToken stopToken)
+        {
+            if (stopToken.IsCancellationRequested)
+            {
+                _stopTokenSource.Cancel();
+                return;
+            }
+            stopToken.Register(o => ((CancellationTokenSource)o).Cancel(), _stopTokenSource);
+        }
+
+        /// <inheritdoc/>
+        public CancellationToken GetStopToken()
+            // Don't throw if the flow data has already been disposed.
+            => disposedValue ? CancellationToken.None : _stopTokenSource.Token;
+
+        /// <inheritdoc/>
+        public bool ShouldRun() => _stopTokenSource.IsCancellationRequested == false;
+
         /// <summary>
-        /// Register an error that occurred while working with this 
+        /// Register an error that occurred while working with this
         /// instance.
         /// </summary>
         /// <param name="ex">
@@ -844,6 +879,7 @@ namespace FiftyOne.Pipeline.Core.Data
                             ((IDisposable)elementData).Dispose();
                         }
                     }
+                    _stopTokenSource.Dispose();
                 }
 
                 disposedValue = true;
