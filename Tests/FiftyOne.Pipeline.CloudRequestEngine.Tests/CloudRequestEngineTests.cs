@@ -67,8 +67,8 @@ namespace FiftyOne.Pipeline.CloudRequestEngine.Tests
             string resourceKey = "resource_key";
             string userAgent = "iPhone";
             ConfigureMockedClient(r =>
-                r.Content.ReadAsStringAsync().Result.Contains($"resource={resourceKey}") // content contains resource key
-                && r.Content.ReadAsStringAsync().Result.Contains($"User-Agent={userAgent}") // content contains licenseKey
+                r.Content.ReadAsStringAsync(TestContext.CancellationToken).Result.Contains($"resource={resourceKey}") // content contains resource key
+                && r.Content.ReadAsStringAsync(TestContext.CancellationToken).Result.Contains($"User-Agent={userAgent}") // content contains licenseKey
             );
 
             var engine = new CloudRequestEngineBuilder(
@@ -129,7 +129,7 @@ namespace FiftyOne.Pipeline.CloudRequestEngine.Tests
                .ReturnsAsync((HttpRequestMessage req, CancellationToken ct) =>
                {
                    // Capture the content for assertion
-                   capturedContent = req.Content.ReadAsStringAsync().Result;
+                   capturedContent = req.Content.ReadAsStringAsync(TestContext.CancellationToken).Result;
                    return new HttpResponseMessage()
                    {
                        StatusCode = _jsonResponseStatus,
@@ -198,7 +198,7 @@ namespace FiftyOne.Pipeline.CloudRequestEngine.Tests
         /// returns the response in the ElementData. Evidence parameters 
         /// should be added in descending order of precedence.
         /// </summary>
-        [DataTestMethod]
+        [TestMethod]
         [DataRow(false, "query.User-Agent=iPhone", "header.User-Agent=iPhone")]
         [DataRow(false, "query.User-Agent=iPhone", "cookie.User-Agent=iPhone")]
         [DataRow(true, "header.User-Agent=iPhone", "cookie.User-Agent=iPhone")]
@@ -212,7 +212,7 @@ namespace FiftyOne.Pipeline.CloudRequestEngine.Tests
 
             string resourceKey = "resource_key";
             ConfigureMockedClient(r =>
-                  r.Content.ReadAsStringAsync().Result.Contains(evidence1.Split('.').Last())
+                  r.Content.ReadAsStringAsync(TestContext.CancellationToken).Result.Contains(evidence1.Split('.').Last())
             );
 
             var loggerFactory = new TestLoggerFactory();
@@ -246,7 +246,7 @@ namespace FiftyOne.Pipeline.CloudRequestEngine.Tests
                 logger.AssertMaxErrors(0);
                 Assert.AreEqual(1, logger.WarningEntries.Count());
                 var warning = logger.WarningEntries.Single();
-                Assert.IsTrue(warning.Contains($"'{evidence1}' evidence conflicts with '{evidence2}'"));
+                Assert.Contains($"'{evidence1}' evidence conflicts with '{evidence2}'", warning);
             } 
             else
             {
@@ -271,7 +271,7 @@ namespace FiftyOne.Pipeline.CloudRequestEngine.Tests
         /// conflicting evidence and returns the response in the ElementData. 
         /// Evidence parameters should be added in descending order of precedence.
         /// </summary>
-        [DataTestMethod]
+        [TestMethod]
         [DataRow("header.User-Agent=iPhone", "cookie.User-Agent=iPhone")]
         [DataRow("header.User-Agent=iPhone", "cookie.User-Agent=iPhone", "a.User-Agent=Samsung")]
         [DataRow("header.User-Agent=iPhone", "cookie.User-Agent=iPhone", "a.User-Agent=Samsung", "b.User-Agent=Samsung")]
@@ -296,7 +296,7 @@ namespace FiftyOne.Pipeline.CloudRequestEngine.Tests
                 // Check that excluded evidence is not in the result.
                 foreach(var item in excludedEvidence)
                 {
-                    valid = r.Content.ReadAsStringAsync().Result.Contains(item) == false;
+                    valid = r.Content.ReadAsStringAsync(TestContext.CancellationToken).Result.Contains(item) == false;
                     if (valid == false)
                     {
                         break;
@@ -304,7 +304,7 @@ namespace FiftyOne.Pipeline.CloudRequestEngine.Tests
                 }
 
                 // Check that the expected evidence is in the result.
-                return r.Content.ReadAsStringAsync().Result.Contains(evidence[0].Split('.').Last()) && valid;
+                return r.Content.ReadAsStringAsync(TestContext.CancellationToken).Result.Contains(evidence[0].Split('.').Last()) && valid;
             });
 
             var loggerFactory = new TestLoggerFactory();
@@ -342,7 +342,7 @@ namespace FiftyOne.Pipeline.CloudRequestEngine.Tests
             // Check that only conflict warnings have been logged.
             foreach (var warning in logger.WarningEntries)
             {
-                Assert.IsTrue(warning.Contains("evidence conflicts"));
+                Assert.Contains("evidence conflicts", warning);
             }
 
             _handlerMock.Protected().Verify(
@@ -367,9 +367,9 @@ namespace FiftyOne.Pipeline.CloudRequestEngine.Tests
             string userAgent = "iPhone";
             string licenseKey = "ABCDEFG";
             ConfigureMockedClient(r =>
-                  r.Content.ReadAsStringAsync().Result.Contains($"resource={resourceKey}") // content contains resource key
-                  && r.Content.ReadAsStringAsync().Result.Contains($"license={licenseKey}") // content contains licenseKey
-                  && r.Content.ReadAsStringAsync().Result.Contains($"User-Agent={userAgent}") // content contains user agent
+                  r.Content.ReadAsStringAsync(TestContext.CancellationToken).Result.Contains($"resource={resourceKey}") // content contains resource key
+                  && r.Content.ReadAsStringAsync(TestContext.CancellationToken).Result.Contains($"license={licenseKey}") // content contains licenseKey
+                  && r.Content.ReadAsStringAsync(TestContext.CancellationToken).Result.Contains($"User-Agent={userAgent}") // content contains user agent
             );
 
 #pragma warning disable CS0618 // Type or member is obsolete
@@ -464,13 +464,13 @@ namespace FiftyOne.Pipeline.CloudRequestEngine.Tests
                 .SetResourceKey("key")
                 .Build();
 
-            Assert.AreEqual(2, engine.PublicProperties.Count);
+            Assert.HasCount(2, engine.PublicProperties);
             var deviceProperties = engine.PublicProperties["device"];
-            Assert.AreEqual(2, deviceProperties.Properties.Count);
+            Assert.HasCount(2, deviceProperties.Properties);
             Assert.IsTrue(deviceProperties.Properties.Any(p => p.Name.Equals("IsMobile")));
             Assert.IsTrue(deviceProperties.Properties.Any(p => p.Name.Equals("IsTablet")));
             var devicesProperties = engine.PublicProperties["devices"];
-            Assert.AreEqual(1, devicesProperties.Properties.Count);
+            Assert.HasCount(1, devicesProperties.Properties);
             Assert.AreEqual("Devices", devicesProperties.Properties[0].Name);
             Assert.IsTrue(devicesProperties.Properties[0].ItemProperties.Any(p => p.Name.Equals("IsMobile")));
             Assert.IsTrue(devicesProperties.Properties[0].ItemProperties.Any(p => p.Name.Equals("IsTablet")));
@@ -494,8 +494,8 @@ namespace FiftyOne.Pipeline.CloudRequestEngine.Tests
             _jsonResponse = @"{ ""errors"": [ ""This resource key is not authorized for use with this domain: . Please visit https://configure.51degrees.com to update your resource key.""] }";
 
             ConfigureMockedClient(r =>
-                r.Content.ReadAsStringAsync().Result.Contains($"resource={resourceKey}") // content contains resource key
-                && r.Content.ReadAsStringAsync().Result.Contains($"User-Agent={userAgent}") // content contains licenseKey
+                r.Content.ReadAsStringAsync(TestContext.CancellationToken).Result.Contains($"resource={resourceKey}") // content contains resource key
+                && r.Content.ReadAsStringAsync(TestContext.CancellationToken).Result.Contains($"User-Agent={userAgent}") // content contains licenseKey
             );
 
             var engine = new CloudRequestEngineBuilder(
@@ -508,13 +508,11 @@ namespace FiftyOne.Pipeline.CloudRequestEngine.Tests
 
             try
             {
-                using (var pipeline = new PipelineBuilder(_loggerFactory).AddFlowElement(engine).Build())
-                {
-                    var data = pipeline.CreateFlowData();
-                    data.AddEvidence("query.User-Agent", userAgent);
+                using var pipeline = new PipelineBuilder(_loggerFactory).AddFlowElement(engine).Build();
+                var data = pipeline.CreateFlowData();
+                data.AddEvidence("query.User-Agent", userAgent);
 
-                    data.Process();
-                }
+                data.Process();
             }
             catch(Exception ex)
             {
@@ -524,12 +522,11 @@ namespace FiftyOne.Pipeline.CloudRequestEngine.Tests
             Assert.IsNotNull(exception, "Expected exception to occur");
             Assert.IsInstanceOfType(exception, typeof(AggregateException));
             var aggEx = exception as AggregateException;
-            Assert.AreEqual(aggEx.InnerExceptions.Count, 1);
+            Assert.HasCount(1, aggEx.InnerExceptions);
             var realEx = aggEx.InnerExceptions[0];
             Assert.IsInstanceOfType(realEx, typeof(PipelineException));
-            Assert.IsTrue(realEx.Message.Contains(
-                "This resource key is not authorized for use with this domain"), 
-                "Exception message did not contain the expected text.");
+            Assert.Contains("This resource key is not authorized for use with this domain",
+                        realEx.Message, "Exception message did not contain the expected text.");
         }
 
 
@@ -552,8 +549,8 @@ namespace FiftyOne.Pipeline.CloudRequestEngine.Tests
             _accessiblePropertiesResponseStatus = HttpStatusCode.BadRequest;
 
             ConfigureMockedClient(r =>
-                r.Content.ReadAsStringAsync().Result.Contains($"resource={resourceKey}") // content contains resource key
-                && r.Content.ReadAsStringAsync().Result.Contains($"User-Agent={userAgent}") // content contains licenseKey
+                r.Content.ReadAsStringAsync(TestContext.CancellationToken).Result.Contains($"resource={resourceKey}") // content contains resource key
+                && r.Content.ReadAsStringAsync(TestContext.CancellationToken).Result.Contains($"User-Agent={userAgent}") // content contains licenseKey
             );
 
             Exception exception = null;
@@ -576,9 +573,8 @@ namespace FiftyOne.Pipeline.CloudRequestEngine.Tests
             Assert.IsNotNull(exception, "Expected exception to occur");
             Assert.IsInstanceOfType(exception, typeof(CloudRequestException));
             var cloudEx = exception as CloudRequestException;
-            Assert.IsTrue(cloudEx.Message.Contains(
-                "resource_key not a valid resource key"),
-                "Exception message did not contain the expected text.");
+            Assert.Contains("resource_key not a valid resource key",
+cloudEx.Message, "Exception message did not contain the expected text.");
         }
 
 
@@ -599,8 +595,10 @@ namespace FiftyOne.Pipeline.CloudRequestEngine.Tests
             _jsonResponse = @"{ ""errors"": [""This resource key is not authorized for use with this domain: . Please visit https://configure.51degrees.com to update your resource key."",""Some other error""] }";
 
             ConfigureMockedClient(r =>
-                r.Content.ReadAsStringAsync().Result.Contains($"resource={resourceKey}") // content contains resource key
-                && r.Content.ReadAsStringAsync().Result.Contains($"User-Agent={userAgent}") // content contains licenseKey
+                r.Content.ReadAsStringAsync(TestContext.CancellationToken).Result
+                .Contains($"resource={resourceKey}") 
+                && r.Content.ReadAsStringAsync(TestContext.CancellationToken).Result
+                .Contains($"User-Agent={userAgent}")
             );
 
             var engine = new CloudRequestEngineBuilder(
@@ -613,13 +611,11 @@ namespace FiftyOne.Pipeline.CloudRequestEngine.Tests
 
             try
             {
-                using (var pipeline = new PipelineBuilder(_loggerFactory).AddFlowElement(engine).Build())
-                {
-                    var data = pipeline.CreateFlowData();
-                    data.AddEvidence("query.User-Agent", userAgent);
+                using var pipeline = new PipelineBuilder(_loggerFactory).AddFlowElement(engine).Build();
+                var data = pipeline.CreateFlowData();
+                data.AddEvidence("query.User-Agent", userAgent);
 
-                    data.Process();
-                }
+                data.Process();
             }
             catch (Exception ex)
             {
@@ -631,7 +627,7 @@ namespace FiftyOne.Pipeline.CloudRequestEngine.Tests
             Assert.IsInstanceOfType<CloudRequestException>(exception.InnerException);
             Assert.IsInstanceOfType<AggregateException>(exception.InnerException.InnerException);
             var aggEx = (exception.InnerException.InnerException as AggregateException).Flatten();
-            Assert.AreEqual(aggEx.InnerExceptions.Count, 2);
+            Assert.HasCount(2, aggEx.InnerExceptions);
             Assert.IsInstanceOfType<CloudRequestException>(aggEx.InnerExceptions[0]);
             Assert.IsInstanceOfType<CloudRequestException>(aggEx.InnerExceptions[1]);
             Assert.IsTrue(aggEx.InnerExceptions.Any(e => e.Message.Contains(
@@ -657,8 +653,10 @@ namespace FiftyOne.Pipeline.CloudRequestEngine.Tests
             _jsonResponse = @"{ }";
 
             ConfigureMockedClient(r =>
-                r.Content.ReadAsStringAsync().Result.Contains($"resource={resourceKey}") // content contains resource key
-                && r.Content.ReadAsStringAsync().Result.Contains($"User-Agent={userAgent}") // content contains licenseKey
+                r.Content.ReadAsStringAsync(TestContext.CancellationToken).Result
+                .Contains($"resource={resourceKey}") && 
+                r.Content.ReadAsStringAsync(TestContext.CancellationToken).Result
+                .Contains($"User-Agent={userAgent}")
             );
 
             var engine = new CloudRequestEngineBuilder(
@@ -667,13 +665,11 @@ namespace FiftyOne.Pipeline.CloudRequestEngine.Tests
                 .SetResourceKey(resourceKey)
                 .Build();
 
-            using (var pipeline = new PipelineBuilder(_loggerFactory).AddFlowElement(engine).Build())
-            {
-                var data = pipeline.CreateFlowData();
-                data.AddEvidence("query.User-Agent", userAgent);
+            using var pipeline = new PipelineBuilder(_loggerFactory).AddFlowElement(engine).Build();
+            var data = pipeline.CreateFlowData();
+            data.AddEvidence("query.User-Agent", userAgent);
 
-                Assert.ThrowsExactly<AggregateException>(() => data.Process());
-            }
+            Assert.ThrowsExactly<AggregateException>(() => data.Process());
         }
 
         /// <summary>
@@ -710,7 +706,7 @@ namespace FiftyOne.Pipeline.CloudRequestEngine.Tests
                 var cloudEngineProps = engine.PublicProperties;
             });
 
-            Assert.AreEqual(ex.HttpStatusCode, 404, "Status code should be 404");
+            Assert.AreEqual(404, ex.HttpStatusCode, "Status code should be 404");
             Assert.IsNotNull(ex.ResponseHeaders, "Response headers not populated");
             Assert.IsNotNull(ex.InnerException, "Inner exception not populated");
             Assert.IsInstanceOfType<JsonReaderException>(ex.InnerException, $"Inner exception is not an instance of {nameof(JsonReaderException)}");
@@ -737,53 +733,51 @@ namespace FiftyOne.Pipeline.CloudRequestEngine.Tests
                 .SetResourceKey(resourceKey)
                 .Build();
 
-            using (var pipeline = new PipelineBuilder(_loggerFactory).AddFlowElement(engine).Build())
+            using var pipeline = new PipelineBuilder(_loggerFactory).AddFlowElement(engine).Build();
+            var defaultResponses = new string[]
             {
-                var defaultResponses = new string[]
-                {
                     _jsonResponse,
                     _evidenceKeysResponse,
                     _accessiblePropertiesResponse,
-                };
+            };
 
-                _jsonResponse = "Status code: 404, '*json' method not found";
-                _jsonResponseStatus = HttpStatusCode.NotFound;
+            _jsonResponse = "Status code: 404, '*json' method not found";
+            _jsonResponseStatus = HttpStatusCode.NotFound;
 
-                _evidenceKeysResponse = "Status code: 404, '*evidencekeys' method not found";
-                _evidenceKeysResponseStatus = HttpStatusCode.NotFound;
+            _evidenceKeysResponse = "Status code: 404, '*evidencekeys' method not found";
+            _evidenceKeysResponseStatus = HttpStatusCode.NotFound;
 
-                _accessiblePropertiesResponse = "Status code: 404, '*accessibleproperties' method not found";
-                _accessiblePropertiesResponseStatus = HttpStatusCode.NotFound;
+            _accessiblePropertiesResponse = "Status code: 404, '*accessibleproperties' method not found";
+            _accessiblePropertiesResponseStatus = HttpStatusCode.NotFound;
 
-                using (var flowData = pipeline.CreateFlowData())
+            using (var flowData = pipeline.CreateFlowData())
+            {
+                flowData.AddEvidence("query.User-Agent", userAgent);
+                try
                 {
-                    flowData.AddEvidence("query.User-Agent", userAgent);
-                    try
-                    {
-                        flowData.Process();
-                        Assert.Fail("Expected exception did not occur");
-                    }
-                    catch (AggregateException)
-                    {
-                        // nop
-                    }
-                }
-                _jsonResponse = defaultResponses[0];
-                _jsonResponseStatus = HttpStatusCode.OK;
-
-                _evidenceKeysResponse = defaultResponses[1];
-                _evidenceKeysResponseStatus = HttpStatusCode.OK;
-
-                _accessiblePropertiesResponse = defaultResponses[2];
-                _accessiblePropertiesResponseStatus = HttpStatusCode.OK;
-
-                using (var flowData = pipeline.CreateFlowData())
-                {
-                    flowData.AddEvidence("query.User-Agent", userAgent);
                     flowData.Process();
-                    var result = flowData.GetFromElement(engine).JsonResponse;
-                    Assert.AreEqual("{'device':{'value':'1'}}", result);
+                    Assert.Fail("Expected exception did not occur");
                 }
+                catch (AggregateException)
+                {
+                    // nop
+                }
+            }
+            _jsonResponse = defaultResponses[0];
+            _jsonResponseStatus = HttpStatusCode.OK;
+
+            _evidenceKeysResponse = defaultResponses[1];
+            _evidenceKeysResponseStatus = HttpStatusCode.OK;
+
+            _accessiblePropertiesResponse = defaultResponses[2];
+            _accessiblePropertiesResponseStatus = HttpStatusCode.OK;
+
+            using (var flowData = pipeline.CreateFlowData())
+            {
+                flowData.AddEvidence("query.User-Agent", userAgent);
+                flowData.Process();
+                var result = flowData.GetFromElement(engine).JsonResponse;
+                Assert.AreEqual("{'device':{'value':'1'}}", result);
             }
         }
 
@@ -803,59 +797,57 @@ namespace FiftyOne.Pipeline.CloudRequestEngine.Tests
                 .SetFailuresToEnterRecovery(1)
                 .Build();
 
-            using (var pipeline = new PipelineBuilder(_loggerFactory).AddFlowElement(engine).Build())
+            using var pipeline = new PipelineBuilder(_loggerFactory).AddFlowElement(engine).Build();
+            var defaultResponses = new string[]
             {
-                var defaultResponses = new string[]
-                {
                     _jsonResponse,
                     _evidenceKeysResponse,
                     _accessiblePropertiesResponse,
-                };
+            };
 
-                _jsonResponse = "Status code: 404, '*json' method not found";
-                _jsonResponseStatus = HttpStatusCode.NotFound;
+            _jsonResponse = "Status code: 404, '*json' method not found";
+            _jsonResponseStatus = HttpStatusCode.NotFound;
 
-                _evidenceKeysResponse = "Status code: 404, '*evidencekeys' method not found";
-                _evidenceKeysResponseStatus = HttpStatusCode.NotFound;
+            _evidenceKeysResponse = "Status code: 404, '*evidencekeys' method not found";
+            _evidenceKeysResponseStatus = HttpStatusCode.NotFound;
 
-                _accessiblePropertiesResponse = "Status code: 404, '*accessibleproperties' method not found";
-                _accessiblePropertiesResponseStatus = HttpStatusCode.NotFound;
+            _accessiblePropertiesResponse = "Status code: 404, '*accessibleproperties' method not found";
+            _accessiblePropertiesResponseStatus = HttpStatusCode.NotFound;
 
-                using (var flowData = pipeline.CreateFlowData())
+            using (var flowData = pipeline.CreateFlowData())
+            {
+                flowData.AddEvidence("query.User-Agent", userAgent);
+                try
                 {
-                    flowData.AddEvidence("query.User-Agent", userAgent);
-                    try
-                    {
-                        flowData.Process();
-                        Assert.Fail("Expected exception did not occur");
-                    }
-                    catch (AggregateException)
-                    {
-                        // nop
-                    }
+                    flowData.Process();
+                    Assert.Fail("Expected exception did not occur");
                 }
-                _jsonResponse = defaultResponses[0];
-                _jsonResponseStatus = HttpStatusCode.OK;
-
-                _evidenceKeysResponse = defaultResponses[1];
-                _evidenceKeysResponseStatus = HttpStatusCode.OK;
-
-                _accessiblePropertiesResponse = defaultResponses[2];
-                _accessiblePropertiesResponseStatus = HttpStatusCode.OK;
-
-                using (var flowData = pipeline.CreateFlowData())
+                catch (AggregateException)
                 {
-                    flowData.AddEvidence("query.User-Agent", userAgent);
-                    try
-                    {
-                        flowData.Process();
-                        Assert.Fail($"{nameof(Process)} didn't throw.");
-                    }
-                    catch (AggregateException ex)
-                    {
-                        Assert.IsInstanceOfType<PipelineTemporarilyUnavailableException>(
-                            ex.InnerException);
-                    }
+                    // nop
+                }
+            }
+            _jsonResponse = defaultResponses[0];
+            _jsonResponseStatus = HttpStatusCode.OK;
+
+            _evidenceKeysResponse = defaultResponses[1];
+            _evidenceKeysResponseStatus = HttpStatusCode.OK;
+
+            _accessiblePropertiesResponse = defaultResponses[2];
+            _accessiblePropertiesResponseStatus = HttpStatusCode.OK;
+
+            using (var flowData = pipeline.CreateFlowData())
+            {
+                flowData.AddEvidence("query.User-Agent", userAgent);
+                try
+                {
+                    flowData.Process();
+                    Assert.Fail($"{nameof(Process)} didn't throw.");
+                }
+                catch (AggregateException ex)
+                {
+                    Assert.IsInstanceOfType<PipelineTemporarilyUnavailableException>(
+                        ex.InnerException);
                 }
             }
         }
@@ -876,56 +868,54 @@ namespace FiftyOne.Pipeline.CloudRequestEngine.Tests
                 .SetFailuresToEnterRecovery(1)
                 .Build();
 
-            using (var pipeline = new PipelineBuilder(_loggerFactory).AddFlowElement(engine).Build())
+            using var pipeline = new PipelineBuilder(_loggerFactory).AddFlowElement(engine).Build();
+            var defaultResponses = new string[]
             {
-                var defaultResponses = new string[]
-                {
                     _jsonResponse,
                     _evidenceKeysResponse,
                     _accessiblePropertiesResponse,
-                };
+            };
 
-                _jsonResponse = "Status code: 404, '*json' method not found";
-                _jsonResponseStatus = HttpStatusCode.NotFound;
+            _jsonResponse = "Status code: 404, '*json' method not found";
+            _jsonResponseStatus = HttpStatusCode.NotFound;
 
-                _evidenceKeysResponse = "Status code: 404, '*evidencekeys' method not found";
-                _evidenceKeysResponseStatus = HttpStatusCode.NotFound;
+            _evidenceKeysResponse = "Status code: 404, '*evidencekeys' method not found";
+            _evidenceKeysResponseStatus = HttpStatusCode.NotFound;
 
-                _accessiblePropertiesResponse = "Status code: 404, '*accessibleproperties' method not found";
-                _accessiblePropertiesResponseStatus = HttpStatusCode.NotFound;
+            _accessiblePropertiesResponse = "Status code: 404, '*accessibleproperties' method not found";
+            _accessiblePropertiesResponseStatus = HttpStatusCode.NotFound;
 
-                using (var flowData = pipeline.CreateFlowData())
+            using (var flowData = pipeline.CreateFlowData())
+            {
+                flowData.AddEvidence("query.User-Agent", userAgent);
+                try
                 {
-                    flowData.AddEvidence("query.User-Agent", userAgent);
-                    try
-                    {
-                        flowData.Process();
-                        Assert.Fail("Expected exception did not occur");
-                    }
-                    catch (AggregateException)
-                    {
-                        // nop
-                    }
-                }
-
-                Thread.Sleep(millisecondsTimeout: 200);
-
-                _jsonResponse = defaultResponses[0];
-                _jsonResponseStatus = HttpStatusCode.OK;
-
-                _evidenceKeysResponse = defaultResponses[1];
-                _evidenceKeysResponseStatus = HttpStatusCode.OK;
-
-                _accessiblePropertiesResponse = defaultResponses[2];
-                _accessiblePropertiesResponseStatus = HttpStatusCode.OK;
-
-                using (var flowData = pipeline.CreateFlowData())
-                {
-                    flowData.AddEvidence("query.User-Agent", userAgent);
                     flowData.Process();
-                    var result = flowData.GetFromElement(engine).JsonResponse;
-                    Assert.AreEqual("{'device':{'value':'1'}}", result);
+                    Assert.Fail("Expected exception did not occur");
                 }
+                catch (AggregateException)
+                {
+                    // nop
+                }
+            }
+
+            Thread.Sleep(millisecondsTimeout: 200);
+
+            _jsonResponse = defaultResponses[0];
+            _jsonResponseStatus = HttpStatusCode.OK;
+
+            _evidenceKeysResponse = defaultResponses[1];
+            _evidenceKeysResponseStatus = HttpStatusCode.OK;
+
+            _accessiblePropertiesResponse = defaultResponses[2];
+            _accessiblePropertiesResponseStatus = HttpStatusCode.OK;
+
+            using (var flowData = pipeline.CreateFlowData())
+            {
+                flowData.AddEvidence("query.User-Agent", userAgent);
+                flowData.Process();
+                var result = flowData.GetFromElement(engine).JsonResponse;
+                Assert.AreEqual("{'device':{'value':'1'}}", result);
             }
         }
 
@@ -948,79 +938,75 @@ namespace FiftyOne.Pipeline.CloudRequestEngine.Tests
                 .SetFailuresToEnterRecovery(1)
                 .Build();
 
-            using (var pipeline = new PipelineBuilder(_loggerFactory).AddFlowElement(engine).Build())
+            using var pipeline = new PipelineBuilder(_loggerFactory).AddFlowElement(engine).Build();
+            var defaultResponses = new string[]
             {
-                var defaultResponses = new string[]
-                {
                     _jsonResponse,
                     _evidenceKeysResponse,
                     _accessiblePropertiesResponse,
-                };
+            };
 
-                _jsonResponse = "Status code: 404, '*json' method not found";
-                _jsonResponseStatus = HttpStatusCode.NotFound;
+            _jsonResponse = "Status code: 404, '*json' method not found";
+            _jsonResponseStatus = HttpStatusCode.NotFound;
 
-                _evidenceKeysResponse = "Status code: 404, '*evidencekeys' method not found";
-                _evidenceKeysResponseStatus = HttpStatusCode.NotFound;
+            _evidenceKeysResponse = "Status code: 404, '*evidencekeys' method not found";
+            _evidenceKeysResponseStatus = HttpStatusCode.NotFound;
 
-                _accessiblePropertiesResponse = "Status code: 404, '*accessibleproperties' method not found";
-                _accessiblePropertiesResponseStatus = HttpStatusCode.NotFound;
+            _accessiblePropertiesResponse = "Status code: 404, '*accessibleproperties' method not found";
+            _accessiblePropertiesResponseStatus = HttpStatusCode.NotFound;
 
-                using (var flowData = pipeline.CreateFlowData())
+            using (var flowData = pipeline.CreateFlowData())
+            {
+                flowData.AddEvidence("query.User-Agent", userAgent);
+                try
                 {
-                    flowData.AddEvidence("query.User-Agent", userAgent);
-                    try
-                    {
-                        flowData.Process();
-                        Assert.Fail("Expected exception did not occur");
-                    }
-                    catch (AggregateException)
-                    {
-                        // nop
-                    }
+                    flowData.Process();
+                    Assert.Fail("Expected exception did not occur");
                 }
-
-                _jsonResponse = defaultResponses[0];
-                _jsonResponseStatus = HttpStatusCode.OK;
-
-                _evidenceKeysResponse = defaultResponses[1];
-                _evidenceKeysResponseStatus = HttpStatusCode.OK;
-
-                _accessiblePropertiesResponse = defaultResponses[2];
-                _accessiblePropertiesResponseStatus = HttpStatusCode.OK;
-
-                bool didFinish = false;
-                int failures = 0;
-                for (int i = 0; i < 10 && !didFinish; ++i)
+                catch (AggregateException)
                 {
-                    Thread.Sleep(millisecondsTimeout: 50);
-
-                    using (var flowData = pipeline.CreateFlowData())
-                    {
-                        flowData.AddEvidence("query.User-Agent", userAgent);
-                        try
-                        {
-                            flowData.Process();
-                            var result = flowData.GetFromElement(engine).JsonResponse;
-                            Assert.AreEqual("{'device':{'value':'1'}}", result);
-                            Assert.IsTrue(DateTime.Now >= unlockTime,
-                                "New request succeeded within RecoveryPeriod"
-                                + $" Iteration: {i}, "
-                                + $" Offset: {(DateTime.Now - unlockTime).TotalSeconds}s");
-                            didFinish = true;
-                        }
-                        catch (AggregateException ex)
-                        {
-                            ++failures;
-                            Assert.IsInstanceOfType<PipelineTemporarilyUnavailableException>(
-                                ex.InnerException, 
-                                "Unexpected error during RecoveryPeriod.");
-                        }
-                    }
+                    // nop
                 }
-                Assert.IsTrue(didFinish, "No request succeeded since first failure.");
-                Assert.IsTrue(failures > 0, "First attempt was successful.");
             }
+
+            _jsonResponse = defaultResponses[0];
+            _jsonResponseStatus = HttpStatusCode.OK;
+
+            _evidenceKeysResponse = defaultResponses[1];
+            _evidenceKeysResponseStatus = HttpStatusCode.OK;
+
+            _accessiblePropertiesResponse = defaultResponses[2];
+            _accessiblePropertiesResponseStatus = HttpStatusCode.OK;
+
+            bool didFinish = false;
+            int failures = 0;
+            for (int i = 0; i < 10 && !didFinish; ++i)
+            {
+                Thread.Sleep(millisecondsTimeout: 50);
+
+                using var flowData = pipeline.CreateFlowData();
+                flowData.AddEvidence("query.User-Agent", userAgent);
+                try
+                {
+                    flowData.Process();
+                    var result = flowData.GetFromElement(engine).JsonResponse;
+                    Assert.AreEqual("{'device':{'value':'1'}}", result);
+                    Assert.IsTrue(DateTime.Now >= unlockTime,
+                        "New request succeeded within RecoveryPeriod"
+                        + $" Iteration: {i}, "
+                        + $" Offset: {(DateTime.Now - unlockTime).TotalSeconds}s");
+                    didFinish = true;
+                }
+                catch (AggregateException ex)
+                {
+                    ++failures;
+                    Assert.IsInstanceOfType<PipelineTemporarilyUnavailableException>(
+                        ex.InnerException,
+                        "Unexpected error during RecoveryPeriod.");
+                }
+            }
+            Assert.IsTrue(didFinish, "No request succeeded since first failure.");
+            Assert.IsGreaterThan(0, failures, "First attempt was successful.");
         }
 
         /// <summary>
@@ -1043,13 +1029,13 @@ namespace FiftyOne.Pipeline.CloudRequestEngine.Tests
                 .SetResourceKey("key")
                 .Build();
 
-            Assert.AreEqual(1, engine.PublicProperties.Count);
+            Assert.HasCount(1, engine.PublicProperties);
             var locationProperties = engine.PublicProperties["location"];
-            Assert.AreEqual(2, locationProperties.Properties.Count);
+            Assert.HasCount(2, locationProperties.Properties);
             var javascript = locationProperties.Properties.Where(p => p.Name.Equals("javascript")).Single();
             var postcode = locationProperties.Properties.Where(p => p.Name.Equals("postcode")).Single();
-            Assert.AreEqual(true, javascript.DelayExecution);
-            Assert.AreEqual(1, postcode.EvidenceProperties.Count);
+            Assert.IsTrue(javascript.DelayExecution);
+            Assert.HasCount(1, postcode.EvidenceProperties);
             Assert.AreEqual("location.javascript", postcode.EvidenceProperties.Single());
         }
 
@@ -1076,22 +1062,20 @@ namespace FiftyOne.Pipeline.CloudRequestEngine.Tests
             .SetCacheHitOrMiss(true)
             .Build();
 
-            using (var pipeline = new PipelineBuilder(_loggerFactory).AddFlowElement(engine).Build())
-            {
-                var data1 = pipeline.CreateFlowData();
-                data1.AddEvidence("query.User-Agent", userAgent);
-                    
-                data1.Process();
+            using var pipeline = new PipelineBuilder(_loggerFactory).AddFlowElement(engine).Build();
+            var data1 = pipeline.CreateFlowData();
+            data1.AddEvidence("query.User-Agent", userAgent);
 
-                Assert.IsFalse(data1.GetFromElement(engine).CacheHit, "cache miss should occur.");
+            data1.Process();
 
-                var data2 = pipeline.CreateFlowData();
-                data2.AddEvidence("query.User-Agent", userAgent);
+            Assert.IsFalse(data1.GetFromElement(engine).CacheHit, "cache miss should occur.");
 
-                data2.Process();
+            var data2 = pipeline.CreateFlowData();
+            data2.AddEvidence("query.User-Agent", userAgent);
 
-                Assert.IsTrue(data2.GetFromElement(engine).CacheHit, "cache hit should occur.");
-            }
+            data2.Process();
+
+            Assert.IsTrue(data2.GetFromElement(engine).CacheHit, "cache hit should occur.");
         }
 
         /// <summary>
@@ -1120,24 +1104,22 @@ namespace FiftyOne.Pipeline.CloudRequestEngine.Tests
             .SetCacheHitOrMiss(true)
             .Build();
 
-            using (var pipeline = new PipelineBuilder(_loggerFactory).AddFlowElement(engine).Build())
-            {
-                var data1 = pipeline.CreateFlowData();
-                data1.AddEvidence("query.User-Agent", userAgent);
-                data1.AddEvidence("header.X-OperaMini-Phone-UA", xOperaMiniUA1);
+            using var pipeline = new PipelineBuilder(_loggerFactory).AddFlowElement(engine).Build();
+            var data1 = pipeline.CreateFlowData();
+            data1.AddEvidence("query.User-Agent", userAgent);
+            data1.AddEvidence("header.X-OperaMini-Phone-UA", xOperaMiniUA1);
 
-                data1.Process();
+            data1.Process();
 
-                Assert.IsFalse(data1.GetFromElement(engine).CacheHit, "cache miss should occur.");
+            Assert.IsFalse(data1.GetFromElement(engine).CacheHit, "cache miss should occur.");
 
-                var data2 = pipeline.CreateFlowData();
-                data2.AddEvidence("query.User-Agent", userAgent);
-                data2.AddEvidence("header.X-OperaMini-Phone-UA", xOperaMiniUA2);
+            var data2 = pipeline.CreateFlowData();
+            data2.AddEvidence("query.User-Agent", userAgent);
+            data2.AddEvidence("header.X-OperaMini-Phone-UA", xOperaMiniUA2);
 
-                data2.Process();
+            data2.Process();
 
-                Assert.IsFalse(data2.GetFromElement(engine).CacheHit, "cache miss should occur.");
-            }
+            Assert.IsFalse(data2.GetFromElement(engine).CacheHit, "cache miss should occur.");
         }
 
         /// <summary>
@@ -1145,7 +1127,7 @@ namespace FiftyOne.Pipeline.CloudRequestEngine.Tests
         /// requests made using the same user-agent but with different lat/lon
         /// values
         /// </summary>
-        [DataTestMethod]
+        [TestMethod]
         // Access to device detection only
         [DataRow(true, "query.User-Agent")]
         // Access to device detection and geo-location
@@ -1170,25 +1152,23 @@ namespace FiftyOne.Pipeline.CloudRequestEngine.Tests
             .SetCacheHitOrMiss(true)
             .Build();
 
-            using (var pipeline = new PipelineBuilder(_loggerFactory).AddFlowElement(engine).Build())
-            {
-                var data1 = pipeline.CreateFlowData();
-                data1.AddEvidence("query.User-Agent", userAgent);
-                data1.AddEvidence("query.51d_pos_latitude", latlon1);
-                data1.AddEvidence("query.51d_pos_longitude", latlon1);
-                data1.Process();
+            using var pipeline = new PipelineBuilder(_loggerFactory).AddFlowElement(engine).Build();
+            var data1 = pipeline.CreateFlowData();
+            data1.AddEvidence("query.User-Agent", userAgent);
+            data1.AddEvidence("query.51d_pos_latitude", latlon1);
+            data1.AddEvidence("query.51d_pos_longitude", latlon1);
+            data1.Process();
 
-                Assert.IsFalse(data1.GetFromElement(engine).CacheHit, "cache miss should occur.");
+            Assert.IsFalse(data1.GetFromElement(engine).CacheHit, "cache miss should occur.");
 
-                var data2 = pipeline.CreateFlowData();
-                data2.AddEvidence("query.User-Agent", userAgent);
-                data2.AddEvidence("query.51d_pos_latitude", latlon2);
-                data2.AddEvidence("query.51d_pos_longitude", latlon2);
+            var data2 = pipeline.CreateFlowData();
+            data2.AddEvidence("query.User-Agent", userAgent);
+            data2.AddEvidence("query.51d_pos_latitude", latlon2);
+            data2.AddEvidence("query.51d_pos_longitude", latlon2);
 
-                data2.Process();
+            data2.Process();
 
-                Assert.AreEqual(hit, data2.GetFromElement(engine).CacheHit, $"cache hit {(hit ? "should" : "shouldn't")} occur.");
-            }
+            Assert.AreEqual(hit, data2.GetFromElement(engine).CacheHit, $"cache hit {(hit ? "should" : "shouldn't")} occur.");
         }
 
         /// <summary>
@@ -1196,7 +1176,7 @@ namespace FiftyOne.Pipeline.CloudRequestEngine.Tests
         /// requests made using a different user-agent but the same lat/lon
         /// values.
         /// </summary>
-        [DataTestMethod]
+        [TestMethod]
         // Access to device detection only
         [DataRow(false, "query.User-Agent")]
         // Access to device detection and geo-location
@@ -1223,29 +1203,339 @@ namespace FiftyOne.Pipeline.CloudRequestEngine.Tests
             .SetCacheHitOrMiss(true)
             .Build();
 
-            using (var pipeline = new PipelineBuilder(_loggerFactory).AddFlowElement(engine).Build())
-            {
-                var data1 = pipeline.CreateFlowData();
-                data1.AddEvidence("query.User-Agent", userAgent1);
-                data1.AddEvidence("query.51d_pos_latitude", latlon);
-                data1.AddEvidence("query.51d_pos_longitude", latlon);
-                data1.Process();
+            using var pipeline = new PipelineBuilder(_loggerFactory).AddFlowElement(engine).Build();
+            var data1 = pipeline.CreateFlowData();
+            data1.AddEvidence("query.User-Agent", userAgent1);
+            data1.AddEvidence("query.51d_pos_latitude", latlon);
+            data1.AddEvidence("query.51d_pos_longitude", latlon);
+            data1.Process();
 
-                Assert.IsFalse(data1.GetFromElement(engine).CacheHit, "cache miss should occur.");
+            Assert.IsFalse(data1.GetFromElement(engine).CacheHit, "cache miss should occur.");
 
-                var data2 = pipeline.CreateFlowData();
-                data2.AddEvidence("query.User-Agent", userAgent2);
-                data2.AddEvidence("query.51d_pos_latitude", latlon);
-                data2.AddEvidence("query.51d_pos_longitude", latlon);
+            var data2 = pipeline.CreateFlowData();
+            data2.AddEvidence("query.User-Agent", userAgent2);
+            data2.AddEvidence("query.51d_pos_latitude", latlon);
+            data2.AddEvidence("query.51d_pos_longitude", latlon);
 
-                data2.Process();
+            data2.Process();
 
-                Assert.AreEqual(hit, data2.GetFromElement(engine).CacheHit, $"cache hit {(hit ? "should" : "shouldn't")} occur.");
-            }
+            Assert.AreEqual(hit, data2.GetFromElement(engine).CacheHit, $"cache hit {(hit ? "should" : "shouldn't")} occur.");
         }
 
         /// <summary>
-        /// Verify that the request to the cloud service will contain 
+        /// Check that a cache hit must short-circuit the
+        /// HTTP call entirely. Two identical Process() calls must result in
+        /// exactly ONE request reaching the cloud json endpoint. A refactor that
+        /// kept the flag but dropped the short-circuit would pass the existing
+        /// tests but fail this one.
+        /// </summary>
+        [TestMethod]
+        public void ValidateCacheHitOnly_NoHttpRequestOnRepeat()
+        {
+            string resourceKey = "resource_key";
+            string userAgent = "iPhone";
+
+            _jsonResponse = @"{ ""device"": { ""ismobile"": true } }";
+            ConfigureMockedClient(r => true);
+
+            var engine = new CloudRequestEngineBuilder(_loggerFactory, _httpClient)
+                .SetResourceKey(resourceKey)
+                .SetCacheSize(10)
+                .SetCacheHitOrMiss(true)
+                .Build();
+
+            using (var pipeline = new PipelineBuilder(_loggerFactory)
+                .AddFlowElement(engine).Build())
+            {
+                var data1 = pipeline.CreateFlowData();
+                data1.AddEvidence("query.User-Agent", userAgent);
+                data1.Process();
+                Assert.IsFalse(
+                    data1.GetFromElement(engine).CacheHit,
+                    "first request should miss the cache.");
+
+                var data2 = pipeline.CreateFlowData();
+                data2.AddEvidence("query.User-Agent", userAgent);
+                data2.Process();
+                Assert.IsTrue(
+                    data2.GetFromElement(engine).CacheHit,
+                    "second request should hit the cache.");
+            }
+
+            // The cache hit must short-circuit the HTTP call: only the first
+            // request reaches the cloud json endpoint.
+            VerifyJsonRequestCount(1);
+        }
+
+        /// <summary>
+        /// Check that Evidence key names are matched case-insensitively,
+        /// so 'query.User-Agent' and 'query.user-agent' with the same value 
+        /// must produce the same cache key. The second request should hit the 
+        /// cache and make no HTTP call.
+        /// </summary>
+        [TestMethod]
+        public void ValidateCacheKeyCaseInsensitive()
+        {
+            string resourceKey = "resource_key";
+            string userAgent = "iPhone";
+
+            _jsonResponse = @"{ ""device"": { ""ismobile"": true } }";
+            ConfigureMockedClient(r => true);
+
+            var engine = new CloudRequestEngineBuilder(_loggerFactory, _httpClient)
+                .SetResourceKey(resourceKey)
+                .SetCacheSize(10)
+                .SetCacheHitOrMiss(true)
+                .Build();
+
+            using (var pipeline = new PipelineBuilder(_loggerFactory)
+                .AddFlowElement(engine).Build())
+            {
+                var data1 = pipeline.CreateFlowData();
+                data1.AddEvidence("query.User-Agent", userAgent);
+                data1.Process();
+                Assert.IsFalse(
+                    data1.GetFromElement(engine).CacheHit, 
+                    "first request should miss the cache.");
+
+                var data2 = pipeline.CreateFlowData();
+                // Same key, differing only in case.
+                data2.AddEvidence("query.user-agent", userAgent);
+                data2.Process();
+                Assert.IsTrue(data2.GetFromElement(engine).CacheHit,
+                    "evidence key differing only in case should hit the cache.");
+            }
+
+            VerifyJsonRequestCount(1);
+        }
+
+        /// <summary>
+        /// Check that the cache key is built from a sorted projection of the 
+        /// evidence (FlowData.GenerateKey orders by filter order, then key),
+        /// so the insertion order of evidence must not change the key. 
+        /// Submitting the same two evidence values in opposite order should 
+        /// hit the cache.
+        /// </summary>
+        [TestMethod]
+        public void ValidateCacheKeyOrderInsensitive()
+        {
+            string resourceKey = "resource_key";
+            string userAgent = "iPhone";
+            string latitude = "51";
+
+            _evidenceKeysResponse = "[ 'query.User-Agent', 'query.51d_pos_latitude' ]";
+            _jsonResponse = @"{ ""device"": { ""ismobile"": true } }";
+            ConfigureMockedClient(r => true);
+
+            var engine = new CloudRequestEngineBuilder(_loggerFactory, _httpClient)
+                .SetResourceKey(resourceKey)
+                .SetCacheSize(10)
+                .SetCacheHitOrMiss(true)
+                .Build();
+
+            using (var pipeline = new PipelineBuilder(_loggerFactory)
+                .AddFlowElement(engine).Build())
+            {
+                var data1 = pipeline.CreateFlowData();
+                data1.AddEvidence("query.User-Agent", userAgent);
+                data1.AddEvidence("query.51d_pos_latitude", latitude);
+                data1.Process();
+                Assert.IsFalse(
+                    data1.GetFromElement(engine).CacheHit,
+                    "first request should miss the cache.");
+
+                var data2 = pipeline.CreateFlowData();
+                // Same values, reverse insertion order.
+                data2.AddEvidence("query.51d_pos_latitude", latitude);
+                data2.AddEvidence("query.User-Agent", userAgent);
+                data2.Process();
+                Assert.IsTrue(data2.GetFromElement(engine).CacheHit,
+                    "evidence insertion order should not affect the cache key.");
+            }
+
+            VerifyJsonRequestCount(1);
+        }
+
+        /// <summary>
+        /// Submitting far more distinct evidence sets than the 
+        /// cache size must evict some of them, so re-submitting them all 
+        /// cannot be all-hits and must generate fresh HTTP requests.
+        /// Check that no regressions that disable eviction (unbounded cache)
+        /// have been introduced.
+        /// </summary>
+        [TestMethod]
+        public void ValidateCacheEviction()
+        {
+            string resourceKey = "resource_key";
+            const int cacheSize = 2;
+            // Far more distinct entries than the cache bound, so eviction is
+            // guaranteed regardless of the approximate per-list behaviour.
+            var userAgents = Enumerable.Range(0, 50).Select(i => $"UA-{i}").ToArray();
+
+            _jsonResponse = @"{ ""device"": { ""ismobile"": true } }";
+            ConfigureMockedClient(r => true);
+
+            var engine = new CloudRequestEngineBuilder(_loggerFactory, _httpClient)
+                .SetResourceKey(resourceKey)
+                .SetCacheSize(cacheSize)
+                .SetCacheHitOrMiss(true)
+                .Build();
+
+            using (var pipeline = new PipelineBuilder(_loggerFactory)
+                    .AddFlowElement(engine).Build())
+            {
+                // First pass: distinct evidence, all miss, overflowing the cache.
+                foreach (var ua in userAgents)
+                {
+                    var data = pipeline.CreateFlowData();
+                    data.AddEvidence("query.User-Agent", ua);
+                    data.Process();
+                    Assert.IsFalse(data.GetFromElement(engine).CacheHit,
+                        $"first sighting of '{ua}' should miss the cache.");
+                }
+
+                // Second pass: count survivors. Some must have been evicted.
+                int hits = 0;
+                foreach (var ua in userAgents)
+                {
+                    var data = pipeline.CreateFlowData();
+                    data.AddEvidence("query.User-Agent", ua);
+                    data.Process();
+                    if (data.GetFromElement(engine).CacheHit)
+                    {
+                        hits++;
+                    }
+                }
+
+                Assert.IsLessThan(
+                    userAgents.Length,
+                    hits, 
+                    $"cache retained all {userAgents.Length} entries with size " +
+                    $"{cacheSize}; eviction did not occur.");
+            }
+
+            // First pass has 50 misses and the second pass adds at least one 
+            // more miss, so the json endpoint should see more than 50 requests.
+            VerifyJsonRequestCountAtLeast(userAgents.Length + 1);
+        }
+
+        /// <summary>
+        /// Check that adding one extra evidence key to an otherwise-cached
+        /// request changes the cache key, so it must miss and make a second 
+        /// HTTP request.
+        /// </summary>
+        [TestMethod]
+        public void ValidateCacheMiss_OneExtraEvidenceKey()
+        {
+            string resourceKey = "resource_key";
+            string userAgent = "iPhone";
+            string latitude = "51";
+
+            _evidenceKeysResponse = "[ 'query.User-Agent', 'query.51d_pos_latitude' ]";
+            _jsonResponse = @"{ ""device"": { ""ismobile"": true } }";
+            ConfigureMockedClient(r => true);
+
+            var engine = new CloudRequestEngineBuilder(_loggerFactory, _httpClient)
+                .SetResourceKey(resourceKey)
+                .SetCacheSize(10)
+                .SetCacheHitOrMiss(true)
+                .Build();
+
+            using (var pipeline = new PipelineBuilder(_loggerFactory)
+                    .AddFlowElement(engine).Build())
+            {
+                var data1 = pipeline.CreateFlowData();
+                data1.AddEvidence("query.User-Agent", userAgent);
+                data1.Process();
+                Assert.IsFalse(data1.GetFromElement(engine)
+                .CacheHit, "first request should miss the cache.");
+
+                var data2 = pipeline.CreateFlowData();
+                data2.AddEvidence("query.User-Agent", userAgent);
+                // One additional whitelisted evidence key.
+                data2.AddEvidence("query.51d_pos_latitude", latitude);
+                data2.Process();
+                Assert.IsFalse(data2.GetFromElement(engine).CacheHit,
+                    "adding an extra evidence key should miss the cache.");
+            }
+
+            VerifyJsonRequestCount(2);
+        }
+
+        /// <summary>
+        /// Check that the same evidence key with a different value misses 
+        /// the cache and makes a second HTTP request.
+        /// </summary>
+        [TestMethod]
+        public void ValidateCacheMiss_SameKeyDifferentValue()
+        {
+            string resourceKey = "resource_key";
+
+            _jsonResponse = @"{ ""device"": { ""ismobile"": true } }";
+            ConfigureMockedClient(r => true);
+
+            var engine = new CloudRequestEngineBuilder(_loggerFactory, _httpClient)
+                .SetResourceKey(resourceKey)
+                .SetCacheSize(10)
+                .SetCacheHitOrMiss(true)
+                .Build();
+
+            using (var pipeline = new PipelineBuilder(_loggerFactory)
+            .AddFlowElement(engine).Build())
+            {
+                var data1 = pipeline.CreateFlowData();
+                data1.AddEvidence("query.User-Agent", "iPhone");
+                data1.Process();
+                Assert.IsFalse(data1.GetFromElement(engine)
+                .CacheHit, "first request should miss the cache.");
+
+                var data2 = pipeline.CreateFlowData();
+                data2.AddEvidence("query.User-Agent", "Samsung");
+                data2.Process();
+                Assert.IsFalse(data2.GetFromElement(engine).CacheHit,
+                    "same key with a different value should miss the cache.");
+            }
+
+            VerifyJsonRequestCount(2);
+        }
+
+        /// <summary>
+        /// Verify that the cloud json endpoint received exactly
+        /// <paramref name="times"/> POST requests. The mock distinguishes the
+        /// three cloud endpoints by URL suffix; only '...json' requests are
+        /// counted here, so the 'evidencekeys'/'accessibleproperties' calls
+        /// made during Build() are excluded.
+        /// </summary>
+        private void VerifyJsonRequestCount(int times)
+        {
+            _handlerMock.Protected().Verify(
+               "SendAsync",
+               Times.Exactly(times),
+               ItExpr.Is<HttpRequestMessage>(req =>
+                  req.Method == HttpMethod.Post
+                  && req.RequestUri.AbsolutePath.ToLower().EndsWith("json")),
+               ItExpr.IsAny<CancellationToken>()
+            );
+        }
+
+        /// <summary>
+        /// As <see cref="VerifyJsonRequestCount(int)"/> but asserts a lower
+        /// bound, for cases where the exact count is non-deterministic.
+        /// </summary>
+        private void VerifyJsonRequestCountAtLeast(int times)
+        {
+            _handlerMock.Protected().Verify(
+               "SendAsync",
+               Times.AtLeast(times),
+               ItExpr.Is<HttpRequestMessage>(req =>
+                  req.Method == HttpMethod.Post
+                  && req.RequestUri.AbsolutePath.ToLower().EndsWith("json")),
+               ItExpr.IsAny<CancellationToken>()
+            );
+        }
+
+        /// <summary>
+        /// Verify that the request to the cloud service will contain
         /// the configured origin header value.
         /// </summary>
         [TestMethod]
@@ -1306,9 +1596,9 @@ namespace FiftyOne.Pipeline.CloudRequestEngine.Tests
             }
             catch (CloudRequestException ex)
             {
-                Assert.IsTrue(ex.HttpStatusCode > 0, "Status code should not be 0");
+                Assert.IsGreaterThan(0, ex.HttpStatusCode, "Status code should not be 0");
                 Assert.IsNotNull(ex.ResponseHeaders, "Response headers not populated");
-                Assert.IsTrue(ex.ResponseHeaders.Count > 0, "Response headers not populated");
+                Assert.IsNotEmpty(ex.ResponseHeaders, "Response headers not populated");
             }
         }
 
@@ -1332,12 +1622,10 @@ namespace FiftyOne.Pipeline.CloudRequestEngine.Tests
 
             try
             {
-                using (var pipeline = new PipelineBuilder(_loggerFactory).AddFlowElement(engine).Build())
-                {
-                    var data = pipeline.CreateFlowData();
-                    data.AddEvidence("query.User-Agent", userAgent);
-                    data.Process();
-                }
+                using var pipeline = new PipelineBuilder(_loggerFactory).AddFlowElement(engine).Build();
+                var data = pipeline.CreateFlowData();
+                data.AddEvidence("query.User-Agent", userAgent);
+                data.Process();
             }
             catch (Exception ex)
             {
@@ -1347,7 +1635,7 @@ namespace FiftyOne.Pipeline.CloudRequestEngine.Tests
             Assert.IsNotNull(exception, "Expected exception to occur");
             Assert.IsInstanceOfType(exception, typeof(AggregateException));
             var aggEx = exception as AggregateException;
-            Assert.AreEqual(aggEx.InnerExceptions.Count, 1);
+            Assert.HasCount(1, aggEx.InnerExceptions);
             var realEx = aggEx.InnerExceptions[0];
             Assert.IsInstanceOfType(realEx, typeof(CloudRequestException));
         }
@@ -1370,21 +1658,19 @@ namespace FiftyOne.Pipeline.CloudRequestEngine.Tests
                 .Build();
 
 
-            using (var pipeline = new PipelineBuilder(_loggerFactory).AddFlowElement(engine).SetSuppressProcessExceptions(true).Build())
-            {
-                var data = pipeline.CreateFlowData();
-                data.AddEvidence("query.User-Agent", userAgent);
-                data.Process();
+            using var pipeline = new PipelineBuilder(_loggerFactory).AddFlowElement(engine).SetSuppressProcessExceptions(true).Build();
+            var data = pipeline.CreateFlowData();
+            data.AddEvidence("query.User-Agent", userAgent);
+            data.Process();
 
-                Assert.IsNotNull(data.Errors);
-                Assert.AreEqual(1, data.Errors.Count);
-                var error = data.Errors[0];
-                Assert.IsInstanceOfType<FlowElements.CloudRequestEngine>(error.FlowElement);
-                var exception = error.ExceptionData;
+            Assert.IsNotNull(data.Errors);
+            Assert.HasCount(1, data.Errors);
+            var error = data.Errors[0];
+            Assert.IsInstanceOfType<FlowElements.CloudRequestEngine>(error.FlowElement);
+            var exception = error.ExceptionData;
 
-                Assert.IsNotNull(exception, "Expected exception to occur");
-                Assert.IsInstanceOfType<CloudRequestException>(exception);
-            }
+            Assert.IsNotNull(exception, "Expected exception to occur");
+            Assert.IsInstanceOfType<CloudRequestException>(exception);
         }
 
         /// <summary>
@@ -1464,5 +1750,7 @@ namespace FiftyOne.Pipeline.CloudRequestEngine.Tests
             // use real http client with mocked handler here
             _httpClient = new HttpClient(_handlerMock.Object);
         }
+
+        public TestContext TestContext { get; set; }
     }
 }
