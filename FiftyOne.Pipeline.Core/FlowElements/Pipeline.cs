@@ -333,6 +333,14 @@ namespace FiftyOne.Pipeline.Core.FlowElements
 
             _ = ElementAvailableProperties; // perform caching attempt (default happy path)
 
+            foreach (var unresolved in
+                ((IPipeline)this).UnresolvedUpstreamDependencies())
+            {
+                _logger.LogWarning(
+                    "Declared upstream dependency '{Key}' does not resolve " +
+                    "to any element in the pipeline.", unresolved);
+            }
+
             _logger.LogInformation($"Pipeline '{GetHashCode()}' created.");
         }
 
