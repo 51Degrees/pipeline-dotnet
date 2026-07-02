@@ -40,10 +40,18 @@
   <ItemGroup>
     <PackageReference Include="FiftyOne.Caching" Version="4.5.2" />
     <PackageReference Include="FiftyOne.Common" Version="5.1.7" />
-    <PackageReference Include="Newtonsoft.Json" Version="13.0.4" />
+  </ItemGroup>
+
+  <!-- JsonLoader uses System.Text.Json on net8.0 but Newtonsoft.Json on
+       netstandard2.0. System.Text.Json does not load reliably on .NET Framework
+       consumers of the netstandard2.0 build without binding redirects, so the
+       JSON library is selected per target framework (see JsonLoader.cs). -->
+  <ItemGroup Condition="'$(TargetFramework)' == 'net8.0'">
+    <PackageReference Include="System.Text.Json" Version="8.0.5" />
   </ItemGroup>
 
   <ItemGroup Condition="'$(TargetFramework)' == 'netstandard2.0'">
+    <PackageReference Include="Newtonsoft.Json" Version="13.0.4" />
     <PackageReference Include="SharpZipLib" Version="1.4.2" />
   </ItemGroup>
 
