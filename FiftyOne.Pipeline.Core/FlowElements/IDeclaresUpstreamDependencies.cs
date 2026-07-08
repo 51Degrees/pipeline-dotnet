@@ -30,7 +30,8 @@ namespace FiftyOne.Pipeline.Core.FlowElements
     public interface IDeclaresUpstreamDependencies
     {
         /// <summary>
-        /// The properties this element needs, as "element.Property" keys.
+        /// The properties this element needs, as "vendor.Property" keys,
+        /// for example "device.DeviceId".
         /// </summary>
         IReadOnlyList<string> RequiredUpstreamProperties { get; }
     }

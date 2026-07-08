@@ -33,7 +33,7 @@ namespace FiftyOne.Pipeline.Core.FlowElements
     public static class UpstreamDependencyExtensions
     {
         /// <summary>
-        /// Finds the element that provides the given "element.Property" key,
+        /// Finds the element that provides the given "vendor.Property" key,
         /// or null if none does.
         /// </summary>
         public static IFlowElement ProvidedBy(
