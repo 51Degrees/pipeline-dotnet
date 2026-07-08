@@ -20,8 +20,14 @@
  * such notice(s) shall fulfill the requirements of that article.
  * ********************************************************************* */
 
-using Newtonsoft.Json;
 using System.IO;
+#if NET8_0_OR_GREATER
+using System.Text.Encodings.Web;
+using System.Text.Json;
+using System.Text.Json.Serialization;
+#else
+using Newtonsoft.Json;
+#endif
 
 namespace FiftyOne.Pipeline.Engines.Data.Readers
 {
@@ -32,6 +38,24 @@ namespace FiftyOne.Pipeline.Engines.Data.Readers
     /// <typeparam name="T"></typeparam>
     public class JsonLoader<T> : IDataLoader<T>
     {
+#if NET8_0_OR_GREATER
+        /// <summary>
+        /// Options that preserve the lenient behaviour callers relied on under
+        /// Newtonsoft.Json: case-insensitive property matching, trailing commas,
+        /// comments, numbers encoded as strings, and enums read from their names.
+        /// </summary>
+        private static readonly JsonSerializerOptions _options =
+            new JsonSerializerOptions
+            {
+                PropertyNameCaseInsensitive = true,
+                AllowTrailingCommas = true,
+                ReadCommentHandling = JsonCommentHandling.Skip,
+                NumberHandling = JsonNumberHandling.AllowReadingFromString,
+                Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping,
+                Converters = { new JsonStringEnumConverter() },
+            };
+#endif
+
         /// <summary>
         /// Load data from a StreamReader.
         /// </summary>
@@ -39,7 +63,14 @@ namespace FiftyOne.Pipeline.Engines.Data.Readers
         /// <returns>A new instance of T</returns>
         private T LoadData(StreamReader reader)
         {
+            // System.Text.Json does not load reliably on .NET Framework (the
+            // netstandard2.0 consumers) without binding redirects, so use it only
+            // on net8.0 and keep Newtonsoft.Json for the netstandard2.0 build.
+#if NET8_0_OR_GREATER
+            return JsonSerializer.Deserialize<T>(reader.ReadToEnd(), _options);
+#else
             return JsonConvert.DeserializeObject<T>(reader.ReadToEnd());
+#endif
         }
 
         /// <summary>
