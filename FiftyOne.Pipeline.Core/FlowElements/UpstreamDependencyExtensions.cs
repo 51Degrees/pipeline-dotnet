@@ -20,7 +20,6 @@
  * such notice(s) shall fulfill the requirements of that article.
  * ********************************************************************* */
 
-using FiftyOne.Pipeline.Core.Data;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -33,12 +32,22 @@ namespace FiftyOne.Pipeline.Core.FlowElements
     public static class UpstreamDependencyExtensions
     {
         /// <summary>
-        /// Finds the element that provides the given "vendor.Property" key,
-        /// or null if none does.
+        /// Finds the element whose data key matches the vendor prefix of
+        /// the given "vendor.Property" key. The property part is not
+        /// checked.
         /// </summary>
+        /// <param name="pipeline">Pipeline containing the elements.</param>
+        /// <param name="propertyKey">
+        /// Dependency key, for example "device.DeviceId".
+        /// </param>
+        /// <returns>The providing element, or null if none matches.</returns>
         public static IFlowElement ProvidedBy(
             this IPipeline pipeline, string propertyKey)
         {
+            if (propertyKey == null)
+            {
+                return null;
+            }
             var elementKey = propertyKey.Split('.')[0];
             return pipeline.FlowElements.FirstOrDefault(e =>
                 string.Equals(
@@ -47,12 +56,18 @@ namespace FiftyOne.Pipeline.Core.FlowElements
         }
 
         /// <summary>
-        /// True if the element is wanted directly, or if a wanted element
-        /// declared that it needs one of this element's properties.
-        /// <paramref name="isWanted"/> answers whether an element is wanted.
+        /// Determines whether an element must run: either it is wanted
+        /// itself, or a wanted element declares a dependency on one of its
+        /// properties. Dependency chains are not walked.
         /// </summary>
+        /// <param name="pipeline">Pipeline containing the elements.</param>
+        /// <param name="element">Element to check.</param>
+        /// <param name="isWanted">
+        /// Predicate deciding whether an element is wanted.
+        /// </param>
+        /// <returns>True if the element is needed.</returns>
         public static bool IsNeededFor(
-            this IFlowData data,
+            this IPipeline pipeline,
             IFlowElement element,
             Func<IFlowElement, bool> isWanted)
         {
@@ -60,27 +75,54 @@ namespace FiftyOne.Pipeline.Core.FlowElements
             {
                 return true;
             }
-            return data.Pipeline.FlowElements
+            return pipeline.FlowElements
                 .Where(e => e is IDeclaresUpstreamDependencies && isWanted(e))
                 .SelectMany(e =>
                     ((IDeclaresUpstreamDependencies)e)
                         .RequiredUpstreamProperties)
-                .Any(required =>
-                    data.Pipeline.ProvidedBy(required) == element);
+                .Any(required => pipeline.ProvidedBy(required) == element);
         }
 
         /// <summary>
-        /// Returns declared dependency keys that no element provides.
+        /// Returns declared dependency keys that no element provides. When
+        /// element metadata is available, the property part is checked too.
         /// </summary>
+        /// <param name="pipeline">Pipeline containing the elements.</param>
+        /// <returns>Unresolved dependency keys.</returns>
         public static IReadOnlyList<string> UnresolvedUpstreamDependencies(
             this IPipeline pipeline)
         {
             return pipeline.FlowElements
                 .OfType<IDeclaresUpstreamDependencies>()
                 .SelectMany(e => e.RequiredUpstreamProperties)
-                .Where(key => pipeline.ProvidedBy(key) == null)
+                .Where(key => !IsProvided(pipeline, key))
                 .Distinct()
                 .ToList();
+        }
+
+        private static bool IsProvided(IPipeline pipeline, string key)
+        {
+            var element = pipeline.ProvidedBy(key);
+            if (element == null)
+            {
+                return false;
+            }
+            var separatorIndex = key.IndexOf('.');
+            if (separatorIndex < 0)
+            {
+                return true;
+            }
+            var propertyName = key.Substring(separatorIndex + 1);
+            var allProperties = pipeline.ElementAvailableProperties;
+            if (allProperties == null
+                || !allProperties.TryGetValue(
+                    element.ElementDataKey, out var elementProperties))
+            {
+                // Metadata may not be loaded yet, so the property
+                // cannot be checked.
+                return true;
+            }
+            return elementProperties.ContainsKey(propertyName);
         }
     }
 }

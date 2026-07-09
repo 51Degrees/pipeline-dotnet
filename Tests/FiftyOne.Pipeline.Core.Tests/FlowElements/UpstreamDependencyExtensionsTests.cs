@@ -24,6 +24,8 @@ using FiftyOne.Pipeline.Core.Data;
 using FiftyOne.Pipeline.Core.FlowElements;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using Moq;
+using System.Collections.Generic;
+using System.Linq;
 
 namespace FiftyOne.Pipeline.Core.Tests.FlowElements
 {
@@ -44,11 +46,26 @@ namespace FiftyOne.Pipeline.Core.Tests.FlowElements
             return pipeline.Object;
         }
 
-        private static IFlowData FlowDataFor(IPipeline pipeline)
+        private static IPipeline PipelineWith(
+            IReadOnlyDictionary<string, IReadOnlyDictionary<string, IElementPropertyMetaData>> metadata,
+            params IFlowElement[] elements)
         {
-            var data = new Mock<IFlowData>();
-            data.SetupGet(d => d.Pipeline).Returns(pipeline);
-            return data.Object;
+            var pipeline = new Mock<IPipeline>();
+            pipeline.SetupGet(p => p.FlowElements).Returns(elements);
+            pipeline.SetupGet(p => p.ElementAvailableProperties)
+                .Returns(metadata);
+            return pipeline.Object;
+        }
+
+        private static IReadOnlyDictionary<string, IReadOnlyDictionary<string, IElementPropertyMetaData>>
+            Metadata(string elementKey, params string[] propertyNames)
+        {
+            return new Dictionary<string, IReadOnlyDictionary<string, IElementPropertyMetaData>>
+            {
+                [elementKey] = propertyNames.ToDictionary(
+                    name => name,
+                    name => new Mock<IElementPropertyMetaData>().Object),
+            };
         }
 
         private static IFlowElement Consumer(string dataKey, params string[] deps)
@@ -77,11 +94,19 @@ namespace FiftyOne.Pipeline.Core.Tests.FlowElements
         }
 
         [TestMethod]
+        public void ProvidedBy_NullKey_ReturnsNull()
+        {
+            var device = MockElement("device").Object;
+            var pipeline = PipelineWith(device);
+            Assert.IsNull(pipeline.ProvidedBy(null));
+        }
+
+        [TestMethod]
         public void IsNeededFor_DirectlyWanted_ReturnsTrue()
         {
             var device = MockElement("device").Object;
-            var data = FlowDataFor(PipelineWith(device));
-            Assert.IsTrue(data.IsNeededFor(device, e => e == device));
+            var pipeline = PipelineWith(device);
+            Assert.IsTrue(pipeline.IsNeededFor(device, e => e == device));
         }
 
         [TestMethod]
@@ -89,9 +114,9 @@ namespace FiftyOne.Pipeline.Core.Tests.FlowElements
         {
             var device = MockElement("device").Object;
             var consumer = Consumer("fodid", "device.DeviceId");
-            var data = FlowDataFor(PipelineWith(consumer, device));
+            var pipeline = PipelineWith(consumer, device);
             // device is not directly wanted, only the consumer is.
-            Assert.IsTrue(data.IsNeededFor(device, e => e == consumer));
+            Assert.IsTrue(pipeline.IsNeededFor(device, e => e == consumer));
         }
 
         [TestMethod]
@@ -99,9 +124,9 @@ namespace FiftyOne.Pipeline.Core.Tests.FlowElements
         {
             var device = MockElement("device").Object;
             var consumer = Consumer("fodid", "device.DeviceId");
-            var data = FlowDataFor(PipelineWith(consumer, device));
+            var pipeline = PipelineWith(consumer, device);
             // Nothing is wanted, so the provider is not needed.
-            Assert.IsFalse(data.IsNeededFor(device, e => false));
+            Assert.IsFalse(pipeline.IsNeededFor(device, e => false));
         }
 
         [TestMethod]
@@ -109,8 +134,8 @@ namespace FiftyOne.Pipeline.Core.Tests.FlowElements
         {
             var device = MockElement("device").Object;
             var other = MockElement("location").Object;
-            var data = FlowDataFor(PipelineWith(other, device));
-            Assert.IsFalse(data.IsNeededFor(device, e => e == other));
+            var pipeline = PipelineWith(other, device);
+            Assert.IsFalse(pipeline.IsNeededFor(device, e => e == other));
         }
 
         [TestMethod]
@@ -127,6 +152,46 @@ namespace FiftyOne.Pipeline.Core.Tests.FlowElements
 
             Assert.HasCount(1, unresolved);
             Assert.AreEqual("ip.CountryCodesGeographical", unresolved[0]);
+        }
+
+        [TestMethod]
+        public void UnresolvedUpstreamDependencies_FindsMissingProperty()
+        {
+            var device = MockElement("device").Object;
+            var consumer = Consumer(
+                "fodid", "device.DeviceId", "device.MadeUpProperty");
+            var pipeline = PipelineWith(
+                Metadata("device", "DeviceId"), consumer, device);
+
+            var unresolved = pipeline.UnresolvedUpstreamDependencies();
+
+            Assert.HasCount(1, unresolved);
+            Assert.AreEqual("device.MadeUpProperty", unresolved[0]);
+        }
+
+        [TestMethod]
+        public void UnresolvedUpstreamDependencies_MetadataNotLoaded_TreatsKeyAsProvided()
+        {
+            var device = MockElement("device").Object;
+            var consumer = Consumer("fodid", "device.MadeUpProperty");
+            var pipeline = PipelineWith(
+                new Dictionary<string, IReadOnlyDictionary<string, IElementPropertyMetaData>>(),
+                consumer, device);
+
+            Assert.HasCount(0, pipeline.UnresolvedUpstreamDependencies());
+        }
+
+        [TestMethod]
+        public void UnresolvedUpstreamDependencies_NullKey_ReportedWithoutThrowing()
+        {
+            var device = MockElement("device").Object;
+            var consumer = Consumer("fodid", new string[] { null });
+            var pipeline = PipelineWith(consumer, device);
+
+            var unresolved = pipeline.UnresolvedUpstreamDependencies();
+
+            Assert.HasCount(1, unresolved);
+            Assert.IsNull(unresolved[0]);
         }
     }
 }
