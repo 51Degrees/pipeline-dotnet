@@ -24,7 +24,6 @@ using FiftyOne.Pipeline.Core.FlowElements;
 using FiftyOne.Pipeline.Core.TypedMap;
 using System;
 using System.Collections.Generic;
-using System.Threading;
 
 namespace FiftyOne.Pipeline.Core.Data
 {
@@ -38,33 +37,13 @@ namespace FiftyOne.Pipeline.Core.Data
         /// A boolean flag that can be used to stop further elements
         /// from executing.
         /// </summary>
-        [Obsolete("Use SetStopToken/GetStopToken instead.")]
+        [Obsolete("Prefer cancelling the CancellationToken passed to " +
+            "IPipeline.CreateFlowData. This flag is retained as the stop " +
+            "signal and its getter still reflects that cancellation.")]
 #pragma warning disable CA1716 // Identifiers should not match keywords
         // Marked as obsolete and will be removed in future.
         bool Stop { get; set; }
 #pragma warning restore CA1716 // Identifiers should not match keywords
-
-        /// <summary>
-        /// Stop processing this flow data when the supplied token is, or
-        /// becomes, cancelled. Used to link an external cancellation source
-        /// (for example an aborted web request) to this flow data.
-        /// </summary>
-        /// <param name="stopToken">The token that triggers the stop.</param>
-        void SetStopToken(CancellationToken stopToken);
-
-        /// <summary>
-        /// The token that is cancelled when processing of this flow data
-        /// should stop.
-        /// </summary>
-        /// <returns>The stop token for this flow data.</returns>
-        CancellationToken GetStopToken();
-
-        /// <summary>
-        /// Whether elements should still run. False once this flow data has
-        /// been told to stop.
-        /// </summary>
-        /// <returns><see langword="true"/> while processing should continue.</returns>
-        bool ShouldRun();
 
         /// <summary>
         /// The errors that have occurred during processing

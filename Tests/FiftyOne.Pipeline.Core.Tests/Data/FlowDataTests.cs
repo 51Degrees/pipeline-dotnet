@@ -119,27 +119,29 @@ namespace FiftyOne.Pipeline.Core.Tests.Data
         }
 
         /// <summary>
-        /// GetStopToken must stay safe after Dispose: processing already
-        /// disposed flow data must not throw ObjectDisposedException.
+        /// GetStopToken must stay safe after Dispose: reading the stop token
+        /// of an already disposed flow data must not throw
+        /// ObjectDisposedException.
         /// </summary>
         [TestMethod]
-        public void FlowData_GetStopToken_AfterDispose_ReturnsNone()
+        public void FlowData_GetStopToken_AfterDispose_DoesNotThrow()
         {
             var flowData = new FlowData(_logger.Object, _pipeline.Object,
                 new Evidence(new Mock<ILogger<Evidence>>().Object));
 
             flowData.Dispose();
 
-            Assert.AreEqual(CancellationToken.None, flowData.GetStopToken());
+            var token = flowData.GetStopToken();
+            Assert.IsFalse(token.IsCancellationRequested);
         }
 
         /// <summary>
-        /// A fresh flow data should run (its stop token is not cancelled).
+        /// A fresh flow data is not stopped (its stop token is not cancelled).
         /// </summary>
         [TestMethod]
-        public void FlowData_ShouldRun_NoCancellation_True()
+        public void FlowData_GetStopToken_NoCancellation_NotRequested()
         {
-            Assert.IsTrue(_flowData.ShouldRun());
+            Assert.IsFalse(_flowData.GetStopToken().IsCancellationRequested);
         }
 
         /// <summary>
@@ -150,7 +152,6 @@ namespace FiftyOne.Pipeline.Core.Tests.Data
         {
             _flowData.SetStopToken(new CancellationToken(canceled: true));
 
-            Assert.IsFalse(_flowData.ShouldRun());
             Assert.IsTrue(_flowData.GetStopToken().IsCancellationRequested);
         }
 
@@ -163,10 +164,10 @@ namespace FiftyOne.Pipeline.Core.Tests.Data
             using var external = new CancellationTokenSource();
 
             _flowData.SetStopToken(external.Token);
-            Assert.IsTrue(_flowData.ShouldRun());
+            Assert.IsFalse(_flowData.GetStopToken().IsCancellationRequested);
 
             external.Cancel();
-            Assert.IsFalse(_flowData.ShouldRun());
+            Assert.IsTrue(_flowData.GetStopToken().IsCancellationRequested);
         }
 
         /// <summary>
@@ -179,6 +180,56 @@ namespace FiftyOne.Pipeline.Core.Tests.Data
 
             _flowData.SetStopToken(new CancellationToken(canceled: true));
             Assert.IsTrue(_flowData.GetStopToken().IsCancellationRequested);
+        }
+
+        /// <summary>
+        /// Regression: after a flow data that linked an external token via
+        /// SetStopToken is disposed, cancelling that external token must not
+        /// throw (the registration is disposed with the flow data).
+        /// </summary>
+        [TestMethod]
+        public void FlowData_SetStopToken_DisposeThenExternalCancel_DoesNotThrow()
+        {
+            using var external = new CancellationTokenSource();
+            var flowData = new FlowData(_logger.Object, _pipeline.Object,
+                new Evidence(new Mock<ILogger<Evidence>>().Object));
+
+            flowData.SetStopToken(external.Token);
+            flowData.Dispose();
+
+            external.Cancel();
+        }
+
+        /// <summary>
+        /// Regression: setting the obsolete Stop flag after Dispose must not
+        /// throw ObjectDisposedException.
+        /// </summary>
+        [TestMethod]
+        public void FlowData_SettingStop_AfterDispose_DoesNotThrow()
+        {
+            var flowData = new FlowData(_logger.Object, _pipeline.Object,
+                new Evidence(new Mock<ILogger<Evidence>>().Object));
+
+            flowData.Dispose();
+
+#pragma warning disable CS0618 // Stop is obsolete
+            flowData.Stop = true;
+#pragma warning restore CS0618
+        }
+
+        /// <summary>
+        /// Regression: calling SetStopToken after Dispose must not throw
+        /// ObjectDisposedException.
+        /// </summary>
+        [TestMethod]
+        public void FlowData_SetStopToken_AfterDispose_DoesNotThrow()
+        {
+            var flowData = new FlowData(_logger.Object, _pipeline.Object,
+                new Evidence(new Mock<ILogger<Evidence>>().Object));
+
+            flowData.Dispose();
+
+            flowData.SetStopToken(new CancellationToken(canceled: true));
         }
 
         /// <summary>

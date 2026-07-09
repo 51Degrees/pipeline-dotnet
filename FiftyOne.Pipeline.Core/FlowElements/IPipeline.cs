@@ -43,18 +43,6 @@ namespace FiftyOne.Pipeline.Core.FlowElements
         IFlowData CreateFlowData();
 
         /// <summary>
-        /// Create a new flow data that stops processing when the supplied
-        /// token is cancelled.
-        /// </summary>
-        /// <param name="cancellationToken">
-        /// Token that cancels processing of the created flow data.
-        /// </param>
-        /// <returns>
-        /// A new <see cref="IFlowData"/> instance.
-        /// </returns>
-        IFlowData CreateFlowData(CancellationToken cancellationToken);
-
-        /// <summary>
         /// Get a filter that will only include the evidence keys that can 
         /// be used by at least one <see cref="IFlowElement"/> within 
         /// this pipeline.
@@ -138,6 +126,18 @@ namespace FiftyOne.Pipeline.Core.FlowElements
     /// </summary>
     internal interface IPipelineInternal : IPipeline
     {
+        /// <summary>
+        /// Create a new flow data that stops processing when the supplied
+        /// token is cancelled.
+        /// </summary>
+        /// <param name="cancellationToken">
+        /// Token that cancels processing of the created flow data.
+        /// </param>
+        /// <returns>
+        /// A new <see cref="IFlowData"/> instance.
+        /// </returns>
+        IFlowData CreateFlowData(CancellationToken cancellationToken);
+
         /// <summary>
         /// Process the given <see cref="IFlowData"/> using the 
         /// <see cref="IFlowElement"/>s in the pipeline.

@@ -208,7 +208,11 @@ namespace FiftyOne.Pipeline.Core.FlowElements
             }
 
             Stopwatch sw = null;
-            if (data.GetStopToken().IsCancellationRequested == false)
+#pragma warning disable CS0618 // Type or member is obsolete
+            // This usage will be replaced once the Cancellation Token
+            // mechanism is available.
+            if (data.Stop == false)
+#pragma warning restore CS0618 // Type or member is obsolete
             {
                 bool log = Logger.IsEnabled(LogLevel.Debug);
                 if (log)

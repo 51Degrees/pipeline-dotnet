@@ -391,7 +391,11 @@ namespace FiftyOne.Pipeline.Core.FlowElements
                 try
                 {
                     element.Process(data);
-                    if (data.GetStopToken().IsCancellationRequested) { break; }
+#pragma warning disable CS0618 // Type or member is obsolete
+                    // Stop is the interface-level stop signal; its getter
+                    // reflects cancellation of the flow data's stop token.
+                    if (data.Stop) { break; }
+#pragma warning restore CS0618 // Type or member is obsolete
                 }
 #pragma warning disable CA1031 // Do not catch general exception types
                 // We want to catch any exception here so that the

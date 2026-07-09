@@ -35,7 +35,10 @@ namespace FiftyOne.Pipeline.Web.Tests
     {
         private static Mock<IFlowData> _flowData;
 
-        private Mock<IPipeline> _pipeline;
+        // Mocked as IPipelineInternal because the token-aware CreateFlowData
+        // is reached through the public IPipeline extension, which forwards to
+        // the internal interface member (the only mockable overload).
+        private Mock<IPipelineInternal> _pipeline;
 
         private Mock<IWebRequestEvidenceService> _evidenceService;
 
@@ -48,7 +51,7 @@ namespace FiftyOne.Pipeline.Web.Tests
         [TestInitialize]
         public void SetUp()
         {
-            _pipeline = new Mock<IPipeline>();
+            _pipeline = new Mock<IPipelineInternal>();
             _flowData = new Mock<IFlowData>();
             _pipeline.Setup(p => p.CreateFlowData(It.IsAny<CancellationToken>())).Returns(_flowData.Object);
             _evidenceService = new Mock<IWebRequestEvidenceService>();
