@@ -35,6 +35,7 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
 using System.Net.Http;
+using System.Runtime.ExceptionServices;
 using System.Threading;
 using System.Threading.Tasks;
 using FiftyOne.Pipeline.Core.Exceptions;
@@ -287,11 +288,12 @@ namespace FiftyOne.Pipeline.CloudRequestEngine.FlowElements
                          true)
                 };
 
-                // Start the tasks to get the evidence keys and the public
-                // properties from the cloud service. If the stop token is
-                // not provided then warn via logging.
+                // Set up lazy initialization for the evidence keys and the
+                // public properties. The values are fetched from the cloud
+                // service on first access, or during WarmUp when the engine
+                // is created through CloudRequestEngineBuilder.
 
-                _lazyEvidenceKeyFilter 
+                _lazyEvidenceKeyFilter
                     = new Lazy<IEvidenceKeyFilter>(
                         GetCloudEvidenceKeys,
                         LazyThreadSafetyMode.PublicationOnly);
@@ -423,6 +425,43 @@ namespace FiftyOne.Pipeline.CloudRequestEngine.FlowElements
                     }
                     throw;
                 }
+            }
+        }
+
+        /// <summary>
+        /// Fetch <see cref="PublicProperties"/> and
+        /// <see cref="EvidenceKeyFilter"/> from the cloud service so that
+        /// the first call to Process does not have to pay the cost of
+        /// these requests.
+        /// The two requests are made in parallel and this method blocks
+        /// until both have completed.
+        /// <see cref="CloudRequestEngineBuilder.Build"/> calls this before
+        /// returning, so an engine created through the builder is ready
+        /// to serve as soon as it is returned.
+        /// </summary>
+        /// <exception cref="CloudRequestException">
+        /// Thrown if there is an error from the cloud service or
+        /// there is no data in the response.
+        /// </exception>
+        public void WarmUp()
+        {
+            var discoveryTasks = new[]
+            {
+                Task.Run(() => { var _ = PublicProperties; }),
+                Task.Run(() => { var _ = EvidenceKeyFilter; }),
+            };
+            try
+            {
+                Task.WaitAll(discoveryTasks);
+            }
+            catch (AggregateException ex)
+            {
+                // Surface the underlying failure directly so that callers
+                // get the same exception type that the PublicProperties and
+                // EvidenceKeyFilter getters would have thrown.
+                ExceptionDispatchInfo.Capture(
+                    ex.InnerExceptions[0]).Throw();
+                throw;
             }
         }
 

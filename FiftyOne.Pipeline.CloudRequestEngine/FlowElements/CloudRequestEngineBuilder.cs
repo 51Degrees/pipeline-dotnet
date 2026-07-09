@@ -329,8 +329,20 @@ namespace FiftyOne.Pipeline.CloudRequestEngine.FlowElements
         /// <summary>
         /// Build and return a new <see cref="CloudRequestEngine"/>
         /// instance using the current configuration.
+        /// The returned engine has already fetched the accessible
+        /// properties and evidence keys from the cloud service, so the
+        /// first call to Process does not pay the cost of these requests.
+        /// This means that this method requires the cloud service to be
+        /// reachable and will throw if it is not.
         /// </summary>
-        /// <returns></returns>
+        /// <returns>
+        /// A new <see cref="CloudRequestEngine"/> that is ready to serve
+        /// requests.
+        /// </returns>
+        /// <exception cref="CloudRequestException">
+        /// Thrown if there is an error from the cloud service or
+        /// there is no data in the response.
+        /// </exception>
         public CloudRequestEngine Build()
         {
             if (string.IsNullOrWhiteSpace(_resourceKey))
@@ -357,7 +369,19 @@ namespace FiftyOne.Pipeline.CloudRequestEngine.FlowElements
                 SetEvidenceKeysEndpoint(endpoint + Constants.EVIDENCE_KEYS_FILENAME);
             }
 
-            return BuildEngine();
+            var engine = BuildEngine();
+            try
+            {
+                engine.WarmUp();
+            }
+            catch
+            {
+                // A failed warmup means the engine must not be returned,
+                // so make sure it is not left registered anywhere.
+                engine.Dispose();
+                throw;
+            }
+            return engine;
         }
 
         private CloudRequestData CreateAspectData(IPipeline pipeline, 

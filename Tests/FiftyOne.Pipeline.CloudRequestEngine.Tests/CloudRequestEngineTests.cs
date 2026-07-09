@@ -31,6 +31,7 @@ using Moq.Protected;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using System.Net;
 using System.Net.Http;
@@ -534,13 +535,12 @@ namespace FiftyOne.Pipeline.CloudRequestEngine.Tests
 
 
         /// <summary>
-        /// Test cloud request engine handles errors from the cloud service 
+        /// Test cloud request engine handles errors from the cloud service
         /// as expected.
-        /// An AggregateException should be thrown by the cloud request engine
-        /// containing the errors from the cloud service
-        /// and the pipeline is configured to throw any exceptions up 
-        /// the stack in an AggregateException.
-        /// We also check that the exception message includes the content 
+        /// Build performs the discovery requests against the cloud service,
+        /// so a CloudRequestException containing the errors from the cloud
+        /// service should be thrown by Build.
+        /// We also check that the exception message includes the content
         /// from the JSON response.
         /// </summary>
         [TestMethod]
@@ -558,15 +558,13 @@ namespace FiftyOne.Pipeline.CloudRequestEngine.Tests
 
             Exception exception = null;
 
-            var engine = new CloudRequestEngineBuilder(
-                _loggerFactory, 
-                _httpClient)
-                .SetResourceKey(resourceKey)
-                .Build();
-
             try
             {
-                var cloudEngineProps = engine.PublicProperties;
+                var engine = new CloudRequestEngineBuilder(
+                    _loggerFactory,
+                    _httpClient)
+                    .SetResourceKey(resourceKey)
+                    .Build();
             }
             catch (Exception ex)
             {
@@ -679,9 +677,9 @@ namespace FiftyOne.Pipeline.CloudRequestEngine.Tests
         /// <summary>
         /// Test cloud request engine handles a lack of data from the
         /// cloud service as expected.
-        /// An exception should be thrown by the cloud request engine
-        /// and the pipeline is configured to throw any exceptions up
-        /// the stack as an AggregateException.
+        /// Build performs the discovery requests against the cloud service,
+        /// so it should throw a CloudRequestException describing the
+        /// failed properties request.
         /// </summary>
         [TestMethod]
         public void ValidateErrorHandling_NotJson()
@@ -699,15 +697,13 @@ namespace FiftyOne.Pipeline.CloudRequestEngine.Tests
 
             ConfigureMockedClient(_ => true);
 
-            var engine = new CloudRequestEngineBuilder(
-                _loggerFactory,
-                _httpClient)
-                .SetResourceKey(resourceKey)
-                .Build();
-
             var ex = Assert.ThrowsExactly<CloudRequestException>(() =>
             {
-                var cloudEngineProps = engine.PublicProperties;
+                var engine = new CloudRequestEngineBuilder(
+                    _loggerFactory,
+                    _httpClient)
+                    .SetResourceKey(resourceKey)
+                    .Build();
             });
 
             Assert.AreEqual(ex.HttpStatusCode, 404, "Status code should be 404");
@@ -1285,23 +1281,23 @@ namespace FiftyOne.Pipeline.CloudRequestEngine.Tests
         }
 
         /// <summary>
-        /// Check that errors from the cloud service will cause the 
+        /// Check that errors from the cloud service will cause the
         /// appropriate data to be set in the CloudRequestException.
+        /// Build performs the discovery requests against the cloud
+        /// service, so the exception is expected from Build.
         /// </summary>
         [TestMethod]
         public void ValidateErrorHandling_HttpDataSetInException()
         {
             string resourceKey = "resource_key";
 
-            var engine = new CloudRequestEngineBuilder(
-                _loggerFactory, 
-                new HttpClient())
-                .SetResourceKey(resourceKey)
-                .Build();
-
             try
             {
-                var cloudEngineProps = engine.PublicProperties;
+                var engine = new CloudRequestEngineBuilder(
+                    _loggerFactory,
+                    new HttpClient())
+                    .SetResourceKey(resourceKey)
+                    .Build();
                 Assert.Fail("Expected exception did not occur");
             }
             catch (CloudRequestException ex)
@@ -1385,6 +1381,154 @@ namespace FiftyOne.Pipeline.CloudRequestEngine.Tests
                 Assert.IsNotNull(exception, "Expected exception to occur");
                 Assert.IsInstanceOfType<CloudRequestException>(exception);
             }
+        }
+
+        /// <summary>
+        /// Verify that Build fetches the accessible properties and evidence
+        /// keys from the cloud service exactly once, and that processing
+        /// does not trigger any further discovery requests.
+        /// </summary>
+        [TestMethod]
+        public void Build_PerformsDiscovery_ProcessMakesNoFurtherDiscoveryRequests()
+        {
+            string resourceKey = "resource_key";
+            ConfigureMockedClient(r => true);
+
+            var engine = new CloudRequestEngineBuilder(
+                _loggerFactory,
+                _httpClient)
+                .SetResourceKey(resourceKey)
+                .Build();
+
+            // Build must have called each discovery endpoint exactly once.
+            VerifyDiscoveryRequests(Times.Exactly(1));
+
+            using (var pipeline = new PipelineBuilder(_loggerFactory).AddFlowElement(engine).Build())
+            {
+                var data = pipeline.CreateFlowData();
+                data.AddEvidence("query.User-Agent", "iPhone");
+
+                data.Process();
+            }
+
+            // Processing must not have triggered any further discovery
+            // requests.
+            VerifyDiscoveryRequests(Times.Exactly(1));
+            _handlerMock.Protected().Verify(
+               "SendAsync",
+               Times.Exactly(1),
+               ItExpr.Is<HttpRequestMessage>(req =>
+                  req.Method == HttpMethod.Post
+                  && req.RequestUri == expectedUri
+               ),
+               ItExpr.IsAny<CancellationToken>()
+            );
+        }
+
+        /// <summary>
+        /// Verify that a failure from the evidence keys endpoint also
+        /// causes Build to throw, not just a failure from the accessible
+        /// properties endpoint.
+        /// </summary>
+        [TestMethod]
+        public void Build_EvidenceKeysError_Throws()
+        {
+            string resourceKey = "resource_key";
+
+            _evidenceKeysResponse = "Status code: 404, '*evidencekeys' method not found";
+            _evidenceKeysResponseStatus = HttpStatusCode.NotFound;
+
+            ConfigureMockedClient(_ => true);
+
+            Assert.ThrowsExactly<CloudRequestException>(() =>
+            {
+                var engine = new CloudRequestEngineBuilder(
+                    _loggerFactory,
+                    _httpClient)
+                    .SetResourceKey(resourceKey)
+                    .Build();
+            });
+        }
+
+        /// <summary>
+        /// Verify that when the discovery requests fail, the engine that
+        /// Build created internally is disposed before the exception is
+        /// thrown to the caller.
+        /// </summary>
+        [TestMethod]
+        public void Build_Failure_DisposesEngine()
+        {
+            string resourceKey = "resource_key";
+
+            _accessiblePropertiesResponse = @"{ ""errors"":[""resource_key not a valid resource key""]}";
+            _accessiblePropertiesResponseStatus = HttpStatusCode.BadRequest;
+
+            ConfigureMockedClient(_ => true);
+
+            var builder = new EngineCapturingBuilder(
+                _loggerFactory,
+                _httpClient);
+
+            Assert.ThrowsExactly<CloudRequestException>(() =>
+            {
+                var engine = builder
+                    .SetResourceKey(resourceKey)
+                    .Build();
+            });
+
+            Assert.IsNotNull(builder.LastEngine,
+                "The engine should have been created before warmup failed.");
+            Assert.IsTrue(builder.LastEngine.IsDisposed,
+                "The engine should have been disposed when warmup failed.");
+        }
+
+        /// <summary>
+        /// Builder that captures the engine instance it creates so that
+        /// tests can inspect the engine even when Build throws.
+        /// </summary>
+        private class EngineCapturingBuilder : CloudRequestEngineBuilder
+        {
+            public FlowElements.CloudRequestEngine LastEngine { get; private set; }
+
+            public EngineCapturingBuilder(
+                ILoggerFactory loggerFactory,
+                HttpClient httpClient)
+                : base(loggerFactory, httpClient)
+            {
+            }
+
+            protected override FlowElements.CloudRequestEngine NewEngine(
+                List<string> properties)
+            {
+                LastEngine = base.NewEngine(properties);
+                return LastEngine;
+            }
+        }
+
+        /// <summary>
+        /// Verify the number of requests made to each of the two
+        /// discovery endpoints.
+        /// </summary>
+        private void VerifyDiscoveryRequests(Times times)
+        {
+            _handlerMock.Protected().Verify(
+               "SendAsync",
+               times,
+               ItExpr.Is<HttpRequestMessage>(req =>
+                  req.Method == HttpMethod.Get
+                  && req.RequestUri.AbsolutePath.ToLower().EndsWith("accessibleproperties")
+               ),
+               ItExpr.IsAny<CancellationToken>()
+            );
+            _handlerMock.Protected().Verify(
+               "SendAsync",
+               times,
+               ItExpr.Is<HttpRequestMessage>(req =>
+                  req.Method == HttpMethod.Get
+                  && req.RequestUri.AbsolutePath.ToLower().EndsWith("evidencekeys")
+               ),
+               ItExpr.IsAny<CancellationToken>()
+            );
         }
 
         /// <summary>

@@ -150,14 +150,12 @@ namespace FiftyOne.Pipeline.CloudRequestEngine.Tests
                 .SetResourceKey("abcdefgh")
                 .Build();
 
-            _ = cloudRequestsEngine.PublicProperties;
-
+            // Build warms the engine, so both discovery endpoints have
+            // already been called exactly once.
             VerifyPublicPropsTimes(1);
-
-            _ = cloudRequestsEngine.EvidenceKeyFilter;
-
             VerifyEvidenceKeysTimes(1);
 
+            // Further accesses must not trigger any additional requests.
             _ = cloudRequestsEngine.PublicProperties;
             _ = cloudRequestsEngine.PublicProperties;
             _ = cloudRequestsEngine.EvidenceKeyFilter;
@@ -209,14 +207,12 @@ namespace FiftyOne.Pipeline.CloudRequestEngine.Tests
                 .Build();
 
 
-            _ = cloudRequestsEngine.PublicProperties;
-
+            // Build warms the engine, so both discovery endpoints have
+            // already been called exactly once.
             VerifyPublicPropsTimes(1);
-
-            _ = cloudRequestsEngine.EvidenceKeyFilter;
-
             VerifyEvidenceKeysTimes(1);
 
+            // Further accesses must not trigger any additional requests.
             _ = cloudRequestsEngine.PublicProperties;
             _ = cloudRequestsEngine.PublicProperties;
             _ = cloudRequestsEngine.EvidenceKeyFilter;
@@ -264,14 +260,12 @@ namespace FiftyOne.Pipeline.CloudRequestEngine.Tests
                 .Build();
 
 
-            _ = cloudRequestsEngine.PublicProperties;
-
+            // Build warms the engine, so both discovery endpoints have
+            // already been called exactly once.
             VerifyPublicPropsTimes(1);
-
-            _ = cloudRequestsEngine.EvidenceKeyFilter;
-
             VerifyEvidenceKeysTimes(1);
 
+            // Further accesses must not trigger any additional requests.
             _ = cloudRequestsEngine.PublicProperties;
             _ = cloudRequestsEngine.PublicProperties;
             _ = cloudRequestsEngine.EvidenceKeyFilter;
