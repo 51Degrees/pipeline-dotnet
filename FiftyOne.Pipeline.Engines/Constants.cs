@@ -45,8 +45,9 @@ namespace FiftyOne.Pipeline.Engines
         /// client-side code that can be used as evidence.
         /// </summary>
         public const string FIFTYONE_COOKIE_PREFIX = "51d_";
+
         /// <summary>
-        /// The default name of the cookie that holds the ID for the 
+        /// The default name of the cookie that holds the ID for the
         /// ASP.NET session.
         /// </summary>
         public const string DEFAULT_ASP_COOKIE_NAME = "asp.net_sessionid";

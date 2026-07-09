@@ -77,6 +77,22 @@ namespace FiftyOne.Did.Core.FlowElements
                     nameof(I51DidData.IdProbLic),
                     "Probabilistic 51Did, unique only across the caller’s license key."
                 },
+                {
+                    nameof(I51DidData.IdRandGlobal),
+                    "Random 51Did carrying a server-generated GUID, unique across all callers."
+                },
+                {
+                    nameof(I51DidData.IdRandLic),
+                    "Random 51Did carrying a server-generated GUID, scoped to the caller’s license key."
+                },
+                {
+                    nameof(I51DidData.IdHemGlobal),
+                    "Hashed-email 51Did derived from the supplied email and salt, unique across all callers."
+                },
+                {
+                    nameof(I51DidData.IdHemLic),
+                    "Hashed-email 51Did derived from the supplied email and salt, scoped to the caller’s license key."
+                },
             };
 
         private static IEnumerable<IFiftyOneAspectPropertyMetaData> BuildProperties(

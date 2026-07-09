@@ -7,27 +7,33 @@
         <member name="T:FiftyOne.Did.Model.FodId">
             <summary>
             An OWID whose payload encodes the three fields of a 51Did: a 1-byte
-            usage flags bitmask, a 4-byte little-endian License Id, and the
-            32-byte SHA-256 probabilistic value.
+            flags bitmask (usage tier and identifier type), a 4-byte
+            little-endian License Id, and the identifier value.
             </summary>
             <remarks>
             <para>
-            Terminology. The 51Did itself (this OWID envelope) is the
-            identifier. The 32-byte SHA-256 hash inside the payload is the
-            probabilistic value carried by that identifier; two responses for
-            the same device + IP + usage share the same probabilistic value
-            but differ at the byte level because the envelope embeds a fresh
-            date and signature on each call. Compare probabilistic values,
-            never full identifiers.
+            Terminology. A 51Did is described at three levels. The 51Did is
+            the identifier as a whole, meaning the concept and its rules. The
+            envelope is the data model that carries it, this OWID, holding the
+            version, domain, date, payload and signature, re-issued fresh on
+            every call. The value is the part of the envelope that is stable
+            and comparable, the payload bytes after Flags and LicenseId,
+            exposed as <see cref="P:FiftyOne.Did.Model.FodId.Hash"/>. Two responses for the same inputs
+            share the same value but differ at the byte level because the
+            envelope embeds a fresh date and signature on each call. Compare
+            values, never envelopes.
             </para>
             <para>
-            Payload layout (37 bytes):
+            Payload layout. The header (offsets 0-4) is shared by every
+            identifier type; bits 6-7 of Flags select the type and the length
+            of the value that follows:
             </para>
             <list type="table">
               <listheader><term>Offset</term><term>Length</term><term>Field</term></listheader>
-              <item><term>0</term><term>1</term><term>Flags (uint8 bit-mask)</term></item>
+              <item><term>0</term><term>1</term><term>Flags (bits 0-2 usage, bits 6-7 type)</term></item>
               <item><term>1</term><term>4</term><term>LicenseId (uint32 LE)</term></item>
-              <item><term>5</term><term>32</term><term>Hash (SHA-256)</term></item>
+              <item><term>5</term><term>32</term><term>Value: SHA-256 (Probabilistic, HashedEmail)</term></item>
+              <item><term>5</term><term>16</term><term>Value: GUID (Random)</term></item>
             </list>
             <para>
             Inherits <see cref="N:Owid"/> so callers can use OWID-level features
@@ -66,14 +72,38 @@
             Byte length of the Hash field (SHA-256).
             </summary>
         </member>
+        <member name="F:FiftyOne.Did.Model.FodId.HeaderLength">
+            <summary>
+            Byte length of the payload header (Flags + LicenseId) that is
+            common to every identifier type.
+            </summary>
+        </member>
+        <member name="F:FiftyOne.Did.Model.FodId.GuidLength">
+            <summary>
+            Byte length of the GUID value carried by Random identifiers.
+            </summary>
+        </member>
+        <member name="F:FiftyOne.Did.Model.FodId.RandomPayloadLength">
+            <summary>
+            Minimum byte length of a Random 51Did payload
+            (Flags + LicenseId + GUID).
+            </summary>
+        </member>
         <member name="F:FiftyOne.Did.Model.FodId.PayloadLength">
             <summary>
-            Minimum byte length of a 51Did payload (Flags + LicenseId + Hash).
+            Minimum byte length of a Probabilistic or HashedEmail 51Did
+            payload (Flags + LicenseId + Hash). Random payloads are
+            shorter - see <see cref="F:FiftyOne.Did.Model.FodId.RandomPayloadLength"/>.
             </summary>
         </member>
         <member name="P:FiftyOne.Did.Model.FodId.Flags">
             <summary>
             The 1-byte usage flags bit-mask from the payload.
+            </summary>
+        </member>
+        <member name="P:FiftyOne.Did.Model.FodId.Type">
+            <summary>
+            The identifier type carried in bits 6-7 of <see cref="P:FiftyOne.Did.Model.FodId.Flags"/>.
             </summary>
         </member>
         <member name="P:FiftyOne.Did.Model.FodId.LicenseId">
@@ -83,13 +113,14 @@
         </member>
         <member name="P:FiftyOne.Did.Model.FodId.Hash">
             <summary>
-            The 32-byte SHA-256 probabilistic value from the payload.
-            This is the stable field for comparing two 51Did identifiers:
-            two identifiers for the same device + IP + usage share the
-            same probabilistic value even though their wrapping envelopes
-            (date, signature) differ on every issue. Treat as the cache /
-            dedup key. SHA-256 is the underlying hash function; the
-            property is named Hash to reflect that implementation detail.
+            The value bytes from the payload, a 32-byte SHA-256 for
+            Probabilistic and HashedEmail identifiers, or 16 GUID bytes for
+            Random ones. This is the stable, comparable part of the
+            envelope. Two 51Dids for the same inputs share the same value
+            even though their envelopes (date, signature) differ on every
+            issue. Treat it as the cache / dedup key. SHA-256 is the
+            underlying hash function for the probabilistic and hashed-email
+            types, and the property is named Hash to reflect that.
             </summary>
         </member>
         <member name="M:FiftyOne.Did.Model.FodId.#ctor(System.String)">
@@ -109,8 +140,8 @@
             is not valid Base64.
             </exception>
             <exception cref="T:System.ArgumentException">
-            Thrown when the decoded payload is shorter than
-            <see cref="F:FiftyOne.Did.Model.FodId.PayloadLength"/> bytes.
+            Thrown when the decoded payload is shorter than the minimum
+            for its identifier type.
             </exception>
         </member>
         <member name="M:FiftyOne.Did.Model.FodId.#ctor(System.Byte[])">
@@ -122,8 +153,8 @@
             Thrown when <paramref name="buffer"/> is <c>null</c>.
             </exception>
             <exception cref="T:System.ArgumentException">
-            Thrown when the payload is shorter than <see cref="F:FiftyOne.Did.Model.FodId.PayloadLength"/>
-            bytes.
+            Thrown when the payload is shorter than the minimum for its
+            identifier type.
             </exception>
         </member>
         <member name="M:FiftyOne.Did.Model.FodId.#ctor(Owid.Client.Model.Owid)">
@@ -138,8 +169,82 @@
             </exception>
             <exception cref="T:System.ArgumentException">
             Thrown when <paramref name="owid"/>'s payload is shorter than
-            <see cref="F:FiftyOne.Did.Model.FodId.PayloadLength"/> bytes.
+            the minimum for its identifier type.
             </exception>
+        </member>
+        <member name="T:FiftyOne.Did.Model.FodIdExtensions">
+            <summary>
+            Extension methods for resolving a base64-encoded 51Did into a
+            <see cref="T:FiftyOne.Did.Model.FodId"/> in a single call.
+            </summary>
+            <remarks>
+            The 51Did cloud engine surfaces each identifier as a raw base64 string.
+            This overload turns that string into a parsed <see cref="T:FiftyOne.Did.Model.FodId"/> so a
+            consumer can write, for example, <c>idString.As51Did()</c>.
+            <para>
+            Error handling is delegated to the existing types rather than reinvented:
+            a value that is not a valid 51Did surfaces the <see cref="T:FiftyOne.Did.Model.FodId"/>
+            constructor's own exceptions. See the per-method remarks for the exact
+            types.
+            </para>
+            <para>
+            Note this type intentionally takes no dependency on the pipeline: a
+            caller holding an <c>IAspectPropertyValue&lt;string&gt;</c> already
+            references the engines assembly and can unwrap it with its own no-value
+            handling, e.g. <c>data.IdProbGlobal.Value.As51Did()</c>.
+            </para>
+            </remarks>
+        </member>
+        <member name="M:FiftyOne.Did.Model.FodIdExtensions.As51Did(System.String)">
+            <summary>
+            Parse a base64-encoded 51Did string into a <see cref="T:FiftyOne.Did.Model.FodId"/>.
+            </summary>
+            <param name="value">
+            The base64 OWID envelope string, as returned by the cloud service.
+            </param>
+            <returns>The parsed <see cref="T:FiftyOne.Did.Model.FodId"/>.</returns>
+            <exception cref="T:System.ArgumentNullException">
+            Thrown (by the <see cref="T:FiftyOne.Did.Model.FodId"/> constructor) when
+            <paramref name="value"/> is <c>null</c>.
+            </exception>
+            <exception cref="T:System.FormatException">
+            Thrown (by the <see cref="T:FiftyOne.Did.Model.FodId"/> constructor) when
+            <paramref name="value"/> is not valid Base64.
+            </exception>
+            <exception cref="T:System.ArgumentException">
+            Thrown (by the <see cref="T:FiftyOne.Did.Model.FodId"/> constructor) when the decoded
+            payload is shorter than the minimum for its identifier type.
+            </exception>
+        </member>
+        <member name="T:FiftyOne.Did.Model.IdType">
+            <summary>
+            The identifier type carried in bits 6-7 of the 51Did flags byte.
+            Existing identifiers were issued with these bits zeroed, so they
+            decode as <see cref="F:FiftyOne.Did.Model.IdType.Probabilistic"/>.
+            </summary>
+        </member>
+        <member name="F:FiftyOne.Did.Model.IdType.Probabilistic">
+            <summary>
+            Derived from the device fingerprint and IP address.
+            Payload carries a 32-byte SHA-256 value.
+            </summary>
+        </member>
+        <member name="F:FiftyOne.Did.Model.IdType.Random">
+            <summary>
+            A server-generated random GUID. Payload carries 16 GUID bytes.
+            </summary>
+        </member>
+        <member name="F:FiftyOne.Did.Model.IdType.HashedEmail">
+            <summary>
+            Derived from the caller-supplied email and salt.
+            Payload carries a 32-byte SHA-256 value.
+            </summary>
+        </member>
+        <member name="F:FiftyOne.Did.Model.IdType.Reserved">
+            <summary>
+            Not yet assigned. Parsed best-effort: the header fields are
+            unpacked and the remaining payload bytes are exposed as-is.
+            </summary>
         </member>
         <member name="F:Owid.Client.Constants.BaseDate">
             <summary>

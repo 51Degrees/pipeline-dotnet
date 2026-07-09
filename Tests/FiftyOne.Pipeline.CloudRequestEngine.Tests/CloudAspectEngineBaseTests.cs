@@ -50,11 +50,15 @@ namespace FiftyOne.Pipeline.CloudRequestEngine.Tests
         /// Expected properties error, duplicated here as error Messages has 
         /// internal access modifier.
         /// </summary>
-        private static readonly string PropertiesError = 
-            "Failed to load aspect properties for element '{0}'. This is " +
-            "because your resource key does not include access to any " +
-            "properties under '{0}'. For more details on resource keys, " +
-            "see our explainer: https://51degrees.com/documentation/_info__resource_keys.html?utm_source=code&utm_medium=comment&utm_campaign=pipeline-dotnet&utm_content=fiftyone.pipeline.cloudrequestengine-messages.resx&utm_term=exceptionfailedtoloadproperties";
+        private static readonly string PropertiesError =
+            "Failed to load properties for '{0}'. This usually means your " +
+            "resource key does not include access to any properties under " +
+            "'{0}'. Check or create a resource key with the properties you " +
+            "need in the configurator at " +
+            "https://configure.51degrees.com?utm_source=code&utm_medium=comment" +
+            "&utm_campaign=pipeline-dotnet&utm_content=fiftyone.pipeline." +
+            "cloudrequestengine-messages.resx&utm_term=" +
+            "exceptionfailedtoloadproperties.";
 
         #region Test Classes
 

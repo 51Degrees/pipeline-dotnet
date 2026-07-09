@@ -962,7 +962,6 @@ namespace FiftyOne.Pipeline.Core.Tests.Data
 
         public interface IDisposableData : IElementData, IDisposable
         {
-
         }
 
         /// <summary>

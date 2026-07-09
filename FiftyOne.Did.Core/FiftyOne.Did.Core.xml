@@ -22,6 +22,30 @@
             unique only across the caller’s license key.
             </summary>
         </member>
+        <member name="P:FiftyOne.Did.Core.Data.I51DidData.IdRandGlobal">
+            <summary>
+            Random 51Did carrying a server-generated GUID,
+            unique across all callers.
+            </summary>
+        </member>
+        <member name="P:FiftyOne.Did.Core.Data.I51DidData.IdRandLic">
+            <summary>
+            Random 51Did carrying a server-generated GUID,
+            scoped to the caller’s license key.
+            </summary>
+        </member>
+        <member name="P:FiftyOne.Did.Core.Data.I51DidData.IdHemGlobal">
+            <summary>
+            Hashed-email 51Did derived from the supplied email and salt,
+            unique across all callers.
+            </summary>
+        </member>
+        <member name="P:FiftyOne.Did.Core.Data.I51DidData.IdHemLic">
+            <summary>
+            Hashed-email 51Did derived from the supplied email and salt,
+            scoped to the caller’s license key.
+            </summary>
+        </member>
         <member name="T:FiftyOne.Did.Core.FlowElements.DidBaseEnginePropertiesBuilder">
             <summary>
             Helper class that builds metadata

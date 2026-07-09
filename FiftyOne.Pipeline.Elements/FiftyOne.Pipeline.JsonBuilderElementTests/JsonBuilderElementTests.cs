@@ -526,9 +526,10 @@ namespace FiftyOne.Pipeline.JsonBuilderElementTests
                 "& ampersand &",
                 "\\ backslash \\",
                 "   tabs  ",
-                @"
-carriage return and new line  
-",
+                // Explicit escapes (not a verbatim multi-line literal) so the value
+                // is LF regardless of this file's line endings, keeping expected and
+                // actual JSON in agreement on both LF and CRLF checkouts.
+                "\ncarriage return and new line  \n",
                 "{ \"json\": [ \"text\", \"abc\" ] }"
             };
             List<string> ipPropertyValues = new() {
@@ -584,8 +585,7 @@ carriage return and new line
             string expectedValue = (valueOfProperty ?? "null").Replace(@"\", @"\\");
             expectedValue = expectedValue.Replace(@"""", @"\""");
             expectedValue = expectedValue.Replace(@"    ", @"\  ");
-            expectedValue = expectedValue.Replace(@"
-", @"\r\n");
+            expectedValue = expectedValue.Replace("\n", @"\r\n");
 
             // Replacing as there is no carriage return in Linux format.
             expectedValue = expectedValue.Replace(@"\r", @"");

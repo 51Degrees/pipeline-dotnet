@@ -347,7 +347,7 @@ namespace FiftyOne.Pipeline.Engines.FiftyOne.FlowElements
         }
 
         /// <summary>
-        /// This setting can be used to stop the usage sharing element 
+        /// This setting can be used to stop the usage sharing element
         /// from sharing anything about specific requests.
         /// For example, if you wanted to stop sharing any details from 
         /// requests where the user-agent header was 'ABC', you would 

@@ -118,6 +118,6 @@
     <value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
   </resheader>
   <data name="ExceptionSequenceNumberNotPresent" xml:space="preserve">
-    <value>The value for the ‘sequence’ parameter could not found. See https://51degrees.com/documentation/_info__error_messages.html?utm_source=code&amp;utm_medium=comment&amp;utm_campaign=pipeline-dotnet&amp;utm_content=fiftyone.pipeline.elements-fiftyone.pipeline.jsonbuilderelement-messages.resx&amp;utm_term=exceptionsequencenumbernotpresent#Sequence_value_not_found for more information.</value>
+    <value>The value for the 'sequence' parameter could not be found. See https://51degrees.com/documentation/4.5/_services__cloud__error_messages.html?utm_source=code&amp;utm_medium=comment&amp;utm_campaign=pipeline-dotnet&amp;utm_content=fiftyone.pipeline.elements-fiftyone.pipeline.jsonbuilderelement-messages.resx&amp;utm_term=exceptionsequencenumbernotpresent for more information.</value>
   </data>
 </root>

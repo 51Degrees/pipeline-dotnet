@@ -79,9 +79,26 @@ namespace FiftyOne.Pipeline.Engines.FiftyOne.Data
         private HashSet<string> _includedQueryStringParams = new HashSet<string>();
 
         /// <summary>
+        /// Evidence keys that are never shared, regardless of the share-all
+        /// setting. These carry caller-supplied secrets (the raw email and
+        /// salt used to derive hashed-email identifiers) that must not leave
+        /// the server. They are matched on a whole-segment boundary by
+        /// <see cref="Include"/>, so both the bare key and any prefixed form
+        /// ('id.email', 'query.id.email', 'header.id.email') are excluded
+        /// while an unrelated key such as 'query.valid.email' is not.
+        /// </summary>
+        private static readonly string[] _neverSharedEvidenceKeys = new[]
+        {
+            "id.email",
+            "id.salt",
+        };
+
+        /// <summary>
         /// Constructor
-        /// Using this constructor will create a filter that allows all 
-        /// evidence. I.e. All evidence will be shared.
+        /// Using this constructor will create a filter that allows all
+        /// evidence. I.e. All evidence will be shared, except for the
+        /// hard-coded exceptions that <see cref="Include"/> never shares
+        /// regardless of this setting (such as caller-supplied personal data).
         /// </summary>
         public EvidenceKeyFilterShareUsage()
         {
@@ -105,10 +122,10 @@ namespace FiftyOne.Pipeline.Engines.FiftyOne.Data
         /// the filter.
         /// </param>
         /// <param name="aspSessionCookieName">
-        /// The name of the cookie that contains the asp.net session id. 
+        /// The name of the cookie that contains the asp.net session id.
         /// </param>
-        [System.Diagnostics.CodeAnalysis.SuppressMessage("Globalization", 
-            "CA1308:Normalize strings to uppercase", 
+        [System.Diagnostics.CodeAnalysis.SuppressMessage("Globalization",
+            "CA1308:Normalize strings to uppercase",
             Justification = "Pipeline specification requires keys to be " +
                 "all lower-case")]
         public EvidenceKeyFilterShareUsage(
@@ -170,6 +187,20 @@ namespace FiftyOne.Pipeline.Engines.FiftyOne.Data
             if(key == null)
             {
                 throw new ArgumentNullException(nameof(key));
+            }
+
+            // Caller-supplied secrets (the raw email and salt) must never
+            // leave the server, even when every other piece of evidence is
+            // shared. Matched on a whole-segment boundary - the bare key or
+            // a separator-prefixed form - so 'query.valid.email' is not
+            // mistaken for the 'id.email' secret. Checked before the
+            // share-all short-circuit below so it applies in every mode.
+            if (Array.Exists(_neverSharedEvidenceKeys, neverShared =>
+                key.Equals(neverShared, StringComparison.OrdinalIgnoreCase)
+                || key.EndsWith(Core.Constants.EVIDENCE_SEPERATOR + neverShared,
+                    StringComparison.OrdinalIgnoreCase)))
+            {
+                return false;
             }
 
             bool result = _shareAll;

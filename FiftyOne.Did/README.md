@@ -1,35 +1,50 @@
 # FiftyOne.Did
 
-Strongly-typed .NET parser for the 51Did (51Degrees device identifier)
+Strongly-typed .NET parser for the 51Did (51Degrees Identifier)
 returned by the 51Degrees Cloud service.
 
 ## Terminology
 
-The 51Did has two layers. The wording below treats them as distinct.
+A 51Did is described at three levels, and the wording below is used
+deliberately.
 
-- The **51Did** is the **identifier**. The whole base64 OWID envelope
-  (version, domain, date, payload, signature). It changes byte-for-byte
-  every time the cloud issues one, even for the same inputs, because
-  the date and signature change with each call.
-- The **probabilistic value** is one of the fields *inside* the payload
-  (a 32-byte SHA-256 hash). It is stable across reissues for the same
-  device + IP + usage: if two 51Dids were issued for the same inputs,
-  their probabilistic values are equal even though the wrapping
-  identifiers differ.
+- The **51Did** (51Degrees Identifier) is the identifier as a whole,
+  meaning the concept together with the rules for how it is issued,
+  compared and licensed. "A 51Did" means the identifier in this complete
+  sense, not any single field.
+- The **envelope** (also called the **wrapper**) is the data model that
+  carries a 51Did. It is a signed OWID holding the version, domain, date,
+  payload and signature, and it changes byte-for-byte every time the cloud
+  issues one, even for the same inputs, because the date and signature
+  change with each call.
+- The **value** is the part of the envelope that is stable and comparable.
+  It is the payload bytes after Flags and LicenseId, a 32-byte SHA-256 for
+  Probabilistic and HashedEmail identifiers, or a 16-byte GUID for Random.
+  Two 51Dids for the same inputs share the same value even though their
+  envelopes differ.
 
-Comparing two browsers means comparing the probabilistic values
-carried inside their identifiers, never the identifiers themselves.
-Calling either layer "the identifier" without qualification leads to
-incorrect comparisons; calling the inner field "the probabilistic
-identifier" is the same conflation in a different costume.
+Comparing two 51Dids means comparing their values, never their envelopes.
 
 ## Payload layout
 
-| Offset | Length | Field      | Type                                  |
-|-------:|-------:|------------|---------------------------------------|
-|      0 |      1 | Flags      | uint8 usage-flags bit-mask            |
-|      1 |      4 | LicenseId  | uint32 (little-endian)                |
-|      5 |     32 | Hash       | 32 bytes, SHA-256 probabilistic value |
+The header is shared by every identifier type; bits 6-7 of Flags
+select the type and the length of the value that follows.
+
+| Offset | Length | Field      | Type                                            |
+|-------:|-------:|------------|-------------------------------------------------|
+|      0 |      1 | Flags      | uint8: bits 0-2 usage, bits 6-7 identifier type |
+|      1 |      4 | LicenseId  | uint32 (little-endian)                          |
+|      5 |  16/32 | Value      | SHA-256 (Probabilistic, HashedEmail) or GUID bytes (Random) |
+
+| Bits 7-6 | `FodId.Type`    | Value length | Minimum payload |
+|---------:|-----------------|-------------:|----------------:|
+|     `00` | `Probabilistic` |           32 |              37 |
+|     `01` | `Random`        |           16 |              21 |
+|     `10` | `HashedEmail`   |           32 |              37 |
+|     `11` | `Reserved`      |    remainder |               5 |
+
+Identifiers issued before the type tag existed have bits 6-7 zeroed
+and decode as `Probabilistic`.
 
 `FodId` inherits from `Owid.Client.Model.Owid` (see
 [SWAN-community/owid-dotnet](https://github.com/SWAN-community/owid-dotnet)),
@@ -46,8 +61,9 @@ using FiftyOne.Did.Model;
 var fodId = new FodId(base64FromCloudService);
 
 byte    flags     = fodId.Flags;
+IdType  type      = fodId.Type;        // Probabilistic / Random / HashedEmail
 uint    licenseId = fodId.LicenseId;
-byte[]  hash      = fodId.Hash;        // 32-byte probabilistic value
+byte[]  hash      = fodId.Hash;        // SHA-256 or GUID bytes, see Type
 
 // Inherited OWID-level fields.
 string   domain   = fodId.Domain;
@@ -64,13 +80,13 @@ string   roundTrip = fodId.AsBase64();
 var a = new FodId(idprobglobalA);
 var b = new FodId(idprobglobalB);
 
-// Wrapper bytes (Domain, Date, Signature) ARE different; the
-// identifier itself is not stable across reissues:
+// Envelope bytes (Domain, Date, Signature) ARE different. The
+// envelope is not stable across reissues:
 bool sameDate = a.Date == b.Date;                           // false
 bool sameSig  = a.Signature.SequenceEqual(b.Signature);     // false
 
-// The probabilistic value inside the payload IS stable; this is
-// what you actually compare:
+// The value inside the payload IS stable. This is what you
+// actually compare:
 bool sameValue = a.Hash.SequenceEqual(b.Hash);              // true
 ```
 
@@ -95,4 +111,4 @@ Key (for `idproblic`) or across all callers (for `idprobglobal`).
   with signature verification and a "Live 51d.es v3" sample.
 - The [51Did comparer](https://51degrees.com/developers/51did-comparer?utm_source=github&utm_medium=readme&utm_campaign=pipeline-dotnet&utm_content=fiftyone.did-readme.md&utm_term=see-also)
   for a side-by-side, byte-by-byte comparison of two 51Dids that
-  highlights the wrapper-vs-value distinction in action.
+  highlights the envelope-vs-value distinction in action.

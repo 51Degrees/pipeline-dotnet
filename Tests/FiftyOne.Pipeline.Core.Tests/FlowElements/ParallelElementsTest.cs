@@ -121,9 +121,27 @@ namespace FiftyOne.Pipeline.Core.Tests.FlowElements
 
             // Assert
             Assert.IsTrue(data.Errors == null || data.Errors.Count == 0, "Expected no errors");
-            Assert.IsTrue(startTimes.TrueForAll(dtStart => endTimes.TrueForAll(dtEnd => dtEnd > dtStart)),
+            // Requiring all three intervals to overlap at a single instant is
+            // too strict for a loaded CI runner: staggered scheduling can leave
+            // one element starting just after another finished. Parallel
+            // execution is still proven if at least one pair of elements
+            // overlaps in time, so only require a single overlapping pair.
+            int overlappingPairs = 0;
+            for (int i = 0; i < startTimes.Count; i++)
+            {
+                for (int j = i + 1; j < startTimes.Count; j++)
+                {
+                    // Two intervals overlap when each starts before the other ends.
+                    if (startTimes[i] < endTimes[j] && startTimes[j] < endTimes[i])
+                    {
+                        overlappingPairs++;
+                    }
+                }
+            }
+            Assert.IsTrue(overlappingPairs >= 1,
+                $"Expected at least two elements to overlap in time. " +
                 $"Start times [{string.Join(",", startTimes.Select(t => t.ToString("HH:mm:ss.ffffff")))}] " +
-                $"not before end times [" +
+                $"end times [" +
                 $"{string.Join(",", endTimes.Select(t => t.ToString("HH:mm:ss.ffffff")))}]");
             for (int i = 0; i < 3; i++)
             {

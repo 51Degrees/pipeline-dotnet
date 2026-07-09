@@ -134,12 +134,7 @@ namespace FiftyOne.Pipeline.JavaScript.Tests
             capturedPostData = null;
             IJavaScriptExecutor js = Driver;
             var q = js.ExecuteScript(BuildXHRJS($"{ClientServerUrl}51dpipeline/json"));
-            while (capturedPostData == null)
-            {
-                DumpNewLogs();
-                Thread.Sleep(1000);
-            }
-            DumpNewLogs();
+            WaitUntil(() => capturedPostData != null, "POST data from intercepted XHR");
             Assert.IsNotNull(capturedPostData);
         }
 
@@ -240,34 +235,22 @@ namespace FiftyOne.Pipeline.JavaScript.Tests
             capturedCompleted = false;
             Action<string> WaitAndValidatePostData = (expectedData) =>
             {
-                while (capturedPostData == null)
-                {
-                    DumpNewLogs();
-                    Thread.Sleep(1000);
-                }
+                WaitUntil(() => capturedPostData != null, $"POST data containing [{expectedData}]");
                 Assert.IsTrue(capturedPostData.Contains(expectedData), $"[{capturedPostData}] does not contain [{expectedData}]");
             };
             Action WaitAndValidateScriptCompletion = () => {
-                while (!capturedCompleted)
-                {
-                    DumpNewLogs();
-                    Thread.Sleep(1000);
-                }
+                WaitUntil(() => capturedCompleted, "script completion callback");
             };
             IJavaScriptExecutor js = Driver;
             Action<string> WaitAndValidateSnippetCalled = (testCode) =>
             {
-                while (true)
+                object lastResult = null;
+                WaitUntil(() =>
                 {
-                    var objResult = js.ExecuteScript(testCode);
-                    if (objResult is bool newResult)
-                    {
-                        Assert.IsTrue(newResult);
-                        break;
-                    }
-                    DumpNewLogs();
-                    Thread.Sleep(1000);
-                };
+                    lastResult = js.ExecuteScript(testCode);
+                    return lastResult is bool;
+                }, $"snippet flag from [{testCode}]");
+                Assert.IsTrue((bool)lastResult);
             };
 
             string additionalCode
@@ -340,6 +323,30 @@ namespace FiftyOne.Pipeline.JavaScript.Tests
             {
                 Assert.Fail($"Detected cookies after script completion: {cookieCount}");
             }
+        }
+
+        private static readonly TimeSpan WaitTimeout = TimeSpan.FromSeconds(60);
+
+        /// <summary>
+        /// Polls <paramref name="condition"/> until it returns true or
+        /// <see cref="WaitTimeout"/> elapses, failing the test on timeout.
+        /// Replaces the previous unbounded spin loops: those would hang until the
+        /// runner's hang-dump aborted the thread mid-WebDriver-command, crashing
+        /// the shared Chrome tab and poisoning every later test in the class.
+        /// </summary>
+        private void WaitUntil(Func<bool> condition, string description)
+        {
+            var deadline = DateTime.UtcNow + WaitTimeout;
+            while (!condition())
+            {
+                DumpNewLogs();
+                if (DateTime.UtcNow >= deadline)
+                {
+                    Assert.Fail($"Timed out after {WaitTimeout.TotalSeconds:0}s waiting for {description}.");
+                }
+                Thread.Sleep(1000);
+            }
+            DumpNewLogs();
         }
 
         private void DumpNewLogs()

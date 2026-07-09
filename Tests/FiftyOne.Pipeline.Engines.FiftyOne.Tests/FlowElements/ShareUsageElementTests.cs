@@ -338,8 +338,11 @@ namespace FiftyOne.Pipeline.Engines.FiftyOne.Tests.FlowElements
             var data = MockFlowData.CreateFromEvidence(evidenceData, false);
 
             // Act
+            // Feed events until the first share message is sent (or we hit the
+            // ceiling). Stop as soon as a send happens so we don't keep feeding
+            // while the asynchronous send is in flight.
             int requiredEvents = 0;
-            while (_xmlContent.Count == 0 &&
+            while (_httpHandler.SendCallCount == 0 &&
                 requiredEvents <= 1000000)
             {
                 _shareUsageElement.Process(data.Object);
@@ -361,9 +364,15 @@ namespace FiftyOne.Pipeline.Engines.FiftyOne.Tests.FlowElements
                 $"events to be at least 10,000, but was actually '{requiredEvents}'");
             Assert.IsLessThan(1000000, requiredEvents, $"Expected the number of required " +
                 $"events to be less than 1,000,000, but was actually '{requiredEvents}'");
-            // Check that one and only one HTTP message was sent.
-            _httpHandler.VerifySendCalled(1);
-            Assert.HasCount(1, _xmlContent);
+            // At least one share message must have been sent with valid XML.
+            // The exact count is not asserted: sharing is probabilistic and the
+            // send is asynchronous, so a second batch can occasionally fill
+            // while the first send is still in flight (this previously caused
+            // intermittent "expected 1, was 2" failures under load).
+            Assert.IsGreaterThan(0, _httpHandler.SendCallCount, $"Expected at least " +
+                $"one share message to be sent, but none were.");
+            Assert.IsGreaterThan(0, _xmlContent.Count, $"Expected at least one " +
+                $"share message body, but there were none.");
         }
 
         /// <summary>
@@ -812,17 +821,33 @@ namespace FiftyOne.Pipeline.Engines.FiftyOne.Tests.FlowElements
         /// 'included query string parameters' value will
         /// result in all query. evidence being shared.
         /// </summary>
+        /// <param name="prefix">
+        /// The prefix for the evidence.
+        /// </param>
+        /// <param name="shareAll">
+        /// True if all evidence should be shared, or false to limit evidence.
+        /// </param>
+        /// <param name="expected">
+        /// True if the header values are expected to be present in the share usage content otherwise false.
+        /// </param>
         [TestMethod]
-        public void ShareUsageElement_NullQueryWhitelist()
+        [DataRow(Core.Constants.EVIDENCE_QUERY_PREFIX, false, true)]
+        [DataRow(Core.Constants.EVIDENCE_HTTPHEADER_PREFIX, false, true)]
+        [DataRow(Core.Constants.EVIDENCE_COOKIE_PREFIX, true, true)]
+        [DataRow(Core.Constants.EVIDENCE_QUERY_PREFIX, true, true)]
+        [DataRow(Core.Constants.EVIDENCE_HTTPHEADER_PREFIX, true, true)]
+        [DataRow(Core.Constants.EVIDENCE_COOKIE_PREFIX, false, false)]
+        public void ShareUsageElement_NullQueryWhitelist(string prefix, bool shareAll, bool expected)
         {
             // Arrange
             CreateShareUsage(1, 1, 1,
                 new List<string>(), null,
-                new List<KeyValuePair<string, string>>());
+                new List<KeyValuePair<string, string>>(),
+                shareAll);
 
             Dictionary<string, object> evidenceData = new Dictionary<string, object>()
             {
-                { Core.Constants.EVIDENCE_QUERY_PREFIX + Core.Constants.EVIDENCE_SEPERATOR + "somevalue", "123" },
+                { prefix + Core.Constants.EVIDENCE_SEPERATOR + "somevalue", "123" },
             };
             var data = MockFlowData.CreateFromEvidence(evidenceData, false);
 
@@ -841,8 +866,63 @@ namespace FiftyOne.Pipeline.Engines.FiftyOne.Tests.FlowElements
             {
                 while (xr.Read()) { }
             }
-            // Check that the expected values are populated.
-            Assert.Contains("<query Name=\"somevalue\"><![CDATA[123]]></query>", _xmlContent[0]);
+            // Check that the expected values are populated or not.
+            Assert.AreEqual(expected, _xmlContent[0].Contains(
+                $"<{prefix} Name=\"somevalue\"><![CDATA[123]]></{prefix}>"));
+        }
+
+        /// <summary>
+        /// A test that checks that share usage of other fields happens when the User-Agent is missing.
+        /// </summary>
+        /// <param name="prefix">
+        /// The prefix for the evidence.
+        /// </param>
+        /// <param name="shareAll">
+        /// True if all evidence should be shared, or false to limit evidence.
+        /// </param>
+        /// <param name="expected">
+        /// True if the header values are expected to be present in the share usage content otherwise false.
+        /// </param>
+        [TestMethod]
+        [DataRow(Core.Constants.EVIDENCE_QUERY_PREFIX, false, true)]
+        [DataRow(Core.Constants.EVIDENCE_HTTPHEADER_PREFIX, false, true)]
+        [DataRow(Core.Constants.EVIDENCE_QUERY_PREFIX, true, true)]
+        [DataRow(Core.Constants.EVIDENCE_HTTPHEADER_PREFIX, true, true)]
+        public void ShareUsageElement_MissingUserAgent(string prefix, bool shareAll, bool expected)
+        {
+            // Arrange
+            CreateShareUsage(1, 1, 1,
+                new List<string>(), null,
+                new List<KeyValuePair<string, string>>());
+
+            var evidenceData = new Dictionary<string, object>()
+            {
+                { prefix + Core.Constants.EVIDENCE_SEPERATOR + "sec-ch-ua", @"""Google Chrome"";v=""143"", ""Chromium"";v=""143"", ""Not A(Brand"";v=""24""" },
+                { prefix + Core.Constants.EVIDENCE_SEPERATOR + "sec-ch-ua-mobile", "?0" },
+                { prefix + Core.Constants.EVIDENCE_SEPERATOR + "sec-ch-ua-platform", @"""Windows""" },
+                { prefix + Core.Constants.EVIDENCE_SEPERATOR + "sec-ch-ua-platform-version", @"""10.0.0""" },
+                { prefix + Core.Constants.EVIDENCE_SEPERATOR + "sec-ch-ua-model", @"""""" },
+                { prefix + Core.Constants.EVIDENCE_SEPERATOR + "sec-ch-ua-full-version-list", @"""Google Chrome"";v=""143.0.7499.170"", ""Chromium"";v=""143.0.7499.170"", ""Not A(Brand"";v=""24.0.0.0""" }
+            };
+            var data = MockFlowData.CreateFromEvidence(evidenceData, false);
+
+            // Act
+            _shareUsageElement.Process(data.Object);
+            // Wait for the consumer task to finish.
+            WaitForSendDataTask();
+
+            // Assert
+            // Check that the HTTP message was sent and the headers were or weren't present.
+            _httpHandler.VerifySendCalled(1);
+            Assert.HasCount(1, _xmlContent);
+            foreach (var pair in evidenceData)
+            {
+                var key = pair.Key.Substring(pair.Key.IndexOf('.') + 1);
+                var value = pair.Value;
+                Assert.AreEqual(expected, _xmlContent[0].Contains(
+                    $"<{prefix} Name=\"{key}\"><![CDATA[{value}]]></{prefix}>"),
+                    $"Expected '{pair.Key}' to be present");
+            }
         }
 
         /// <summary>

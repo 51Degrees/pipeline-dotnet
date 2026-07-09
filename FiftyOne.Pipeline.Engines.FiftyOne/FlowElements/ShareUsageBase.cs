@@ -644,9 +644,11 @@ namespace FiftyOne.Pipeline.Engines.FiftyOne.FlowElements
                 }
 
                 _evidenceKeyFilter = new EvidenceKeyFilterShareUsage(
-                    blockedHttpHeaders, includedQueryStringParameters, true, aspSessionCookieName);
+                    blockedHttpHeaders, includedQueryStringParameters, true,
+                    aspSessionCookieName);
                 _evidenceKeyFilterExclSession = new EvidenceKeyFilterShareUsage(
-                    blockedHttpHeaders, includedQueryStringParameters, false, aspSessionCookieName);
+                    blockedHttpHeaders, includedQueryStringParameters, false,
+                    aspSessionCookieName);
 
                 _ignoreDataEvidenceFilter = ignoreDataEvidenceFilter;
 

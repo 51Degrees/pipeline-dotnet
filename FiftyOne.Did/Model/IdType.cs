@@ -1,4 +1,4 @@
-﻿/* *********************************************************************
+/* *********************************************************************
  * This Original Work is copyright of 51 Degrees Mobile Experts Limited.
  * Copyright 2026 51 Degrees Mobile Experts Limited, Davidson House,
  * Forbury Square, Reading, Berkshire, United Kingdom RG1 3EU.
@@ -20,50 +20,36 @@
  * such notice(s) shall fulfill the requirements of that article.
  * ********************************************************************* */
 
-using FiftyOne.Pipeline.Engines.Data;
-
-namespace FiftyOne.Did.Core.Data
+namespace FiftyOne.Did.Model
 {
     /// <summary>
-    /// Contains IDs related to the user.
+    /// The identifier type carried in bits 6-7 of the 51Did flags byte.
+    /// Existing identifiers were issued with these bits zeroed, so they
+    /// decode as <see cref="Probabilistic"/>.
     /// </summary>
-    public interface I51DidData : IAspectData
+    public enum IdType : byte
     {
         /// <summary>
-        /// Probabilistic 51Did,
-        /// unique across all callers
-        /// from the same device and network.
+        /// Derived from the device fingerprint and IP address.
+        /// Payload carries a 32-byte SHA-256 value.
         /// </summary>
-        IAspectPropertyValue<string> IdProbGlobal { get; }
+        Probabilistic = 0,
 
         /// <summary>
-        /// Probabilistic 51Did,
-        /// unique only across the caller’s license key.
+        /// A server-generated random GUID. Payload carries 16 GUID bytes.
         /// </summary>
-        IAspectPropertyValue<string> IdProbLic { get; }
+        Random = 1,
 
         /// <summary>
-        /// Random 51Did carrying a server-generated GUID,
-        /// unique across all callers.
+        /// Derived from the caller-supplied email and salt.
+        /// Payload carries a 32-byte SHA-256 value.
         /// </summary>
-        IAspectPropertyValue<string> IdRandGlobal { get; }
+        HashedEmail = 2,
 
         /// <summary>
-        /// Random 51Did carrying a server-generated GUID,
-        /// scoped to the caller’s license key.
+        /// Not yet assigned. Parsed best-effort: the header fields are
+        /// unpacked and the remaining payload bytes are exposed as-is.
         /// </summary>
-        IAspectPropertyValue<string> IdRandLic { get; }
-
-        /// <summary>
-        /// Hashed-email 51Did derived from the supplied email and salt,
-        /// unique across all callers.
-        /// </summary>
-        IAspectPropertyValue<string> IdHemGlobal { get; }
-
-        /// <summary>
-        /// Hashed-email 51Did derived from the supplied email and salt,
-        /// scoped to the caller’s license key.
-        /// </summary>
-        IAspectPropertyValue<string> IdHemLic { get; }
+        Reserved = 3,
     }
 }
