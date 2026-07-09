@@ -97,9 +97,9 @@ namespace FiftyOne.Pipeline.Core.Tests.Data
             using var flowData = new FlowData(_logger.Object, _pipeline.Object,
                 new Evidence(new Mock<ILogger<Evidence>>().Object), externalCts.Token);
 
-            Assert.IsFalse(flowData.GetStopToken().IsCancellationRequested);
+            Assert.IsFalse(flowData.GetPipelineStopToken().IsCancellationRequested);
             externalCts.Cancel();
-            Assert.IsTrue(flowData.GetStopToken().IsCancellationRequested);
+            Assert.IsTrue(flowData.GetPipelineStopToken().IsCancellationRequested);
 #pragma warning disable CS0618 // Stop is obsolete
             Assert.IsTrue(flowData.Stop);
 #pragma warning restore CS0618
@@ -111,27 +111,27 @@ namespace FiftyOne.Pipeline.Core.Tests.Data
         [TestMethod]
         public void FlowData_SettingStop_CancelsTokenSource()
         {
-            Assert.IsFalse(_flowData.GetStopToken().IsCancellationRequested);
+            Assert.IsFalse(_flowData.GetPipelineStopToken().IsCancellationRequested);
 #pragma warning disable CS0618 // Stop is obsolete
             _flowData.Stop = true;
 #pragma warning restore CS0618
-            Assert.IsTrue(_flowData.GetStopToken().IsCancellationRequested);
+            Assert.IsTrue(_flowData.GetPipelineStopToken().IsCancellationRequested);
         }
 
         /// <summary>
-        /// GetStopToken must stay safe after Dispose: reading the stop token
+        /// GetPipelineStopToken must stay safe after Dispose: reading the stop token
         /// of an already disposed flow data must not throw
         /// ObjectDisposedException.
         /// </summary>
         [TestMethod]
-        public void FlowData_GetStopToken_AfterDispose_DoesNotThrow()
+        public void FlowData_GetPipelineStopToken_AfterDispose_DoesNotThrow()
         {
             var flowData = new FlowData(_logger.Object, _pipeline.Object,
                 new Evidence(new Mock<ILogger<Evidence>>().Object));
 
             flowData.Dispose();
 
-            var token = flowData.GetStopToken();
+            var token = flowData.GetPipelineStopToken();
             Assert.IsFalse(token.IsCancellationRequested);
         }
 
@@ -139,9 +139,9 @@ namespace FiftyOne.Pipeline.Core.Tests.Data
         /// A fresh flow data is not stopped (its stop token is not cancelled).
         /// </summary>
         [TestMethod]
-        public void FlowData_GetStopToken_NoCancellation_NotRequested()
+        public void FlowData_GetPipelineStopToken_NoCancellation_NotRequested()
         {
-            Assert.IsFalse(_flowData.GetStopToken().IsCancellationRequested);
+            Assert.IsFalse(_flowData.GetPipelineStopToken().IsCancellationRequested);
         }
 
         /// <summary>
@@ -152,7 +152,7 @@ namespace FiftyOne.Pipeline.Core.Tests.Data
         {
             _flowData.SetStopToken(new CancellationToken(canceled: true));
 
-            Assert.IsTrue(_flowData.GetStopToken().IsCancellationRequested);
+            Assert.IsTrue(_flowData.GetPipelineStopToken().IsCancellationRequested);
         }
 
         /// <summary>
@@ -164,10 +164,10 @@ namespace FiftyOne.Pipeline.Core.Tests.Data
             using var external = new CancellationTokenSource();
 
             _flowData.SetStopToken(external.Token);
-            Assert.IsFalse(_flowData.GetStopToken().IsCancellationRequested);
+            Assert.IsFalse(_flowData.GetPipelineStopToken().IsCancellationRequested);
 
             external.Cancel();
-            Assert.IsTrue(_flowData.GetStopToken().IsCancellationRequested);
+            Assert.IsTrue(_flowData.GetPipelineStopToken().IsCancellationRequested);
         }
 
         /// <summary>
@@ -186,22 +186,22 @@ namespace FiftyOne.Pipeline.Core.Tests.Data
 
             // The superseded token must no longer affect the flow data.
             first.Cancel();
-            Assert.IsFalse(_flowData.GetStopToken().IsCancellationRequested);
+            Assert.IsFalse(_flowData.GetPipelineStopToken().IsCancellationRequested);
 
             second.Cancel();
-            Assert.IsTrue(_flowData.GetStopToken().IsCancellationRequested);
+            Assert.IsTrue(_flowData.GetPipelineStopToken().IsCancellationRequested);
         }
 
         /// <summary>
-        /// GetStopToken reflects the current stop state.
+        /// GetPipelineStopToken reflects the current stop state.
         /// </summary>
         [TestMethod]
-        public void FlowData_GetStopToken_TracksCancellation()
+        public void FlowData_GetPipelineStopToken_TracksCancellation()
         {
-            Assert.IsFalse(_flowData.GetStopToken().IsCancellationRequested);
+            Assert.IsFalse(_flowData.GetPipelineStopToken().IsCancellationRequested);
 
             _flowData.SetStopToken(new CancellationToken(canceled: true));
-            Assert.IsTrue(_flowData.GetStopToken().IsCancellationRequested);
+            Assert.IsTrue(_flowData.GetPipelineStopToken().IsCancellationRequested);
         }
 
         /// <summary>

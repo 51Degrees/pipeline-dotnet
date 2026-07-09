@@ -46,7 +46,7 @@ namespace FiftyOne.Pipeline.Core.Data
         /// <exception cref="ArgumentNullException">
         /// Thrown if the supplied data is null.
         /// </exception>
-        public static CancellationToken GetStopToken(this IFlowData data)
+        public static CancellationToken GetPipelineStopToken(this IFlowData data)
         {
             if (data == null)
             {

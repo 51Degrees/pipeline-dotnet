@@ -29,7 +29,7 @@ namespace FiftyOne.Pipeline.Core.FlowElements
     /// <summary>
     /// Extension methods for <see cref="IPipeline"/>.
     /// </summary>
-    public static class PipelineExtensions
+    public static class PipelineCancellationExtensions
     {
         /// <summary>
         /// Create a new flow data that stops processing when the supplied

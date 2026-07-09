@@ -124,7 +124,7 @@ In the ASP.NET Core integration the token is wired to `HttpContext.RequestAborte
 and in the .NET Framework integration to `HttpResponse.ClientDisconnectedToken`, so
 processing stops automatically when the client disconnects.
 
-An element with long-running work can check `flowData.GetStopToken()` itself
+An element with long-running work can check `flowData.GetPipelineStopToken()` itself
 to stop sooner; elements that don't are simply skipped once the token is cancelled.
 
 ## Tests
