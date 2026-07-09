@@ -171,6 +171,28 @@ namespace FiftyOne.Pipeline.Core.Tests.Data
         }
 
         /// <summary>
+        /// Calling SetStopToken twice drops the first registration: the
+        /// superseded token no longer stops the flow data, the latest one
+        /// does, and nothing leaks or throws.
+        /// </summary>
+        [TestMethod]
+        public void FlowData_SetStopToken_CalledTwice_LatestTokenWins()
+        {
+            using var first = new CancellationTokenSource();
+            using var second = new CancellationTokenSource();
+
+            _flowData.SetStopToken(first.Token);
+            _flowData.SetStopToken(second.Token);
+
+            // The superseded token must no longer affect the flow data.
+            first.Cancel();
+            Assert.IsFalse(_flowData.GetStopToken().IsCancellationRequested);
+
+            second.Cancel();
+            Assert.IsTrue(_flowData.GetStopToken().IsCancellationRequested);
+        }
+
+        /// <summary>
         /// GetStopToken reflects the current stop state.
         /// </summary>
         [TestMethod]

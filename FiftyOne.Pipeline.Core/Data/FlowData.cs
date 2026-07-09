@@ -190,7 +190,8 @@ namespace FiftyOne.Pipeline.Core.Data
         /// <summary>
         /// Stop processing this flow data when the supplied token is, or
         /// becomes, cancelled. Used to link an external cancellation source
-        /// (for example an aborted web request) to this flow data.
+        /// (for example an aborted web request) to this flow data. Calling
+        /// this again replaces any previously linked token.
         /// </summary>
         /// <param name="stopToken">The token that triggers the stop.</param>
         public void SetStopToken(CancellationToken stopToken)
@@ -201,6 +202,10 @@ namespace FiftyOne.Pipeline.Core.Data
             {
                 return;
             }
+            // Drop any previous registration so a repeat call does not leak
+            // the earlier one (Dispose on a default registration is a no-op).
+            _stopTokenRegistration.Dispose();
+            _stopTokenRegistration = default;
             if (stopToken.IsCancellationRequested)
             {
                 _stopTokenSource.Cancel();
