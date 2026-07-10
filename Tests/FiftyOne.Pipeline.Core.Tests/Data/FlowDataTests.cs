@@ -136,6 +136,24 @@ namespace FiftyOne.Pipeline.Core.Tests.Data
         }
 
         /// <summary>
+        /// The stop token stays truthful after Dispose: a flow data cancelled
+        /// before disposal still reports cancellation afterwards. This is the
+        /// reason the token is captured into a field in the constructor rather
+        /// than read from the (now disposed) source.
+        /// </summary>
+        [TestMethod]
+        public void FlowData_GetStopToken_CancelledThenDisposed_StaysCancelled()
+        {
+            var flowData = new FlowData(_logger.Object, _pipeline.Object,
+                new Evidence(new Mock<ILogger<Evidence>>().Object));
+
+            flowData.SetStopToken(new CancellationToken(canceled: true));
+            flowData.Dispose();
+
+            Assert.IsTrue(flowData.GetStopToken().IsCancellationRequested);
+        }
+
+        /// <summary>
         /// A fresh flow data is not stopped (its stop token is not cancelled).
         /// </summary>
         [TestMethod]

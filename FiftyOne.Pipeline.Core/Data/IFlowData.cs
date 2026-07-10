@@ -35,7 +35,8 @@ namespace FiftyOne.Pipeline.Core.Data
     {
         /// <summary>
         /// A boolean flag that can be used to stop further elements
-        /// from executing.
+        /// from executing. Cancellation is one-way: setting it to
+        /// <see langword="false"/> is a no-op.
         /// </summary>
         [Obsolete("Prefer cancelling the CancellationToken passed to " +
             "IPipeline.CreateFlowData. This flag is retained as the stop " +

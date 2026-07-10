@@ -30,7 +30,9 @@ namespace FiftyOne.Pipeline.Core.Tests.HelperClasses
 {
     internal class StaticFactories
     {
-        public static IFlowData CreateFlowData(IPipelineInternal pipeline, CancellationToken cancellationToken = default)
+        public static IFlowData CreateFlowData(
+            IPipelineInternal pipeline,
+            CancellationToken cancellationToken = default)
         {
             var logger = new Mock<ILogger<FlowData>>();
             var evidenceLogger = new Mock<ILogger<Evidence>>();

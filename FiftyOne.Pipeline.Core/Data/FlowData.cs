@@ -97,19 +97,37 @@ namespace FiftyOne.Pipeline.Core.Data
 
         /// <summary>
         /// A boolean flag that can be used to stop further elements
-        /// from executing.
+        /// from executing. Cancellation is one-way: setting it to
+        /// <see langword="false"/> is a no-op.
         /// </summary>
         public bool Stop
         {
             get => _stopTokenSource.IsCancellationRequested;
             set
             {
-                // Cancellation is one-way; setting false is a no-op. Guard
-                // against dispose so this never throws ObjectDisposedException.
+                // Cancellation is one-way; setting false is a no-op.
                 if (value && disposedValue == false)
                 {
-                    _stopTokenSource.Cancel();
+                    CancelStopSource();
                 }
+            }
+        }
+
+        /// <summary>
+        /// Cancel the stop token source, tolerating a concurrent
+        /// <see cref="Dispose(bool)"/> that may have already torn it down in
+        /// the window after the dispose guard was checked. Stopping a disposed
+        /// flow data is a no-op rather than an error.
+        /// </summary>
+        private void CancelStopSource()
+        {
+            try
+            {
+                _stopTokenSource.Cancel();
+            }
+            catch (ObjectDisposedException)
+            {
+                // A concurrent Dispose won the race; nothing left to stop.
             }
         }
 
@@ -208,7 +226,7 @@ namespace FiftyOne.Pipeline.Core.Data
             _stopTokenRegistration = default;
             if (stopToken.IsCancellationRequested)
             {
-                _stopTokenSource.Cancel();
+                CancelStopSource();
                 return;
             }
             // Keep the registration so it can be disposed with this flow data.

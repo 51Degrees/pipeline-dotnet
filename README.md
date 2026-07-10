@@ -115,8 +115,10 @@ using var cts = new CancellationTokenSource();
 using var flowData = pipeline.CreateFlowData(cts.Token);
 flowData.AddEvidence("key", "value");
 
-// Cancelling the token (for example when the web request is aborted)
-// stops the pipeline before the next element runs.
+// Cancel processing if it has not finished within one second (for example
+// when a web request is aborted). Elements after the cancellation point are
+// skipped.
+cts.CancelAfter(TimeSpan.FromSeconds(1));
 flowData.Process();
 ```
 
