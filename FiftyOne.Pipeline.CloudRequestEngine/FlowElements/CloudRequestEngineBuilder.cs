@@ -329,19 +329,25 @@ namespace FiftyOne.Pipeline.CloudRequestEngine.FlowElements
         /// <summary>
         /// Build and return a new <see cref="CloudRequestEngine"/>
         /// instance using the current configuration.
-        /// The returned engine has already fetched the accessible
-        /// properties and evidence keys from the cloud service, so the
-        /// first call to Process does not pay the cost of these requests.
-        /// This means that this method requires the cloud service to be
-        /// reachable and will throw if it is not.
+        /// This fetches the accessible properties and evidence keys from
+        /// the cloud service before returning, so the first call to
+        /// Process does not pay the cost of these requests.
+        /// If the cloud service definitively rejects a discovery request
+        /// (a 4xx response such as an invalid resource key) then this
+        /// method throws, as retrying with the same configuration can
+        /// never succeed. If the discovery requests fail transiently (the
+        /// service is unreachable, times out or returns a 5xx response)
+        /// then the engine is still returned and the discovery requests
+        /// are retried when the engine is first used, so a temporary cloud
+        /// outage does not prevent the application from starting.
         /// </summary>
         /// <returns>
-        /// A new <see cref="CloudRequestEngine"/> that is ready to serve
-        /// requests.
+        /// A new <see cref="CloudRequestEngine"/>.
         /// </returns>
         /// <exception cref="CloudRequestException">
-        /// Thrown if there is an error from the cloud service or
-        /// there is no data in the response.
+        /// Thrown if the cloud service definitively rejected a discovery
+        /// request (4xx response), for example because the resource key
+        /// is invalid.
         /// </exception>
         public CloudRequestEngine Build()
         {

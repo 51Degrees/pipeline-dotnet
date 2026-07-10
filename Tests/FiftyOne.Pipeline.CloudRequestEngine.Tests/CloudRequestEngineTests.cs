@@ -1426,9 +1426,95 @@ namespace FiftyOne.Pipeline.CloudRequestEngine.Tests
         }
 
         /// <summary>
-        /// Verify that a failure from the evidence keys endpoint also
-        /// causes Build to throw, not just a failure from the accessible
-        /// properties endpoint.
+        /// Verify that a transient failure (5xx) from the discovery
+        /// endpoints does not cause Build to throw, and that the
+        /// discovery requests are retried and succeed when the engine
+        /// is used after the cloud service has recovered.
+        /// </summary>
+        [TestMethod]
+        public void Build_TransientDiscoveryError_ReturnsEngine_AndRetriesOnFirstUse()
+        {
+            string resourceKey = "resource_key";
+
+            _accessiblePropertiesResponseStatus = HttpStatusCode.ServiceUnavailable;
+            _evidenceKeysResponseStatus = HttpStatusCode.ServiceUnavailable;
+
+            ConfigureMockedClient(r => true);
+
+            // Build must succeed despite the cloud service being
+            // temporarily unavailable.
+            var engine = new CloudRequestEngineBuilder(
+                _loggerFactory,
+                _httpClient)
+                .SetResourceKey(resourceKey)
+                .Build();
+
+            Assert.IsNotNull(engine);
+            Assert.IsFalse(engine.IsDisposed);
+            VerifyDiscoveryRequests(Times.Exactly(1));
+
+            // The cloud service comes back up.
+            _accessiblePropertiesResponseStatus = HttpStatusCode.OK;
+            _evidenceKeysResponseStatus = HttpStatusCode.OK;
+
+            // First use must retry the discovery requests and succeed.
+            // Note that Process does not use EvidenceKeyFilter itself
+            // (GetContent sends all evidence), so access both values the
+            // way a consumer such as the web integration would.
+            Assert.IsTrue(engine.PublicProperties.Count > 0);
+            Assert.IsNotNull(engine.EvidenceKeyFilter);
+            using (var pipeline = new PipelineBuilder(_loggerFactory).AddFlowElement(engine).Build())
+            {
+                var data = pipeline.CreateFlowData();
+                data.AddEvidence("query.User-Agent", "iPhone");
+
+                data.Process();
+
+                var result = data.GetFromElement(engine).JsonResponse;
+                Assert.AreEqual("{'device':{'value':'1'}}", result);
+            }
+
+            // One failed attempt at Build plus one successful retry.
+            VerifyDiscoveryRequests(Times.Exactly(2));
+        }
+
+        /// <summary>
+        /// Verify that Build does not throw when the cloud service is
+        /// unreachable at the network level (for example a DNS failure or
+        /// connection refused - the scenario from issue #44), so that a
+        /// temporary cloud outage cannot prevent application startup.
+        /// </summary>
+        [TestMethod]
+        public void Build_CloudUnreachable_ReturnsEngine()
+        {
+            string resourceKey = "resource_key";
+
+            _handlerMock = new Mock<HttpMessageHandler>(MockBehavior.Strict);
+            _handlerMock
+               .Protected()
+               .Setup<Task<HttpResponseMessage>>(
+                  "SendAsync",
+                  ItExpr.Is<HttpRequestMessage>(r => r.Method == HttpMethod.Get),
+                  ItExpr.IsAny<CancellationToken>()
+               )
+               .ThrowsAsync(new HttpRequestException(
+                   "The remote name could not be resolved: 'cloud.51degrees.com'"));
+            _httpClient = new HttpClient(_handlerMock.Object);
+
+            var engine = new CloudRequestEngineBuilder(
+                _loggerFactory,
+                _httpClient)
+                .SetResourceKey(resourceKey)
+                .Build();
+
+            Assert.IsNotNull(engine);
+            Assert.IsFalse(engine.IsDisposed);
+        }
+
+        /// <summary>
+        /// Verify that a definitive failure (4xx) from the evidence keys
+        /// endpoint also causes Build to throw, not just a failure from
+        /// the accessible properties endpoint.
         /// </summary>
         [TestMethod]
         public void Build_EvidenceKeysError_Throws()
@@ -1451,9 +1537,9 @@ namespace FiftyOne.Pipeline.CloudRequestEngine.Tests
         }
 
         /// <summary>
-        /// Verify that when the discovery requests fail, the engine that
-        /// Build created internally is disposed before the exception is
-        /// thrown to the caller.
+        /// Verify that when the discovery requests fail definitively (4xx),
+        /// the engine that Build created internally is disposed before the
+        /// exception is thrown to the caller.
         /// </summary>
         [TestMethod]
         public void Build_Failure_DisposesEngine()

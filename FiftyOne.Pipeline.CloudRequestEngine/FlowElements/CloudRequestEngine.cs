@@ -438,10 +438,18 @@ namespace FiftyOne.Pipeline.CloudRequestEngine.FlowElements
         /// <see cref="CloudRequestEngineBuilder.Build"/> calls this before
         /// returning, so an engine created through the builder is ready
         /// to serve as soon as it is returned.
+        /// A definitive configuration error from the cloud service (a 4xx
+        /// response such as an invalid resource key) is thrown, as retrying
+        /// would never succeed. A transient failure (the service being
+        /// unreachable, a timeout or a 5xx response) is only logged as a
+        /// warning - the discovery requests will be retried on first use,
+        /// so a temporary cloud outage does not prevent the engine from
+        /// being constructed.
         /// </summary>
         /// <exception cref="CloudRequestException">
-        /// Thrown if there is an error from the cloud service or
-        /// there is no data in the response.
+        /// Thrown if the cloud service definitively rejected a discovery
+        /// request (4xx response), for example because the resource key
+        /// is invalid.
         /// </exception>
         public void WarmUp()
         {
@@ -456,13 +464,35 @@ namespace FiftyOne.Pipeline.CloudRequestEngine.FlowElements
             }
             catch (AggregateException ex)
             {
-                // Surface the underlying failure directly so that callers
+                // Surface a definitive failure directly so that callers
                 // get the same exception type that the PublicProperties and
                 // EvidenceKeyFilter getters would have thrown.
-                ExceptionDispatchInfo.Capture(
-                    ex.InnerExceptions[0]).Throw();
-                throw;
+                var definitive = ex.InnerExceptions
+                    .FirstOrDefault(IsDefinitiveConfigurationError);
+                if (definitive != null)
+                {
+                    ExceptionDispatchInfo.Capture(definitive).Throw();
+                }
+                Logger?.LogWarning(ex,
+                    "Failed to warm up the cloud request engine due to a " +
+                    "transient error. The engine will retry the discovery " +
+                    "requests when it is first used.");
             }
+        }
+
+        /// <summary>
+        /// True if the exception indicates that the cloud service received
+        /// the discovery request and definitively rejected it (4xx), so
+        /// retrying with the same configuration can never succeed.
+        /// Network failures, timeouts and 5xx responses are not definitive -
+        /// they can resolve themselves, so the caller should fall back to
+        /// retrying lazily rather than failing.
+        /// </summary>
+        private static bool IsDefinitiveConfigurationError(Exception ex)
+        {
+            return ex is CloudRequestException cloudEx &&
+                cloudEx.HttpStatusCode >= 400 &&
+                cloudEx.HttpStatusCode < 500;
         }
 
         /// <summary>
