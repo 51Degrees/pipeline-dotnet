@@ -28,6 +28,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Runtime.CompilerServices;
+using System.Threading;
 
 [assembly: InternalsVisibleTo("FiftyOne.Pipeline.Web.Tests, PublicKey=0024000004800000940000000602000000240000525341310004000001000100c3a631e6634ea697e19c6d2fedc285bdc7f0447a5583e1ac3c5ed3502b7633e691f899a265c42a5611122a23fd2bc882e4e412384a5d4183271782416cf016b06e6648273d44896e95ce482bb8b13054ba6a6f41d393c3f3f2e5780d620e50cb67c248882e4427bf007b7c77fdd65f832c7f4a3fef9dc18e39f792d1a37cc980")]
 [assembly: InternalsVisibleTo("FiftyOne.Pipeline.Core.Tests, PublicKey=0024000004800000940000000602000000240000525341310004000001000100c3a631e6634ea697e19c6d2fedc285bdc7f0447a5583e1ac3c5ed3502b7633e691f899a265c42a5611122a23fd2bc882e4e412384a5d4183271782416cf016b06e6648273d44896e95ce482bb8b13054ba6a6f41d393c3f3f2e5780d620e50cb67c248882e4427bf007b7c77fdd65f832c7f4a3fef9dc18e39f792d1a37cc980")]
@@ -96,10 +97,65 @@ namespace FiftyOne.Pipeline.Core.Data
 
         /// <summary>
         /// A boolean flag that can be used to stop further elements
-        /// from executing.
+        /// from executing. Cancellation is one-way: setting it to
+        /// <see langword="false"/> is a no-op.
         /// </summary>
-        public bool Stop { get; set; }
+        public bool Stop
+        {
+            get => _stopTokenSource.IsCancellationRequested;
+            set
+            {
+                // Cancellation is one-way; setting false is a no-op.
+                if (value && disposedValue == false)
+                {
+                    CancelStopSource();
+                }
+            }
+        }
 
+        /// <summary>
+        /// Cancel the stop token source, tolerating a concurrent
+        /// <see cref="Dispose(bool)"/> that may have already torn it down in
+        /// the window after the dispose guard was checked. Stopping a disposed
+        /// flow data is a no-op rather than an error.
+        /// </summary>
+        private void CancelStopSource()
+        {
+            try
+            {
+                _stopTokenSource.Cancel();
+            }
+            catch (ObjectDisposedException)
+            {
+                // A concurrent Dispose won the race; nothing left to stop.
+            }
+        }
+
+        /// <summary>
+        /// Source for the cancellation token that stops processing of this
+        /// flow data. Linked to the token passed to the constructor.
+        /// </summary>
+        private readonly CancellationTokenSource _stopTokenSource;
+
+        /// <summary>
+        /// Cancellation token captured from <see cref="_stopTokenSource"/>.
+        /// Captured in the constructor so it stays readable (and truthful)
+        /// after the source has been disposed.
+        /// </summary>
+        private readonly CancellationToken _stopToken;
+
+        /// <summary>
+        /// Registration created by <see cref="SetStopToken"/> so it can be
+        /// disposed with this flow data, preventing a leak / callback into a
+        /// disposed token source when an external token is later cancelled.
+        /// </summary>
+        private CancellationTokenRegistration _stopTokenRegistration;
+
+        /// <summary>
+        /// The token that is cancelled when processing of this flow data
+        /// should stop.
+        /// </summary>
+        public CancellationToken StopToken => _stopToken;
 
         /// <summary>
         /// Get a filter that will only include the evidence keys that can 
@@ -126,15 +182,22 @@ namespace FiftyOne.Pipeline.Core.Data
         /// <param name="evidence">
         /// The initial evidence.
         /// </param>
+        /// <param name="cancellationToken">
+        /// Token that, when cancelled, stops the pipeline processing this
+        /// flow data. Linked to the flow data's stop token.
+        /// </param>
         internal FlowData(
             ILogger<FlowData> logger,
             IPipelineInternal pipeline,
-            Evidence evidence)
+            Evidence evidence,
+            CancellationToken cancellationToken = default)
         {
             _logger = logger;
             PipelineInternal = pipeline;
             _data = new TypedKeyMap(pipeline?.IsConcurrent ?? false);
             _evidence = evidence;
+            _stopTokenSource = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+            _stopToken = _stopTokenSource.Token;
 
             if (_logger != null && _logger.IsEnabled(LogLevel.Debug))
             {
@@ -143,7 +206,38 @@ namespace FiftyOne.Pipeline.Core.Data
         }
 
         /// <summary>
-        /// Register an error that occurred while working with this 
+        /// Stop processing this flow data when the supplied token is, or
+        /// becomes, cancelled. Used to link an external cancellation source
+        /// (for example an aborted web request) to this flow data. Calling
+        /// this again replaces any previously linked token.
+        /// </summary>
+        /// <param name="stopToken">The token that triggers the stop.</param>
+        public void SetStopToken(CancellationToken stopToken)
+        {
+            // Guard against dispose so this never throws
+            // ObjectDisposedException from Cancel().
+            if (disposedValue)
+            {
+                return;
+            }
+            // Drop any previous registration so a repeat call does not leak
+            // the earlier one (Dispose on a default registration is a no-op).
+            _stopTokenRegistration.Dispose();
+            _stopTokenRegistration = default;
+            if (stopToken.IsCancellationRequested)
+            {
+                CancelStopSource();
+                return;
+            }
+            // Keep the registration so it can be disposed with this flow data.
+            // Without this, cancelling a long-lived external token after this
+            // flow data is disposed would call back into the disposed source.
+            _stopTokenRegistration = stopToken.Register(
+                o => ((CancellationTokenSource)o).Cancel(), _stopTokenSource);
+        }
+
+        /// <summary>
+        /// Register an error that occurred while working with this
         /// instance.
         /// </summary>
         /// <param name="ex">
@@ -844,6 +938,10 @@ namespace FiftyOne.Pipeline.Core.Data
                             ((IDisposable)elementData).Dispose();
                         }
                     }
+                    // Unregister from the external token (if any) before
+                    // disposing the source it would call back into.
+                    _stopTokenRegistration.Dispose();
+                    _stopTokenSource.Dispose();
                 }
 
                 disposedValue = true;

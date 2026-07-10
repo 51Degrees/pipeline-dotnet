@@ -104,6 +104,31 @@ If you want examples that demonstrate how to use 51Degrees products such as devi
 
 The CloudRequestEngine\GettingStarted example requires a resource key. It reads the aligned `_51DEGREES_RESOURCE_KEY` environment variable first, then the legacy `RESOURCE_KEY` variable. A resource key with the free properties used by the examples can be created at https://configure.51degrees.com/Wkqxf3Bs?utm_source=github&utm_medium=readme&utm_campaign=pipeline-dotnet&utm_content=readme.md&utm_term=pipeline-examples.
 
+## Cancelling processing
+
+Pass a `CancellationToken` to `CreateFlowData` to stop processing when the token
+is cancelled. The pipeline checks the token between elements, so once it is
+cancelled no further elements run.
+
+```csharp
+using var cts = new CancellationTokenSource();
+using var flowData = pipeline.CreateFlowData(cts.Token);
+flowData.AddEvidence("key", "value");
+
+// Cancel processing if it has not finished within one second (for example
+// when a web request is aborted). Elements after the cancellation point are
+// skipped.
+cts.CancelAfter(TimeSpan.FromSeconds(1));
+flowData.Process();
+```
+
+In the ASP.NET Core integration the token is wired to `HttpContext.RequestAborted`,
+and in the .NET Framework integration to `HttpResponse.ClientDisconnectedToken`, so
+processing stops automatically when the client disconnects.
+
+An element with long-running work can check `flowData.GetStopToken()` itself
+to stop sooner; elements that don't are simply skipped once the token is cancelled.
+
 ## Tests
 
 - **FiftyOne.Pipeline.CloudRequestEngine.Tests** - Tests for the CloudRequestEngine and builder.

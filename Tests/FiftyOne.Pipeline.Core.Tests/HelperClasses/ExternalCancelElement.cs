@@ -24,20 +24,43 @@ using FiftyOne.Pipeline.Core.Data;
 using FiftyOne.Pipeline.Core.FlowElements;
 using Microsoft.Extensions.Logging;
 using Moq;
+using System.Collections.Generic;
 using System.Threading;
 
 namespace FiftyOne.Pipeline.Core.Tests.HelperClasses
 {
-    internal class StaticFactories
+    /// <summary>
+    /// Test element that cancels the given token source when it runs.
+    /// </summary>
+    public class ExternalCancelElement : FlowElementBase<TestElementData, IElementPropertyMetaData>
     {
-        public static IFlowData CreateFlowData(
-            IPipelineInternal pipeline,
-            CancellationToken cancellationToken = default)
+        private readonly CancellationTokenSource _toCancel;
+        private readonly EvidenceKeyFilterWhitelist _evidenceKeyFilter;
+
+        public override string ElementDataKey => "externalcancel";
+
+        public override IEvidenceKeyFilter EvidenceKeyFilter => _evidenceKeyFilter;
+
+        public override IList<IElementPropertyMetaData> Properties => new List<IElementPropertyMetaData>();
+
+        public ExternalCancelElement(CancellationTokenSource toCancel) :
+            base(new Mock<ILogger<ExternalCancelElement>>().Object)
         {
-            var logger = new Mock<ILogger<FlowData>>();
-            var evidenceLogger = new Mock<ILogger<Evidence>>();
-            var evidence = new Evidence(evidenceLogger.Object);
-            return new FlowData(logger.Object, pipeline, evidence, cancellationToken);
+            _toCancel = toCancel;
+            _evidenceKeyFilter = new EvidenceKeyFilterWhitelist(new List<string>());
+        }
+
+        protected override void ProcessInternal(IFlowData data)
+        {
+            _toCancel.Cancel();
+        }
+
+        protected override void ManagedResourcesCleanup()
+        {
+        }
+
+        protected override void UnmanagedResourcesCleanup()
+        {
         }
     }
 }

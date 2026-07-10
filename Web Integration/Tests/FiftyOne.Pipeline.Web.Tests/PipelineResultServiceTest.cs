@@ -26,6 +26,7 @@ using FiftyOne.Pipeline.Web.Services;
 using Microsoft.AspNetCore.Http;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using Moq;
+using System.Threading;
 
 namespace FiftyOne.Pipeline.Web.Tests
 {
@@ -34,7 +35,10 @@ namespace FiftyOne.Pipeline.Web.Tests
     {
         private static Mock<IFlowData> _flowData;
 
-        private Mock<IPipeline> _pipeline;
+        // Mocked as IPipelineInternal because the token-aware CreateFlowData
+        // is reached through the public IPipeline extension, which forwards to
+        // the internal interface member (the only mockable overload).
+        private Mock<IPipelineInternal> _pipeline;
 
         private Mock<IWebRequestEvidenceService> _evidenceService;
 
@@ -47,9 +51,9 @@ namespace FiftyOne.Pipeline.Web.Tests
         [TestInitialize]
         public void SetUp()
         {
-            _pipeline = new Mock<IPipeline>();
+            _pipeline = new Mock<IPipelineInternal>();
             _flowData = new Mock<IFlowData>();
-            _pipeline.Setup(p => p.CreateFlowData()).Returns(_flowData.Object);
+            _pipeline.Setup(p => p.CreateFlowData(It.IsAny<CancellationToken>())).Returns(_flowData.Object);
             _evidenceService = new Mock<IWebRequestEvidenceService>();
 
             _resultsService = new PipelineResultService(
@@ -71,6 +75,21 @@ namespace FiftyOne.Pipeline.Web.Tests
                 Times.Once,
                 "The process method on flow data should have been called " +
                 "once by the process method.");
+        }
+
+        /// <summary>
+        /// Test that the request abort token is passed to CreateFlowData.
+        /// </summary>
+        [TestMethod]
+        public void PipelineResultsService_PassesRequestAbortedToken()
+        {
+            using var cts = new CancellationTokenSource();
+            var context = new DefaultHttpContext();
+            context.RequestAborted = cts.Token;
+
+            _resultsService.Process(context);
+
+            _pipeline.Verify(p => p.CreateFlowData(cts.Token), Times.Once);
         }
 
         /// <summary>
