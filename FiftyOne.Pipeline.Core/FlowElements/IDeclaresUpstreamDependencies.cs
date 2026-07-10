@@ -27,6 +27,16 @@ namespace FiftyOne.Pipeline.Core.FlowElements
     /// <summary>
     /// Implemented by an element that needs properties from other elements.
     /// </summary>
+    /// <remarks>
+    /// Resolution is single-hop: a provider element is kept only when a
+    /// directly wanted element declares a dependency on one of its
+    /// properties. Declared dependencies are not walked transitively, so a
+    /// provider whose only consumer is itself another (not directly wanted)
+    /// provider will not be kept. If a chain like that is ever needed, the
+    /// resolution logic in
+    /// <see cref="UpstreamDependencyExtensions.IsNeededFor"/> has to be
+    /// extended.
+    /// </remarks>
     public interface IDeclaresUpstreamDependencies
     {
         /// <summary>
