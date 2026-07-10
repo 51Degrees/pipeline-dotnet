@@ -52,7 +52,7 @@ namespace FiftyOne.Pipeline.Core.Tests.HelperClasses
 
         protected override void ProcessInternal(IFlowData data)
         {
-            SeenToken = data.GetPipelineStopToken();
+            SeenToken = data.GetStopToken();
         }
 
         protected override void ManagedResourcesCleanup()

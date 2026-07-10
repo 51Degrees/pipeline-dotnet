@@ -164,7 +164,7 @@ namespace FiftyOne.Pipeline.Core.Tests.Integration
             using (var flowData = pipeline.CreateFlowData(externalCts.Token))
             {
                 flowData.Process();
-                Assert.IsTrue(flowData.GetPipelineStopToken().IsCancellationRequested);
+                Assert.IsTrue(flowData.GetStopToken().IsCancellationRequested);
             }
             testElement.Verify(e => e.Process(It.IsAny<IFlowData>()), Times.Never());
         }

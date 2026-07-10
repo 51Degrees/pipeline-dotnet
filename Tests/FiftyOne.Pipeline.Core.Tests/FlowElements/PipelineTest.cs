@@ -104,9 +104,9 @@ namespace FiftyOne.Pipeline.Core.Tests.FlowElements
 
             using var data = pipeline.CreateFlowData(cts.Token);
 
-            Assert.IsFalse(data.GetPipelineStopToken().IsCancellationRequested);
+            Assert.IsFalse(data.GetStopToken().IsCancellationRequested);
             cts.Cancel();
-            Assert.IsTrue(data.GetPipelineStopToken().IsCancellationRequested);
+            Assert.IsTrue(data.GetStopToken().IsCancellationRequested);
         }
 
         /// <summary>

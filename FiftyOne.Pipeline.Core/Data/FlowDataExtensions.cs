@@ -46,7 +46,7 @@ namespace FiftyOne.Pipeline.Core.Data
         /// <exception cref="ArgumentNullException">
         /// Thrown if the supplied data is null.
         /// </exception>
-        public static CancellationToken GetPipelineStopToken(this IFlowData data)
+        public static CancellationToken GetStopToken(this IFlowData data)
         {
             if (data == null)
             {
@@ -63,6 +63,60 @@ namespace FiftyOne.Pipeline.Core.Data
                 ? new CancellationToken(canceled: true)
                 : CancellationToken.None;
 #pragma warning restore CS0618 // Type or member is obsolete
+        }
+
+        /// <summary>
+        /// Whether processing of this flow data should continue. Returns
+        /// false once the stop token has been cancelled (for example by an
+        /// aborted web request or an element setting <see cref="IFlowData.Stop"/>).
+        /// </summary>
+        /// <param name="data">The flow data to check.</param>
+        /// <returns>
+        /// True while the flow data's stop token is not cancelled.
+        /// </returns>
+        /// <exception cref="ArgumentNullException">
+        /// Thrown if the supplied data is null.
+        /// </exception>
+        public static bool ShouldRun(this IFlowData data)
+        {
+            return data.GetStopToken().IsCancellationRequested == false;
+        }
+
+        /// <summary>
+        /// Stop processing this flow data when the supplied token is, or
+        /// becomes, cancelled. Used to link an external cancellation source
+        /// (for example an aborted web request) to a flow data after it has
+        /// been created. Calling this again replaces any previously linked
+        /// token.
+        /// </summary>
+        /// <param name="data">The flow data to link the token to.</param>
+        /// <param name="stopToken">The token that triggers the stop.</param>
+        /// <exception cref="ArgumentNullException">
+        /// Thrown if the supplied data is null.
+        /// </exception>
+        public static void SetStopToken(
+            this IFlowData data,
+            CancellationToken stopToken)
+        {
+            if (data == null)
+            {
+                throw new ArgumentNullException(nameof(data));
+            }
+            if (data is FlowData concrete)
+            {
+                concrete.SetStopToken(stopToken);
+                return;
+            }
+            // Third-party IFlowData without a linkable stop token: the only
+            // stop signal available is the interface-level Stop flag, so an
+            // already-cancelled token maps to it. A token that cancels later
+            // cannot be observed by such an implementation.
+            if (stopToken.IsCancellationRequested)
+            {
+#pragma warning disable CS0618 // Type or member is obsolete
+                data.Stop = true;
+#pragma warning restore CS0618 // Type or member is obsolete
+            }
         }
     }
 }
