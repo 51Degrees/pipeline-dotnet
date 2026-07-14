@@ -636,7 +636,7 @@ namespace FiftyOne.Pipeline.JsonBuilder.FlowElement
         /// </exception>
         protected virtual void AddJsonValuesForProperty(
             IFlowData flowData,
-            Dictionary<string, object> jsonValues, 
+            IDictionary<string, object> jsonValues, 
             string dataPath, 
             string name, 
             object value, 
