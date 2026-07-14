@@ -258,7 +258,12 @@ namespace FiftyOne.Pipeline.Engines.Services
 					}
 
 					// If file system watcher is enabled then set it up.
-					if (dataFile.Configuration.FileSystemWatcherEnabled &&
+					// AutomaticUpdatesEnabled is the master switch for all
+					// automatic update activity, so the watcher is only created
+					// when auto updates are enabled - the same gate that is
+					// applied to the polling timer above.
+					if (dataFile.AutomaticUpdatesEnabled &&
+						dataFile.Configuration.FileSystemWatcherEnabled &&
 						dataFile.FileWatcher == null &&
 						string.IsNullOrEmpty(dataFile.DataFilePath) == false)
                     {
