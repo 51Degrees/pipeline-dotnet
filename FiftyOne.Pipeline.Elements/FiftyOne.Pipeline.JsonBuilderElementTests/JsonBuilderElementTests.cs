@@ -487,6 +487,54 @@ namespace FiftyOne.Pipeline.JsonBuilderElementTests
         }
 
         /// <summary>
+        /// Inner class used to verify that AddJsonValuesForProperty
+        /// can be overridden using the IDictionary parameter and that
+        /// entries added through the interface reach the JSON output.
+        /// </summary>
+        private class OverridingJsonBuilderElement : TestJsonBuilderElement
+        {
+            public OverridingJsonBuilderElement(ILoggerFactory loggerFactory)
+                : base(loggerFactory)
+            { }
+
+            protected override void AddJsonValuesForProperty(
+                IFlowData flowData,
+                IDictionary<string, object> jsonValues,
+                string dataPath,
+                string name,
+                object value,
+                PipelineConfig config,
+                bool includeValueDataOnly)
+            {
+                base.AddJsonValuesForProperty(flowData, jsonValues,
+                    dataPath, name, value, config, includeValueDataOnly);
+                jsonValues[name.ToLowerInvariant() + "overridden"] = true;
+            }
+        }
+
+        /// <summary>
+        /// Check that AddJsonValuesForProperty can be overridden via its
+        /// IDictionary parameter and that entries added by the override
+        /// appear in the JSON alongside the standard values.
+        /// </summary>
+        [TestMethod]
+        public void JsonBuilder_AddJsonValuesForProperty_Override()
+        {
+            _jsonBuilderElement = new OverridingJsonBuilderElement(_loggerFactory);
+
+            var json = TestIteration(1);
+
+            Assert.IsTrue(IsExpectedJson(json),
+                "The standard property values should still be present. " +
+                "Complete JSON: " + Environment.NewLine + json);
+            JObject obj = JObject.Parse(json);
+            Assert.IsNotNull(obj["test"]["propertyoverridden"],
+                "The entry added by the override through the IDictionary " +
+                "parameter is missing from the JSON. " +
+                "Complete JSON: " + Environment.NewLine + json);
+        }
+
+        /// <summary>
         /// Used by the serialization tests below
         /// </summary>
         public enum TypeToBeTested
