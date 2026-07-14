@@ -442,9 +442,14 @@ namespace FiftyOne.Pipeline.CloudRequestEngine.FlowElements
         /// response such as an invalid resource key) is thrown, as retrying
         /// would never succeed. A transient failure (the service being
         /// unreachable, a timeout or a 5xx response) is only logged as a
-        /// warning - the discovery requests will be retried on first use,
-        /// so a temporary cloud outage does not prevent the engine from
-        /// being constructed.
+        /// warning, so a temporary cloud outage does not prevent the engine
+        /// from being constructed - the discovery requests will be retried
+        /// on first use, subject to the configured
+        /// <see cref="IRecoveryStrategy"/>. Note that the failed warmup
+        /// attempts count towards the failures-to-enter-recovery threshold,
+        /// so with an aggressive threshold (1 or 2) the engine may throw
+        /// <see cref="CloudRequestEngineTemporarilyUnavailableException"/>
+        /// on use until the recovery period has passed.
         /// </summary>
         /// <exception cref="CloudRequestException">
         /// Thrown if the cloud service definitively rejected a discovery
@@ -467,7 +472,7 @@ namespace FiftyOne.Pipeline.CloudRequestEngine.FlowElements
                 // Surface a definitive failure directly so that callers
                 // get the same exception type that the PublicProperties and
                 // EvidenceKeyFilter getters would have thrown.
-                var definitive = ex.InnerExceptions
+                var definitive = ex.Flatten().InnerExceptions
                     .FirstOrDefault(IsDefinitiveConfigurationError);
                 if (definitive != null)
                 {

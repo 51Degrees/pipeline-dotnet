@@ -329,17 +329,12 @@ namespace FiftyOne.Pipeline.CloudRequestEngine.FlowElements
         /// <summary>
         /// Build and return a new <see cref="CloudRequestEngine"/>
         /// instance using the current configuration.
-        /// This fetches the accessible properties and evidence keys from
-        /// the cloud service before returning, so the first call to
-        /// Process does not pay the cost of these requests.
-        /// If the cloud service definitively rejects a discovery request
-        /// (a 4xx response such as an invalid resource key) then this
-        /// method throws, as retrying with the same configuration can
-        /// never succeed. If the discovery requests fail transiently (the
-        /// service is unreachable, times out or returns a 5xx response)
-        /// then the engine is still returned and the discovery requests
-        /// are retried when the engine is first used, so a temporary cloud
-        /// outage does not prevent the application from starting.
+        /// This calls <see cref="CloudRequestEngine.WarmUp"/> before
+        /// returning, so the first call to Process does not pay the cost
+        /// of the discovery requests. See that method's documentation for
+        /// the failure semantics: a definitive configuration error (4xx)
+        /// throws, while a transient failure falls back to retrying on
+        /// first use.
         /// </summary>
         /// <returns>
         /// A new <see cref="CloudRequestEngine"/>.
@@ -383,8 +378,19 @@ namespace FiftyOne.Pipeline.CloudRequestEngine.FlowElements
             catch
             {
                 // A failed warmup means the engine must not be returned,
-                // so make sure it is not left registered anywhere.
-                engine.Dispose();
+                // so make sure it is not left registered anywhere. A
+                // dispose failure is only logged so that it cannot mask
+                // the warmup exception.
+                try
+                {
+                    engine.Dispose();
+                }
+                catch (Exception disposeEx)
+                {
+                    _loggerFactory.CreateLogger<CloudRequestEngineBuilder>()
+                        .LogWarning(disposeEx,
+                            "Failed to dispose engine after warmup failure.");
+                }
                 throw;
             }
             return engine;

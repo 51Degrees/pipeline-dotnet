@@ -1512,6 +1512,49 @@ namespace FiftyOne.Pipeline.CloudRequestEngine.Tests
         }
 
         /// <summary>
+        /// Document the interaction between a transient warmup failure and
+        /// an aggressive recovery configuration: the failed warmup attempts
+        /// count towards the failures-to-enter-recovery threshold, so first
+        /// use within the recovery period throws
+        /// <see cref="CloudRequestEngineTemporarilyUnavailableException"/>
+        /// rather than retrying, and the engine heals once the recovery
+        /// period has passed.
+        /// </summary>
+        [TestMethod]
+        public void Build_TransientError_AggressiveRecovery_HealsAfterRecoveryPeriod()
+        {
+            string resourceKey = "resource_key";
+
+            _accessiblePropertiesResponseStatus = HttpStatusCode.ServiceUnavailable;
+            _evidenceKeysResponseStatus = HttpStatusCode.ServiceUnavailable;
+
+            ConfigureMockedClient(r => true);
+
+            var engine = new CloudRequestEngineBuilder(
+                _loggerFactory,
+                _httpClient)
+                .SetResourceKey(resourceKey)
+                .SetRecoverySeconds(0.2)
+                .SetFailuresToEnterRecovery(1)
+                .Build();
+
+            // The cloud service comes back up immediately...
+            _accessiblePropertiesResponseStatus = HttpStatusCode.OK;
+            _evidenceKeysResponseStatus = HttpStatusCode.OK;
+
+            // ...but the engine is still within the recovery period, so
+            // use throws rather than retrying.
+            Assert.ThrowsExactly<CloudRequestEngineTemporarilyUnavailableException>(() =>
+            {
+                var _ = engine.PublicProperties;
+            });
+
+            // Once the recovery period has passed, the engine heals.
+            Thread.Sleep(millisecondsTimeout: 400);
+            Assert.IsTrue(engine.PublicProperties.Count > 0);
+        }
+
+        /// <summary>
         /// Verify that a definitive failure (4xx) from the evidence keys
         /// endpoint also causes Build to throw, not just a failure from
         /// the accessible properties endpoint.
