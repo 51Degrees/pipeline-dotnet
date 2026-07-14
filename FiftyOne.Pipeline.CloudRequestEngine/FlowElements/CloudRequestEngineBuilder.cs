@@ -329,8 +329,21 @@ namespace FiftyOne.Pipeline.CloudRequestEngine.FlowElements
         /// <summary>
         /// Build and return a new <see cref="CloudRequestEngine"/>
         /// instance using the current configuration.
+        /// This calls <see cref="CloudRequestEngine.WarmUp"/> before
+        /// returning, so the first call to Process does not pay the cost
+        /// of the discovery requests. See that method's documentation for
+        /// the failure semantics: a definitive configuration error (4xx)
+        /// throws, while a transient failure falls back to retrying on
+        /// first use.
         /// </summary>
-        /// <returns></returns>
+        /// <returns>
+        /// A new <see cref="CloudRequestEngine"/>.
+        /// </returns>
+        /// <exception cref="CloudRequestException">
+        /// Thrown if the cloud service definitively rejected a discovery
+        /// request (4xx response), for example because the resource key
+        /// is invalid.
+        /// </exception>
         public CloudRequestEngine Build()
         {
             if (string.IsNullOrWhiteSpace(_resourceKey))
@@ -357,7 +370,30 @@ namespace FiftyOne.Pipeline.CloudRequestEngine.FlowElements
                 SetEvidenceKeysEndpoint(endpoint + Constants.EVIDENCE_KEYS_FILENAME);
             }
 
-            return BuildEngine();
+            var engine = BuildEngine();
+            try
+            {
+                engine.WarmUp();
+            }
+            catch
+            {
+                // A failed warmup means the engine must not be returned,
+                // so make sure it is not left registered anywhere. A
+                // dispose failure is only logged so that it cannot mask
+                // the warmup exception.
+                try
+                {
+                    engine.Dispose();
+                }
+                catch (Exception disposeEx)
+                {
+                    _loggerFactory.CreateLogger<CloudRequestEngineBuilder>()
+                        .LogWarning(disposeEx,
+                            "Failed to dispose engine after warmup failure.");
+                }
+                throw;
+            }
+            return engine;
         }
 
         private CloudRequestData CreateAspectData(IPipeline pipeline, 

@@ -35,6 +35,7 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
 using System.Net.Http;
+using System.Runtime.ExceptionServices;
 using System.Threading;
 using System.Threading.Tasks;
 using FiftyOne.Pipeline.Core.Exceptions;
@@ -287,11 +288,12 @@ namespace FiftyOne.Pipeline.CloudRequestEngine.FlowElements
                          true)
                 };
 
-                // Start the tasks to get the evidence keys and the public
-                // properties from the cloud service. If the stop token is
-                // not provided then warn via logging.
+                // Set up lazy initialization for the evidence keys and the
+                // public properties. The values are fetched from the cloud
+                // service on first access, or during WarmUp when the engine
+                // is created through CloudRequestEngineBuilder.
 
-                _lazyEvidenceKeyFilter 
+                _lazyEvidenceKeyFilter
                     = new Lazy<IEvidenceKeyFilter>(
                         GetCloudEvidenceKeys,
                         LazyThreadSafetyMode.PublicationOnly);
@@ -424,6 +426,78 @@ namespace FiftyOne.Pipeline.CloudRequestEngine.FlowElements
                     throw;
                 }
             }
+        }
+
+        /// <summary>
+        /// Fetch <see cref="PublicProperties"/> and
+        /// <see cref="EvidenceKeyFilter"/> from the cloud service so that
+        /// the first call to Process does not have to pay the cost of
+        /// these requests.
+        /// The two requests are made in parallel and this method blocks
+        /// until both have completed.
+        /// <see cref="CloudRequestEngineBuilder.Build"/> calls this before
+        /// returning, so an engine created through the builder is ready
+        /// to serve as soon as it is returned.
+        /// A definitive configuration error from the cloud service (a 4xx
+        /// response such as an invalid resource key) is thrown, as retrying
+        /// would never succeed. A transient failure (the service being
+        /// unreachable, a timeout or a 5xx response) is only logged as a
+        /// warning, so a temporary cloud outage does not prevent the engine
+        /// from being constructed - the discovery requests will be retried
+        /// on first use, subject to the configured
+        /// <see cref="IRecoveryStrategy"/>. Note that the failed warmup
+        /// attempts count towards the failures-to-enter-recovery threshold,
+        /// so with an aggressive threshold (1 or 2) the engine may throw
+        /// <see cref="CloudRequestEngineTemporarilyUnavailableException"/>
+        /// on use until the recovery period has passed.
+        /// </summary>
+        /// <exception cref="CloudRequestException">
+        /// Thrown if the cloud service definitively rejected a discovery
+        /// request (4xx response), for example because the resource key
+        /// is invalid.
+        /// </exception>
+        public void WarmUp()
+        {
+            var discoveryTasks = new[]
+            {
+                Task.Run(() => { var _ = PublicProperties; }),
+                Task.Run(() => { var _ = EvidenceKeyFilter; }),
+            };
+            try
+            {
+                Task.WaitAll(discoveryTasks);
+            }
+            catch (AggregateException ex)
+            {
+                // Surface a definitive failure directly so that callers
+                // get the same exception type that the PublicProperties and
+                // EvidenceKeyFilter getters would have thrown.
+                var definitive = ex.Flatten().InnerExceptions
+                    .FirstOrDefault(IsDefinitiveConfigurationError);
+                if (definitive != null)
+                {
+                    ExceptionDispatchInfo.Capture(definitive).Throw();
+                }
+                Logger?.LogWarning(ex,
+                    "Failed to warm up the cloud request engine due to a " +
+                    "transient error. The engine will retry the discovery " +
+                    "requests when it is first used.");
+            }
+        }
+
+        /// <summary>
+        /// True if the exception indicates that the cloud service received
+        /// the discovery request and definitively rejected it (4xx), so
+        /// retrying with the same configuration can never succeed.
+        /// Network failures, timeouts and 5xx responses are not definitive -
+        /// they can resolve themselves, so the caller should fall back to
+        /// retrying lazily rather than failing.
+        /// </summary>
+        private static bool IsDefinitiveConfigurationError(Exception ex)
+        {
+            return ex is CloudRequestException cloudEx &&
+                cloudEx.HttpStatusCode >= 400 &&
+                cloudEx.HttpStatusCode < 500;
         }
 
         /// <summary>
