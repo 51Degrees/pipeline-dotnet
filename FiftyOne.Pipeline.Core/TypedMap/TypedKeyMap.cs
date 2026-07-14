@@ -24,7 +24,6 @@ using FiftyOne.Pipeline.Core.Exceptions;
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
-using System.Linq;
 
 namespace FiftyOne.Pipeline.Core.TypedMap
 {
@@ -82,14 +81,9 @@ namespace FiftyOne.Pipeline.Core.TypedMap
         /// </param>
         public void Add<T>(ITypedKey<T> key, T data)
         {
-            if (_data.ContainsKey(key.Name) == false)
-            {
-                _data.Add(key.Name, data);
-            }
-            else
-            {
-                _data[key.Name] = data;
-            }
+            // A single indexer assignment adds or overwrites with one
+            // dictionary lookup.
+            _data[key.Name] = data;
         }
 
         /// <summary>
@@ -132,9 +126,8 @@ namespace FiftyOne.Pipeline.Core.TypedMap
             }
 
             T result = default(T);
-            if (_data.ContainsKey(key.Name))
+            if (_data.TryGetValue(key.Name, out object obj))
             {
-                object obj = _data[key.Name];
                 if (obj != null)
                 {
                     result = (T)obj;
@@ -149,29 +142,31 @@ namespace FiftyOne.Pipeline.Core.TypedMap
 
         public T Get<T>()
         {
-            var matches = _data
-                .Where(kvp => kvp.Value.GetType() is T);
-            if (matches.Any() == false)
+            // Iterate the values once, looking for entries that are
+            // assignable to the requested type.
+            object match = null;
+            bool found = false;
+            foreach (var value in _data.Values)
             {
-                matches = _data.Where(kvp => typeof(T)
-                    .IsAssignableFrom(kvp.Value.GetType()));
+                if (value is T)
+                {
+                    if (found)
+                    {
+                        throw new PipelineDataException($"This map contains " +
+                            $"multiple data instances matching type '{typeof(T).Name}'");
+                    }
+                    match = value;
+                    found = true;
+                }
             }
 
-            if (matches.Count() == 1)
-            {
-                return (T)matches.Single().Value;
-            }
-            else if (matches.Any() == false)
+            if (found == false)
             {
                 throw new PipelineDataException(
                     $"This map contains no data matching type " +
                     $"'{typeof(T).Name}'");
             }
-            else
-            {
-                throw new PipelineDataException($"This map contains " +
-                    $"multiple data instances matching type '{typeof(T).Name}'");
-            }
+            return (T)match;
         }
 
         private String GetKeyMissingMessage(string key)
