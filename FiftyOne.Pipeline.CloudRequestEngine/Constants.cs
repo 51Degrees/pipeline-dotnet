@@ -94,9 +94,15 @@ namespace FiftyOne.Pipeline.CloudRequestEngine
         public const string CLOUD_REQUEST_ORIGIN_DEFAULT = null;
 
         /// <summary>
-        /// Default timeout when calling cloud service with CloudRequestEngine.
+        /// Default timeout in seconds for a request to the cloud service.
+        /// Set high enough that normal cloud latency is not counted as a
+        /// failure (which would trip the recovery circuit breaker), whilst
+        /// still bounding how long a caller thread can block on a slow or
+        /// unreachable cloud. The circuit breaker
+        /// (see <c>CLOUD_REQUEST_FAILURES_TO_ENTER_RECOVERY_DEFAULT</c>)
+        /// caps thread exposure during a genuine outage.
         /// </summary>
-        public const int CLOUD_REQUEST_TIMEOUT_DEFAULT_SECONDS = 2;
+        public const int CLOUD_REQUEST_TIMEOUT_DEFAULT_SECONDS = 10;
 
         /// <summary>
         /// Default recovery period for CloudRequestEngine

@@ -275,6 +275,34 @@ namespace FiftyOne.Pipeline.CloudRequestEngine.Tests
             VerifyEvidenceKeysTimes(1);
         }
 
+        /// <summary>
+        /// The default request timeout must not regress into the range
+        /// where ordinary cloud latency is counted as a failure and trips
+        /// the recovery circuit breaker, and it must reach the HttpClient
+        /// when no explicit timeout is configured.
+        /// </summary>
+        [TestMethod]
+        public void Timeout_Default_AppliedToHttpClient()
+        {
+            Assert.IsTrue(
+                Constants.CLOUD_REQUEST_TIMEOUT_DEFAULT_SECONDS >= 5,
+                "The default cloud request timeout is too low; short " +
+                "timeouts turn normal latency into failures that trip the " +
+                "recovery circuit breaker.");
+
+            var httpClient = new HttpClient(_handlerMock.Object);
+
+            _ = new CloudRequestEngineBuilder(new LoggerFactory(), httpClient)
+                .SetResourceKey("abcdefgh")
+                .Build();
+
+            Assert.AreEqual(
+                TimeSpan.FromSeconds(
+                    Constants.CLOUD_REQUEST_TIMEOUT_DEFAULT_SECONDS),
+                httpClient.Timeout,
+                "The default timeout was not applied to the HttpClient.");
+        }
+
         [TestCleanup]
         public void Cleanup()
         {
