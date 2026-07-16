@@ -92,22 +92,20 @@ namespace FiftyOne.Pipeline.Core.Data
             }
             set
             {
-                if (_data.ContainsKey(key))
+                // Only pay for the existence check when debug logging
+                // is enabled. Otherwise a single indexer assignment
+                // adds or overwrites with one dictionary lookup.
+                if (_logger != null &&
+                    _logger.IsEnabled(LogLevel.Debug) &&
+                    _data.TryGetValue(key, out var oldValue))
                 {
-                    if (_logger.IsEnabled(LogLevel.Debug))
-                    {
-                        _logger.LogDebug(
-                            $"Data '{GetType().Name}' " +
-                            $"overwriting existing value for '{key}' " +
-                            $"(old value '{AsTruncatedString(_data[key])}', " +
-                            $"new value '{AsTruncatedString(value)}').");
-                    }
-                    _data[key] = value;
+                    _logger.LogDebug(
+                        $"Data '{GetType().Name}' " +
+                        $"overwriting existing value for '{key}' " +
+                        $"(old value '{AsTruncatedString(oldValue)}', " +
+                        $"new value '{AsTruncatedString(value)}').");
                 }
-                else
-                {
-                    _data.Add(key, value);
-                }
+                _data[key] = value;
             }
         }
 

@@ -799,13 +799,18 @@ namespace FiftyOne.Pipeline.CloudRequestEngine.FlowElements
         /// <param name="prefix">The prefix to check for.</param>
         /// <returns>True if the key has the prefix.</returns>
         private static bool KeyHasPrefix(
-            KeyValuePair<string, object> item, 
-            string prefix) 
+            KeyValuePair<string, object> item,
+            string prefix)
         {
-            var key = item.Key.Split(EVIDENCE_SEPARATOR_CHAR_ARRAY);
-            return key[0].Equals(
-                prefix, 
-                StringComparison.InvariantCultureIgnoreCase);
+            // Compare the portion of the key before the first separator
+            // in place, avoiding the string array that Split allocates
+            // for every evidence entry.
+            var key = item.Key;
+            int separatorIndex = key.IndexOfAny(EVIDENCE_SEPARATOR_CHAR_ARRAY);
+            int prefixLength = separatorIndex >= 0 ? separatorIndex : key.Length;
+            return prefixLength == prefix.Length &&
+                string.Compare(key, 0, prefix, 0, prefixLength,
+                    StringComparison.InvariantCultureIgnoreCase) == 0;
         }
 
         /// <summary>
@@ -828,10 +833,16 @@ namespace FiftyOne.Pipeline.CloudRequestEngine.FlowElements
         {
             foreach (var item in evidence)
             {
-                // Get the key parts
-                var key = item.Key.Split(EVIDENCE_SEPARATOR_CHAR_ARRAY, count: 2);
-                var prefix = key[0];
-                var suffix = key.Last();
+                // Get the key parts without allocating the string array
+                // that Split would create for every evidence entry.
+                int separatorIndex =
+                    item.Key.IndexOfAny(EVIDENCE_SEPARATOR_CHAR_ARRAY);
+                var prefix = separatorIndex >= 0
+                    ? item.Key.Substring(0, separatorIndex)
+                    : item.Key;
+                var suffix = separatorIndex >= 0
+                    ? item.Key.Substring(separatorIndex + 1)
+                    : item.Key;
 
                 // Check and add the evidence to the query parameters.
                 if (queryData.ContainsKey(suffix) == false)

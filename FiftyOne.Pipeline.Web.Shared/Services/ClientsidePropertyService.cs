@@ -303,7 +303,9 @@ namespace FiftyOne.Pipeline.Web.Shared.Services
                 int length = 0;
                 if (content != null && content.Length > 0)
                 {
-                    length = Encoding.UTF8.GetBytes(content).Length;
+                    // GetByteCount computes the length without allocating
+                    // the byte array that GetBytes would create.
+                    length = Encoding.UTF8.GetByteCount(content);
                 }
 
                 context.Response.StatusCode = 200;
