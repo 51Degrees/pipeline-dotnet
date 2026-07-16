@@ -116,19 +116,29 @@ namespace FiftyOne.Pipeline.CloudRequestEngine
         public const double CLOUD_REQUEST_RECOVERY_SECONDS_DEFAULT = 10.0;
 
         /// <summary>
-        /// Whether exponential backoff is enabled by default.
+        /// Whether exponential backoff is enabled by default. Enabled so
+        /// that after a trip the breaker probes the cloud again quickly
+        /// (see the initial delay below) rather than sitting in a fixed
+        /// <see cref="CLOUD_REQUEST_RECOVERY_SECONDS_DEFAULT"/> blackout,
+        /// backing off further only if the outage persists. When this is
+        /// true the simple <see cref="CLOUD_REQUEST_RECOVERY_SECONDS_DEFAULT"/>
+        /// period is not used.
         /// </summary>
-        public const bool CLOUD_REQUEST_EXPONENTIAL_BACKOFF_ENABLED_DEFAULT = false;
+        public const bool CLOUD_REQUEST_EXPONENTIAL_BACKOFF_ENABLED_DEFAULT = true;
 
         /// <summary>
         /// Default initial delay in seconds for exponential backoff recovery.
+        /// The first recovery probe after a trip happens this soon, so a
+        /// brief cloud blip clears quickly.
         /// </summary>
         public const double CLOUD_REQUEST_EXPONENTIAL_BACKOFF_INITIAL_DELAY_SECONDS_DEFAULT = 2.0;
 
         /// <summary>
         /// Default maximum delay in seconds for exponential backoff recovery.
+        /// Caps how long the breaker stays suppressed between probes so a
+        /// prolonged outage never parks recovery for long.
         /// </summary>
-        public const double CLOUD_REQUEST_EXPONENTIAL_BACKOFF_MAX_DELAY_SECONDS_DEFAULT = 300.0;
+        public const double CLOUD_REQUEST_EXPONENTIAL_BACKOFF_MAX_DELAY_SECONDS_DEFAULT = 10.0;
 
         /// <summary>
         /// Default multiplier for exponential backoff recovery.

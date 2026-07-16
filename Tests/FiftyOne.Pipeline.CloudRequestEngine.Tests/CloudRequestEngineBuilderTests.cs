@@ -22,6 +22,8 @@
 
 using FiftyOne.Pipeline.CloudRequestEngine.FlowElements;
 using FiftyOne.Pipeline.Core.Exceptions;
+using FiftyOne.Pipeline.Core.FailHandling.Facade;
+using FiftyOne.Pipeline.Core.FailHandling.Recovery;
 using Microsoft.Extensions.Logging;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using Moq;
@@ -30,6 +32,7 @@ using System;
 using System.Linq;
 using System.Net;
 using System.Net.Http;
+using System.Reflection;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -312,6 +315,56 @@ namespace FiftyOne.Pipeline.CloudRequestEngine.Tests
                 .SetFailuresToEnterRecovery(
                     Constants.CLOUD_REQUEST_FAILURES_TO_ENTER_RECOVERY_DEFAULT)
                 .Build();
+        }
+
+        /// <summary>
+        /// By default a tripped breaker must recover with exponential
+        /// backoff (probe again quickly, back off only if the outage
+        /// persists) rather than a fixed blackout, and the backoff must be
+        /// capped so it never stays suppressed for long.
+        /// </summary>
+        [TestMethod]
+        public void ExponentialBackoff_IsDefault_WithCappedDelay()
+        {
+            Assert.IsTrue(
+                Constants.CLOUD_REQUEST_EXPONENTIAL_BACKOFF_ENABLED_DEFAULT,
+                "Exponential backoff should be the default recovery strategy.");
+            Assert.IsTrue(
+                Constants.CLOUD_REQUEST_EXPONENTIAL_BACKOFF_MAX_DELAY_SECONDS_DEFAULT
+                    <= 10,
+                "The default maximum backoff delay is too long; recovery " +
+                "should never stay suppressed for long.");
+
+            var engine = new CloudRequestEngineBuilder(
+                    new LoggerFactory(), new HttpClient(_handlerMock.Object))
+                .SetResourceKey("abcdefgh")
+                .Build();
+
+            var failHandler = GetPrivateField<IFailHandler>(
+                engine, "_failHandler");
+            var strategy = GetPrivateField<IRecoveryStrategy>(
+                failHandler, "_recoveryStrategy");
+            Assert.IsInstanceOfType<ExponentialBackoffRecoveryStrategy>(
+                strategy,
+                "The default recovery strategy should be exponential backoff.");
+            var backoff = (ExponentialBackoffRecoveryStrategy)strategy;
+            Assert.AreEqual(
+                Constants.CLOUD_REQUEST_EXPONENTIAL_BACKOFF_INITIAL_DELAY_SECONDS_DEFAULT,
+                backoff.InitialDelaySeconds);
+            Assert.AreEqual(
+                Constants.CLOUD_REQUEST_EXPONENTIAL_BACKOFF_MAX_DELAY_SECONDS_DEFAULT,
+                backoff.MaxDelaySeconds);
+        }
+
+        private static T GetPrivateField<T>(object instance, string fieldName)
+        {
+            var field = instance.GetType().GetField(
+                fieldName, BindingFlags.Instance | BindingFlags.NonPublic);
+            Assert.IsNotNull(
+                field,
+                $"Field '{fieldName}' not found on " +
+                $"{instance.GetType().Name}; pipeline internals changed.");
+            return (T)field.GetValue(instance);
         }
 
         [TestCleanup]

@@ -789,6 +789,7 @@ cloudEx.Message, "Exception message did not contain the expected text.");
                 _loggerFactory,
                 _httpClient)
                 .SetResourceKey(resourceKey)
+                .SetUseExponentialBackoff(false)
                 .SetRecoverySeconds(0.1)
                 .SetFailuresToEnterRecovery(1)
                 .Build();
@@ -860,6 +861,7 @@ cloudEx.Message, "Exception message did not contain the expected text.");
                 _loggerFactory,
                 _httpClient)
                 .SetResourceKey(resourceKey)
+                .SetUseExponentialBackoff(false)
                 .SetRecoverySeconds(0.1)
                 .SetFailuresToEnterRecovery(1)
                 .Build();
@@ -930,6 +932,7 @@ cloudEx.Message, "Exception message did not contain the expected text.");
                 _loggerFactory,
                 _httpClient)
                 .SetResourceKey(resourceKey)
+                .SetUseExponentialBackoff(false)
                 .SetRecoverySeconds(0.3)
                 .SetFailuresToEnterRecovery(1)
                 .Build();
@@ -1914,6 +1917,7 @@ cloudEx.Message, "Exception message did not contain the expected text.");
                 _loggerFactory,
                 _httpClient)
                 .SetResourceKey(resourceKey)
+                .SetUseExponentialBackoff(false)
                 .SetRecoverySeconds(0.2)
                 .SetFailuresToEnterRecovery(1)
                 .Build();
