@@ -1006,6 +1006,100 @@ cloudEx.Message, "Exception message did not contain the expected text.");
         }
 
         /// <summary>
+        /// Reproduce the full circuit-breaker cycle on the per-request
+        /// (Process) path with the exponential backoff recovery strategy
+        /// enabled, which is the configuration a consumer turns on to
+        /// shorten the recovery blackout.
+        ///
+        /// <para>
+        /// Simulate a cloud failure, confirm one failure trips the
+        /// breaker, confirm that a request made while the breaker is open
+        /// is suppressed (throws without making any HTTP call, which is
+        /// what stops a single trip flooding logs and parking threads),
+        /// and confirm the engine comes back alive once the backoff delay
+        /// has elapsed and the cloud is healthy again.
+        /// </para>
+        /// </summary>
+        [TestMethod]
+        public void ExponentialBackoff_TripsThenRecoversAfterDelay()
+        {
+            string resourceKey = "resource_key";
+            string userAgent = "iPhone";
+            const double initialDelaySeconds = 0.5;
+
+            ConfigureMockedClient(_ => true);
+
+            // Warmup discovery succeeds, so the engine builds cleanly and
+            // only the per-request json call fails below.
+            var engine = new CloudRequestEngineBuilder(
+                _loggerFactory,
+                _httpClient)
+                .SetResourceKey(resourceKey)
+                .SetUseExponentialBackoff(true)
+                .SetExponentialBackoffInitialDelay(initialDelaySeconds)
+                .SetExponentialBackoffMaxDelay(30)
+                .SetExponentialBackoffMultiplier(2)
+                .SetFailuresToEnterRecovery(1)
+                .Build();
+
+            using var pipeline = new PipelineBuilder(_loggerFactory)
+                .AddFlowElement(engine).Build();
+
+            void Process()
+            {
+                using var flowData = pipeline.CreateFlowData();
+                flowData.AddEvidence("query.User-Agent", userAgent);
+                flowData.Process();
+            }
+
+            // The cloud starts failing every per-request json call.
+            _jsonResponse = "Status code: 503, service unavailable";
+            _jsonResponseStatus = HttpStatusCode.ServiceUnavailable;
+
+            // First request is attempted, fails, and trips the breaker.
+            var firstError = Assert.ThrowsExactly<AggregateException>(Process);
+            Assert.IsNotInstanceOfType<PipelineTemporarilyUnavailableException>(
+                firstError.InnerException,
+                "The first failure should be the real cloud error, not a " +
+                "suppression, because the breaker is not open yet.");
+            VerifyJsonPosts(Times.Exactly(1));
+
+            // While the breaker is open, a request is short-circuited: it
+            // throws PipelineTemporarilyUnavailableException and makes no
+            // HTTP call (the json POST count stays at one).
+            var suppressed = Assert.ThrowsExactly<AggregateException>(Process);
+            Assert.IsInstanceOfType<PipelineTemporarilyUnavailableException>(
+                suppressed.InnerException,
+                "A request during the recovery window should be suppressed.");
+            VerifyJsonPosts(Times.Exactly(1));
+
+            // The cloud recovers, but the engine stays suppressed until the
+            // backoff delay elapses.
+            _jsonResponse = "{'device':{'value':'1'}}";
+            _jsonResponseStatus = HttpStatusCode.OK;
+
+            Thread.Sleep(TimeSpan.FromSeconds(initialDelaySeconds + 0.3));
+
+            // After the delay the engine comes back alive: the request is
+            // attempted again (a second json POST) and succeeds.
+            Process();
+            VerifyJsonPosts(Times.Exactly(2));
+        }
+
+        private void VerifyJsonPosts(Times times)
+        {
+            _handlerMock.Protected().Verify(
+               "SendAsync",
+               times,
+               ItExpr.Is<HttpRequestMessage>(req =>
+                  req.Method == HttpMethod.Post
+                  && req.RequestUri.AbsolutePath.ToLower().EndsWith("json")
+               ),
+               ItExpr.IsAny<CancellationToken>()
+            );
+        }
+
+        /// <summary>
         /// Verify that the 'DelayExecution' and 'EvidenceProperties'
         /// properties are populated correctly by the CloudRequestEngine.
         /// </summary>

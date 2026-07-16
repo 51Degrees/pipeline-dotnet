@@ -275,6 +275,45 @@ namespace FiftyOne.Pipeline.CloudRequestEngine.Tests
             VerifyEvidenceKeysTimes(1);
         }
 
+        /// <summary>
+        /// The default circuit breaker sensitivity must stay in the range
+        /// that only trips on a genuine outage: a high failure count over a
+        /// short window (a failure rate), not a low count over a long one.
+        /// The default count must also remain a configurable value (within
+        /// the allowed min/max), not sit on the ceiling.
+        /// </summary>
+        [TestMethod]
+        public void FailuresToEnterRecovery_Defaults_RequireSustainedFailureRate()
+        {
+            Assert.IsTrue(
+                Constants.CLOUD_REQUEST_FAILURES_TO_ENTER_RECOVERY_DEFAULT >= 100,
+                "The default failure count is too low; a small count lets " +
+                "stray timeouts on a healthy cloud trip the breaker.");
+            Assert.IsTrue(
+                Constants.CLOUD_REQUEST_FAILURES_WINDOW_SECONDS_DEFAULT <= 10,
+                "The default window is too long; a long window lets failures " +
+                "accumulate slowly rather than requiring an outage-like rate.");
+            Assert.IsTrue(
+                Constants.CLOUD_REQUEST_FAILURES_TO_ENTER_RECOVERY_DEFAULT
+                    < Constants.CLOUD_REQUEST_FAILURES_TO_ENTER_RECOVERY_MAX,
+                "The default failure count must leave headroom below the " +
+                "maximum so a less sensitive breaker can still be configured.");
+            Assert.IsTrue(
+                Constants.CLOUD_REQUEST_RECOVERY_SECONDS_DEFAULT <= 10,
+                "The default recovery period is too long; a trip should " +
+                "suppress requests only briefly before probing the cloud again.");
+
+            // The default must be a value the builder accepts (does not
+            // exceed the max), so an engine can be built without overriding
+            // it.
+            _ = new CloudRequestEngineBuilder(
+                    new LoggerFactory(), new HttpClient(_handlerMock.Object))
+                .SetResourceKey("abcdefgh")
+                .SetFailuresToEnterRecovery(
+                    Constants.CLOUD_REQUEST_FAILURES_TO_ENTER_RECOVERY_DEFAULT)
+                .Build();
+        }
+
         [TestCleanup]
         public void Cleanup()
         {
