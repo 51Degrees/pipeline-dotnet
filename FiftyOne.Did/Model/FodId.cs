@@ -27,7 +27,7 @@ namespace FiftyOne.Did.Model
     /// <summary>
     /// An OWID whose payload encodes the three fields of a 51Did: a 1-byte
     /// flags bitmask (usage tier and identifier type), a 4-byte
-    /// little-endian License Id, and the identifier value.
+    /// little-endian License Id, and the match key.
     /// </summary>
     /// <remarks>
     /// <para>
@@ -35,24 +35,24 @@ namespace FiftyOne.Did.Model
     /// the identifier as a whole, meaning the concept and its rules. The
     /// envelope is the data model that carries it, this OWID, holding the
     /// version, domain, date, payload and signature, re-issued fresh on
-    /// every call. The value is the part of the envelope that is stable
+    /// every call. The match key is the part of the envelope that is stable
     /// and comparable, the payload bytes after Flags and LicenseId,
-    /// exposed as <see cref="Hash"/>. Two responses for the same inputs
-    /// share the same value but differ at the byte level because the
+    /// exposed as <see cref="MatchKey"/>. Two responses for the same inputs
+    /// share the same match key but differ at the byte level because the
     /// envelope embeds a fresh date and signature on each call. Compare
-    /// values, never envelopes.
+    /// match keys, never envelopes.
     /// </para>
     /// <para>
     /// Payload layout. The header (offsets 0-4) is shared by every
     /// identifier type; bits 6-7 of Flags select the type and the length
-    /// of the value that follows:
+    /// of the match key that follows:
     /// </para>
     /// <list type="table">
     ///   <listheader><term>Offset</term><term>Length</term><term>Field</term></listheader>
     ///   <item><term>0</term><term>1</term><term>Flags (bits 0-2 usage, bits 6-7 type)</term></item>
     ///   <item><term>1</term><term>4</term><term>LicenseId (uint32 LE)</term></item>
-    ///   <item><term>5</term><term>32</term><term>Value: SHA-256 (Probabilistic, HashedEmail)</term></item>
-    ///   <item><term>5</term><term>16</term><term>Value: GUID (Random)</term></item>
+    ///   <item><term>5</term><term>32</term><term>Match key: SHA-256 (Probabilistic, HashedEmail)</term></item>
+    ///   <item><term>5</term><term>16</term><term>Match key: GUID (Random)</term></item>
     /// </list>
     /// <para>
     /// Inherits <see cref="Owid"/> so callers can use OWID-level features
@@ -83,12 +83,12 @@ namespace FiftyOne.Did.Model
         public const int LicenseIdLength = 4;
 
         /// <summary>
-        /// Byte offset of the Hash field within the payload.
+        /// Byte offset of the match key field within the payload.
         /// </summary>
         public const int HashOffset = 5;
 
         /// <summary>
-        /// Byte length of the Hash field (SHA-256).
+        /// Byte length of the match key field (SHA-256).
         /// </summary>
         public const int HashLength = 32;
 
@@ -99,7 +99,7 @@ namespace FiftyOne.Did.Model
         public const int HeaderLength = HashOffset;
 
         /// <summary>
-        /// Byte length of the GUID value carried by Random identifiers.
+        /// Byte length of the GUID match key carried by Random identifiers.
         /// </summary>
         public const int GuidLength = 16;
 
@@ -111,7 +111,7 @@ namespace FiftyOne.Did.Model
 
         /// <summary>
         /// Minimum byte length of a Probabilistic or HashedEmail 51Did
-        /// payload (Flags + LicenseId + Hash). Random payloads are
+        /// payload (Flags + LicenseId + MatchKey). Random payloads are
         /// shorter - see <see cref="RandomPayloadLength"/>.
         /// </summary>
         public const int PayloadLength = HashOffset + HashLength;
@@ -132,16 +132,22 @@ namespace FiftyOne.Did.Model
         public uint LicenseId { get; private set; }
 
         /// <summary>
-        /// The value bytes from the payload, a 32-byte SHA-256 for
+        /// The match key from the payload, a 32-byte SHA-256 for
         /// Probabilistic and HashedEmail identifiers, or 16 GUID bytes for
         /// Random ones. This is the stable, comparable part of the
-        /// envelope. Two 51Dids for the same inputs share the same value
+        /// envelope: two 51Dids for the same inputs share the same match key
         /// even though their envelopes (date, signature) differ on every
-        /// issue. Treat it as the cache / dedup key. SHA-256 is the
-        /// underlying hash function for the probabilistic and hashed-email
-        /// types, and the property is named Hash to reflect that.
+        /// issue. Treat it as the cache / dedup key.
         /// </summary>
-        public byte[] Hash { get; private set; } = Array.Empty<byte>();
+        public byte[] MatchKey { get; private set; } = Array.Empty<byte>();
+
+        /// <summary>
+        /// Obsolete alias for <see cref="MatchKey"/>. The stable, comparable
+        /// part of a 51Did is now called the match key, mirroring the Model
+        /// Terms for Marketing vocabulary.
+        /// </summary>
+        [Obsolete("Renamed to MatchKey. This alias will be removed in a future release.")]
+        public byte[] Hash => MatchKey;
 
         /// <summary>
         /// Parse a 51Did from its base64-encoded OWID string.
@@ -232,8 +238,8 @@ namespace FiftyOne.Did.Model
                     $"{HeaderLength + valueLength} bytes; got {Payload.Length}.",
                     paramName);
             }
-            Hash = new byte[valueLength];
-            Array.Copy(Payload, HashOffset, Hash, 0, valueLength);
+            MatchKey = new byte[valueLength];
+            Array.Copy(Payload, HashOffset, MatchKey, 0, valueLength);
         }
     }
 }
