@@ -356,6 +356,8 @@ namespace FiftyOne.Pipeline.Core.Tests.FlowElements
         /// Check that an exception being thrown by a flow element will 
         /// result in the AddError method being called on FlowData and that
         /// the exception is suppressed.
+        /// As exceptions are suppressed, the error must not be flagged for
+        /// error level logging (issue #280).
         /// </summary>
         public void Pipeline_ExceptionDuringProcessingAdd()
         {
@@ -381,7 +383,46 @@ namespace FiftyOne.Pipeline.Core.Tests.FlowElements
             // and flow element.
             data.Verify(d => d.AddError(
                 It.Is<Exception>(ex => ex.Message == "TEST"),
-                element2.Object),
+                element2.Object,
+                true,
+                false),
+                Times.Once());
+        }
+
+        [TestMethod]
+        /// <summary>
+        /// Check that an exception being thrown by a flow element is flagged
+        /// for error level logging when exceptions are not suppressed
+        /// (issue #280).
+        /// </summary>
+        public void Pipeline_ExceptionDuringProcessingLogged()
+        {
+            var element1 = GetMockFlowElement();
+            var element2 = GetMockFlowElement();
+            var data = new Mock<IFlowData>();
+
+            // Configure element 2 to throw an exception.
+            element2.Setup(e => e.Process(It.IsAny<IFlowData>()))
+                .Throws(new Exception("TEST"));
+
+            // Create the pipeline with exceptions not suppressed.
+            var pipeline = CreatePipeline(
+                false,
+                false,
+                element1.Object,
+                element2.Object);
+
+            // Start processing. The mock flow data returns no errors, so no
+            // aggregate exception is thrown here.
+            pipeline.Process(data.Object);
+
+            // Check that add error was called requesting that the error
+            // is logged.
+            data.Verify(d => d.AddError(
+                It.Is<Exception>(ex => ex.Message == "TEST"),
+                element2.Object,
+                true,
+                true),
                 Times.Once());
         }
 

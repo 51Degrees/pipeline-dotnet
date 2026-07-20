@@ -180,6 +180,9 @@ namespace FiftyOne.Pipeline.Core.FlowElements
         /// Control field that indicates if the Pipeline will throw an
         /// aggregate exception during processing or suppress it and ignore the
         /// exceptions added to <see cref="IFlowData.Errors"/>.
+        /// When true, exceptions thrown by flow elements are also not logged
+        /// at error level. They are logged at debug level instead and remain
+        /// available through <see cref="IFlowData.Errors"/>.
         /// </summary>
         public bool SuppressProcessExceptions => _suppressProcessExceptions;
 
@@ -416,7 +419,19 @@ namespace FiftyOne.Pipeline.Core.FlowElements
                 {
                     // If an error occurs then store it in the 
                     // FlowData object.
-                    data.AddError(ex, element);
+                    // When exceptions are suppressed, the caller has stated
+                    // that these failures are expected, so do not log at
+                    // error level. The error is still added to
+                    // IFlowData.Errors and is repeated below at debug level
+                    // so the detail is not lost.
+                    data.AddError(ex, element, true, !SuppressProcessExceptions);
+                    if (SuppressProcessExceptions &&
+                        _logger.IsEnabled(LogLevel.Debug))
+                    {
+                        _logger.LogDebug(ex,
+                            $"Suppressed error during processing of " +
+                            $"'{element?.GetType().Name}'.");
+                    }
                 }
             }
 

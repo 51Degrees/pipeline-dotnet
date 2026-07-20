@@ -200,11 +200,49 @@ namespace FiftyOne.Pipeline.Core.Tests.FlowElements
             // Start processing
             _parallelElements.Process(data.Object);
 
-            // Check that add error was called with the expected exception 
-            // and flow element.
+            // Check that add error was called with the expected exception
+            // and flow element. The mock flow data has no pipeline, so
+            // exceptions are not suppressed and the error is logged.
             data.Verify(d => d.AddError(
                 It.Is<Exception>(ex => ex.Message == "TEST"),
-                element2.Object),
+                element2.Object,
+                true,
+                true),
+                Times.Once());
+        }
+
+        [TestMethod]
+        /// <summary>
+        /// Check that an exception being thrown by a flow element is not
+        /// flagged for error level logging when the pipeline is suppressing
+        /// process exceptions (issue #280).
+        /// </summary>
+        public void ParallelElements_ExceptionDuringProcessingSuppressed()
+        {
+            var element1 = new Mock<IFlowElement>();
+            var element2 = new Mock<IFlowElement>();
+            var data = new Mock<IFlowData>();
+            _pipeline.Setup(p => p.SuppressProcessExceptions).Returns(true);
+            data.Setup(d => d.Pipeline).Returns(_pipeline.Object);
+
+            // Configure element 2 to throw an exception.
+            element2.Setup(e => e.Process(It.IsAny<IFlowData>()))
+                .Throws(new Exception("TEST"));
+
+            _parallelElements = new ParallelElements(_logger.Object,
+                element1.Object,
+                element2.Object);
+
+            // Start processing
+            _parallelElements.Process(data.Object);
+
+            // Check that add error was called asking for the error not to
+            // be logged.
+            data.Verify(d => d.AddError(
+                It.Is<Exception>(ex => ex.Message == "TEST"),
+                element2.Object,
+                true,
+                false),
                 Times.Once());
         }
 
