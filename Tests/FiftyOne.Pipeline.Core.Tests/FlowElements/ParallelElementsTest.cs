@@ -188,6 +188,8 @@ namespace FiftyOne.Pipeline.Core.Tests.FlowElements
             var element1 = new Mock<IFlowElement>();
             var element2 = new Mock<IFlowElement>();
             var data = new Mock<IFlowData>();
+            _pipeline.Setup(p => p.SuppressProcessExceptions).Returns(false);
+            data.Setup(d => d.Pipeline).Returns(_pipeline.Object);
 
             // Configure element 2 to throw an exception.
             element2.Setup(e => e.Process(It.IsAny<IFlowData>()))
@@ -201,8 +203,8 @@ namespace FiftyOne.Pipeline.Core.Tests.FlowElements
             _parallelElements.Process(data.Object);
 
             // Check that add error was called with the expected exception
-            // and flow element. The mock flow data has no pipeline, so
-            // exceptions are not suppressed and the error is logged.
+            // and flow element. Exceptions are not suppressed, so the error
+            // is flagged for logging.
             data.Verify(d => d.AddError(
                 It.Is<Exception>(ex => ex.Message == "TEST"),
                 element2.Object,

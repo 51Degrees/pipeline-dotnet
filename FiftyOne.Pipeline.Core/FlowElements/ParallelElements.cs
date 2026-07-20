@@ -143,6 +143,9 @@ namespace FiftyOne.Pipeline.Core.FlowElements
                             // skipped when the pipeline suppresses process
                             // exceptions. The error remains available through
                             // IFlowData.Errors and is logged at debug level.
+                            // Pipeline is never null on a flow data created by
+                            // a pipeline, but stub implementations can leave it
+                            // unset, so treat that as 'do not suppress'.
                             var suppress =
                                 data.Pipeline?.SuppressProcessExceptions ?? false;
                             foreach (var innerException in t.Exception.InnerExceptions)
@@ -151,7 +154,7 @@ namespace FiftyOne.Pipeline.Core.FlowElements
                                 if (suppress && Logger.IsEnabled(LogLevel.Debug))
                                 {
                                     Logger.LogDebug(innerException,
-                                        $"Suppressed error during processing of " +
+                                        "Suppressed error during processing of " +
                                         $"'{element?.GetType().Name}'.");
                                 }
                             }

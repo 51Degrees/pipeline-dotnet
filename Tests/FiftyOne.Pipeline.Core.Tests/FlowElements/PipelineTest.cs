@@ -20,6 +20,7 @@
  * such notice(s) shall fulfill the requirements of that article.
  * ********************************************************************* */
 
+using FiftyOne.Common.TestHelpers;
 using FiftyOne.Pipeline.Core.Data;
 using FiftyOne.Pipeline.Core.Exceptions;
 using FiftyOne.Pipeline.Core.FlowElements;
@@ -29,6 +30,7 @@ using Microsoft.VisualStudio.TestTools.UnitTesting;
 using Moq;
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -424,6 +426,63 @@ namespace FiftyOne.Pipeline.Core.Tests.FlowElements
                 true,
                 true),
                 Times.Once());
+        }
+
+        [TestMethod]
+        /// <summary>
+        /// End to end check that a real pipeline and flow data log nothing
+        /// at error level when exceptions are suppressed, and that the error
+        /// is still available through IFlowData.Errors (issue #280).
+        /// </summary>
+        public void Pipeline_ExceptionDuringProcessing_Suppressed_NotLoggedAsError()
+        {
+            var loggerFactory = new TestLoggerFactory();
+            var element = GetMockFlowElement();
+            element.Setup(e => e.Process(It.IsAny<IFlowData>()))
+                .Throws(new Exception("TEST"));
+
+            using (var pipeline = new PipelineBuilder(loggerFactory)
+                .AddFlowElement(element.Object)
+                .SetSuppressProcessExceptions(true)
+                .Build())
+            using (var data = pipeline.CreateFlowData())
+            {
+                data.Process();
+
+                Assert.HasCount(1, data.Errors,
+                    "The error should still be recorded in FlowData.Errors.");
+            }
+
+            // Nothing must have been logged at error level.
+            loggerFactory.AssertMaxErrors(0);
+        }
+
+        [TestMethod]
+        /// <summary>
+        /// End to end check that a real pipeline and flow data do log at
+        /// error level when exceptions are not suppressed (issue #280).
+        /// </summary>
+        public void Pipeline_ExceptionDuringProcessing_NotSuppressed_LoggedAsError()
+        {
+            var loggerFactory = new TestLoggerFactory();
+            var element = GetMockFlowElement();
+            element.Setup(e => e.Process(It.IsAny<IFlowData>()))
+                .Throws(new Exception("TEST"));
+
+            using (var pipeline = new PipelineBuilder(loggerFactory)
+                .AddFlowElement(element.Object)
+                .SetSuppressProcessExceptions(false)
+                .Build())
+            using (var data = pipeline.CreateFlowData())
+            {
+                Assert.ThrowsExactly<AggregateException>(() => data.Process());
+            }
+
+            var errorEntries = loggerFactory.Loggers
+                .SelectMany(l => l.ErrorEntries)
+                .ToList();
+            Assert.HasCount(1, errorEntries,
+                "The error should have been logged at error level.");
         }
 
         /// <summary>
