@@ -375,7 +375,14 @@ namespace FiftyOne.Pipeline.Translation.FlowElements
         }
 
         /// <summary>
-        /// Gets the source value from the sourceData
+        /// Gets the source value from the sourceData.
+        /// The value is read through <see cref="IData.AsDictionary"/>
+        /// rather than the indexer because a missing property must report
+        /// false, not throw: aspect data (for example a cloud engine's
+        /// data when the resource key does not include the property, or
+        /// when the cloud request failed) throws from its indexer for a
+        /// missing property, while its AsDictionary waits for any lazy
+        /// loading and then supports a non-throwing lookup.
         /// </summary>
         /// <param name="sourceData"></param>
         /// <param name="sourceProperty"></param>
@@ -394,8 +401,9 @@ namespace FiftyOne.Pipeline.Translation.FlowElements
                 return false;
             }
 
-            sourceValue = sourceData[sourceProperty];
-            return sourceValue != null;
+            return sourceData.AsDictionary()
+                    .TryGetValue(sourceProperty, out sourceValue) &&
+                sourceValue != null;
         }
 
         /// <summary>
@@ -419,14 +427,11 @@ namespace FiftyOne.Pipeline.Translation.FlowElements
                    property.SourceProperty,
                    out object sourceValue) == false)
                 {
-                    // Here there is no way to know what type the source property
-                    // is, so we don't have to match it. Meaning we can use an
-                    // AspectPropertyValue.
-                    var value = new AspectPropertyValue<string>();
-                    value.NoValueMessage = $"The source property " +
-                        $"'{property.SourceProperty}' could not be found in " +
-                        $"the source data.";
-                    translationData[property.DestinationProperty] = value;
+                    translationData[property.DestinationProperty] =
+                        property.CreateNoValuePlaceholder(
+                            $"The source property " +
+                            $"'{property.SourceProperty}' could not be " +
+                            $"found in the source data.");
                 }
                 else
                 {
