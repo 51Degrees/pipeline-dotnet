@@ -353,7 +353,87 @@ namespace FiftyOne.Pipeline.Core.Tests.FlowElements
 
         [TestMethod]
         /// <summary>
-        /// Check that an exception being thrown by a flow element will 
+        /// Check that errors recorded with ShouldThrow false (e.g. a cloud
+        /// engine noting that it did not process because the cloud request
+        /// failed) do not cause the Process method to throw, even when
+        /// process exceptions are not suppressed.
+        /// </summary>
+        public void Pipeline_NonThrowingErrorsOnlyDontThrow()
+        {
+            var element1 = GetMockFlowElement();
+            var errors = new List<IFlowError>() {
+                new FlowError(
+                    new Exception("TEST"),
+                    element1.Object,
+                    shouldThrow: false)
+            };
+            var data = new Mock<IFlowData>();
+
+            // Configure the flow data to return errors.
+            data.SetupGet(d => d.Errors).Returns(errors);
+
+            // Create the pipeline without suppressing process exceptions.
+            var pipeline = CreatePipeline(
+                false,
+                false,
+                element1.Object);
+
+            // Start processing. No exception is expected because the only
+            // recorded error is non-throwing.
+            pipeline.Process(data.Object);
+        }
+
+        [TestMethod]
+        /// <summary>
+        /// Check that when throwing and non-throwing errors are mixed, only
+        /// the throwing errors appear in the aggregate exception.
+        /// </summary>
+        public void Pipeline_MixedErrorsThrowOnlyThrowing()
+        {
+            var element1 = GetMockFlowElement();
+            var errors = new List<IFlowError>() {
+                new FlowError(
+                    new Exception("QUIET"),
+                    element1.Object,
+                    shouldThrow: false),
+                new FlowError(new Exception("LOUD"), element1.Object)
+            };
+            var data = new Mock<IFlowData>();
+
+            // Configure the flow data to return errors.
+            data.SetupGet(d => d.Errors).Returns(errors);
+
+            // Create the pipeline without suppressing process exceptions.
+            var pipeline = CreatePipeline(
+                false,
+                false,
+                element1.Object);
+
+            // Start processing.
+            Exception exception = null;
+            try
+            {
+                pipeline.Process(data.Object);
+            }
+            catch (Exception e)
+            {
+                exception = e;
+            }
+
+            // Check that only the throwing error is in the aggregate.
+            Assert.IsNotNull(exception);
+            Assert.IsInstanceOfType(exception, typeof(AggregateException));
+            Assert.HasCount(
+                1,
+                ((AggregateException)exception).InnerExceptions);
+            Assert.AreEqual(
+                "LOUD",
+                ((AggregateException)exception).InnerExceptions[0].Message);
+        }
+
+        [TestMethod]
+        /// <summary>
+        /// Check that an exception being thrown by a flow element will
         /// result in the AddError method being called on FlowData and that
         /// the exception is suppressed.
         /// </summary>

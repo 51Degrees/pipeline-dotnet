@@ -420,11 +420,14 @@ namespace FiftyOne.Pipeline.Core.FlowElements
                 }
             }
 
-            // If any errors have occurred and exceptions are not
-            // suppressed, then throw an aggregate exception.
+            // If any throwing errors have occurred and exceptions are not
+            // suppressed, then throw an aggregate exception. Errors recorded
+            // with ShouldThrow false (e.g. a cloud engine noting that it did
+            // not process because the cloud request failed) are diagnostic
+            // only and must not surface as an exception of their own.
             if (data.Errors != null &&
-                data.Errors.Count > 0 &&
-                SuppressProcessExceptions == false)
+                SuppressProcessExceptions == false &&
+                data.Errors.Any(e => e.ShouldThrow))
             {
                 throw new AggregateException(data.Errors
                     .Where(e => e.ShouldThrow == true)
