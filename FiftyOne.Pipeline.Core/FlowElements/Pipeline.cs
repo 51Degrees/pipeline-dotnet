@@ -180,6 +180,13 @@ namespace FiftyOne.Pipeline.Core.FlowElements
         /// Control field that indicates if the Pipeline will throw an
         /// aggregate exception during processing or suppress it and ignore the
         /// exceptions added to <see cref="IFlowData.Errors"/>.
+        /// When true, exceptions thrown by flow elements are also not logged
+        /// at error level. They are logged at debug level instead and remain
+        /// available through <see cref="IFlowData.Errors"/>.
+        /// This applies to exceptions that a flow element allows to escape
+        /// its Process method. Errors that an element records itself by
+        /// calling AddError on the flow data are logged as that element
+        /// requests, regardless of this setting.
         /// </summary>
         public bool SuppressProcessExceptions => _suppressProcessExceptions;
 
@@ -382,6 +389,13 @@ namespace FiftyOne.Pipeline.Core.FlowElements
         /// Thrown if an error occurred during processing, 
         /// unless <see ref="SuppressProcessExceptions"/> is true.
         /// </exception>
+        /// <remarks>
+        /// If <see ref="SuppressProcessExceptions"/> is true then exceptions
+        /// thrown by elements are logged at debug rather than error level.
+        /// They are always added to <see cref="IFlowData.Errors"/>.
+        /// Errors that an element records itself by calling AddError on the
+        /// flow data are not affected by this setting.
+        /// </remarks>
         public void Process(IFlowData data)
         {
             if(data == null)
@@ -416,7 +430,19 @@ namespace FiftyOne.Pipeline.Core.FlowElements
                 {
                     // If an error occurs then store it in the 
                     // FlowData object.
-                    data.AddError(ex, element);
+                    // When exceptions are suppressed, the caller has stated
+                    // that these failures are expected, so do not log at
+                    // error level. The error is still added to
+                    // IFlowData.Errors and is repeated below at debug level
+                    // so the detail is not lost.
+                    data.AddError(ex, element, true, !SuppressProcessExceptions);
+                    if (SuppressProcessExceptions &&
+                        _logger.IsEnabled(LogLevel.Debug))
+                    {
+                        _logger.LogDebug(ex,
+                            "Suppressed error during processing of " +
+                            $"'{element?.GetType().Name}'.");
+                    }
                 }
             }
 
