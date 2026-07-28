@@ -175,6 +175,7 @@ namespace FiftyOne.Pipeline.JavaScript.Tests
             fullJS = BuildTemplateScript(jsonData);
 
             Driver.Manage().Cookies.DeleteAllCookies();
+            ((IJavaScriptExecutor)Driver).ExecuteScript("sessionStorage.clear();");
             Driver.Navigate().GoToUrl(ClientServerUrl);
 
             IJavaScriptExecutor js = Driver;
@@ -182,6 +183,7 @@ namespace FiftyOne.Pipeline.JavaScript.Tests
                 () => js.ExecuteScript("return window.fod && window.fod.isComplete === true;") is bool b && b,
                 "fod.isComplete === true");
             Assert.AreEqual("True", (string)js.ExecuteScript("return window.fod.data.device.ismobile;"));
+            Assert.IsNull(capturedPostData);
         }
 
         [TestMethod]
@@ -199,6 +201,7 @@ namespace FiftyOne.Pipeline.JavaScript.Tests
             fullJS = BuildTemplateScript(embeddedJson);
 
             Driver.Manage().Cookies.DeleteAllCookies();
+            ((IJavaScriptExecutor)Driver).ExecuteScript("sessionStorage.clear();");
             Driver.Navigate().GoToUrl(ClientServerUrl);
 
             IJavaScriptExecutor js = Driver;
@@ -224,6 +227,7 @@ namespace FiftyOne.Pipeline.JavaScript.Tests
                 + BuildTemplateScript(embeddedJson);
 
             Driver.Manage().Cookies.DeleteAllCookies();
+            ((IJavaScriptExecutor)Driver).ExecuteScript("sessionStorage.clear();");
             Driver.Navigate().GoToUrl(ClientServerUrl);
 
             WaitUntil(() => capturedPostData != null, "POST data with id.email");
