@@ -301,7 +301,8 @@ namespace FiftyOne.Pipeline.Engines.FiftyOne.FlowElements
 
         /// <summary>
         /// Configure the usage sharing element to share all evidence.
-        /// This will override all the other evidence filtering settings.
+        /// This will override the blocked header and included query
+        /// string parameter settings.
         /// </summary>
         /// <param name="shareAll">
         /// If set to true then all evidence will be shared
@@ -367,10 +368,13 @@ namespace FiftyOne.Pipeline.Engines.FiftyOne.FlowElements
             {
                 foreach (var kvpString in evidenceFilter.Split(','))
                 {
-                    if (kvpString.Contains(":"))
+                    int separatorIndex = kvpString.IndexOf(':');
+                    if (separatorIndex >= 0)
                     {
                         KeyValuePair<string, string> kvp =
-                            new KeyValuePair<string, string>(kvpString.Split(':')[0], kvpString.Split(':')[1]);
+                            new KeyValuePair<string, string>(
+                                kvpString.Substring(0, separatorIndex),
+                                kvpString.Substring(separatorIndex + 1));
                         IgnoreDataEvidenceFilter.Add(kvp);
                     }
                     else

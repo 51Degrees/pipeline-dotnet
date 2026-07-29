@@ -601,6 +601,38 @@ namespace FiftyOne.Pipeline.Engines.FiftyOne.Tests.FlowElements
         }
 
         /// <summary>
+        /// Test that the ignore filter is applied when the element is
+        /// configured to share all evidence.
+        /// </summary>
+        [TestMethod]
+        public void ShareUsageElement_IgnoreOnEvidence_ShareAllEvidence()
+        {
+            // Arrange
+            CreateShareUsage(1, 1, 1, new List<string>(), new List<string>(),
+                new List<KeyValuePair<string, string>>()
+                {
+                    new KeyValuePair<string, string>("header.User-Agent", "Azure Traffic Manager Endpoint Monitor")
+                },
+                shareAll: true);
+
+            Dictionary<string, object> evidenceData = new Dictionary<string, object>()
+            {
+                { Core.Constants.EVIDENCE_CLIENTIP_KEY, "1.2.3.4" },
+                { "header.User-Agent", "Azure Traffic Manager Endpoint Monitor" }
+            };
+            var data = MockFlowData.CreateFromEvidence(evidenceData, false);
+
+            // Act
+            _shareUsageElement.Process(data.Object);
+            // Check that the consumer task did not start.
+            Assert.IsNull(_shareUsageElement.SendDataTask);
+
+            // Assert
+            // Check that no HTTP messages were sent.
+            _httpHandler.VerifySendCalled(0);
+        }
+
+        /// <summary>
         /// Check that the usage element can handle invalid xml chars.
         /// </summary>
         /// <param name="config"></param>
@@ -682,6 +714,42 @@ namespace FiftyOne.Pipeline.Engines.FiftyOne.Tests.FlowElements
 
             Assert.AreEqual(0, logger.WarningEntries.Count());
             Assert.AreEqual(0, logger.ErrorEntries.Count());
+        }
+
+        /// <summary>
+        /// Test that a filter value containing colons is parsed in full.
+        /// </summary>
+        [TestMethod]
+        public void ShareUsageBuilder_IgnoreData_ValueWithColons()
+        {
+            var logger = new TestLogger();
+
+            TestShareUsageBuilder builder = new TestShareUsageBuilder(new TestLoggerFactory(), logger, _httpClient);
+            builder.SetIgnoreFlowDataEvidenceFilter(
+                "header.User-Agent:Pingdom.com_bot_version_1.4_(http://www.pingdom.com/)");
+
+            Assert.AreEqual(0, logger.WarningEntries.Count());
+            Assert.HasCount(1, builder.Filter);
+            Assert.AreEqual("header.User-Agent", builder.Filter[0].Key);
+            Assert.AreEqual(
+                "Pingdom.com_bot_version_1.4_(http://www.pingdom.com/)",
+                builder.Filter[0].Value);
+        }
+
+        /// <summary>
+        /// Exposes the parsed ignore filter for assertions.
+        /// </summary>
+        private class TestShareUsageBuilder : ShareUsageBuilder
+        {
+            public TestShareUsageBuilder(
+                ILoggerFactory loggerFactory,
+                ILogger logger,
+                HttpClient httpClient)
+                : base(loggerFactory, logger, httpClient)
+            {
+            }
+
+            public List<KeyValuePair<string, string>> Filter => IgnoreDataEvidenceFilter;
         }
 
         /// <summary>
