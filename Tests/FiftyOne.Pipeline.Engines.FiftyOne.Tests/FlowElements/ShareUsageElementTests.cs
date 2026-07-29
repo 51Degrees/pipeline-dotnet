@@ -633,6 +633,43 @@ namespace FiftyOne.Pipeline.Engines.FiftyOne.Tests.FlowElements
         }
 
         /// <summary>
+        /// Test that a request which does not match the ignore filter is
+        /// still shared when the element is configured to share all
+        /// evidence. This guards the opposite direction to
+        /// <see cref="ShareUsageElement_IgnoreOnEvidence_ShareAllEvidence"/>:
+        /// applying the filter must not suppress everything.
+        /// </summary>
+        [TestMethod]
+        public void ShareUsageElement_ShareAllEvidence_FilterDoesNotMatch()
+        {
+            // Arrange
+            CreateShareUsage(1, 1, 1, new List<string>(), new List<string>(),
+                new List<KeyValuePair<string, string>>()
+                {
+                    new KeyValuePair<string, string>("header.User-Agent", "Azure Traffic Manager Endpoint Monitor")
+                },
+                shareAll: true);
+
+            Dictionary<string, object> evidenceData = new Dictionary<string, object>()
+            {
+                { Core.Constants.EVIDENCE_CLIENTIP_KEY, "1.2.3.4" },
+                { "header.User-Agent", "iPhone" }
+            };
+            var data = MockFlowData.CreateFromEvidence(evidenceData, false);
+
+            // Act
+            _shareUsageElement.Process(data.Object);
+            // Wait for the consumer task to finish.
+            WaitForSendDataTask();
+
+            // Assert
+            // Check that one and only one HTTP message was sent.
+            _httpHandler.VerifySendCalled(1);
+            Assert.HasCount(1, _xmlContent);
+            Assert.Contains("iPhone", _xmlContent[0]);
+        }
+
+        /// <summary>
         /// Check that the usage element can handle invalid xml chars.
         /// </summary>
         /// <param name="config"></param>
