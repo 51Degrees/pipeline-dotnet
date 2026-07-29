@@ -737,6 +737,29 @@ namespace FiftyOne.Pipeline.Engines.FiftyOne.Tests.FlowElements
         }
 
         /// <summary>
+        /// Test that whitespace around entries and keys is ignored, so a
+        /// filter written with spaces after the commas still matches.
+        /// </summary>
+        [TestMethod]
+        public void ShareUsageBuilder_IgnoreData_WhitespaceAroundEntries()
+        {
+            var logger = new TestLogger();
+
+            TestShareUsageBuilder builder = new TestShareUsageBuilder(new TestLoggerFactory(), logger, _httpClient);
+            builder.SetIgnoreFlowDataEvidenceFilter(
+                " header.User-Agent :Azure Traffic Manager Endpoint Monitor , header.Other:value ");
+
+            Assert.AreEqual(0, logger.WarningEntries.Count());
+            Assert.HasCount(2, builder.Filter);
+            Assert.AreEqual("header.User-Agent", builder.Filter[0].Key);
+            Assert.AreEqual(
+                "Azure Traffic Manager Endpoint Monitor",
+                builder.Filter[0].Value);
+            Assert.AreEqual("header.Other", builder.Filter[1].Key);
+            Assert.AreEqual("value", builder.Filter[1].Value);
+        }
+
+        /// <summary>
         /// Exposes the parsed ignore filter for assertions.
         /// </summary>
         private class TestShareUsageBuilder : ShareUsageBuilder
