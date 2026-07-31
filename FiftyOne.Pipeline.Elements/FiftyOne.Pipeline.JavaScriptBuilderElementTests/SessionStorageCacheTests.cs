@@ -1,3 +1,25 @@
+/* *********************************************************************
+ * This Original Work is copyright of 51 Degrees Mobile Experts Limited.
+ * Copyright 2026 51 Degrees Mobile Experts Limited, Davidson House,
+ * Forbury Square, Reading, Berkshire, United Kingdom RG1 3EU.
+ *
+ * This Original Work is licensed under the European Union Public Licence
+ * (EUPL) v.1.2 and is subject to its terms as set out below.
+ *
+ * If a copy of the EUPL was not distributed with this file, You can obtain
+ * one at https://opensource.org/licenses/EUPL-1.2.
+ *
+ * The 'Compatible Licences' set out in the Appendix to the EUPL (as may be
+ * amended by the European Commission) shall be deemed incompatible for
+ * the purposes of the Work and the provisions of the compatibility
+ * clause in Article 5 of the EUPL shall not apply.
+ *
+ * If using the Work as, or as part of, a network application, by
+ * including the attribution notice(s) required under Article 5 of the EUPL
+ * in the end user terms of the application under an appropriate heading,
+ * such notice(s) shall fulfill the requirements of that article.
+ * ********************************************************************* */
+
 using FiftyOne.Common.TestHelpers;
 using FiftyOne.Pipeline.Core.Data;
 using FiftyOne.Pipeline.Core.FlowElements;
@@ -181,6 +203,10 @@ namespace FiftyOne.Pipeline.JavaScript.Tests
                 Assert.AreNotEqual(sessionIdPage1, sessionIdPage2,
                     "the include must be fetched fresh on the second page, " +
                     "not served from the browser cache");
+                Assert.IsFalse(
+                    keysPage1.Concat(keysPage2).Any(k =>
+                        k.Contains(sessionIdPage1) || k.Contains(sessionIdPage2)),
+                    "session storage keys must not embed the per-request session id");
                 CollectionAssert.AreEqual(keysPage1, keysPage2,
                     "session storage keys must not change between page views: " +
                     $"[{string.Join(", ", keysPage1)}] -> [{string.Join(", ", keysPage2)}]");
@@ -188,6 +214,57 @@ namespace FiftyOne.Pipeline.JavaScript.Tests
                     "no json refresh call is expected on the second page");
                 Assert.AreEqual("purple", valuePage2,
                     "the second page must still see the value produced on the first page");
+            }
+            finally
+            {
+                driver?.Quit();
+                await app.DisposeAsync();
+            }
+        }
+
+        [TestMethod]
+        [Timeout(300_000)]
+        public async Task SessionStorageCache_BadJsonResponseClearsCache()
+        {
+            var port = TestHttpListener.GetRandomUnusedPort();
+            var url = $"http://localhost:{port}/";
+
+            using var pipeline = BuildPipeline(enableCookies: false, port);
+
+            var builder = WebApplication.CreateBuilder();
+            var app = builder.Build();
+            app.Use((ctx, next) =>
+            {
+                ctx.Response.Headers["Cache-Control"] = "no-store";
+                return next();
+            });
+            app.MapGet("/51dpipeline/js", (HttpContext ctx) =>
+                Results.Content(
+                    BuildContent(pipeline, ctx,
+                        d => d.Get<IJavaScriptBuilderElementData>().JavaScript),
+                    "text/javascript"));
+            app.MapPost("/51dpipeline/json", () =>
+                Results.Content("not json", "application/json"));
+            app.MapGet("/{page}", (string page) => Results.Content(PageHtml, "text/html"));
+            app.Urls.Add(url);
+            await app.StartAsync();
+
+            ChromeDriver driver = null;
+            try
+            {
+                driver = CreateDriver();
+                IJavaScriptExecutor js = driver;
+
+                driver.Navigate().GoToUrl(url + "page1");
+                WaitForFodDone(js, "page with a failing refresh", () => 0);
+
+                var leftover = GetSessionStorageKeys(js)
+                    .Where(k => k == "fod" ||
+                        k.StartsWith("fod_", StringComparison.Ordinal))
+                    .ToList();
+                Assert.AreEqual(0, leftover.Count,
+                    "a failed refresh must clear every cached entry, left: " +
+                    $"[{string.Join(", ", leftover)}]");
             }
             finally
             {
@@ -240,18 +317,9 @@ namespace FiftyOne.Pipeline.JavaScript.Tests
 
         private static ChromeDriver CreateDriver()
         {
-            var chromeOptions = new ChromeOptions();
-            chromeOptions.SetLoggingPreference(LogType.Browser, OpenQA.Selenium.LogLevel.Info);
-            chromeOptions.AcceptInsecureCertificates = true;
-            chromeOptions.AddArgument("--headless");
-            chromeOptions.AddArgument("--no-sandbox");
-            chromeOptions.AddArgument("--disable-dev-shm-usage");
-            chromeOptions.AddArgument("--disable-gpu");
             try
             {
-                var driver = new ChromeDriver(chromeOptions);
-                driver.Manage().Timeouts().PageLoad = TimeSpan.FromSeconds(60);
-                return driver;
+                return JavaScriptBuilderElementTestsBase.CreateConfiguredDriver();
             }
             catch (WebDriverException)
             {

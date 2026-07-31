@@ -51,7 +51,11 @@ namespace FiftyOne.Pipeline.JavaScript.Tests
             return Task.CompletedTask;
         }
 
-        private static void CreateDriver()
+        /// <summary>
+        /// Builds a headless Chrome driver with the options shared by the
+        /// browser tests in this project.
+        /// </summary>
+        public static ChromeDriver CreateConfiguredDriver()
         {
             var chromeOptions = new ChromeOptions();
             chromeOptions.SetLoggingPreference(LogType.Browser, OpenQA.Selenium.LogLevel.Info);
@@ -64,13 +68,19 @@ namespace FiftyOne.Pipeline.JavaScript.Tests
             chromeOptions.AddArgument("--disable-dev-shm-usage");
             chromeOptions.AddArgument("--disable-gpu");
 
+            var driver = new ChromeDriver(chromeOptions);
+            // Bound a stuck navigation so GoToUrl throws quickly instead of
+            // blocking until the runner's hang-dump aborts the thread and
+            // crashes the tab.
+            driver.Manage().Timeouts().PageLoad = TimeSpan.FromSeconds(60);
+            return driver;
+        }
+
+        private static void CreateDriver()
+        {
             try
             {
-                Driver = new ChromeDriver(chromeOptions);
-                // Bound a stuck navigation so GoToUrl throws quickly instead of
-                // blocking until the runner's hang-dump aborts the thread and
-                // crashes the tab.
-                Driver.Manage().Timeouts().PageLoad = TimeSpan.FromSeconds(60);
+                Driver = CreateConfiguredDriver();
             }
             catch (WebDriverException)
             {
