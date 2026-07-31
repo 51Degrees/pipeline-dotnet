@@ -140,6 +140,90 @@ namespace FiftyOne.Pipeline.JavaScript.Tests
             protected override void UnmanagedResourcesCleanup() { }
         }
 
+        private const string DelayedPageHtml = """
+            <!DOCTYPE html>
+            <html>
+              <head>
+                <title>Delayed evidence test</title>
+                <script src="/51dpipeline/js"></script>
+                <script>
+                  window.fodError = '';
+                  window.addEventListener('error', function (e) {
+                    window.fodError = e.message || 'unknown error';
+                  });
+                  window.addEventListener('load', function () {
+                    fod.complete(function (data) {}, 'loc');
+                  });
+                </script>
+              </head>
+              <body>
+                Delayed evidence test page
+              </body>
+            </html>
+            """;
+
+        private class TestDelayedData : ElementDataBase
+        {
+            public TestDelayedData(ILogger<ElementDataBase> logger, IPipeline pipeline)
+                : base(logger, pipeline)
+            {
+            }
+        }
+
+        /// <summary>
+        /// Test element with two delayed JavaScript properties: one referenced
+        /// by an evidenceproperties entry at the top level of the aspect and
+        /// one by an entry inside a nested object.
+        /// </summary>
+        private class TestDelayedElement : FlowElementBase<TestDelayedData, ElementPropertyMetaData>
+        {
+            private readonly ILoggerFactory _loggerFactory;
+
+            public TestDelayedElement(ILoggerFactory loggerFactory)
+                : base(loggerFactory.CreateLogger<FlowElementBase<TestDelayedData, ElementPropertyMetaData>>())
+            {
+                _loggerFactory = loggerFactory;
+            }
+
+            public override string ElementDataKey => "loc";
+
+            public override IEvidenceKeyFilter EvidenceKeyFilter =>
+                new EvidenceKeyFilterWhitelist(new List<string>() {
+                    "query.51D_a",
+                    "query.51D_b",
+                });
+
+            public override IList<ElementPropertyMetaData> Properties =>
+                new List<ElementPropertyMetaData>()
+                {
+                    new ElementPropertyMetaData(this, "ajs", typeof(Core.Data.Types.JavaScript), true),
+                    new ElementPropertyMetaData(this, "bjs", typeof(Core.Data.Types.JavaScript), true),
+                };
+
+            protected override void ProcessInternal(IFlowData data)
+            {
+                var result = new TestDelayedData(
+                    _loggerFactory.CreateLogger<TestDelayedData>(), data.Pipeline);
+                // The top level entry must come before the nested object so
+                // the recursion walks both.
+                result["aevidenceproperties"] = new List<string> { "loc.ajs" };
+                result["nested"] = new Dictionary<string, object>
+                {
+                    ["bevidenceproperties"] = new List<string> { "loc.bjs" },
+                };
+                result["ajs"] = new Core.Data.Types.JavaScript(
+                    "document.cookie = \"51D_a=\" + \"one\"");
+                result["bjs"] = new Core.Data.Types.JavaScript(
+                    "document.cookie = \"51D_b=\" + \"two\"");
+                result["ajsdelayexecution"] = true;
+                result["bjsdelayexecution"] = true;
+                data.GetOrAdd(ElementDataKey, p => result);
+            }
+
+            protected override void ManagedResourcesCleanup() { }
+            protected override void UnmanagedResourcesCleanup() { }
+        }
+
         [DataTestMethod]
         [DataRow(true)]
         [DataRow(false)]
@@ -222,6 +306,11 @@ namespace FiftyOne.Pipeline.JavaScript.Tests
             }
         }
 
+        /// <summary>
+        /// Pins the clearCache iteration: a failed refresh must remove every
+        /// cached entry, not every other one. The session id key shape is
+        /// pinned by SessionStorageCache_SecondPageIsServedFromCache.
+        /// </summary>
         [TestMethod]
         [Timeout(300_000)]
         public async Task SessionStorageCache_BadJsonResponseClearsCache()
@@ -286,6 +375,104 @@ namespace FiftyOne.Pipeline.JavaScript.Tests
                 }
                 await app.DisposeAsync();
             }
+        }
+
+        /// <summary>
+        /// Both evidence snippets behind a delayed property must run when the
+        /// page asks for the aspect, whether their evidenceproperties entry
+        /// sits at the top level or inside a nested object.
+        /// </summary>
+        [TestMethod]
+        [Timeout(300_000)]
+        public async Task SessionStorageCache_DelayedEvidenceReachesTheEndpoint()
+        {
+            var port = TestHttpListener.GetRandomUnusedPort();
+            var url = $"http://localhost:{port}/";
+            string postBody = null;
+
+            using var pipeline = BuildDelayedPipeline(port);
+
+            var builder = WebApplication.CreateBuilder();
+            var app = builder.Build();
+            app.Use((ctx, next) =>
+            {
+                ctx.Response.Headers["Cache-Control"] = "no-store";
+                return next();
+            });
+            app.MapGet("/51dpipeline/js", (HttpContext ctx) =>
+                Results.Content(
+                    BuildContent(pipeline, ctx,
+                        d => d.Get<IJavaScriptBuilderElementData>().JavaScript),
+                    "text/javascript"));
+            app.MapPost("/51dpipeline/json", async (HttpContext ctx) =>
+            {
+                var form = await ctx.Request.ReadFormAsync();
+                postBody = string.Join("&",
+                    form.Select(f => $"{f.Key}={f.Value}"));
+                return Results.Content(
+                    BuildContent(pipeline, ctx,
+                        d => d.Get<IJsonBuilderElementData>().Json, form),
+                    "application/json");
+            });
+            app.MapGet("/{page}", (string page) => Results.Content(DelayedPageHtml, "text/html"));
+            app.Urls.Add(url);
+
+            ChromeDriver driver = null;
+            try
+            {
+                await app.StartAsync();
+                driver = CreateDriver();
+                IJavaScriptExecutor js = driver;
+
+                driver.Navigate().GoToUrl(url + "page1");
+
+                var deadline = DateTime.UtcNow + TimeSpan.FromSeconds(60);
+                while (postBody == null)
+                {
+                    if (DateTime.UtcNow >= deadline)
+                    {
+                        var pageError = js.ExecuteScript("return window.fodError || ''");
+                        Assert.Fail(
+                            "Timed out waiting for the delayed evidence refresh. " +
+                            $"pageError=[{pageError}]");
+                    }
+                    Thread.Sleep(500);
+                }
+
+                StringAssert.Contains(postBody, "51D_a=one",
+                    "evidence from the top level entry must reach the endpoint");
+                StringAssert.Contains(postBody, "51D_b=two",
+                    "evidence from the nested entry must reach the endpoint");
+            }
+            finally
+            {
+                try
+                {
+                    driver?.Quit();
+                }
+                catch (WebDriverException)
+                {
+                    // A dead session must not mask the real failure or stop the
+                    // web application being disposed.
+                }
+                await app.DisposeAsync();
+            }
+        }
+
+        private IPipeline BuildDelayedPipeline(int port)
+        {
+            return new PipelineBuilder(_loggerFactory)
+                .AddFlowElement(new TestDelayedElement(_loggerFactory))
+                .AddFlowElement(new SequenceElementBuilder(_loggerFactory).Build())
+                .AddFlowElement(new JsonBuilderElementBuilder(_loggerFactory).Build())
+                .AddFlowElement(new JavaScriptBuilderElementBuilder(_loggerFactory)
+                    .SetMinify(false)
+                    .SetProtocol("http")
+                    .SetHost($"localhost:{port}")
+                    .SetEndpoint("/51dpipeline/json")
+                    .SetEnableCookies(false)
+                    .Build())
+                .Build();
         }
 
         private IPipeline BuildPipeline(bool enableCookies, int port)
