@@ -140,6 +140,82 @@ namespace FiftyOne.Pipeline.JavaScript.Tests
             protected override void UnmanagedResourcesCleanup() { }
         }
 
+        private const string MergePageHtml = """
+            <!DOCTYPE html>
+            <html>
+              <head>
+                <title>Cache merge test</title>
+                <script src="/51dpipeline/js"></script>
+                <script>
+                  window.fodDone = false;
+                  window.fodValue = '';
+                  window.fodFreshBody = false;
+                  window.addEventListener('load', function () {
+                    fod.complete(function (data) {
+                      window.fodDone = true;
+                      window.fodValue =
+                        (data && data.device && data.device.testvalue) || '';
+                      window.fodFreshBody =
+                        !!(data && data.device &&
+                           typeof data.device.testvaluejavascript === 'string');
+                    });
+                  });
+                </script>
+              </head>
+              <body>
+                Cache merge test page
+              </body>
+            </html>
+            """;
+
+        private const string ParamsFirstPageHtml = """
+            <!DOCTYPE html>
+            <html>
+              <head>
+                <title>Parameters test, first page</title>
+                <script src="/51dpipeline/js?mark=first"></script>
+                <script>
+                  window.fodDone = false;
+                  window.fodValue = '';
+                  window.addEventListener('load', function () {
+                    fod.complete(function (data) {
+                      window.fodDone = true;
+                      window.fodValue =
+                        (data && data.device && data.device.testvalue) || '';
+                    });
+                  });
+                </script>
+              </head>
+              <body>
+                Parameters test, first page
+              </body>
+            </html>
+            """;
+
+        private const string ParamsSecondPageHtml = """
+            <!DOCTYPE html>
+            <html>
+              <head>
+                <title>Parameters test, second page</title>
+                <script src="/51dpipeline/js?mark=second"></script>
+                <script>
+                  window.fodDone = false;
+                  window.fodValue = '';
+                  window.addEventListener('load', function () {
+                    fod.complete(function (data) {
+                      window.fodDone = true;
+                      window.fodValue =
+                        (data && data.device && data.device.testvalue) || '';
+                    });
+                  });
+                </script>
+              </head>
+              <body>
+                Parameters test, second page
+              </body>
+            </html>
+            """;
+
         private const string MultiCallbackPageHtml = """
             <!DOCTYPE html>
             <html>
@@ -582,6 +658,283 @@ namespace FiftyOne.Pipeline.JavaScript.Tests
             }
         }
 
+        /// <summary>
+        /// An error status from the refresh endpoint must not be cached: the
+        /// next page view retries instead of replaying the error body.
+        /// </summary>
+        [TestMethod]
+        [Timeout(300_000)]
+        public async Task SessionStorageCache_ErrorStatusIsNotCached()
+        {
+            var port = TestHttpListener.GetRandomUnusedPort();
+            var url = $"http://localhost:{port}/";
+            var failing = true;
+            int healthyPosts = 0;
+
+            using var pipeline = BuildPipeline(enableCookies: false, port);
+
+            var app = BuildTestApp(pipeline, url, async (ctx) =>
+            {
+                if (failing)
+                {
+                    return Results.Content("{\"errors\":[\"boom\"]}",
+                        "application/json", null, 500);
+                }
+                Interlocked.Increment(ref healthyPosts);
+                var form = await ctx.Request.ReadFormAsync();
+                return Results.Content(
+                    BuildContent(pipeline, ctx,
+                        d => d.Get<IJsonBuilderElementData>().Json, form),
+                    "application/json");
+            }, _ => PageHtml);
+
+            ChromeDriver driver = null;
+            try
+            {
+                await app.StartAsync();
+                driver = CreateDriver();
+                IJavaScriptExecutor js = driver;
+
+                driver.Navigate().GoToUrl(url + "page1");
+                WaitForFodDone(js, "page with a failing endpoint", () => healthyPosts);
+                CollectionAssert.DoesNotContain(GetSessionStorageKeys(js), "fod",
+                    "an error response must not be cached");
+
+                failing = false;
+                driver.Navigate().GoToUrl(url + "page2");
+                WaitForFodDone(js, "page after the endpoint recovered", () => healthyPosts);
+
+                Assert.AreEqual(1, healthyPosts,
+                    "the second page must retry the refresh");
+                Assert.AreEqual("purple",
+                    (string)js.ExecuteScript("return window.fodValue"),
+                    "the second page must get the real value");
+            }
+            finally
+            {
+                try
+                {
+                    driver?.Quit();
+                }
+                catch (WebDriverException)
+                {
+                    // A dead session must not mask the real failure or stop the
+                    // web application being disposed.
+                }
+                await app.DisposeAsync();
+            }
+        }
+
+        /// <summary>
+        /// A property flag left behind by a refresh that never returned must
+        /// not count on the next page view: without the response next to it
+        /// the snippet runs again.
+        /// </summary>
+        [TestMethod]
+        [Timeout(300_000)]
+        public async Task SessionStorageCache_FlagWithoutResponseSelfHeals()
+        {
+            var port = TestHttpListener.GetRandomUnusedPort();
+            var url = $"http://localhost:{port}/";
+            var hang = true;
+            int posts = 0;
+
+            using var pipeline = BuildPipeline(enableCookies: false, port);
+
+            var app = BuildTestApp(pipeline, url, async (ctx) =>
+            {
+                if (hang)
+                {
+                    try
+                    {
+                        await Task.Delay(Timeout.Infinite, ctx.RequestAborted);
+                    }
+                    catch (OperationCanceledException)
+                    {
+                    }
+                    return Results.StatusCode(500);
+                }
+                Interlocked.Increment(ref posts);
+                var form = await ctx.Request.ReadFormAsync();
+                return Results.Content(
+                    BuildContent(pipeline, ctx,
+                        d => d.Get<IJsonBuilderElementData>().Json, form),
+                    "application/json");
+            }, _ => PageHtml);
+
+            ChromeDriver driver = null;
+            try
+            {
+                await app.StartAsync();
+                driver = CreateDriver();
+                IJavaScriptExecutor js = driver;
+
+                driver.Navigate().GoToUrl(url + "page1");
+                // The refresh hangs, so completion never fires: wait for the
+                // flag write instead.
+                WaitForStorageKey(js, "fod_property_");
+                CollectionAssert.DoesNotContain(GetSessionStorageKeys(js), "fod",
+                    "no response was received, so nothing must be cached");
+
+                hang = false;
+                driver.Navigate().GoToUrl(url + "page2");
+                WaitForFodDone(js, "page after the hung refresh", () => posts);
+
+                Assert.AreEqual(1, posts,
+                    "the snippet must run again when the flag has no response");
+                Assert.AreEqual("purple",
+                    (string)js.ExecuteScript("return window.fodValue"),
+                    "the second page must get the real value");
+            }
+            finally
+            {
+                try
+                {
+                    driver?.Quit();
+                }
+                catch (WebDriverException)
+                {
+                    // A dead session must not mask the real failure or stop the
+                    // web application being disposed.
+                }
+                await app.DisposeAsync();
+            }
+        }
+
+        /// <summary>
+        /// On a later page view the cached response fills the gaps in the
+        /// fresh payload instead of hiding what the server just rendered.
+        /// </summary>
+        [TestMethod]
+        [Timeout(300_000)]
+        public async Task SessionStorageCache_CachedResponseDoesNotHideFreshPayload()
+        {
+            var port = TestHttpListener.GetRandomUnusedPort();
+            var url = $"http://localhost:{port}/";
+
+            using var pipeline = BuildPipeline(enableCookies: false, port);
+
+            var app = BuildTestApp(pipeline, url, async (ctx) =>
+            {
+                var form = await ctx.Request.ReadFormAsync();
+                return Results.Content(
+                    BuildContent(pipeline, ctx,
+                        d => d.Get<IJsonBuilderElementData>().Json, form),
+                    "application/json");
+            }, _ => MergePageHtml);
+
+            ChromeDriver driver = null;
+            try
+            {
+                await app.StartAsync();
+                driver = CreateDriver();
+                IJavaScriptExecutor js = driver;
+
+                driver.Navigate().GoToUrl(url + "page1");
+                WaitForFodDone(js, "first page", () => 0);
+
+                driver.Navigate().GoToUrl(url + "page2");
+                WaitForFodDone(js, "second page", () => 0);
+
+                Assert.AreEqual("purple",
+                    (string)js.ExecuteScript("return window.fodValue"),
+                    "the cached value must fill the gap in the fresh payload");
+                Assert.IsTrue(
+                    true.Equals(js.ExecuteScript("return window.fodFreshBody")),
+                    "the fresh payload must not be hidden by the cached response");
+            }
+            finally
+            {
+                try
+                {
+                    driver?.Quit();
+                }
+                catch (WebDriverException)
+                {
+                    // A dead session must not mask the real failure or stop the
+                    // web application being disposed.
+                }
+                await app.DisposeAsync();
+            }
+        }
+
+        /// <summary>
+        /// When a later page view does refresh, its own query evidence wins
+        /// over whatever an earlier page view stored.
+        /// </summary>
+        [TestMethod]
+        [Timeout(300_000)]
+        public async Task SessionStorageCache_StoredParametersDoNotOverrideCurrentPage()
+        {
+            var port = TestHttpListener.GetRandomUnusedPort();
+            var url = $"http://localhost:{port}/";
+            var hang = true;
+            string postBody = null;
+
+            using var pipeline = BuildPipeline(enableCookies: false, port);
+
+            var app = BuildTestApp(pipeline, url, async (ctx) =>
+            {
+                if (hang)
+                {
+                    try
+                    {
+                        await Task.Delay(Timeout.Infinite, ctx.RequestAborted);
+                    }
+                    catch (OperationCanceledException)
+                    {
+                    }
+                    return Results.StatusCode(500);
+                }
+                var form = await ctx.Request.ReadFormAsync();
+                postBody = string.Join("&",
+                    form.Select(f => $"{f.Key}={f.Value}"));
+                return Results.Content(
+                    BuildContent(pipeline, ctx,
+                        d => d.Get<IJsonBuilderElementData>().Json, form),
+                    "application/json");
+            }, page => page == "page1" ? ParamsFirstPageHtml : ParamsSecondPageHtml);
+
+            ChromeDriver driver = null;
+            try
+            {
+                await app.StartAsync();
+                driver = CreateDriver();
+                IJavaScriptExecutor js = driver;
+
+                driver.Navigate().GoToUrl(url + "page1");
+                // The refresh hangs, so the first page stores its parameters
+                // and its flag but never caches a response.
+                WaitForStorageKey(js, "fod_parameters");
+
+                hang = false;
+                driver.Navigate().GoToUrl(url + "page2");
+                WaitForFodDone(js, "page with its own parameters", () => postBody == null ? 0 : 1);
+
+                Assert.IsNotNull(postBody, "the second page must refresh");
+                StringAssert.Contains(postBody, "mark=second",
+                    "the current page's own query evidence must be sent");
+                Assert.IsFalse(postBody.Contains("mark=first"),
+                    "stored parameters must not override the current page");
+                Assert.AreEqual("purple",
+                    (string)js.ExecuteScript("return window.fodValue"),
+                    "the second page must get the real value");
+            }
+            finally
+            {
+                try
+                {
+                    driver?.Quit();
+                }
+                catch (WebDriverException)
+                {
+                    // A dead session must not mask the real failure or stop the
+                    // web application being disposed.
+                }
+                await app.DisposeAsync();
+            }
+        }
+
         private IPipeline BuildDelayedPipeline(int port)
         {
             return new PipelineBuilder(_loggerFactory)
@@ -612,6 +965,51 @@ namespace FiftyOne.Pipeline.JavaScript.Tests
                     .SetEnableCookies(enableCookies)
                     .Build())
                 .Build();
+        }
+
+        private static WebApplication BuildTestApp(
+            IPipeline pipeline,
+            string url,
+            Func<HttpContext, Task<IResult>> onJson,
+            Func<string, string> pageHtml)
+        {
+            var builder = WebApplication.CreateBuilder();
+            var app = builder.Build();
+            app.Use((ctx, next) =>
+            {
+                ctx.Response.Headers["Cache-Control"] = "no-store";
+                return next();
+            });
+            app.MapGet("/51dpipeline/js", (HttpContext ctx) =>
+                Results.Content(
+                    BuildContent(pipeline, ctx,
+                        d => d.Get<IJavaScriptBuilderElementData>().JavaScript),
+                    "text/javascript"));
+            app.MapPost("/51dpipeline/json", onJson);
+            app.MapGet("/{page}", (string page) =>
+                Results.Content(pageHtml(page), "text/html"));
+            app.Urls.Add(url);
+            return app;
+        }
+
+        private static void WaitForStorageKey(IJavaScriptExecutor js, string prefix)
+        {
+            var deadline = DateTime.UtcNow + TimeSpan.FromSeconds(60);
+            while (true)
+            {
+                var keys = GetSessionStorageKeys(js);
+                if (keys.Any(k => k.StartsWith(prefix, StringComparison.Ordinal)))
+                {
+                    return;
+                }
+                if (DateTime.UtcNow >= deadline)
+                {
+                    Assert.Fail(
+                        $"Timed out waiting for a session storage key starting " +
+                        $"with {prefix}, have: [{string.Join(", ", keys)}]");
+                }
+                Thread.Sleep(200);
+            }
         }
 
         private static string BuildContent(
