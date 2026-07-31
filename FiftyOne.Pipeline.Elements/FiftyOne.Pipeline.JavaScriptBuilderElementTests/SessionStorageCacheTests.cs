@@ -140,6 +140,35 @@ namespace FiftyOne.Pipeline.JavaScript.Tests
             protected override void UnmanagedResourcesCleanup() { }
         }
 
+        private const string MultiCallbackPageHtml = """
+            <!DOCTYPE html>
+            <html>
+              <head>
+                <title>Multiple complete callbacks test</title>
+                <script src="/51dpipeline/js"></script>
+                <script>
+                  window.firstValue = '';
+                  window.secondValue = '';
+                  window.addEventListener('load', function () {
+                    // The page registers its own callback first, a later
+                    // consumer registers another one. Both must fire.
+                    fod.complete(function (data) {
+                      window.firstValue =
+                        (data && data.device && data.device.testvalue) || '';
+                    });
+                    fod.complete(function (data) {
+                      window.secondValue =
+                        (data && data.device && data.device.testvalue) || '';
+                    });
+                  });
+                </script>
+              </head>
+              <body>
+                Multiple complete callbacks test page
+              </body>
+            </html>
+            """;
+
         private const string DelayedPageHtml = """
             <!DOCTYPE html>
             <html>
@@ -443,6 +472,100 @@ namespace FiftyOne.Pipeline.JavaScript.Tests
                     "evidence from the top level entry must reach the endpoint");
                 StringAssert.Contains(postBody, "51D_b=two",
                     "evidence from the nested entry must reach the endpoint");
+            }
+            finally
+            {
+                try
+                {
+                    driver?.Quit();
+                }
+                catch (WebDriverException)
+                {
+                    // A dead session must not mask the real failure or stop the
+                    // web application being disposed.
+                }
+                await app.DisposeAsync();
+            }
+        }
+
+        /// <summary>
+        /// A complete callback must not replace one registered earlier:
+        /// every callback registered before the data is ready fires when it
+        /// arrives, and one registered afterwards fires immediately.
+        /// </summary>
+        [TestMethod]
+        [Timeout(300_000)]
+        public async Task Complete_DoesNotReplaceEarlierCallbacks()
+        {
+            var port = TestHttpListener.GetRandomUnusedPort();
+            var url = $"http://localhost:{port}/";
+
+            using var pipeline = BuildPipeline(enableCookies: false, port);
+
+            var builder = WebApplication.CreateBuilder();
+            var app = builder.Build();
+            app.Use((ctx, next) =>
+            {
+                ctx.Response.Headers["Cache-Control"] = "no-store";
+                return next();
+            });
+            app.MapGet("/51dpipeline/js", (HttpContext ctx) =>
+                Results.Content(
+                    BuildContent(pipeline, ctx,
+                        d => d.Get<IJavaScriptBuilderElementData>().JavaScript),
+                    "text/javascript"));
+            app.MapPost("/51dpipeline/json", async (HttpContext ctx) =>
+            {
+                var form = await ctx.Request.ReadFormAsync();
+                return Results.Content(
+                    BuildContent(pipeline, ctx,
+                        d => d.Get<IJsonBuilderElementData>().Json, form),
+                    "application/json");
+            });
+            app.MapGet("/{page}", (string page) => Results.Content(MultiCallbackPageHtml, "text/html"));
+            app.Urls.Add(url);
+
+            ChromeDriver driver = null;
+            try
+            {
+                await app.StartAsync();
+                driver = CreateDriver();
+                IJavaScriptExecutor js = driver;
+
+                driver.Navigate().GoToUrl(url + "page1");
+
+                var deadline = DateTime.UtcNow + TimeSpan.FromSeconds(60);
+                while (true)
+                {
+                    var done = js.ExecuteScript(
+                        "return window.firstValue !== '' && window.secondValue !== ''");
+                    if (true.Equals(done))
+                    {
+                        break;
+                    }
+                    if (DateTime.UtcNow >= deadline)
+                    {
+                        var first = js.ExecuteScript("return window.firstValue");
+                        var second = js.ExecuteScript("return window.secondValue");
+                        Assert.Fail(
+                            "Timed out waiting for both callbacks. " +
+                            $"first=[{first}], second=[{second}]");
+                    }
+                    Thread.Sleep(500);
+                }
+
+                Assert.AreEqual("purple",
+                    (string)js.ExecuteScript("return window.firstValue"),
+                    "the callback registered first must still fire");
+                Assert.AreEqual("purple",
+                    (string)js.ExecuteScript("return window.secondValue"),
+                    "the callback registered second must fire as well");
+
+                var lateValue = (string)js.ExecuteScript(
+                    "var v = ''; fod.complete(function (d) { " +
+                    "v = (d && d.device && d.device.testvalue) || ''; }); return v;");
+                Assert.AreEqual("purple", lateValue,
+                    "a callback registered after completion must fire immediately");
             }
             finally
             {
