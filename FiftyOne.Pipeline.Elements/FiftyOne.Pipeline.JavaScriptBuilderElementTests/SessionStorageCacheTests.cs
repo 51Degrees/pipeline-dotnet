@@ -275,7 +275,15 @@ namespace FiftyOne.Pipeline.JavaScript.Tests
             }
             finally
             {
-                driver?.Quit();
+                try
+                {
+                    driver?.Quit();
+                }
+                catch (WebDriverException)
+                {
+                    // A dead session must not mask the real failure or stop the
+                    // web application being disposed.
+                }
                 await app.DisposeAsync();
             }
         }
