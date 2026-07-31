@@ -88,7 +88,7 @@ namespace FiftyOne.Pipeline.JavaScript.Tests
                 var body = await reader.ReadToEndAsync();
                 capturedPostData = body;
                 Console.WriteLine($"[POST DATA] > {body}");
-                return Results.Json(jsonData);
+                return Results.Content(jsonData.ToString(), "application/json");
             });
             webApp.MapPost("/51dpipeline/completed", () =>
             {
@@ -136,6 +136,120 @@ namespace FiftyOne.Pipeline.JavaScript.Tests
             var q = js.ExecuteScript(BuildXHRJS($"{ClientServerUrl}51dpipeline/json"));
             WaitUntil(() => capturedPostData != null, "POST data from intercepted XHR");
             Assert.IsNotNull(capturedPostData);
+        }
+
+        private string BuildTemplateScript(JObject data, bool enableCookies = false)
+        {
+            int firstColon = ClientServerUrl.IndexOf(":");
+            var javaScriptBuilderElement =
+                new JavaScriptBuilderElementBuilder(LoggerFactory)
+                .SetMinify(false)
+                .SetProtocol(ClientServerUrl.Substring(0, firstColon))
+                .SetHost(ClientServerUrl.Substring(firstColon + 3))
+                .SetEnableCookies(enableCookies)
+                .Build();
+            var flowData = new Mock<IFlowData>();
+            Configure(flowData, data);
+
+            IJavaScriptBuilderElementData result = null;
+            flowData.Setup(d => d.GetOrAdd(
+                It.IsAny<ITypedKey<IJavaScriptBuilderElementData>>(),
+                It.IsAny<Func<IPipeline, IJavaScriptBuilderElementData>>()))
+                .Returns<ITypedKey<IJavaScriptBuilderElementData>, Func<IPipeline, IJavaScriptBuilderElementData>>((k, f) =>
+                {
+                    result = f(flowData.Object.Pipeline);
+                    return result;
+                });
+
+            javaScriptBuilderElement.Process(flowData.Object);
+            return result.JavaScript;
+        }
+
+        [TestMethod]
+        [Timeout(300_000)]
+        public void JavaScriptBuilderTemplate_PageContract_StaticJson()
+        {
+            jsonData = new JObject {
+                { "device", new JObject { { "ismobile", "True" } } },
+            };
+            fullJS = BuildTemplateScript(jsonData);
+
+            Driver.Manage().Cookies.DeleteAllCookies();
+            ((IJavaScriptExecutor)Driver).ExecuteScript("sessionStorage.clear();");
+            Driver.Navigate().GoToUrl(ClientServerUrl);
+
+            IJavaScriptExecutor js = Driver;
+            WaitUntil(
+                () => js.ExecuteScript("return window.fod && window.fod.isComplete === true;") is bool b && b,
+                "fod.isComplete === true");
+            Assert.AreEqual("True", (string)js.ExecuteScript("return window.fod.data.device.ismobile;"));
+            Assert.IsNull(capturedPostData);
+        }
+
+        [TestMethod]
+        [Timeout(300_000)]
+        public void JavaScriptBuilderTemplate_PageContract_DataTracksRefreshedJson()
+        {
+            var embeddedJson = new JObject {
+                { "device", new JObject { { "snippetjavascript", "window.snippet_ran_51d = true;" } } },
+                { "javascriptProperties", new JArray { "device.snippetjavascript" } },
+            };
+            var refreshedJson = new JObject {
+                { "device", new JObject { { "marker", "refreshed" } } },
+            };
+            jsonData = refreshedJson;
+            fullJS = BuildTemplateScript(embeddedJson);
+
+            Driver.Manage().Cookies.DeleteAllCookies();
+            ((IJavaScriptExecutor)Driver).ExecuteScript("sessionStorage.clear();");
+            Driver.Navigate().GoToUrl(ClientServerUrl);
+
+            IJavaScriptExecutor js = Driver;
+            WaitUntil(
+                () => js.ExecuteScript("return window.fod && window.fod.isComplete === true;") is bool b && b,
+                "fod.isComplete === true after refresh");
+            Assert.AreEqual("refreshed", (string)js.ExecuteScript("return window.fod.data.device.marker;"));
+        }
+
+        [TestMethod]
+        [Timeout(300_000)]
+        public void JavaScriptBuilderTemplate_EvidenceBox_RidesPostBodyOnly()
+        {
+            var embeddedJson = new JObject {
+                { "device", new JObject { { "snippetjavascript", "window.snippet_ran_51d = true;" } } },
+                { "javascriptProperties", new JArray { "device.snippetjavascript" } },
+            };
+            jsonData = new JObject {
+                { "device", new JObject { { "marker", "refreshed" } } },
+            };
+            capturedPostData = null;
+            fullJS = "window.fodEvidence = { 'id.email': 'user@example.com' };"
+                + BuildTemplateScript(embeddedJson);
+
+            Driver.Manage().Cookies.DeleteAllCookies();
+            ((IJavaScriptExecutor)Driver).ExecuteScript("sessionStorage.clear();");
+            Driver.Navigate().GoToUrl(ClientServerUrl);
+
+            WaitUntil(() => capturedPostData != null, "POST data with id.email");
+            Assert.IsTrue(
+                capturedPostData.Contains("id.email=user%40example.com"),
+                $"[{capturedPostData}] does not contain the url-encoded email");
+
+            IJavaScriptExecutor js = Driver;
+            WaitUntil(
+                () => js.ExecuteScript("return window.fod && window.fod.isComplete === true;") is bool b && b,
+                "fod.isComplete === true");
+
+            Assert.IsFalse((bool)js.ExecuteScript(
+                "for (var i = 0; i < sessionStorage.length; i++) {" +
+                " var v = sessionStorage.getItem(sessionStorage.key(i));" +
+                " if (v && v.indexOf('user@example.com') !== -1) return true;" +
+                " if (v && v.indexOf('user%40example.com') !== -1) return true; }" +
+                "return false;"), "email leaked to sessionStorage");
+            Assert.IsFalse((bool)js.ExecuteScript(
+                "return document.cookie.indexOf('user') !== -1;"), "email leaked to cookies");
+            Assert.IsFalse((bool)js.ExecuteScript(
+                "return window.location.href.indexOf('user') !== -1;"), "email leaked to URL");
         }
 
         public static IEnumerable<object[]> GetValidateSetCookieBlockData()
