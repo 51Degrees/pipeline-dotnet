@@ -228,6 +228,7 @@ namespace FiftyOne.Pipeline.JavaScript.Tests
         {
             var port = TestHttpListener.GetRandomUnusedPort();
             var url = $"http://localhost:{port}/";
+            int jsonPostCount = 0;
 
             using var pipeline = BuildPipeline(enableCookies: false, port);
 
@@ -244,20 +245,26 @@ namespace FiftyOne.Pipeline.JavaScript.Tests
                         d => d.Get<IJavaScriptBuilderElementData>().JavaScript),
                     "text/javascript"));
             app.MapPost("/51dpipeline/json", () =>
-                Results.Content("not json", "application/json"));
+            {
+                Interlocked.Increment(ref jsonPostCount);
+                return Results.Content("not json", "application/json");
+            });
             app.MapGet("/{page}", (string page) => Results.Content(PageHtml, "text/html"));
             app.Urls.Add(url);
-            await app.StartAsync();
 
             ChromeDriver driver = null;
             try
             {
+                await app.StartAsync();
                 driver = CreateDriver();
                 IJavaScriptExecutor js = driver;
 
                 driver.Navigate().GoToUrl(url + "page1");
-                WaitForFodDone(js, "page with a failing refresh", () => 0);
+                WaitForFodDone(js, "page with a failing refresh", () => jsonPostCount);
 
+                Assert.AreEqual(1, jsonPostCount,
+                    "the refresh must actually have been attempted, otherwise the " +
+                    "clear-on-error path was never exercised");
                 var leftover = GetSessionStorageKeys(js)
                     .Where(k => k == "fod" ||
                         k.StartsWith("fod_", StringComparison.Ordinal))
