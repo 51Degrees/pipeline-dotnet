@@ -508,6 +508,127 @@ namespace FiftyOne.Pipeline.JavaScript.Tests
             protected override void UnmanagedResourcesCleanup() { }
         }
 
+        private const string TwoStagePageHtml = """
+            <!DOCTYPE html>
+            <html>
+              <head>
+                <title>Two stage snippet test</title>
+                <script src="/51dpipeline/js"></script>
+                <script>
+                  window.fodDone = false;
+                  window.fodValue = '';
+                  window.fodStageTwo = '';
+                  window.addEventListener('load', function () {
+                    fod.complete(function (data) {
+                      window.fodValue =
+                        (data && data.device && data.device.testvalue) || '';
+                      window.fodStageTwo =
+                        (data && data.device && data.device.stagetwo) || '';
+                      window.fodDone = true;
+                    });
+                  });
+                </script>
+              </head>
+              <body>
+                Two stage snippet test page
+              </body>
+            </html>
+            """;
+
+        /// <summary>
+        /// Test element with a second snippet the test brings into play after
+        /// the first page view, and which keeps naming the first property once
+        /// its value is known but gives it nothing to run. The cloud does the
+        /// same for a property it can still list but has already resolved.
+        /// </summary>
+        private class TestTwoStageElement : FlowElementBase<TestValueData, ElementPropertyMetaData>
+        {
+            private readonly ILoggerFactory _loggerFactory;
+
+            public TestTwoStageElement(ILoggerFactory loggerFactory)
+                : base(loggerFactory.CreateLogger<FlowElementBase<TestValueData, ElementPropertyMetaData>>())
+            {
+                _loggerFactory = loggerFactory;
+            }
+
+            /// <summary>
+            /// Set between page views. Stands in for a snippet the server only
+            /// starts asking for after an earlier page view, which is what puts
+            /// an unflagged property next to a flagged one.
+            /// </summary>
+            public bool StageTwoAvailable { get; set; }
+
+            public override string ElementDataKey => "device";
+
+            public override IEvidenceKeyFilter EvidenceKeyFilter =>
+                new EvidenceKeyFilterWhitelist(new List<string>() {
+                    "query.51D_testvalue",
+                    "cookie.51D_testvalue",
+                    "query.51D_stagetwo",
+                    "cookie.51D_stagetwo",
+                });
+
+            public override IList<ElementPropertyMetaData> Properties =>
+                new List<ElementPropertyMetaData>()
+                {
+                    new ElementPropertyMetaData(this, "testvalue", typeof(string), true),
+                    new ElementPropertyMetaData(this, "testvaluejavascript", typeof(Core.Data.Types.JavaScript), true),
+                    new ElementPropertyMetaData(this, "stagetwo", typeof(string), true),
+                    new ElementPropertyMetaData(this, "stagetwojavascript", typeof(Core.Data.Types.JavaScript), true),
+                };
+
+            protected override void ProcessInternal(IFlowData data)
+            {
+                var result = new TestValueData(
+                    _loggerFactory.CreateLogger<TestValueData>(), data.Pipeline);
+                if (TryGetSavedValue(data, "51D_testvalue", out var saved))
+                {
+                    result["testvalue"] = saved;
+                    // Named with nothing to run. A property in this state used
+                    // to raise the cached count without raising the count of
+                    // properties to process.
+                    result["testvaluejavascript"] = new Core.Data.Types.JavaScript("");
+                }
+                else
+                {
+                    result["testvaluejavascript"] = new Core.Data.Types.JavaScript(
+                        "document.cookie = \"51D_testvalue=\" + \"purple\"");
+                }
+                if (StageTwoAvailable)
+                {
+                    if (TryGetSavedValue(data, "51D_stagetwo", out var stageTwo))
+                    {
+                        result["stagetwo"] = stageTwo;
+                    }
+                    else
+                    {
+                        result["stagetwojavascript"] = new Core.Data.Types.JavaScript(
+                            "document.cookie = \"51D_stagetwo=\" + \"green\"");
+                    }
+                }
+                data.GetOrAdd(ElementDataKey, p => result);
+            }
+
+            private static bool TryGetSavedValue(
+                IFlowData data, string name, out string value)
+            {
+                foreach (var key in new[] { "query." + name, "cookie." + name })
+                {
+                    if (data.TryGetEvidence(key, out object obj) &&
+                        string.IsNullOrEmpty(obj?.ToString()) == false)
+                    {
+                        value = obj.ToString();
+                        return true;
+                    }
+                }
+                value = null;
+                return false;
+            }
+
+            protected override void ManagedResourcesCleanup() { }
+            protected override void UnmanagedResourcesCleanup() { }
+        }
+
         [DataTestMethod]
         [DataRow(true, true)]
         [DataRow(false, true)]
@@ -914,18 +1035,19 @@ namespace FiftyOne.Pipeline.JavaScript.Tests
         }
 
         /// <summary>
-        /// A property flag left behind by a refresh that never returned must
-        /// not count on the next page view: without the response next to it
-        /// the snippet runs again.
+        /// A refresh that never returns must leave nothing behind that retires
+        /// its snippets: no response is cached and no property is flagged, so
+        /// the next page view runs them again.
         /// </summary>
         [TestMethod]
         [Timeout(300_000)]
-        public async Task SessionStorageCache_FlagWithoutResponseSelfHeals()
+        public async Task SessionStorageCache_AbandonedRefreshSelfHeals()
         {
             var port = TestHttpListener.GetRandomUnusedPort();
             var url = $"http://localhost:{port}/";
             var hang = true;
             int posts = 0;
+            int hungPosts = 0;
 
             using var pipeline = BuildPipeline(enableCookies: false, port);
 
@@ -933,6 +1055,7 @@ namespace FiftyOne.Pipeline.JavaScript.Tests
             {
                 if (hang)
                 {
+                    Interlocked.Increment(ref hungPosts);
                     try
                     {
                         await Task.Delay(Timeout.Infinite, ctx.RequestAborted);
@@ -959,17 +1082,25 @@ namespace FiftyOne.Pipeline.JavaScript.Tests
 
                 driver.Navigate().GoToUrl(url + "page1");
                 // The refresh hangs, so completion never fires: wait for the
-                // flag write instead.
-                WaitForStorageKey(js, "fod_property_");
-                CollectionAssert.DoesNotContain(GetSessionStorageKeys(js), "fod",
+                // request to arrive instead.
+                WaitForPostCount(() => hungPosts, 1, "the hung refresh",
+                    () => string.Join(", ", GetSessionStorageKeys(js)));
+                var keysDuringHang = GetSessionStorageKeys(js);
+                CollectionAssert.DoesNotContain(keysDuringHang, "fod",
                     "no response was received, so nothing must be cached");
+                Assert.IsFalse(
+                    keysDuringHang.Any(k =>
+                        k.StartsWith("fod_property_", StringComparison.Ordinal)),
+                    "a property must not be flagged before the response it " +
+                    "belongs to, or an older response would validate the flag " +
+                    $"on a later page view, have: [{string.Join(", ", keysDuringHang)}]");
 
                 hang = false;
                 driver.Navigate().GoToUrl(url + "page2");
                 WaitForFodDone(js, "page after the hung refresh", () => posts);
 
                 Assert.AreEqual(1, posts,
-                    "the snippet must run again when the flag has no response");
+                    "the snippet must run again after a refresh that never landed");
                 Assert.AreEqual("purple",
                     (string)js.ExecuteScript("return window.fodValue"),
                     "the second page must get the real value");
@@ -1433,6 +1564,199 @@ namespace FiftyOne.Pipeline.JavaScript.Tests
                 QuitDriver(driver);
                 await app.DisposeAsync();
             }
+        }
+
+        /// <summary>
+        /// A snippet that runs must produce a refresh even when every other
+        /// property on the page is already cached. A property the server has
+        /// resolved is still named in the payload with nothing to run, so the
+        /// count of cached properties can reach the count of properties to
+        /// process while a snippet is in flight. Completing from the cache
+        /// there throws away the evidence that snippet has just produced.
+        /// </summary>
+        [TestMethod]
+        [Timeout(300_000)]
+        public async Task SessionStorageCache_RunningSnippetIsNotCompletedFromCache()
+        {
+            var port = TestHttpListener.GetRandomUnusedPort();
+            var url = $"http://localhost:{port}/";
+            int posts = 0;
+
+            var element = new TestTwoStageElement(_loggerFactory);
+            // Cookies carry the first value back to the server on the next page
+            // view, which is what makes it resolve it and stop giving the
+            // property anything to run.
+            using var pipeline = BuildTwoStagePipeline(
+                enableCookies: true, port, element);
+
+            var app = BuildTestApp(pipeline, url, async (ctx) =>
+            {
+                Interlocked.Increment(ref posts);
+                var form = await ctx.Request.ReadFormAsync();
+                return Results.Content(
+                    BuildContent(pipeline, ctx,
+                        d => d.Get<IJsonBuilderElementData>().Json, form),
+                    "application/json");
+            }, _ => TwoStagePageHtml);
+
+            ChromeDriver driver = null;
+            try
+            {
+                await app.StartAsync();
+                driver = CreateDriver();
+                IJavaScriptExecutor js = driver;
+
+                driver.Navigate().GoToUrl(url + "page1");
+                WaitForFodDone(js, "first page", () => posts);
+                Assert.AreEqual("purple",
+                    (string)js.ExecuteScript("return window.fodValue"),
+                    "the first page must produce and see the first value");
+
+                element.StageTwoAvailable = true;
+                posts = 0;
+                driver.Navigate().GoToUrl(url + "page2");
+                WaitForFodDone(js, "page with a second snippet", () => posts);
+
+                Assert.AreEqual(1, posts,
+                    "the second snippet has produced evidence, so the page must " +
+                    "refresh rather than complete from the cached response");
+                Assert.AreEqual("green",
+                    (string)js.ExecuteScript("return window.fodStageTwo"),
+                    "the second page must see the value its own snippet produced");
+            }
+            finally
+            {
+                QuitDriver(driver);
+                await app.DisposeAsync();
+            }
+        }
+
+        /// <summary>
+        /// A page view left before its refresh completes must not mark the
+        /// snippets it started as done. The flag belongs to the response that
+        /// never arrived, so an older cached response must not stand in for it
+        /// and retire the property for the rest of the tab session.
+        /// </summary>
+        [TestMethod]
+        [Timeout(300_000)]
+        public async Task SessionStorageCache_FlagFromAnAbandonedPageViewDoesNotCount()
+        {
+            var port = TestHttpListener.GetRandomUnusedPort();
+            var url = $"http://localhost:{port}/";
+            var hang = false;
+            int posts = 0;
+            int hungPosts = 0;
+
+            var element = new TestTwoStageElement(_loggerFactory);
+            // Without cookies the snippet values only travel in the refresh
+            // body, so a page view whose refresh never lands leaves the server
+            // knowing nothing about them.
+            using var pipeline = BuildTwoStagePipeline(
+                enableCookies: false, port, element);
+
+            var app = BuildTestApp(pipeline, url, async (ctx) =>
+            {
+                if (hang)
+                {
+                    Interlocked.Increment(ref hungPosts);
+                    try
+                    {
+                        await Task.Delay(Timeout.Infinite, ctx.RequestAborted);
+                    }
+                    catch (OperationCanceledException)
+                    {
+                    }
+                    return Results.StatusCode(500);
+                }
+                Interlocked.Increment(ref posts);
+                var form = await ctx.Request.ReadFormAsync();
+                return Results.Content(
+                    BuildContent(pipeline, ctx,
+                        d => d.Get<IJsonBuilderElementData>().Json, form),
+                    "application/json");
+            }, _ => TwoStagePageHtml);
+
+            ChromeDriver driver = null;
+            try
+            {
+                await app.StartAsync();
+                driver = CreateDriver();
+                IJavaScriptExecutor js = driver;
+
+                driver.Navigate().GoToUrl(url + "page1");
+                WaitForFodDone(js, "first page", () => posts);
+                CollectionAssert.Contains(GetSessionStorageKeys(js), "fod",
+                    "the first page must leave a cached response behind, " +
+                    "otherwise the flag under test has nothing to be validated by");
+
+                // The second snippet starts here and its refresh never lands.
+                element.StageTwoAvailable = true;
+                hang = true;
+                driver.Navigate().GoToUrl(url + "page2");
+                WaitForPostCount(() => hungPosts, 1, "the abandoned page view",
+                    () => string.Join(", ", GetSessionStorageKeys(js)));
+
+                hang = false;
+                posts = 0;
+                driver.Navigate().GoToUrl(url + "page3");
+                WaitForFodDone(js, "page after the abandoned refresh", () => posts);
+
+                Assert.AreEqual(1, posts,
+                    "the snippet whose refresh never landed must run again and " +
+                    "report its evidence");
+                Assert.AreEqual("green",
+                    (string)js.ExecuteScript("return window.fodStageTwo"),
+                    "the value must resolve rather than stay missing for the " +
+                    "life of the tab");
+            }
+            finally
+            {
+                QuitDriver(driver);
+                await app.DisposeAsync();
+            }
+        }
+
+        /// <summary>
+        /// Waits for the endpoint to have been reached the given number of
+        /// times. Used where the page cannot report its own progress because
+        /// the request it is waiting on never completes.
+        /// </summary>
+        private static void WaitForPostCount(
+            Func<int> postCount, int expected, string phase, Func<string> detail)
+        {
+            var deadline = DateTime.UtcNow + TimeSpan.FromSeconds(60);
+            while (true)
+            {
+                if (postCount() >= expected)
+                {
+                    return;
+                }
+                if (DateTime.UtcNow >= deadline)
+                {
+                    Assert.Fail($"Timed out during {phase}, the endpoint was " +
+                        $"reached {postCount()} times, expected {expected}. " +
+                        $"{detail()}");
+                }
+                Thread.Sleep(200);
+            }
+        }
+
+        private IPipeline BuildTwoStagePipeline(
+            bool enableCookies, int port, TestTwoStageElement element)
+        {
+            return new PipelineBuilder(_loggerFactory)
+                .AddFlowElement(element)
+                .AddFlowElement(new BrowserCapabilityElement(_loggerFactory))
+                .AddFlowElement(new SequenceElementBuilder(_loggerFactory).Build())
+                .AddFlowElement(new JsonBuilderElementBuilder(_loggerFactory).Build())
+                .AddFlowElement(new JavaScriptBuilderElementBuilder(_loggerFactory)
+                    .SetMinify(false)
+                    .SetProtocol("http")
+                    .SetHost($"localhost:{port}")
+                    .SetEndpoint("/51dpipeline/json")
+                    .SetEnableCookies(enableCookies)
+                    .Build())
+                .Build();
         }
 
         private IPipeline BuildDelayedPipeline(int port)
