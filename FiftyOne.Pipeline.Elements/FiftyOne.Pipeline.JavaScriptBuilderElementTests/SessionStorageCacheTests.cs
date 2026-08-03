@@ -267,6 +267,134 @@ namespace FiftyOne.Pipeline.JavaScript.Tests
             </html>
             """;
 
+        private const string OnChangePageHtml = """
+            <!DOCTYPE html>
+            <html>
+              <head>
+                <title>onChange test</title>
+                <script src="/51dpipeline/js"></script>
+                <script>
+                  window.changeCount = 0;
+                  window.changeValue = '';
+                  window.addEventListener('load', function () {
+                    // Registered the way page code has to register it: after
+                    // the include has run and built the object.
+                    fod.onChange(function (data) {
+                      window.changeCount = window.changeCount + 1;
+                      window.changeValue =
+                        (data && data.device && data.device.testvalue) || '';
+                    });
+                  });
+                </script>
+              </head>
+              <body>
+                onChange test page
+              </body>
+            </html>
+            """;
+
+        private const string PayloadPageHtml = """
+            <!DOCTYPE html>
+            <html>
+              <head>
+                <title>Payload shape test</title>
+                <script src="/51dpipeline/js"></script>
+                <script>
+                  window.fodDone = false;
+                  window.fodValue = '';
+                  window.fodErrorCount = -1;
+                  window.fodJsProperties = '';
+                  window.addEventListener('load', function () {
+                    fod.complete(function (data) {
+                      window.fodValue =
+                        (data && data.device && data.device.testvalue) || '';
+                      window.fodErrorCount =
+                        (data && data.errors && data.errors.length) || 0;
+                      window.fodJsProperties =
+                        (data && data.javascriptProperties || []).join(',');
+                      window.fodDone = true;
+                    });
+                  });
+                </script>
+              </head>
+              <body>
+                Payload shape test page
+              </body>
+            </html>
+            """;
+
+        /// <summary>
+        /// Test element with a second JavaScript property named the way the
+        /// template special cases it. Its snippet records that it ran and
+        /// deliberately saves no profile ids, which is the case the template
+        /// backs out of.
+        /// </summary>
+        private class TestHardwareProfileElement : FlowElementBase<TestValueData, ElementPropertyMetaData>
+        {
+            private readonly ILoggerFactory _loggerFactory;
+
+            public TestHardwareProfileElement(ILoggerFactory loggerFactory)
+                : base(loggerFactory.CreateLogger<FlowElementBase<TestValueData, ElementPropertyMetaData>>())
+            {
+                _loggerFactory = loggerFactory;
+            }
+
+            public override string ElementDataKey => "device";
+
+            public override IEvidenceKeyFilter EvidenceKeyFilter =>
+                new EvidenceKeyFilterWhitelist(new List<string>() {
+                    "query.51D_testvalue",
+                    "cookie.51D_testvalue",
+                });
+
+            public override IList<ElementPropertyMetaData> Properties =>
+                new List<ElementPropertyMetaData>()
+                {
+                    new ElementPropertyMetaData(this, "testvalue", typeof(string), true),
+                    new ElementPropertyMetaData(this, "testvaluejavascript", typeof(Core.Data.Types.JavaScript), true),
+                    new ElementPropertyMetaData(this, "javascripthardwareprofile", typeof(Core.Data.Types.JavaScript), true),
+                };
+
+            protected override void ProcessInternal(IFlowData data)
+            {
+                var result = new TestValueData(
+                    _loggerFactory.CreateLogger<TestValueData>(), data.Pipeline);
+                if (TryGetSavedValue(data, out var saved))
+                {
+                    result["testvalue"] = saved;
+                }
+                else
+                {
+                    result["testvaluejavascript"] = new Core.Data.Types.JavaScript(
+                        "document.cookie = \"51D_testvalue=\" + \"purple\"");
+                }
+                // Records the run and saves nothing, so the template's
+                // empty-profile back-out is what decides whether it is ever
+                // attempted again.
+                result["javascripthardwareprofile"] = new Core.Data.Types.JavaScript(
+                    "window.hardwareProfileRuns = (window.hardwareProfileRuns || 0) + 1;");
+                data.GetOrAdd(ElementDataKey, p => result);
+            }
+
+            private static bool TryGetSavedValue(IFlowData data, out string value)
+            {
+                foreach (var key in new[] { "query.51D_testvalue", "cookie.51D_testvalue" })
+                {
+                    if (data.TryGetEvidence(key, out object obj) &&
+                        string.IsNullOrEmpty(obj?.ToString()) == false)
+                    {
+                        value = obj.ToString();
+                        return true;
+                    }
+                }
+                value = null;
+                return false;
+            }
+
+            protected override void ManagedResourcesCleanup() { }
+            protected override void UnmanagedResourcesCleanup() { }
+        }
+
         private class TestDelayedData : ElementDataBase
         {
             public TestDelayedData(ILogger<ElementDataBase> logger, IPipeline pipeline)
@@ -935,6 +1063,312 @@ namespace FiftyOne.Pipeline.JavaScript.Tests
             }
         }
 
+        /// <summary>
+        /// A page view served from the cache must still announce the change.
+        /// The cached branch resolves inside the constructor, before page code
+        /// has had a chance to call onChange, so nothing but a deferral gets
+        /// the handler registered in time.
+        /// </summary>
+        [TestMethod]
+        [Timeout(300_000)]
+        public async Task SessionStorageCache_CacheHitFiresOnChange()
+        {
+            var port = TestHttpListener.GetRandomUnusedPort();
+            var url = $"http://localhost:{port}/";
+            int posts = 0;
+
+            using var pipeline = BuildPipeline(enableCookies: false, port);
+
+            var app = BuildTestApp(pipeline, url, async (ctx) =>
+            {
+                Interlocked.Increment(ref posts);
+                var form = await ctx.Request.ReadFormAsync();
+                return Results.Content(
+                    BuildContent(pipeline, ctx,
+                        d => d.Get<IJsonBuilderElementData>().Json, form),
+                    "application/json");
+            }, _ => OnChangePageHtml);
+
+            ChromeDriver driver = null;
+            try
+            {
+                await app.StartAsync();
+                driver = CreateDriver();
+                IJavaScriptExecutor js = driver;
+
+                driver.Navigate().GoToUrl(url + "page1");
+                WaitForScript(js, "return window.changeCount > 0",
+                    "first page onChange", () => $"posts={posts}");
+                Assert.AreEqual(1, posts, "the first page must refresh");
+
+                driver.Navigate().GoToUrl(url + "page2");
+                WaitForScript(js, "return window.changeCount > 0",
+                    "cache hit onChange",
+                    () => "the handler registered after the include ran was " +
+                        "never called on a page view served from the cache");
+
+                Assert.AreEqual("purple",
+                    (string)js.ExecuteScript("return window.changeValue"),
+                    "the handler must be given the merged payload");
+                Assert.AreEqual(1, posts,
+                    "the second page must still be served from the cache");
+            }
+            finally
+            {
+                QuitDriver(driver);
+                await app.DisposeAsync();
+            }
+        }
+
+        /// <summary>
+        /// The refresh endpoint's payload is not under the template's control.
+        /// The arrays in it describe the request that produced them, so a
+        /// cached one must not reach a later page view, and an aspect that
+        /// comes back null must not break the merge.
+        /// </summary>
+        [TestMethod]
+        [Timeout(300_000)]
+        public async Task SessionStorageCache_CachedPayloadShapeDoesNotLeak()
+        {
+            var port = TestHttpListener.GetRandomUnusedPort();
+            var url = $"http://localhost:{port}/";
+
+            using var pipeline = BuildPipeline(enableCookies: false, port);
+
+            // A success response that still reports an error and lists a
+            // snippet the next page view is not given.
+            const string ResponseJson =
+                "{\"device\":{\"testvalue\":\"purple\"}," +
+                "\"javascriptProperties\":[\"device.testvaluejavascript\"," +
+                "\"device.ghostjavascript\"]," +
+                "\"errors\":[\"transient upstream problem\"]}";
+
+            var app = BuildTestApp(pipeline, url,
+                _ => Task.FromResult(Results.Content(ResponseJson, "application/json")),
+                _ => PayloadPageHtml,
+                // The second page renders with a null errors entry, which the
+                // old merge read straight through.
+                javaScript => javaScript.Replace(
+                    "var json = {", "var json = {\"errors\":null,",
+                    StringComparison.Ordinal));
+
+            ChromeDriver driver = null;
+            try
+            {
+                await app.StartAsync();
+                driver = CreateDriver();
+                IJavaScriptExecutor js = driver;
+
+                driver.Navigate().GoToUrl(url + "page1");
+                WaitForFodDone(js, "first page", () => 0);
+
+                driver.Navigate().GoToUrl(url + "page2");
+                WaitForFodDone(js, "second page", () => 0);
+
+                Assert.AreEqual("purple",
+                    (string)js.ExecuteScript("return window.fodValue"),
+                    "a null aspect must not stop the cached value being merged");
+                Assert.AreEqual(0L,
+                    js.ExecuteScript("return window.fodErrorCount"),
+                    "an error from an earlier page view must not be reported " +
+                    "on this one");
+                Assert.AreEqual("device.testvaluejavascript",
+                    (string)js.ExecuteScript("return window.fodJsProperties"),
+                    "the snippet list must be the one the server rendered for " +
+                    "this page view");
+            }
+            finally
+            {
+                QuitDriver(driver);
+                await app.DisposeAsync();
+            }
+        }
+
+        /// <summary>
+        /// A cached entry that cannot be used must send the page view down the
+        /// request path rather than leaving it with neither the cached values
+        /// nor a refresh. 'null' is included because it parses.
+        /// </summary>
+        [DataTestMethod]
+        [DataRow("{not json")]
+        [DataRow("null")]
+        [Timeout(300_000)]
+        public async Task SessionStorageCache_UnusableEntryFallsBackToRequest(
+            string cachedText)
+        {
+            var port = TestHttpListener.GetRandomUnusedPort();
+            var url = $"http://localhost:{port}/";
+            int posts = 0;
+
+            using var pipeline = BuildPipeline(enableCookies: false, port);
+
+            var app = BuildTestApp(pipeline, url, async (ctx) =>
+            {
+                Interlocked.Increment(ref posts);
+                var form = await ctx.Request.ReadFormAsync();
+                return Results.Content(
+                    BuildContent(pipeline, ctx,
+                        d => d.Get<IJsonBuilderElementData>().Json, form),
+                    "application/json");
+            }, _ => PageHtml);
+
+            ChromeDriver driver = null;
+            try
+            {
+                await app.StartAsync();
+                driver = CreateDriver();
+                IJavaScriptExecutor js = driver;
+
+                driver.Navigate().GoToUrl(url + "page1");
+                WaitForFodDone(js, "first page", () => posts);
+                Assert.AreEqual(1, posts, "the first page must refresh");
+
+                // Leave the property flags in place and damage only the
+                // response, which is the state a truncated or externally
+                // modified entry produces.
+                js.ExecuteScript(
+                    "sessionStorage.setItem('fod', arguments[0])", cachedText);
+
+                driver.Navigate().GoToUrl(url + "page2");
+                WaitForFodDone(js, "page with an unusable cached entry", () => posts);
+
+                Assert.AreEqual(2, posts,
+                    "the page view must fall back to a refresh");
+                Assert.AreEqual("purple",
+                    (string)js.ExecuteScript("return window.fodValue"),
+                    "the page view must still end up with the value");
+                Assert.AreNotEqual(cachedText,
+                    (string)js.ExecuteScript("return sessionStorage.getItem('fod')"),
+                    "the unusable entry must not be left in place to be " +
+                    "rejected again on every later page view");
+            }
+            finally
+            {
+                QuitDriver(driver);
+                await app.DisposeAsync();
+            }
+        }
+
+        /// <summary>
+        /// A snippet that saves nothing must be attempted again on the next
+        /// page view. The template backs out of the empty
+        /// javascripthardwareprofile case, and with the key stable the flag it
+        /// wrote before backing out would otherwise retire the property for
+        /// the whole tab session.
+        /// </summary>
+        [TestMethod]
+        [Timeout(300_000)]
+        public async Task SessionStorageCache_SnippetThatSavesNothingIsRetried()
+        {
+            var port = TestHttpListener.GetRandomUnusedPort();
+            var url = $"http://localhost:{port}/";
+
+            using var pipeline = new PipelineBuilder(_loggerFactory)
+                .AddFlowElement(new TestHardwareProfileElement(_loggerFactory))
+                .AddFlowElement(new SequenceElementBuilder(_loggerFactory).Build())
+                .AddFlowElement(new JsonBuilderElementBuilder(_loggerFactory).Build())
+                .AddFlowElement(new JavaScriptBuilderElementBuilder(_loggerFactory)
+                    .SetMinify(false)
+                    .SetProtocol("http")
+                    .SetHost($"localhost:{port}")
+                    .SetEndpoint("/51dpipeline/json")
+                    .SetEnableCookies(false)
+                    .Build())
+                .Build();
+
+            var app = BuildTestApp(pipeline, url, async (ctx) =>
+            {
+                var form = await ctx.Request.ReadFormAsync();
+                return Results.Content(
+                    BuildContent(pipeline, ctx,
+                        d => d.Get<IJsonBuilderElementData>().Json, form),
+                    "application/json");
+            }, _ => PageHtml);
+
+            ChromeDriver driver = null;
+            try
+            {
+                await app.StartAsync();
+                driver = CreateDriver();
+                IJavaScriptExecutor js = driver;
+
+                driver.Navigate().GoToUrl(url + "page1");
+                WaitForFodDone(js, "first page", () => 0);
+                Assert.AreEqual(1L,
+                    js.ExecuteScript("return window.hardwareProfileRuns || 0"),
+                    "the snippet must run on the first page");
+
+                driver.Navigate().GoToUrl(url + "page2");
+                WaitForFodDone(js, "second page", () => 0);
+
+                Assert.AreEqual(1L,
+                    js.ExecuteScript("return window.hardwareProfileRuns || 0"),
+                    "the snippet saved nothing, so the next page view must " +
+                    "attempt it again instead of treating it as done");
+            }
+            finally
+            {
+                QuitDriver(driver);
+                await app.DisposeAsync();
+            }
+        }
+
+        /// <summary>
+        /// A refresh that brings back a snippet the page has not run yet must
+        /// execute it and refresh again, and must then stop.
+        /// </summary>
+        [TestMethod]
+        [Timeout(300_000)]
+        public async Task SessionStorageCache_SnippetArrivingInARefreshIsExecuted()
+        {
+            var port = TestHttpListener.GetRandomUnusedPort();
+            var url = $"http://localhost:{port}/";
+            int posts = 0;
+
+            using var pipeline = BuildPipeline(enableCookies: false, port);
+
+            const string WithFollowUpJson =
+                "{\"device\":{\"testvalue\":\"purple\"," +
+                "\"followupjavascript\":\"window.followUpRuns = " +
+                "(window.followUpRuns || 0) + 1;\"}," +
+                "\"javascriptProperties\":[\"device.followupjavascript\"]}";
+            const string SettledJson =
+                "{\"device\":{\"testvalue\":\"purple\"}," +
+                "\"javascriptProperties\":[]}";
+
+            var app = BuildTestApp(pipeline, url,
+                _ => Task.FromResult(Results.Content(
+                    Interlocked.Increment(ref posts) == 1
+                        ? WithFollowUpJson
+                        : SettledJson,
+                    "application/json")),
+                _ => PageHtml);
+
+            ChromeDriver driver = null;
+            try
+            {
+                await app.StartAsync();
+                driver = CreateDriver();
+                IJavaScriptExecutor js = driver;
+
+                driver.Navigate().GoToUrl(url + "page1");
+                WaitForFodDone(js, "page with a follow-up snippet", () => posts);
+
+                Assert.AreEqual(1L,
+                    js.ExecuteScript("return window.followUpRuns || 0"),
+                    "the snippet that arrived in the refresh must run exactly " +
+                    "once");
+                Assert.AreEqual(2, posts,
+                    "the follow-up snippet must produce one further refresh " +
+                    "and the flow must then settle");
+            }
+            finally
+            {
+                QuitDriver(driver);
+                await app.DisposeAsync();
+            }
+        }
+
         private IPipeline BuildDelayedPipeline(int port)
         {
             return new PipelineBuilder(_loggerFactory)
@@ -971,7 +1405,8 @@ namespace FiftyOne.Pipeline.JavaScript.Tests
             IPipeline pipeline,
             string url,
             Func<HttpContext, Task<IResult>> onJson,
-            Func<string, string> pageHtml)
+            Func<string, string> pageHtml,
+            Func<string, string> transformJavaScript = null)
         {
             var builder = WebApplication.CreateBuilder();
             var app = builder.Build();
@@ -981,15 +1416,55 @@ namespace FiftyOne.Pipeline.JavaScript.Tests
                 return next();
             });
             app.MapGet("/51dpipeline/js", (HttpContext ctx) =>
-                Results.Content(
-                    BuildContent(pipeline, ctx,
-                        d => d.Get<IJavaScriptBuilderElementData>().JavaScript),
-                    "text/javascript"));
+            {
+                var javaScript = BuildContent(pipeline, ctx,
+                    d => d.Get<IJavaScriptBuilderElementData>().JavaScript);
+                return Results.Content(
+                    transformJavaScript == null
+                        ? javaScript
+                        : transformJavaScript(javaScript),
+                    "text/javascript");
+            });
             app.MapPost("/51dpipeline/json", onJson);
             app.MapGet("/{page}", (string page) =>
                 Results.Content(pageHtml(page), "text/html"));
             app.Urls.Add(url);
             return app;
+        }
+
+        /// <summary>
+        /// Waits for a script that returns a boolean to become true, failing
+        /// with whatever context the caller can add.
+        /// </summary>
+        private static void WaitForScript(
+            IJavaScriptExecutor js, string script, string phase, Func<string> detail)
+        {
+            var deadline = DateTime.UtcNow + TimeSpan.FromSeconds(60);
+            while (true)
+            {
+                if (true.Equals(js.ExecuteScript(script)))
+                {
+                    return;
+                }
+                if (DateTime.UtcNow >= deadline)
+                {
+                    Assert.Fail($"Timed out during {phase}. {detail()}");
+                }
+                Thread.Sleep(200);
+            }
+        }
+
+        private static void QuitDriver(ChromeDriver driver)
+        {
+            try
+            {
+                driver?.Quit();
+            }
+            catch (WebDriverException)
+            {
+                // A dead session must not mask the real failure or stop the
+                // web application being disposed.
+            }
         }
 
         private static void WaitForStorageKey(IJavaScriptExecutor js, string prefix)
@@ -1044,10 +1519,10 @@ namespace FiftyOne.Pipeline.JavaScript.Tests
             {
                 return JavaScriptBuilderElementTestsBase.CreateConfiguredDriver();
             }
-            catch (WebDriverException)
+            catch (WebDriverException ex)
             {
                 Assert.Inconclusive("Could not create a ChromeDriver, check " +
-                    "that the Chromium driver is installed");
+                    $"that the Chromium driver is installed: {ex.Message}");
                 return null;
             }
         }
