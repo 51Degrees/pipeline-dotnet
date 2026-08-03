@@ -224,7 +224,7 @@ namespace FiftyOne.Pipeline.JavaScript.Tests
             <html>
               <head>
                 <title>Parameters test, first page</title>
-                <script src="/51dpipeline/js?mark=first"></script>
+                <script src="/51dpipeline/js?mark=first&amp;campaign=spring"></script>
                 <script>
                   window.fodDone = false;
                   window.fodValue = '';
@@ -1047,12 +1047,15 @@ namespace FiftyOne.Pipeline.JavaScript.Tests
         }
 
         /// <summary>
-        /// When a later page view does refresh, its own query evidence wins
-        /// over whatever an earlier page view stored.
+        /// A refresh reports the query evidence of the page view making it and
+        /// nothing else. The parameters object is rendered from that page
+        /// view's own query string, so carrying any of it into a later page
+        /// view misreports that page. The values the snippets produce do carry
+        /// over, from their own storage.
         /// </summary>
         [TestMethod]
         [Timeout(300_000)]
-        public async Task SessionStorageCache_StoredParametersDoNotOverrideCurrentPage()
+        public async Task SessionStorageCache_RefreshSendsOnlyThisPageViewsQueryEvidence()
         {
             var port = TestHttpListener.GetRandomUnusedPort();
             var url = $"http://localhost:{port}/";
@@ -1091,9 +1094,9 @@ namespace FiftyOne.Pipeline.JavaScript.Tests
                 IJavaScriptExecutor js = driver;
 
                 driver.Navigate().GoToUrl(url + "page1");
-                // The refresh hangs, so the first page stores its parameters
-                // and its flag but never caches a response.
-                WaitForStorageKey(js, "fod_parameters");
+                // The refresh hangs, so the first page runs its snippet and
+                // saves the value it produces but never caches a response.
+                WaitForStorageKey(js, "fod_data_");
 
                 hang = false;
                 driver.Navigate().GoToUrl(url + "page2");
@@ -1103,22 +1106,24 @@ namespace FiftyOne.Pipeline.JavaScript.Tests
                 StringAssert.Contains(postBody, "mark=second",
                     "the current page's own query evidence must be sent");
                 Assert.IsFalse(postBody.Contains("mark=first"),
-                    "stored parameters must not override the current page");
+                    "an earlier page view's value must not override this one");
+                Assert.IsFalse(postBody.Contains("campaign=spring"),
+                    "a parameter this page view does not have must not be " +
+                    "resurrected from an earlier one");
+                StringAssert.Contains(postBody, "51D_testvalue=purple",
+                    "the values the snippets produce must still carry over");
+                Assert.IsFalse(
+                    GetSessionStorageKeys(js).Any(k => k.EndsWith(
+                        "_parameters", StringComparison.Ordinal)),
+                    "the parameters object belongs to one page view and must " +
+                    "not be stored at all");
                 Assert.AreEqual("purple",
                     (string)js.ExecuteScript("return window.fodValue"),
                     "the second page must get the real value");
             }
             finally
             {
-                try
-                {
-                    driver?.Quit();
-                }
-                catch (WebDriverException)
-                {
-                    // A dead session must not mask the real failure or stop the
-                    // web application being disposed.
-                }
+                QuitDriver(driver);
                 await app.DisposeAsync();
             }
         }
