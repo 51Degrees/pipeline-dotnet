@@ -23,6 +23,7 @@
 using FiftyOne.Common.TestHelpers;
 using FiftyOne.Pipeline.Core.Data;
 using FiftyOne.Pipeline.Core.FlowElements;
+using FiftyOne.Pipeline.Engines.Data;
 using FiftyOne.Pipeline.Engines.FiftyOne.FlowElements;
 using FiftyOne.Pipeline.Engines.TestHelpers;
 using FiftyOne.Pipeline.JavaScriptBuilder.Data;
@@ -73,6 +74,56 @@ namespace FiftyOne.Pipeline.JavaScript.Tests
                 : base(logger, pipeline)
             {
             }
+        }
+
+        private class BrowserCapabilityData : ElementDataBase
+        {
+            public BrowserCapabilityData(ILogger<ElementDataBase> logger, IPipeline pipeline)
+                : base(logger, pipeline)
+            {
+            }
+        }
+
+        /// <summary>
+        /// Supplies the two properties the JavaScript builder reads to decide
+        /// which transport the template is rendered with. Device detection
+        /// provides them in production; without an element that does, the
+        /// builder falls back to XHR and no promises, which is not what any
+        /// current browser gets.
+        /// </summary>
+        private class BrowserCapabilityElement : FlowElementBase<BrowserCapabilityData, ElementPropertyMetaData>
+        {
+            private readonly ILoggerFactory _loggerFactory;
+
+            public BrowserCapabilityElement(ILoggerFactory loggerFactory)
+                : base(loggerFactory.CreateLogger<FlowElementBase<BrowserCapabilityData, ElementPropertyMetaData>>())
+            {
+                _loggerFactory = loggerFactory;
+            }
+
+            public override string ElementDataKey => "browser";
+
+            public override IEvidenceKeyFilter EvidenceKeyFilter =>
+                new EvidenceKeyFilterWhitelist(new List<string>());
+
+            public override IList<ElementPropertyMetaData> Properties =>
+                new List<ElementPropertyMetaData>()
+                {
+                    new ElementPropertyMetaData(this, "Promise", typeof(string), true),
+                    new ElementPropertyMetaData(this, "Fetch", typeof(bool), true),
+                };
+
+            protected override void ProcessInternal(IFlowData data)
+            {
+                var result = new BrowserCapabilityData(
+                    _loggerFactory.CreateLogger<BrowserCapabilityData>(), data.Pipeline);
+                result["Promise"] = new AspectPropertyValue<string>("Full");
+                result["Fetch"] = new AspectPropertyValue<bool>(true);
+                data.GetOrAdd(ElementDataKey, p => result);
+            }
+
+            protected override void ManagedResourcesCleanup() { }
+            protected override void UnmanagedResourcesCleanup() { }
         }
 
         /// <summary>
@@ -458,30 +509,26 @@ namespace FiftyOne.Pipeline.JavaScript.Tests
         }
 
         [DataTestMethod]
-        [DataRow(true)]
-        [DataRow(false)]
+        [DataRow(true, true)]
+        [DataRow(false, true)]
+        // The XHR and no-promises render is what a browser without the Promise
+        // and Fetch properties gets, so it keeps one pass through the suite's
+        // broadest case.
+        [DataRow(true, false)]
+        [DataRow(false, false)]
         [Timeout(300_000)]
-        public async Task SessionStorageCache_SecondPageIsServedFromCache(bool enableCookies)
+        public async Task SessionStorageCache_SecondPageIsServedFromCache(
+            bool enableCookies, bool modernBrowser)
         {
             var port = TestHttpListener.GetRandomUnusedPort();
             var url = $"http://localhost:{port}/";
             int jsonPostCount = 0;
 
-            using var pipeline = BuildPipeline(enableCookies, port);
+            using var pipeline = BuildPipeline(enableCookies, port, modernBrowser);
 
-            var builder = WebApplication.CreateBuilder();
-            var app = builder.Build();
-            app.Use((ctx, next) =>
-            {
-                ctx.Response.Headers["Cache-Control"] = "no-store";
-                return next();
-            });
-            app.MapGet("/51dpipeline/js", (HttpContext ctx) =>
-                Results.Content(
-                    BuildContent(pipeline, ctx,
-                        d => d.Get<IJavaScriptBuilderElementData>().JavaScript),
-                    "text/javascript"));
-            app.MapPost("/51dpipeline/json", async (HttpContext ctx) =>
+            string servedJavaScript = null;
+
+            var app = BuildTestApp(pipeline, url, async (ctx) =>
             {
                 Interlocked.Increment(ref jsonPostCount);
                 var form = await ctx.Request.ReadFormAsync();
@@ -489,9 +536,12 @@ namespace FiftyOne.Pipeline.JavaScript.Tests
                     BuildContent(pipeline, ctx,
                         d => d.Get<IJsonBuilderElementData>().Json, form),
                     "application/json");
+            }, _ => PageHtml,
+            javaScript =>
+            {
+                servedJavaScript = javaScript;
+                return javaScript;
             });
-            app.MapGet("/{page}", (string page) => Results.Content(PageHtml, "text/html"));
-            app.Urls.Add(url);
             await app.StartAsync();
 
             ChromeDriver driver = null;
@@ -502,6 +552,16 @@ namespace FiftyOne.Pipeline.JavaScript.Tests
 
                 driver.Navigate().GoToUrl(url + "page1");
                 WaitForFodDone(js, "first page", () => jsonPostCount);
+
+                // The transport is chosen from the Promise and Fetch
+                // properties. If nothing supplies them the builder quietly
+                // falls back to XHR, so the mode under test has to be pinned
+                // or this dimension tests nothing.
+                Assert.AreEqual(modernBrowser,
+                    servedJavaScript.Contains("fetch(", StringComparison.Ordinal),
+                    "the template must be rendered with the transport this " +
+                    "case is for");
+
                 var valuePage1 = (string)js.ExecuteScript("return window.fodValue");
                 var keysPage1 = GetSessionStorageKeys(js);
                 var sessionIdPage1 = (string)js.ExecuteScript("return fod.sessionId");
@@ -1265,6 +1325,7 @@ namespace FiftyOne.Pipeline.JavaScript.Tests
 
             using var pipeline = new PipelineBuilder(_loggerFactory)
                 .AddFlowElement(new TestHardwareProfileElement(_loggerFactory))
+                .AddFlowElement(new BrowserCapabilityElement(_loggerFactory))
                 .AddFlowElement(new SequenceElementBuilder(_loggerFactory).Build())
                 .AddFlowElement(new JsonBuilderElementBuilder(_loggerFactory).Build())
                 .AddFlowElement(new JavaScriptBuilderElementBuilder(_loggerFactory)
@@ -1373,6 +1434,7 @@ namespace FiftyOne.Pipeline.JavaScript.Tests
         {
             return new PipelineBuilder(_loggerFactory)
                 .AddFlowElement(new TestDelayedElement(_loggerFactory))
+                .AddFlowElement(new BrowserCapabilityElement(_loggerFactory))
                 .AddFlowElement(new SequenceElementBuilder(_loggerFactory).Build())
                 .AddFlowElement(new JsonBuilderElementBuilder(_loggerFactory).Build())
                 .AddFlowElement(new JavaScriptBuilderElementBuilder(_loggerFactory)
@@ -1385,10 +1447,17 @@ namespace FiftyOne.Pipeline.JavaScript.Tests
                 .Build();
         }
 
-        private IPipeline BuildPipeline(bool enableCookies, int port)
+        private IPipeline BuildPipeline(bool enableCookies, int port,
+            bool modernBrowser = true)
         {
-            return new PipelineBuilder(_loggerFactory)
-                .AddFlowElement(new TestValueElement(_loggerFactory))
+            var builder = new PipelineBuilder(_loggerFactory)
+                .AddFlowElement(new TestValueElement(_loggerFactory));
+            if (modernBrowser)
+            {
+                builder = builder.AddFlowElement(
+                    new BrowserCapabilityElement(_loggerFactory));
+            }
+            return builder
                 .AddFlowElement(new SequenceElementBuilder(_loggerFactory).Build())
                 .AddFlowElement(new JsonBuilderElementBuilder(_loggerFactory).Build())
                 .AddFlowElement(new JavaScriptBuilderElementBuilder(_loggerFactory)
@@ -1521,8 +1590,10 @@ namespace FiftyOne.Pipeline.JavaScript.Tests
             }
             catch (WebDriverException ex)
             {
-                Assert.Inconclusive("Could not create a ChromeDriver, check " +
-                    $"that the Chromium driver is installed: {ex.Message}");
+                // Not Inconclusive: skipping here reports green for a run in
+                // which none of these tests executed at all.
+                Assert.Fail("Could not create a ChromeDriver, check that the " +
+                    $"Chromium driver is installed: {ex.Message}");
                 return null;
             }
         }
