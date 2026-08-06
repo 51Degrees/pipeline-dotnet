@@ -1070,5 +1070,144 @@ namespace FiftyOne.Pipeline.Core.Tests.Data
 
             DisposeFlowData();
         }
+
+        #region Warnings
+
+        /// <summary>
+        /// A flow data that nothing has warned about has no warnings.
+        /// </summary>
+        [TestMethod]
+        public void FlowData_Warnings_NoneByDefault()
+        {
+            Assert.IsEmpty(_flowData.Warnings);
+            Assert.IsEmpty(((IFlowData)_flowData).GetWarnings());
+        }
+
+        /// <summary>
+        /// A recorded warning is readable, in order, with the element that
+        /// recorded it.
+        /// </summary>
+        [TestMethod]
+        public void FlowData_Warnings_Added()
+        {
+            var element = new Mock<IFlowElement>();
+
+            _flowData.AddWarning("first", element.Object);
+            _flowData.AddWarning("second", null);
+
+            var warnings = _flowData.Warnings;
+            Assert.HasCount(2, warnings);
+            Assert.AreEqual("first", warnings[0].Message);
+            Assert.AreEqual(element.Object, warnings[0].FlowElement);
+            Assert.AreEqual("second", warnings[1].Message);
+            Assert.IsNull(warnings[1].FlowElement);
+        }
+
+        /// <summary>
+        /// A warning must not make the pipeline throw the way an error does,
+        /// which is the whole reason for the collection existing.
+        /// </summary>
+        [TestMethod]
+        public void FlowData_Warnings_NotAddedToErrors()
+        {
+            _flowData.AddWarning("a warning", null);
+
+            Assert.IsTrue(
+                _flowData.Errors == null || _flowData.Errors.Count == 0);
+        }
+
+        /// <summary>
+        /// The returned collection is a snapshot, so a caller holding it
+        /// while further warnings are recorded does not see them appear.
+        /// </summary>
+        [TestMethod]
+        public void FlowData_Warnings_IsSnapshot()
+        {
+            _flowData.AddWarning("first", null);
+            var warnings = _flowData.Warnings;
+
+            _flowData.AddWarning("second", null);
+
+            Assert.HasCount(1, warnings);
+            Assert.HasCount(2, _flowData.Warnings);
+        }
+
+        /// <summary>
+        /// A null message is a caller error rather than something to record.
+        /// </summary>
+        [TestMethod]
+        public void FlowData_Warnings_NullMessage()
+        {
+            Assert.ThrowsExactly<ArgumentNullException>(
+                () => _flowData.AddWarning(null, null));
+        }
+
+        /// <summary>
+        /// Elements in a ParallelElements group can warn at the same time,
+        /// so no warning may be lost and the collection may not be observed
+        /// part-written. This is the requirement the collection exists to
+        /// meet - see 51Degrees/pipeline-dotnet#363.
+        /// </summary>
+        [TestMethod]
+        public void FlowData_Warnings_AddedConcurrently()
+        {
+            const int threads = 8;
+            const int perThread = 250;
+            var start = new ManualResetEventSlim(false);
+            var readerFailure = 0;
+
+            var writers = Enumerable.Range(0, threads).Select(t =>
+            {
+                var thread = new Thread(() =>
+                {
+                    start.Wait();
+                    for (var i = 0; i < perThread; i++)
+                    {
+                        _flowData.AddWarning($"{t}-{i}", null);
+                    }
+                });
+                thread.Start();
+                return thread;
+            }).ToList();
+
+            // Read throughout, so a reader overlapping a writer is covered
+            // as well as writers overlapping each other.
+            var reader = new Thread(() =>
+            {
+                start.Wait();
+                for (var i = 0; i < 500; i++)
+                {
+                    try
+                    {
+                        foreach (var warning in _flowData.Warnings)
+                        {
+                            if (warning == null)
+                            {
+                                Interlocked.Increment(ref readerFailure);
+                            }
+                        }
+                    }
+                    catch (InvalidOperationException)
+                    {
+                        Interlocked.Increment(ref readerFailure);
+                    }
+                }
+            });
+            reader.Start();
+
+            start.Set();
+            foreach (var thread in writers)
+            {
+                thread.Join();
+            }
+            reader.Join();
+
+            Assert.AreEqual(0, readerFailure,
+                "Reading the warnings while they were being added failed.");
+            Assert.HasCount(threads * perThread, _flowData.Warnings,
+                "Warnings were lost when several threads recorded them.");
+        }
+
+        #endregion
     }
 }

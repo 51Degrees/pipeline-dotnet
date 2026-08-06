@@ -83,6 +83,21 @@ namespace FiftyOne.Pipeline.Core.Data
         /// Lock to use when adding errors.
         /// </summary>
         private object _errorsLock;
+
+        /// <summary>
+        /// Messages for the caller that did not stop the request being
+        /// served. Created on the first warning, under
+        /// <see cref="_warningsLock"/>.
+        /// </summary>
+        private List<IFlowWarning> _warnings;
+
+        /// <summary>
+        /// Lock to use when adding or reading warnings. Assigned here rather
+        /// than on first use so that concurrent elements cannot each install
+        /// a lock of their own and then add while holding different ones.
+        /// </summary>
+        private readonly object _warningsLock = new object();
+
         private bool disposedValue;
 
         /// <summary>
@@ -286,6 +301,77 @@ namespace FiftyOne.Pipeline.Core.Data
                 }
                 _logger.LogError(ex, logMessage);
             }            
+        }
+
+        /// <summary>
+        /// The warnings that have been recorded during processing, in the
+        /// order they were added. Empty if there are none.
+        /// </summary>
+        /// <remarks>
+        /// A snapshot rather than the live collection, so that a caller
+        /// reading this while a concurrent element is still adding cannot
+        /// observe a partially written list.
+        /// </remarks>
+        public IReadOnlyList<IFlowWarning> Warnings
+        {
+            get
+            {
+                lock (_warningsLock)
+                {
+                    return _warnings == null
+                        ? EmptyWarnings
+                        : _warnings.ToArray();
+                }
+            }
+        }
+
+        private static readonly IFlowWarning[] EmptyWarnings =
+            new IFlowWarning[0];
+
+        /// <summary>
+        /// Record a message for the caller about something that was wrong
+        /// with the request but did not stop it being served.
+        /// </summary>
+        /// <remarks>
+        /// Unlike <see cref="AddError(Exception, IFlowElement)"/> this never
+        /// affects processing: the pipeline does not throw because a warning
+        /// was recorded. Use it for a problem the caller should know about
+        /// and can act on, such as an evidence value that could not be used.
+        /// Safe to call from elements running concurrently.
+        /// </remarks>
+        /// <param name="message">The message for the caller.</param>
+        /// <param name="flowElement">
+        /// The flow element the warning relates to, or null.
+        /// </param>
+        /// <exception cref="ArgumentNullException">
+        /// Thrown if the supplied message is null.
+        /// </exception>
+        public void AddWarning(string message, IFlowElement flowElement)
+        {
+            if (message == null)
+            {
+                throw new ArgumentNullException(nameof(message));
+            }
+            var warning = new FlowWarning(message, flowElement);
+            lock (_warningsLock)
+            {
+                if (_warnings == null)
+                {
+                    _warnings = new List<IFlowWarning>();
+                }
+                _warnings.Add(warning);
+            }
+
+            if (_logger != null && _logger.IsEnabled(LogLevel.Warning))
+            {
+                var logMessage = message;
+                if (flowElement != null)
+                {
+                    logMessage = logMessage
+                        + $" (from {flowElement.GetType().Name})";
+                }
+                _logger.LogWarning(logMessage);
+            }
         }
 
         /// <summary>

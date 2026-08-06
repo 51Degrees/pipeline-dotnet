@@ -439,6 +439,117 @@ namespace FiftyOne.Pipeline.JsonBuilderElementTests
         }
 
         /// <summary>
+        /// A message recorded with AddWarning must reach the caller in the
+        /// top level warnings array, with the rest of the data alongside it.
+        /// </summary>
+        [TestMethod]
+        public void JsonBuilder_Warnings_InJson()
+        {
+            const string message = "evidence value 'n2' could not be used";
+
+            var json = ProcessWithWarnings(
+                new JsonBuilderElementBuilder(_loggerFactory).Build(),
+                message);
+
+            var warnings = JObject.Parse(json)["warnings"];
+            Assert.IsNotNull(warnings, "expected a warnings array");
+            CollectionAssert.AreEqual(
+                new[] { message },
+                warnings.Select(w => w.ToString()).ToArray());
+            // The data must still be there. A warning is not an error.
+            Assert.IsNotNull(JObject.Parse(json)["empty-aspect"]);
+        }
+
+        /// <summary>
+        /// With nothing to report there must be no warnings entry, so the
+        /// response shape does not change for the normal case.
+        /// </summary>
+        [TestMethod]
+        public void JsonBuilder_NoWarnings_NoEntryInJson()
+        {
+            var json = ProcessWithWarnings(
+                new JsonBuilderElementBuilder(_loggerFactory).Build());
+
+            Assert.IsNull(JObject.Parse(json)["warnings"]);
+        }
+
+        /// <summary>
+        /// A subclass that already writes warnings of its own keeps them:
+        /// the flow data warnings are added to that entry rather than
+        /// replacing it or throwing on the duplicate key.
+        /// </summary>
+        [TestMethod]
+        public void JsonBuilder_Warnings_MergedWithSubclassEntry()
+        {
+            var json = ProcessWithWarnings(
+                new SubclassWarningJsonBuilderElement(_loggerFactory),
+                "from the flow data");
+
+            var warnings = JObject.Parse(json)["warnings"]
+                .Select(w => w.ToString())
+                .ToArray();
+            CollectionAssert.AreEqual(
+                new[]
+                {
+                    SubclassWarningJsonBuilderElement.Warning,
+                    "from the flow data"
+                },
+                warnings);
+        }
+
+        /// <summary>
+        /// Run a real pipeline built around the supplied JSON builder,
+        /// recording the supplied warnings on the flow data first.
+        /// </summary>
+        /// <param name="jsonBuilder">The JSON builder to use.</param>
+        /// <param name="warnings">The warnings to record.</param>
+        /// <returns>The JSON the builder produced.</returns>
+        private string ProcessWithWarnings(
+            IJsonBuilderElement jsonBuilder,
+            params string[] warnings)
+        {
+            var engine = new EmptyEngineBuilder(_loggerFactory).Build();
+            var sequenceElement = new SequenceElementBuilder(_loggerFactory)
+                .Build();
+            var pipeline = new PipelineBuilder(_loggerFactory)
+                .AddFlowElement(sequenceElement)
+                .AddFlowElement(engine)
+                .AddFlowElement(jsonBuilder)
+                .Build();
+
+            using (var flowData = pipeline.CreateFlowData())
+            {
+                foreach (var warning in warnings)
+                {
+                    flowData.AddWarning(warning, engine);
+                }
+                flowData.Process();
+                return flowData.Get<IJsonBuilderElementData>().Json;
+            }
+        }
+
+        /// <summary>
+        /// Inner class standing in for a builder that already produces its
+        /// own warnings entry, as a subclass in another repository does.
+        /// </summary>
+        private class SubclassWarningJsonBuilderElement : TestJsonBuilderElement
+        {
+            public const string Warning = "from the subclass";
+
+            public SubclassWarningJsonBuilderElement(
+                ILoggerFactory loggerFactory)
+                : base(loggerFactory)
+            { }
+
+            protected override void AddErrors(IFlowData data,
+                Dictionary<string, object> allProperties)
+            {
+                base.AddErrors(data, allProperties);
+                allProperties["warnings"] = new string[] { Warning };
+            }
+        }
+
+        /// <summary>
         /// Inner class used to test serialization of values in 
         /// isolation
         /// </summary>
