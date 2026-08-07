@@ -20,7 +20,9 @@
  * such notice(s) shall fulfill the requirements of that article.
  * ********************************************************************* */
 
+using FiftyOne.Pipeline.Core.FlowElements;
 using System;
+using System.Collections.Generic;
 using System.Threading;
 
 namespace FiftyOne.Pipeline.Core.Data
@@ -117,6 +119,79 @@ namespace FiftyOne.Pipeline.Core.Data
                 data.Stop = true;
 #pragma warning restore CS0618 // Type or member is obsolete
             }
+        }
+
+        /// <summary>
+        /// Record a message for the caller about something that was wrong
+        /// with the request but did not stop it being served, for example an
+        /// evidence value that an element could not use. A builder such as
+        /// the JSON builder writes these into the response.
+        /// </summary>
+        /// <remarks>
+        /// This is the channel to use instead of
+        /// <see cref="IFlowData.AddError(Exception, IFlowElement)"/> for a
+        /// problem that should not fail the request. A non-empty errors
+        /// collection makes the pipeline throw at the end of processing
+        /// unless the host has set SuppressProcessExceptions, whatever the
+        /// shouldThrow flag on the individual error says, which leaves such
+        /// a host returning no payload at all.
+        /// </remarks>
+        /// <param name="data">The flow data to record the message on.</param>
+        /// <param name="message">The message for the caller.</param>
+        /// <param name="flowElement">
+        /// The flow element the warning relates to, or null.
+        /// </param>
+        /// <exception cref="ArgumentNullException">
+        /// Thrown if the supplied data or message is null.
+        /// </exception>
+        public static void AddWarning(
+            this IFlowData data,
+            string message,
+            IFlowElement flowElement)
+        {
+            if (data == null)
+            {
+                throw new ArgumentNullException(nameof(data));
+            }
+            if (message == null)
+            {
+                throw new ArgumentNullException(nameof(message));
+            }
+            if (data is FlowData concrete)
+            {
+                concrete.AddWarning(message, flowElement);
+                return;
+            }
+            // A third-party IFlowData has nowhere to keep the message and no
+            // builder that would read it back, so there is nothing to do.
+            // Every flow data the pipeline creates is a FlowData.
+        }
+
+        /// <summary>
+        /// The messages recorded by
+        /// <see cref="AddWarning(IFlowData, string, IFlowElement)"/>, in the
+        /// order they were added.
+        /// </summary>
+        /// <param name="data">The flow data to read the messages from.</param>
+        /// <returns>
+        /// The warnings, or an empty list if there are none or the flow data
+        /// does not support them.
+        /// </returns>
+        /// <exception cref="ArgumentNullException">
+        /// Thrown if the supplied data is null.
+        /// </exception>
+        public static IReadOnlyList<IFlowWarning> GetWarnings(
+            this IFlowData data)
+        {
+            if (data == null)
+            {
+                throw new ArgumentNullException(nameof(data));
+            }
+            if (data is FlowData concrete)
+            {
+                return concrete.Warnings;
+            }
+            return new IFlowWarning[0];
         }
     }
 }
