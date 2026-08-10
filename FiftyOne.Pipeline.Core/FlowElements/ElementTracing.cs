@@ -53,6 +53,13 @@ namespace FiftyOne.Pipeline.Core.FlowElements
             ConditionalWeakTable<IFlowElement, ElementNames> _names =
                 new ConditionalWeakTable<IFlowElement, ElementNames>();
 
+        // Held in a field because the project compiles as C# 7.3, which
+        // has no static method group delegate caching: passing Resolve
+        // directly would allocate a delegate on every traced element.
+        private static readonly
+            ConditionalWeakTable<IFlowElement, ElementNames>.CreateValueCallback
+                _resolveCallback = Resolve;
+
         /// <summary>
         /// Start a span for the element about to be processed. Returns
         /// null when nothing listens to the source, so tracing that is
@@ -77,7 +84,7 @@ namespace FiftyOne.Pipeline.Core.FlowElements
             {
                 return null;
             }
-            var names = _names.GetValue(element, Resolve);
+            var names = _names.GetValue(element, _resolveCallback);
             // Tags handed over at creation are visible to samplers and
             // cost no work per request.
             return Source.StartActivity(
