@@ -117,5 +117,13 @@ namespace FiftyOne.Pipeline.Core
         /// from flow elements to bubble up to the caller, or be caught and logged.
         /// </summary>
         public const bool PIPELINE_BUILDER_DEFAULT_AUTO_SUPRESS_PROCESS_EXCEPTIONS = false;
+
+        /// <summary>
+        /// The name of the <see cref="System.Diagnostics.ActivitySource"/>
+        /// that emits a tracing span for each flow element a pipeline
+        /// processes. Register this name with an OpenTelemetry tracer
+        /// (AddSource) to collect the spans; nothing is emitted otherwise.
+        /// </summary>
+        public const string TRACING_SOURCE_NAME = "FiftyOne.Pipeline";
     }
 }

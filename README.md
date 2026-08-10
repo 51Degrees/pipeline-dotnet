@@ -129,6 +129,31 @@ processing stops automatically when the client disconnects.
 An element with long-running work can check `flowData.GetStopToken()` itself
 to stop sooner; elements that don't are simply skipped once the token is cancelled.
 
+## Tracing
+
+The pipeline emits an OpenTelemetry-compatible tracing span for every flow
+element executed by `flowData.Process()`, from an `ActivitySource` named
+`FiftyOne.Pipeline` (also available as
+`FiftyOne.Pipeline.Core.Constants.TRACING_SOURCE_NAME`). Nothing is emitted
+unless something listens to that source, so there is no cost when tracing
+is not configured.
+
+Each span is named `element.<ElementDataKey>` (for example `element.device`)
+and carries `element.type` and `element.data_key` tags. Elements inside a
+parallel section each get their own span; the parallel wrapper itself does
+not emit one. An element that throws marks its span with error status;
+error handling is otherwise unchanged.
+
+Register the source with your tracer to collect the spans:
+
+```csharp
+services.AddOpenTelemetry().WithTracing(tracing =>
+{
+    tracing.AddSource("FiftyOne.Pipeline");
+    // exporter configuration goes here
+});
+```
+
 ## Tests
 
 - **FiftyOne.Pipeline.CloudRequestEngine.Tests** - Tests for the CloudRequestEngine and builder.
