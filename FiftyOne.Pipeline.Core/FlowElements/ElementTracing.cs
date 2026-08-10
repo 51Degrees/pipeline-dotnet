@@ -33,7 +33,9 @@ namespace FiftyOne.Pipeline.Core.FlowElements
     internal static class ElementTracing
     {
         internal static readonly ActivitySource Source =
-            new ActivitySource(Constants.TRACING_SOURCE_NAME);
+            new ActivitySource(
+                Constants.TRACING_SOURCE_NAME,
+                typeof(ElementTracing).Assembly.GetName().Version?.ToString());
 
         /// <summary>
         /// Start a span for the element about to be processed. Returns
@@ -59,12 +61,25 @@ namespace FiftyOne.Pipeline.Core.FlowElements
             {
                 return null;
             }
-            var activity = Source.StartActivity(
-                "element." + element.ElementDataKey);
+            string dataKey;
+            try
+            {
+                dataKey = element.ElementDataKey;
+            }
+#pragma warning disable CA1031 // Do not catch general exception types
+            catch (Exception)
+#pragma warning restore CA1031 // Do not catch general exception types
+            {
+                // Tracing stays observational: an element whose data key
+                // getter throws must not start failing processing once a
+                // listener attaches.
+                dataKey = element.GetType().Name;
+            }
+            var activity = Source.StartActivity("element." + dataKey);
             if (activity != null && activity.IsAllDataRequested)
             {
                 activity.SetTag("element.type", element.GetType().Name);
-                activity.SetTag("element.data_key", element.ElementDataKey);
+                activity.SetTag("element.data_key", dataKey);
             }
             return activity;
         }
