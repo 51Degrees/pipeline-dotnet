@@ -37,9 +37,8 @@ namespace FiftyOne.Pipeline.Core.FlowElements
 
         /// <summary>
         /// Start a span for the element about to be processed. Returns
-        /// null when nothing listens to the source, so a pipeline with
-        /// tracing switched off pays nothing, not even the span name
-        /// concatenation.
+        /// null when nothing listens to the source, so tracing that is
+        /// switched off costs nothing.
         /// </summary>
         /// <param name="element">
         /// The element about to be processed.

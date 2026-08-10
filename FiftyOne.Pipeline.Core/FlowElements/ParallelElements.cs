@@ -140,9 +140,8 @@ namespace FiftyOne.Pipeline.Core.FlowElements
                         }
                         catch (Exception ex)
                         {
-                            // Mark the span before the exception continues
-                            // into the ContinueWith error handling below,
-                            // which stays unchanged.
+                            // Mark the span before the exception carries
+                            // on into the error handling below.
                             activity?.SetStatus(
                                 ActivityStatusCode.Error, ex.Message);
                             throw;
