@@ -25,6 +25,7 @@ using Microsoft.Extensions.Logging;
 using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
+using System.Diagnostics;
 using System.Linq;
 using System.Threading.Tasks;
 
@@ -132,7 +133,23 @@ namespace FiftyOne.Pipeline.Core.FlowElements
                     // Run each element on a new thread.
                     Task.Run(() =>
                     {
-                        element.Process(data);
+                        var activity = ElementTracing.StartElement(element);
+                        try
+                        {
+                            element.Process(data);
+                        }
+                        catch (Exception ex)
+                        {
+                            // Mark the span before the exception carries
+                            // on into the error handling below.
+                            activity?.SetStatus(
+                                ActivityStatusCode.Error, ex.Message);
+                            throw;
+                        }
+                        finally
+                        {
+                            activity?.Dispose();
+                        }
                     }).ContinueWith(t =>
                     {
                         // If any exceptions occurred then add them to the 

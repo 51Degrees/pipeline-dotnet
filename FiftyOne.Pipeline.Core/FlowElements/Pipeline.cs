@@ -27,6 +27,7 @@ using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
+using System.Diagnostics;
 using System.Globalization;
 using System.Linq;
 using System.Threading;
@@ -410,6 +411,7 @@ namespace FiftyOne.Pipeline.Core.FlowElements
 
             foreach (var element in _flowElements)
             {
+                Activity activity = null;
                 try
                 {
 #pragma warning disable CS0618 // Type or member is obsolete
@@ -420,6 +422,7 @@ namespace FiftyOne.Pipeline.Core.FlowElements
                     // first (e.g. a client that disconnected before processing).
                     if (data.Stop) { break; }
 #pragma warning restore CS0618 // Type or member is obsolete
+                    activity = ElementTracing.StartElement(element);
                     element.Process(data);
                 }
 #pragma warning disable CA1031 // Do not catch general exception types
@@ -428,6 +431,8 @@ namespace FiftyOne.Pipeline.Core.FlowElements
                 catch (Exception ex)
 #pragma warning restore CA1031 // Do not catch general exception types
                 {
+                    activity?.SetStatus(
+                        ActivityStatusCode.Error, ex.Message);
                     // If an error occurs then store it in the 
                     // FlowData object.
                     // When exceptions are suppressed, the caller has stated
@@ -443,6 +448,10 @@ namespace FiftyOne.Pipeline.Core.FlowElements
                             "Suppressed error during processing of " +
                             $"'{element?.GetType().Name}'.");
                     }
+                }
+                finally
+                {
+                    activity?.Dispose();
                 }
             }
 
