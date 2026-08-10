@@ -21,7 +21,9 @@
  * ********************************************************************* */
 
 using System;
+using System.Collections.Generic;
 using System.Diagnostics;
+using System.Runtime.CompilerServices;
 
 namespace FiftyOne.Pipeline.Core.FlowElements
 {
@@ -36,6 +38,20 @@ namespace FiftyOne.Pipeline.Core.FlowElements
             new ActivitySource(
                 Constants.TRACING_SOURCE_NAME,
                 typeof(ElementTracing).Assembly.GetName().Version?.ToString());
+
+        /// <summary>
+        /// The span name and tags of one element, resolved once: they
+        /// cannot change over the element's lifetime.
+        /// </summary>
+        private sealed class ElementNames
+        {
+            public string SpanName;
+            public KeyValuePair<string, object>[] Tags;
+        }
+
+        private static readonly
+            ConditionalWeakTable<IFlowElement, ElementNames> _names =
+                new ConditionalWeakTable<IFlowElement, ElementNames>();
 
         /// <summary>
         /// Start a span for the element about to be processed. Returns
@@ -61,6 +77,18 @@ namespace FiftyOne.Pipeline.Core.FlowElements
             {
                 return null;
             }
+            var names = _names.GetValue(element, Resolve);
+            // Tags handed over at creation are visible to samplers and
+            // cost no work per request.
+            return Source.StartActivity(
+                names.SpanName,
+                ActivityKind.Internal,
+                default(ActivityContext),
+                names.Tags);
+        }
+
+        private static ElementNames Resolve(IFlowElement element)
+        {
             string dataKey;
             try
             {
@@ -75,13 +103,17 @@ namespace FiftyOne.Pipeline.Core.FlowElements
                 // listener attaches.
                 dataKey = element.GetType().Name;
             }
-            var activity = Source.StartActivity("element." + dataKey);
-            if (activity != null && activity.IsAllDataRequested)
+            return new ElementNames
             {
-                activity.SetTag("element.type", element.GetType().Name);
-                activity.SetTag("element.data_key", dataKey);
-            }
-            return activity;
+                SpanName = "element." + dataKey,
+                Tags = new[]
+                {
+                    new KeyValuePair<string, object>(
+                        "element.type", element.GetType().Name),
+                    new KeyValuePair<string, object>(
+                        "element.data_key", dataKey),
+                },
+            };
         }
     }
 }

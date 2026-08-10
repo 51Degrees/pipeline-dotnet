@@ -144,6 +144,12 @@ parallel section each get their own span; the parallel wrapper itself does
 not emit one. An element that throws marks its span with error status;
 error handling is otherwise unchanged.
 
+The spans attach to the caller's current `Activity`, so they group into
+one trace when something already traces the request, as the ASP.NET Core
+instrumentation does. Without an ambient activity (a console application
+or a background worker), each element span becomes its own single-span
+trace; start an activity around `flowData.Process()` to group them.
+
 Register the source with your tracer to collect the spans:
 
 ```csharp

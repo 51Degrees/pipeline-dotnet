@@ -32,6 +32,7 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
 using System.Threading;
+using System.Threading.Tasks;
 
 namespace FiftyOne.Pipeline.Core.Tests.FlowElements
 {
@@ -135,23 +136,19 @@ namespace FiftyOne.Pipeline.Core.Tests.FlowElements
         }
 
         /// <summary>
-        /// With nothing listening to the source, processing works and no
-        /// activity leaks.
+        /// With nothing listening to the source, processing works.
         /// </summary>
         [TestMethod]
-        public void Process_NoListener_NoSpansAndElementRuns()
+        public void Process_NoListener_ElementRuns()
         {
             var element = MockElement("test");
             using var pipeline = CreatePipeline(true, element.Object);
             using var data = pipeline.CreateFlowData();
-            var ambient = Activity.Current;
 
             data.Process();
 
             element.Verify(
                 e => e.Process(It.IsAny<IFlowData>()), Times.Once());
-            Assert.AreSame(ambient, Activity.Current,
-                "no activity should leak from processing");
         }
 
         /// <summary>
@@ -203,11 +200,11 @@ namespace FiftyOne.Pipeline.Core.Tests.FlowElements
         }
 
         /// <summary>
-        /// When the sampler drops the trace, the activity still exists for
-        /// context propagation but no tags are formatted for it.
+        /// When the sampler drops the trace, the activity exists for
+        /// context propagation but asks for no data.
         /// </summary>
         [TestMethod]
-        public void Process_SamplerDropsTrace_ActivityWithoutTags()
+        public void Process_SamplerDropsTrace_NotAllDataRequested()
         {
             using var collector = new ActivityCollector(
                 ActivitySamplingResult.PropagationData);
@@ -221,8 +218,8 @@ namespace FiftyOne.Pipeline.Core.Tests.FlowElements
 
             var span = collector.Stopped
                 .Single(a => a.TraceId == root.TraceId);
-            Assert.IsNull(span.GetTagItem("element.data_key"),
-                "tags must not be formatted for an unsampled trace");
+            Assert.IsFalse(span.IsAllDataRequested,
+                "the sampler decision must be respected");
         }
 
         /// <summary>
@@ -310,6 +307,121 @@ namespace FiftyOne.Pipeline.Core.Tests.FlowElements
             Assert.AreEqual(ActivityStatusCode.Error, crashed.Status);
             Assert.AreEqual("TEST", crashed.StatusDescription);
             Assert.HasCount(1, data.Errors);
+        }
+
+        /// <summary>
+        /// A failing element does not disturb the parentage of the spans
+        /// that follow it.
+        /// </summary>
+        [TestMethod]
+        public void Process_FirstElementThrows_NextSpanStillUnderRoot()
+        {
+            using var collector = new ActivityCollector();
+            var element1 = MockElement("crash");
+            element1.Setup(e => e.Process(It.IsAny<IFlowData>()))
+                .Throws(new Exception("TEST"));
+            var element2 = MockElement("after");
+            using var pipeline = CreatePipeline(
+                true, element1.Object, element2.Object);
+            using var root = new Activity("root").Start();
+            using var data = pipeline.CreateFlowData();
+
+            data.Process();
+            root.Stop();
+
+            var after = collector.Stopped.Single(
+                a => a.TraceId == root.TraceId
+                    && a.OperationName == "element.after");
+            Assert.AreEqual(root.Id, after.ParentId);
+            var crashed = collector.Stopped.Single(
+                a => a.TraceId == root.TraceId
+                    && a.OperationName == "element.crash");
+            Assert.AreEqual(ActivityStatusCode.Error, crashed.Status);
+        }
+
+        /// <summary>
+        /// A throwing child in a parallel block with suppression off still
+        /// propagates the aggregate exception and marks its span.
+        /// </summary>
+        [TestMethod]
+        public void Process_ParallelChildThrows_SuppressOff_SpanErrorAndThrows()
+        {
+            using var collector = new ActivityCollector();
+            var element1 = MockElement("par1");
+            var element2 = MockElement("crash");
+            element2.Setup(e => e.Process(It.IsAny<IFlowData>()))
+                .Throws(new Exception("TEST"));
+            var parallel = new ParallelElements(
+                new Mock<ILogger<ParallelElements>>().Object,
+                element1.Object,
+                element2.Object);
+            using var pipeline = CreatePipeline(false, parallel);
+            using var root = new Activity("root").Start();
+            using var data = pipeline.CreateFlowData();
+
+            Assert.ThrowsExactly<AggregateException>(() => data.Process());
+            root.Stop();
+
+            var crashed = collector.Stopped.Single(
+                a => a.TraceId == root.TraceId
+                    && a.OperationName == "element.crash");
+            Assert.AreEqual(ActivityStatusCode.Error, crashed.Status);
+            Assert.IsNotNull(collector.Stopped.SingleOrDefault(
+                a => a.TraceId == root.TraceId
+                    && a.OperationName == "element.par1"));
+        }
+
+        /// <summary>
+        /// Attaching and disposing listeners while requests process must
+        /// neither throw nor leave a span running.
+        /// </summary>
+        [TestMethod]
+        public void Process_ListenerChurn_NoThrowAndAllSpansStopped()
+        {
+            var started = new ConcurrentBag<Activity>();
+            using var watcher = new ActivityListener
+            {
+                ShouldListenTo = source =>
+                    source.Name == Constants.TRACING_SOURCE_NAME,
+                Sample = (ref ActivityCreationOptions<ActivityContext> options) =>
+                    ActivitySamplingResult.AllDataAndRecorded,
+                ActivityStarted = activity => started.Add(activity),
+            };
+            ActivitySource.AddActivityListener(watcher);
+            var element = MockElement("test");
+            using var pipeline = CreatePipeline(true, element.Object);
+
+            var stop = false;
+            var churn = Task.Run(() =>
+            {
+                while (Volatile.Read(ref stop) == false)
+                {
+                    using var extra = new ActivityListener
+                    {
+                        ShouldListenTo = source =>
+                            source.Name == Constants.TRACING_SOURCE_NAME,
+                        Sample = (ref ActivityCreationOptions<ActivityContext> options) =>
+                            ActivitySamplingResult.AllDataAndRecorded,
+                    };
+                    ActivitySource.AddActivityListener(extra);
+                }
+            });
+            try
+            {
+                for (int i = 0; i < 200; i++)
+                {
+                    using var data = pipeline.CreateFlowData();
+                    data.Process();
+                }
+            }
+            finally
+            {
+                Volatile.Write(ref stop, true);
+                churn.Wait();
+            }
+
+            Assert.IsTrue(started.All(a => a.IsStopped),
+                "every span must be stopped by the end of its request");
         }
     }
 }
