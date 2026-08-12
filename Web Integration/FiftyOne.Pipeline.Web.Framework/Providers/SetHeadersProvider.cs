@@ -21,6 +21,7 @@
  * ********************************************************************* */
 
 using FiftyOne.Pipeline.Core.Data;
+using FiftyOne.Pipeline.Engines.FiftyOne.Data;
 using FiftyOne.Pipeline.Engines.FiftyOne.FlowElements;
 using System;
 using System.Collections.Generic;
@@ -82,7 +83,11 @@ namespace FiftyOne.Pipeline.Web.Framework.Providers
 
         /// <summary>
         /// Set the HTTP headers in the response based
-        /// on values from the <see cref="SetHeadersElement"/>
+        /// on values from the <see cref="SetHeadersElement"/>.
+        /// If the flow data has no data for the element (its processing can
+        /// fail before the data is added, for example when the cloud
+        /// service could not be reached, with the pipeline configured to
+        /// suppress process exceptions), then no headers are set.
         /// </summary>
         /// <param name="flowData">
         /// The flow data containing the information about the headers to set.
@@ -95,11 +100,13 @@ namespace FiftyOne.Pipeline.Web.Framework.Providers
             if (flowData == null) throw new ArgumentNullException(nameof(flowData));
             if (context == null) throw new ArgumentNullException(nameof(context));
 
-            if (_setHeadersElement != null)
+            if (_setHeadersElement != null &&
+                flowData.TryGetValue(
+                    _setHeadersElement.ElementDataKeyTyped,
+                    out var setHeadersData) &&
+                setHeadersData.ResponseHeaderDictionary != null)
             {
-                var headersToSet = flowData
-                    .GetFromElement(_setHeadersElement).ResponseHeaderDictionary;
-                SetHeaders(context, headersToSet);
+                SetHeaders(context, setHeadersData.ResponseHeaderDictionary);
             }
         }
 
