@@ -9,6 +9,12 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <!-- The package from this repository rather than the published one,
+         so the example is built and tested against the branch. -->
+    <ProjectReference Include="..\..\..\FiftyOne.Did\FiftyOne.Did.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
     <!-- Both are read from the output directory at start-up, so both
          have to be copied there. -->
     <None Include="page.html" CopyToOutputDirectory="PreserveNewest" />

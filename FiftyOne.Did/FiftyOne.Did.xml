@@ -4,6 +4,611 @@
         <name>FiftyOne.Did</name>
     </assembly>
     <members>
+        <member name="T:FiftyOne.Did.Client.ContextOutcome">
+            <summary>
+            The creator context verdict the cloud's redeem endpoint reports,
+            mapped from the <c>context</c> string in its answer. The first four
+            are verdicts about the identifier. The rest describe the redemption
+            itself, being why no verdict could be read this time.
+            </summary>
+        </member>
+        <member name="F:FiftyOne.Did.Client.ContextOutcome.Verified">
+            <summary>
+            Every factor of the creator context matched the connection the
+            identifier was verified on.
+            </summary>
+        </member>
+        <member name="F:FiftyOne.Did.Client.ContextOutcome.Mismatch">
+            <summary>
+            At least one factor did not match, and
+            <see cref="P:FiftyOne.Did.Client.RedeemResult.Factors"/> says which. An identifier
+            whose signature verifies is still genuine, so this reports a
+            moved identifier rather than a bad one.
+            </summary>
+        </member>
+        <member name="F:FiftyOne.Did.Client.ContextOutcome.NoContext">
+            <summary>
+            The identifier carries no creator context at all, for example
+            because a self-hosted service was configured not to add one.
+            </summary>
+        </member>
+        <member name="F:FiftyOne.Did.Client.ContextOutcome.NotCheckable">
+            <summary>
+            Nothing could be checked, because the service holds no context
+            key covering the identifier's creation time.
+            </summary>
+        </member>
+        <member name="F:FiftyOne.Did.Client.ContextOutcome.Expired">
+            <summary>
+            The sealed result was presented after the service's freshness
+            window closed. <see cref="P:FiftyOne.Did.Client.RedeemResult.VerifiedAt"/> says when
+            the verification happened.
+            </summary>
+        </member>
+        <member name="F:FiftyOne.Did.Client.ContextOutcome.Replayed">
+            <summary>
+            The sealed result had already been redeemed on this service
+            instance.
+            </summary>
+        </member>
+        <member name="F:FiftyOne.Did.Client.ContextOutcome.Unreadable">
+            <summary>
+            The sealed result could not be read. Every cryptographic failure
+            (tampered, made for another identifier, sealed under a key the
+            service does not hold, or presented without a licence key the
+            account requires) gives this one answer by design, so nothing
+            finer is available. A <c>context</c> string this client does not
+            recognise also maps here, with the raw string kept in
+            <see cref="P:FiftyOne.Did.Client.RedeemResult.ContextValue"/>.
+            </summary>
+        </member>
+        <member name="F:FiftyOne.Did.Client.ContextOutcome.Unconfirmed">
+            <summary>
+            The service could not confirm first use of the sealed result and
+            answered 503. Not a verdict. The caller may retry.
+            </summary>
+        </member>
+        <member name="T:FiftyOne.Did.Client.DidClient">
+            <summary>
+            Everything a server does with a 51Did against the 51Degrees cloud:
+            fetch and cache the signing public keys, verify a signature offline
+            against the key in force when the identifier was created, verify a
+            signature through the cloud, and redeem a sealed creator context
+            result with the account's licence key.
+            <para>
+            Creating a 51Did is not part of this client. Creation is the cloud
+            <c>json</c> endpoint through the cloud request engine and pipeline,
+            and a page creates from the browser because the identifier describes
+            the browser's own connection. The <c>verify-context</c> and
+            <c>verify-full</c> endpoints are browser calls for the same reason,
+            so they are not here either. This client is the server side, which
+            holds the licence key the browser never sees.
+            </para>
+            <para>
+            Credentials never travel in a URL. The resource key is part of the
+            route, as the endpoints accept, and the licence key travels only in
+            a POST form body, because a query string is written to access logs.
+            </para>
+            <para>
+            The key cache is per instance and safe to share across threads, so
+            create one client for the process and reuse it.
+            </para>
+            </summary>
+        </member>
+        <member name="F:FiftyOne.Did.Client.DidClient.DefaultEndpoint">
+            <summary>
+            The public cloud API base, used when no endpoint is given and
+            <see cref="F:FiftyOne.Did.Client.DidClient.EndpointEnvironmentVariable"/> is not set.
+            </summary>
+        </member>
+        <member name="F:FiftyOne.Did.Client.DidClient.EndpointEnvironmentVariable">
+            <summary>
+            The environment variable read for the API base when the
+            constructor is given none, the same variable the cloud request
+            engine honours. A host other than the public cloud is used for
+            a privately hosted copy of the same service.
+            </summary>
+        </member>
+        <member name="F:FiftyOne.Did.Client.DidClient.KeyCacheLifetime">
+            <summary>
+            How old the cached key list may be before a lookup fetches it
+            again. Keys are published up to three months ahead of their
+            start, so a day is far inside that margin.
+            </summary>
+        </member>
+        <member name="P:FiftyOne.Did.Client.DidClient.UserAgent">
+            <summary>
+            The <c>User-Agent</c> every request carries, naming this package
+            and its version.
+            </summary>
+        </member>
+        <member name="F:FiftyOne.Did.Client.DidClient.BoundaryTolerance">
+            <summary>
+            A key may be used for an identifier created this close to a
+            boundary in the schedule, at either end, so the key in force a
+            tolerance either side of the identifier's date is tried too.
+            </summary>
+        </member>
+        <member name="M:FiftyOne.Did.Client.DidClient.#ctor(System.String,System.String,System.String,System.Net.Http.HttpClient,System.TimeProvider)">
+            <summary>
+            Creates a client.
+            </summary>
+            <param name="resourceKey">
+            The resource key, which is public by nature.
+            </param>
+            <param name="licenceKey">
+            A licence key of the same account, server side only. Needed to
+            redeem where the account holds licence keys, and sent only in
+            the redeem form body.
+            </param>
+            <param name="endpoint">
+            The API base including <c>/api/v4/</c>. When null the
+            <see cref="F:FiftyOne.Did.Client.DidClient.EndpointEnvironmentVariable"/> is read, and when that
+            is unset too <see cref="F:FiftyOne.Did.Client.DidClient.DefaultEndpoint"/> is used. A value with
+            or without a trailing slash is accepted, and is normalised to
+            end in exactly one.
+            </param>
+            <param name="httpClient">
+            The transport to use, so a test can inject one. When null the
+            client creates and owns one.
+            </param>
+            <param name="timeProvider">
+            The clock the key cache ages against, so a test can inject one.
+            When null the system clock is used.
+            </param>
+            <exception cref="T:System.ArgumentException">
+            Thrown when <paramref name="resourceKey"/> is empty or the
+            endpoint is not an absolute URL.
+            </exception>
+        </member>
+        <member name="P:FiftyOne.Did.Client.DidClient.ResourceKey">
+            <summary>The resource key the client sends.</summary>
+        </member>
+        <member name="P:FiftyOne.Did.Client.DidClient.Endpoint">
+            <summary>
+            The API base every request is built on, ending in one slash.
+            </summary>
+        </member>
+        <member name="P:FiftyOne.Did.Client.DidClient.HasLicenceKey">
+            <summary>
+            Whether a licence key was given. The key itself is not exposed.
+            </summary>
+        </member>
+        <member name="M:FiftyOne.Did.Client.DidClient.PublicKeysAsync(System.Threading.CancellationToken)">
+            <summary>
+            The signing public keys the cloud publishes, fetched on first use
+            and then answered from the cache. Use
+            <see cref="M:FiftyOne.Did.Client.DidClient.PublicKeyForAsync(FiftyOne.Did.Model.FodId,System.Threading.CancellationToken)"/> to pick the key for one
+            identifier, which also refreshes the cache when it is stale.
+            </summary>
+            <param name="cancellationToken">Cancels the fetch.</param>
+            <returns>The keys in start order.</returns>
+            <exception cref="T:System.Net.Http.HttpRequestException">
+            Thrown when the cloud cannot be reached or answers with a status
+            other than 200.
+            </exception>
+        </member>
+        <member name="M:FiftyOne.Did.Client.DidClient.PublicKeyForAsync(FiftyOne.Did.Model.FodId,System.Threading.CancellationToken)">
+            <summary>
+            The key in force when the identifier was created, being the
+            entry whose start is latest on or before the identifier's date.
+            The cache is fetched again, once, before answering when it holds
+            no entry on or before the date, when the date is later than the
+            newest start held, or when the cache is older than
+            <see cref="F:FiftyOne.Did.Client.DidClient.KeyCacheLifetime"/>.
+            </summary>
+            <param name="fodId">The identifier.</param>
+            <param name="cancellationToken">Cancels a fetch.</param>
+            <returns>
+            The key, or null when the date precedes the whole schedule.
+            </returns>
+            <exception cref="T:System.ArgumentNullException">
+            Thrown when <paramref name="fodId"/> is null.
+            </exception>
+            <exception cref="T:System.Net.Http.HttpRequestException">
+            Thrown when a fetch was needed and the cloud could not be
+            reached or answered with a status other than 200.
+            </exception>
+        </member>
+        <member name="M:FiftyOne.Did.Client.DidClient.VerifySignatureAsync(FiftyOne.Did.Model.FodId,System.Threading.CancellationToken)">
+            <summary>
+            Verifies the identifier's signature offline against the
+            published keys, without a cloud call once the keys are cached.
+            </summary>
+            <param name="fodId">The identifier.</param>
+            <param name="cancellationToken">Cancels a key fetch.</param>
+            <returns>
+            True only when the signature verifies under a key in force at
+            the identifier's date. See
+            <see cref="M:FiftyOne.Did.Client.DidClient.VerifySignatureDetailedAsync(FiftyOne.Did.Model.FodId,System.Threading.CancellationToken)"/> for why a check did
+            not pass.
+            </returns>
+        </member>
+        <member name="M:FiftyOne.Did.Client.DidClient.VerifySignatureDetailedAsync(FiftyOne.Did.Model.FodId,System.Threading.CancellationToken)">
+            <summary>
+            Verifies the identifier's signature offline and says why when
+            the check did not pass. The envelope must be OWID version 3 and
+            the payload at least the base length for its type, being the
+            five header bytes plus a 32 byte value, or a 16 byte value for a
+            Random identifier. A longer payload carries a creator context
+            section and is accepted, because the signature covers the whole
+            payload. The keys tried are the one in force at the identifier's
+            date and, where they differ, the ones in force a short tolerance
+            before and after it, best first. Older keys are never tried,
+            because a key belongs to its own period.
+            </summary>
+            <param name="fodId">The identifier.</param>
+            <param name="cancellationToken">Cancels a key fetch.</param>
+            <returns>The outcome.</returns>
+            <exception cref="T:System.ArgumentNullException">
+            Thrown when <paramref name="fodId"/> is null.
+            </exception>
+            <exception cref="T:System.Net.Http.HttpRequestException">
+            Thrown when a key fetch was needed and the cloud could not be
+            reached or answered with a status other than 200.
+            </exception>
+        </member>
+        <member name="M:FiftyOne.Did.Client.DidClient.VerifyAsync(FiftyOne.Did.Model.FodId,System.Threading.CancellationToken)">
+            <summary>
+            Verifies the identifier's signature through the cloud's verify
+            endpoint, which needs no licence key and counts as one use.
+            </summary>
+            <param name="fodId">The identifier.</param>
+            <param name="cancellationToken">Cancels the call.</param>
+            <returns>Whether the cloud found the signature valid.</returns>
+            <exception cref="T:System.ArgumentNullException">
+            Thrown when <paramref name="fodId"/> is null.
+            </exception>
+            <exception cref="T:System.Net.Http.HttpRequestException">
+            Thrown when the cloud cannot be reached or answers with an
+            unexpected status.
+            </exception>
+        </member>
+        <member name="M:FiftyOne.Did.Client.DidClient.VerifyAsync(System.String,System.Threading.CancellationToken)">
+            <summary>
+            Verifies a 51Did string's signature through the cloud's verify
+            endpoint, which needs no licence key and counts as one use.
+            Either base64 alphabet is accepted. The identifier is sent as
+            <c>51did</c> and again as <c>owid</c>, the name the endpoint
+            first went live under, so a service of either age answers.
+            </summary>
+            <param name="fodId">The identifier as base64.</param>
+            <param name="cancellationToken">Cancels the call.</param>
+            <returns>Whether the cloud found the signature valid.</returns>
+            <exception cref="T:System.ArgumentException">
+            Thrown, with the cloud's message, when the cloud could not parse
+            the value as a 51Did.
+            </exception>
+            <exception cref="T:System.Net.Http.HttpRequestException">
+            Thrown when the cloud cannot be reached or answers with an
+            unexpected status.
+            </exception>
+        </member>
+        <member name="M:FiftyOne.Did.Client.DidClient.RedeemAsync(FiftyOne.Did.Model.FodId,System.String,System.String,System.Threading.CancellationToken)">
+            <summary>
+            Redeems a sealed creator context result against the identifier
+            it was made for, sending the licence key where one was given.
+            Counts as one use, the second of the two a browser-based context
+            check costs.
+            </summary>
+            <param name="fodId">The identifier the caller knows independently.</param>
+            <param name="result">The sealed result the browser relayed.</param>
+            <param name="challenge">
+            The single-use challenge given to the verify call, or null where
+            none was.
+            </param>
+            <param name="cancellationToken">Cancels the call.</param>
+            <returns>The typed verdict.</returns>
+            <exception cref="T:System.ArgumentNullException">
+            Thrown when <paramref name="fodId"/> is null.
+            </exception>
+            <exception cref="T:System.ArgumentException">
+            Thrown, with the cloud's message, when the cloud answered 400
+            because the identifier was malformed.
+            </exception>
+            <exception cref="T:System.NotSupportedException">
+            Thrown when the host answered 404, meaning it does not offer the
+            creator context.
+            </exception>
+            <exception cref="T:System.Net.Http.HttpRequestException">
+            Thrown when the cloud cannot be reached or answers with any
+            other unexpected status.
+            </exception>
+        </member>
+        <member name="M:FiftyOne.Did.Client.DidClient.RedeemAsync(System.String,System.String,System.String,System.Threading.CancellationToken)">
+            <summary>
+            Redeems a sealed creator context result against a 51Did string,
+            in either base64 alphabet. See
+            <see cref="M:FiftyOne.Did.Client.DidClient.RedeemAsync(FiftyOne.Did.Model.FodId,System.String,System.String,System.Threading.CancellationToken)"/>.
+            </summary>
+            <param name="fodId">The identifier as base64.</param>
+            <param name="result">The sealed result the browser relayed.</param>
+            <param name="challenge">
+            The single-use challenge given to the verify call, or null where
+            none was.
+            </param>
+            <param name="cancellationToken">Cancels the call.</param>
+            <returns>The typed verdict.</returns>
+            <exception cref="T:System.ArgumentException">
+            Thrown when <paramref name="fodId"/> is empty, or with the
+            cloud's message when the cloud answered 400.
+            </exception>
+            <exception cref="T:System.NotSupportedException">
+            Thrown when the host answered 404, meaning it does not offer the
+            creator context.
+            </exception>
+            <exception cref="T:System.Net.Http.HttpRequestException">
+            Thrown when the cloud cannot be reached or answers with any
+            other unexpected status.
+            </exception>
+        </member>
+        <member name="M:FiftyOne.Did.Client.DidClient.Dispose">
+            <summary>
+            Releases the transport when this client created it.
+            </summary>
+        </member>
+        <member name="M:FiftyOne.Did.Client.DidClient.InForceAt(System.Collections.Generic.IReadOnlyList{FiftyOne.Did.Client.DidPublicKey},System.DateTime)">
+            <summary>
+            The entry in force at the moment, being the one whose start is
+            latest on or before it, or null when the moment precedes every
+            entry.
+            </summary>
+            <param name="keys">The schedule, in any order.</param>
+            <param name="at">The moment.</param>
+            <returns>The entry in force, or null.</returns>
+        </member>
+        <member name="M:FiftyOne.Did.Client.DidClient.CandidatesForDate(System.Collections.Generic.IReadOnlyList{FiftyOne.Did.Client.DidPublicKey},System.DateTime)">
+            <summary>
+            The keys that may have signed something created at the moment,
+            best first: the entry in force, then the entries in force a
+            short tolerance earlier and later where those differ. Empty when
+            the moment precedes the whole schedule.
+            </summary>
+            <param name="keys">The schedule, in any order.</param>
+            <param name="at">The creation moment.</param>
+            <returns>The keys to try.</returns>
+        </member>
+        <member name="M:FiftyOne.Did.Client.DidClient.ParseKeys(System.String)">
+            <summary>
+            Reads the key endpoint's answer, a JSON array of objects each
+            carrying <c>startsAt</c> (or <c>created</c> on a service that
+            predates <c>startsAt</c>) and <c>publicKey</c>. Other fields are
+            ignored.
+            </summary>
+            <param name="json">The response body.</param>
+            <returns>The keys in start order.</returns>
+            <exception cref="T:System.FormatException">
+            Thrown when the body is not an array of such objects.
+            </exception>
+            <exception cref="T:System.Text.Json.JsonException">
+            Thrown when the body is not JSON.
+            </exception>
+        </member>
+        <member name="M:FiftyOne.Did.Client.DidClient.ReadErrors(System.String)">
+            <summary>
+            The cloud's <c>errors</c> array joined into one message, or null
+            when the body carries none.
+            </summary>
+        </member>
+        <member name="T:FiftyOne.Did.Client.DidPublicKey">
+            <summary>
+            One entry of the 51Did signing key schedule as the cloud publishes
+            it. A key is in force from <see cref="P:FiftyOne.Did.Client.DidPublicKey.StartsAt"/> until the next
+            entry starts, so the entry whose start is latest on or before an
+            identifier's creation time is the one that signed it.
+            </summary>
+        </member>
+        <member name="M:FiftyOne.Did.Client.DidPublicKey.#ctor(System.DateTime,System.String)">
+            <summary>
+            Creates an entry.
+            </summary>
+            <param name="startsAt">When the key comes into force, UTC.</param>
+            <param name="publicKeyPem">The public key as SPKI PEM.</param>
+            <exception cref="T:System.ArgumentNullException">
+            Thrown when <paramref name="publicKeyPem"/> is null.
+            </exception>
+        </member>
+        <member name="P:FiftyOne.Did.Client.DidPublicKey.StartsAt">
+            <summary>
+            When the key comes into force, UTC. Keys are published up to
+            three months ahead of their start, so an entry may be in the
+            future.
+            </summary>
+        </member>
+        <member name="P:FiftyOne.Did.Client.DidPublicKey.PublicKeyPem">
+            <summary>
+            The public key in SPKI PEM form, as accepted by
+            <c>ECDsa.ImportFromPem</c>.
+            </summary>
+        </member>
+        <member name="T:FiftyOne.Did.Client.FactorOutcome">
+            <summary>
+            The outcome of one creator context factor, reported when the
+            context is <see cref="F:FiftyOne.Did.Client.ContextOutcome.Mismatch"/>.
+            </summary>
+        </member>
+        <member name="F:FiftyOne.Did.Client.FactorOutcome.Verified">
+            <summary>The factor matched the verifying connection.</summary>
+        </member>
+        <member name="F:FiftyOne.Did.Client.FactorOutcome.Mismatch">
+            <summary>The factor did not match the verifying connection.</summary>
+        </member>
+        <member name="T:FiftyOne.Did.Client.RedeemResult">
+            <summary>
+            The typed answer from the cloud's redeem endpoint, built by
+            <see cref="M:FiftyOne.Did.Client.DidClient.RedeemAsync(System.String,System.String,System.String,System.Threading.CancellationToken)"/>
+            from the JSON body. <see cref="P:FiftyOne.Did.Client.RedeemResult.Raw"/> keeps the body as received and
+            <see cref="P:FiftyOne.Did.Client.RedeemResult.StatusCode"/> the HTTP status, so nothing the cloud said
+            is lost in the mapping.
+            </summary>
+        </member>
+        <member name="F:FiftyOne.Did.Client.RedeemResult.VerifiedAtFormat">
+            <summary>
+            The format the cloud writes <c>verifiedAt</c> in, ISO 8601 UTC to
+            the second.
+            </summary>
+        </member>
+        <member name="M:FiftyOne.Did.Client.RedeemResult.#ctor(FiftyOne.Did.Client.ContextOutcome,System.String,FiftyOne.Did.Client.SignatureOutcome,System.Collections.Generic.IReadOnlyDictionary{System.String,FiftyOne.Did.Client.FactorOutcome},System.Nullable{System.DateTime},System.Nullable{System.Int32},System.Int32,System.String)">
+            <summary>
+            Creates a result from its parts. Callers normally get one from
+            <see cref="M:FiftyOne.Did.Client.RedeemResult.FromResponse(System.Int32,System.String)"/> rather than building one.
+            </summary>
+            <param name="context">The mapped context verdict.</param>
+            <param name="contextValue">The raw <c>context</c> string.</param>
+            <param name="signature">The mapped signature outcome.</param>
+            <param name="factors">The per-factor outcomes, or null.</param>
+            <param name="verifiedAt">When the result was sealed, or null.</param>
+            <param name="secondsSinceVerified">The result's age, or null.</param>
+            <param name="statusCode">The HTTP status.</param>
+            <param name="raw">The response body.</param>
+        </member>
+        <member name="P:FiftyOne.Did.Client.RedeemResult.Context">
+            <summary>
+            The creator context verdict, mapped from the <c>context</c>
+            string. A string this client does not recognise maps to
+            <see cref="F:FiftyOne.Did.Client.ContextOutcome.Unreadable"/>, so an unexpected answer
+            never reads as a pass.
+            </summary>
+        </member>
+        <member name="P:FiftyOne.Did.Client.RedeemResult.ContextValue">
+            <summary>
+            The <c>context</c> string exactly as the cloud sent it, or null
+            when the body carried none.
+            </summary>
+        </member>
+        <member name="P:FiftyOne.Did.Client.RedeemResult.Signature">
+            <summary>
+            The signature outcome, mapped from the <c>signature</c> string.
+            <see cref="F:FiftyOne.Did.Client.SignatureOutcome.Unknown"/> when the field is absent,
+            which it is on every outcome other than a redeemed verdict.
+            </summary>
+        </member>
+        <member name="P:FiftyOne.Did.Client.RedeemResult.Factors">
+            <summary>
+            The outcome of each creator context factor by name
+            (<c>transport</c>, <c>device</c>, <c>browserip</c>,
+            <c>connectionip</c>, <c>asn</c>, <c>browser</c>), present only
+            when the cloud sent <c>factors</c>, which it does for a
+            <see cref="F:FiftyOne.Did.Client.ContextOutcome.Mismatch"/>.
+            </summary>
+        </member>
+        <member name="P:FiftyOne.Did.Client.RedeemResult.VerifiedAt">
+            <summary>
+            When the verify endpoint checked the context and sealed the
+            result, UTC. Present on the redeemed and expired outcomes.
+            </summary>
+        </member>
+        <member name="P:FiftyOne.Did.Client.RedeemResult.SecondsSinceVerified">
+            <summary>
+            How long before this redemption the verification happened, in
+            whole seconds by the cloud's clock. Present on the redeemed and
+            expired outcomes.
+            </summary>
+        </member>
+        <member name="P:FiftyOne.Did.Client.RedeemResult.StatusCode">
+            <summary>
+            The HTTP status the cloud answered with, 200 for every verdict
+            and 503 for <see cref="F:FiftyOne.Did.Client.ContextOutcome.Unconfirmed"/>.
+            </summary>
+        </member>
+        <member name="P:FiftyOne.Did.Client.RedeemResult.Raw">
+            <summary>The response body as received.</summary>
+        </member>
+        <member name="M:FiftyOne.Did.Client.RedeemResult.FromResponse(System.Int32,System.String)">
+            <summary>
+            Builds a result from a redeem response. A body that is not a
+            JSON object, or carries no <c>context</c>, gives
+            <see cref="F:FiftyOne.Did.Client.ContextOutcome.Unreadable"/> with the body kept in
+            <see cref="P:FiftyOne.Did.Client.RedeemResult.Raw"/>.
+            </summary>
+            <param name="statusCode">The HTTP status.</param>
+            <param name="body">The response body.</param>
+            <returns>The typed result.</returns>
+        </member>
+        <member name="M:FiftyOne.Did.Client.RedeemResult.ParseContext(System.String)">
+            <summary>
+            Maps a <c>context</c> string to its outcome. Anything not
+            recognised, including null, is
+            <see cref="F:FiftyOne.Did.Client.ContextOutcome.Unreadable"/>.
+            </summary>
+            <param name="value">The <c>context</c> string.</param>
+            <returns>The outcome.</returns>
+        </member>
+        <member name="M:FiftyOne.Did.Client.RedeemResult.ToContextValue(FiftyOne.Did.Client.ContextOutcome)">
+            <summary>
+            The <c>context</c> string the cloud uses for an outcome, the
+            inverse of <see cref="M:FiftyOne.Did.Client.RedeemResult.ParseContext(System.String)"/>.
+            </summary>
+            <param name="outcome">The outcome.</param>
+            <returns>The cloud's word for it.</returns>
+        </member>
+        <member name="M:FiftyOne.Did.Client.RedeemResult.ParseSignature(System.String)">
+            <summary>
+            Maps a <c>signature</c> string to its outcome. Anything not
+            recognised, including null, is
+            <see cref="F:FiftyOne.Did.Client.SignatureOutcome.Unknown"/>.
+            </summary>
+            <param name="value">The <c>signature</c> string.</param>
+            <returns>The outcome.</returns>
+        </member>
+        <member name="T:FiftyOne.Did.Client.SignatureCheck">
+            <summary>
+            The outcome of an offline signature check by
+            <see cref="M:FiftyOne.Did.Client.DidClient.VerifySignatureDetailedAsync(FiftyOne.Did.Model.FodId,System.Threading.CancellationToken)"/>. Only
+            <see cref="F:FiftyOne.Did.Client.SignatureCheck.Verified"/> means the identifier is genuine. The other
+            values say why the check did not pass, for diagnosis.
+            </summary>
+        </member>
+        <member name="F:FiftyOne.Did.Client.SignatureCheck.Verified">
+            <summary>
+            The signature verifies under a signing key in force at the
+            identifier's creation time.
+            </summary>
+        </member>
+        <member name="F:FiftyOne.Did.Client.SignatureCheck.Invalid">
+            <summary>
+            The signature does not verify under any key in force at the
+            identifier's creation time.
+            </summary>
+        </member>
+        <member name="F:FiftyOne.Did.Client.SignatureCheck.NoKeyForDate">
+            <summary>
+            No published signing key covers the identifier's creation time,
+            which happens when the date precedes the whole schedule.
+            </summary>
+        </member>
+        <member name="F:FiftyOne.Did.Client.SignatureCheck.UnsupportedVersion">
+            <summary>The envelope is not OWID version 3.</summary>
+        </member>
+        <member name="F:FiftyOne.Did.Client.SignatureCheck.InvalidLength">
+            <summary>
+            The payload is shorter than the base length for the identifier
+            type.
+            </summary>
+        </member>
+        <member name="T:FiftyOne.Did.Client.SignatureOutcome">
+            <summary>
+            The signature outcome the cloud's redeem endpoint reports, mapped
+            from the <c>signature</c> string in its answer.
+            </summary>
+        </member>
+        <member name="F:FiftyOne.Did.Client.SignatureOutcome.Verified">
+            <summary>
+            The identifier was signed by a 51Degrees signing key.
+            </summary>
+        </member>
+        <member name="F:FiftyOne.Did.Client.SignatureOutcome.Invalid">
+            <summary>
+            The identifier was not signed by a 51Degrees signing key.
+            </summary>
+        </member>
+        <member name="F:FiftyOne.Did.Client.SignatureOutcome.Unknown">
+            <summary>
+            The answer carried no signature outcome. The redeem endpoint
+            only reports one on the redeemed outcome, so every other
+            <see cref="T:FiftyOne.Did.Client.ContextOutcome"/> comes with this value.
+            </summary>
+        </member>
         <member name="T:FiftyOne.Did.Model.FodId">
             <summary>
             An OWID whose payload encodes the three fields of a 51Did: a 1-byte
@@ -108,7 +713,12 @@
         </member>
         <member name="P:FiftyOne.Did.Model.FodId.LicenseId">
             <summary>
-            The 4-byte little-endian License Id from the payload.
+            The 4-byte little-endian License Id from the payload, as the
+            raw value of the field. On an identifier carrying a creator
+            context these four bytes hold an encrypted value that only
+            51Degrees can turn back into a licence identifier, so the
+            property identifies nothing outside 51Degrees and two
+            identifiers for the same licence need not share it.
             </summary>
         </member>
         <member name="P:FiftyOne.Did.Model.FodId.Hash">
@@ -123,25 +733,101 @@
             types, and the property is named Hash to reflect that.
             </summary>
         </member>
+        <member name="F:FiftyOne.Did.Model.FodId.DateBase">
+            <summary>
+            The moment the envelope's date field counts minutes from,
+            2020-01-01T00:00:00Z. See <see cref="P:FiftyOne.Did.Model.FodId.DateMinutes"/>.
+            </summary>
+        </member>
+        <member name="P:FiftyOne.Did.Model.FodId.DateMinutes">
+            <summary>
+            The envelope's own date as the unsigned 32-bit count of minutes
+            since <see cref="F:FiftyOne.Did.Model.FodId.DateBase"/>, which is the value the field holds
+            on the wire and the value the OWID <c>public-key?date=</c>
+            parameter takes. Callers comparing creation times want this
+            integer rather than the converted
+            <see cref="P:Owid.Client.Model.Owid.Date"/>.
+            A date before the base gives zero.
+            </summary>
+        </member>
         <member name="M:FiftyOne.Did.Model.FodId.#ctor(System.String)">
             <summary>
-            Parse a 51Did from its base64-encoded OWID string.
+            Parse a 51Did from its base64-encoded OWID string, in either
+            base64 alphabet.
             </summary>
             <param name="base64">
             Base64 of the full OWID envelope (version + domain + date +
             length-prefixed payload + 64-byte signature) as produced by the
-            51Degrees cloud service.
+            51Degrees cloud service. The standard alphabet with padding, as
+            the cloud issues it, and the URL-safe alphabet with or without
+            padding, as a page puts it in a link, are both accepted. See
+            <see cref="M:FiftyOne.Did.Model.FodId.NormaliseBase64(System.String)"/>.
             </param>
             <exception cref="T:System.ArgumentNullException">
             Thrown when <paramref name="base64"/> is <c>null</c>.
             </exception>
             <exception cref="T:System.FormatException">
             Thrown by the underlying OWID parser when <paramref name="base64"/>
-            is not valid Base64.
+            is not valid Base64 in either alphabet.
             </exception>
             <exception cref="T:System.ArgumentException">
             Thrown when the decoded payload is shorter than the minimum
             for its identifier type.
+            </exception>
+        </member>
+        <member name="M:FiftyOne.Did.Model.FodId.FromBase64(System.String)">
+            <summary>
+            Parse a 51Did from its base64-encoded OWID string, in either
+            base64 alphabet. The same as the string constructor, named so
+            the parse reads as one call.
+            </summary>
+            <param name="base64">The envelope as base64.</param>
+            <returns>The parsed 51Did.</returns>
+            <exception cref="T:System.ArgumentNullException">
+            Thrown when <paramref name="base64"/> is <c>null</c>.
+            </exception>
+            <exception cref="T:System.FormatException">
+            Thrown when <paramref name="base64"/> is not valid Base64 in
+            either alphabet.
+            </exception>
+            <exception cref="T:System.ArgumentException">
+            Thrown when the decoded payload is shorter than the minimum
+            for its identifier type.
+            </exception>
+        </member>
+        <member name="M:FiftyOne.Did.Model.FodId.AsBase64Url">
+            <summary>
+            The envelope in the URL-safe base64 alphabet without padding,
+            so it can be put in a URL without further conversion. The
+            inverse of <see cref="M:FiftyOne.Did.Model.FodId.NormaliseBase64(System.String)"/>, and accepted back by
+            <see cref="M:FiftyOne.Did.Model.FodId.FromBase64(System.String)"/> and every cloud endpoint.
+            </summary>
+            <returns>The URL-safe form.</returns>
+        </member>
+        <member name="M:FiftyOne.Did.Model.FodId.NormaliseBase64(System.String)">
+            <summary>
+            Restores a base64 string in either alphabet to the standard
+            alphabet with padding, as <c>Convert.FromBase64String</c>
+            expects: <c>-</c> becomes <c>+</c>, <c>_</c> becomes <c>/</c>,
+            and padding is added when the length modulo 4 is 2 or 3. A
+            value already in the standard form is returned unchanged.
+            </summary>
+            <param name="value">The base64 in either alphabet.</param>
+            <returns>
+            The standard form, or <c>null</c> when <paramref name="value"/>
+            is <c>null</c>.
+            </returns>
+        </member>
+        <member name="M:FiftyOne.Did.Model.FodId.ToBase64Url(System.String)">
+            <summary>
+            Converts standard base64 to the URL-safe alphabet without
+            padding: <c>+</c> becomes <c>-</c>, <c>/</c> becomes <c>_</c>,
+            and trailing <c>=</c> is removed.
+            </summary>
+            <param name="base64">The standard base64.</param>
+            <returns>The URL-safe form.</returns>
+            <exception cref="T:System.ArgumentNullException">
+            Thrown when <paramref name="base64"/> is <c>null</c>.
             </exception>
         </member>
         <member name="M:FiftyOne.Did.Model.FodId.#ctor(System.Byte[])">
@@ -396,6 +1082,18 @@
             <param name="others"></param>
             <returns></returns>
         </member>
+        <member name="M:Owid.Client.CryptoExtensions.Verify(Owid.Client.Model.Owid,System.Security.Cryptography.ECDsa,Owid.Client.Model.Owid[])">
+            <summary>
+            Verify that <see cref="N:Owid"/> signature is correct without any
+            asynchronous machinery. Verification is a short CPU-bound
+            operation, so callers on a request path should prefer this over
+            the asynchronous methods, which remain for compatibility.
+            </summary>
+            <param name="owid"></param>
+            <param name="crypto"></param>
+            <param name="others"></param>
+            <returns></returns>
+        </member>
         <member name="M:Owid.Client.CryptoExtensions.VerifyAsyncWithOthers(Owid.Client.Model.Owid,System.Security.Cryptography.ECDsa,Owid.Client.Model.Owid[])">
             <summary>
             Verify that <see cref="N:Owid"/> signature is correct.
@@ -442,6 +1140,45 @@
             <param name="owid"></param>
             <returns></returns>
         </member>
+        <member name="M:Owid.Client.Extensions.GetByteCount(Owid.Client.Model.Owid)">
+            <summary>
+            The number of bytes <see cref="M:Owid.Client.Extensions.AsByteArray(Owid.Client.Model.Owid)"/> returns for the
+            OWID in its current state, being the version byte, the domain
+            with its terminator, the date, the length-prefixed payload and
+            the signature.
+            </summary>
+            <param name="owid"></param>
+            <returns></returns>
+        </member>
+        <member name="M:Owid.Client.Extensions.GetSignedBytes(Owid.Client.Model.Owid)">
+            <summary>
+            The bytes the signature covers, being the version, domain, date
+            and payload. A caller that checks one OWID against several
+            candidate public keys can build these bytes once and run the
+            signature check per key, rather than rebuilding the same bytes
+            for every attempt.
+            </summary>
+            <param name="owid"></param>
+            <returns></returns>
+        </member>
+        <member name="M:Owid.Client.Extensions.GetSignedByteCount(Owid.Client.Model.Owid)">
+            <summary>
+            The number of bytes the signature covers, being everything
+            <see cref="M:Owid.Client.Extensions.GetByteCount(Owid.Client.Model.Owid)"/> counts except the signature itself.
+            </summary>
+            <param name="owid"></param>
+            <returns></returns>
+        </member>
+        <member name="M:Owid.Client.Extensions.ToExactBuffer``1(System.Int32,``0,System.Action{System.IO.BinaryWriter,``0})">
+            <summary>
+            Writes into a buffer of exactly the given size through a
+            BinaryWriter, so every serialization shares one sizing and
+            wrapping implementation. The buffer never grows and is returned
+            without a final copy, and a wrong size fails loudly rather than
+            truncating. The state parameter with static callers keeps the
+            sharing free of closure allocations.
+            </summary>
+        </member>
         <member name="M:Owid.Client.Extensions.AsBase64(Owid.Client.Model.Owid)">
             <summary>
             Converts <see cref="N:Owid"/> to Base64-encoded string.
@@ -471,6 +1208,45 @@
             <param name="reader"></param>
             <exception cref="T:System.Exception"></exception>
         </member>
+        <member name="M:Owid.Client.Extensions.ReadByteArray(System.IO.BinaryReader)">
+            <summary>
+            Reads the length-prefixed payload. The count is whatever the
+            sender declared, so it is checked against the bytes actually
+            present before anything is sized by it. A valid OWID is the
+            declared payload followed by the signature and nothing else, so
+            the count must equal the bytes remaining less the signature
+            length, and any other count is refused here. Until 27 August
+            2026 the count went straight to ReadBytes, which allocates the
+            whole count before reading, so a 22 character identifier that
+            declared 64 MiB cost 64 MiB of allocation per request before
+            failing on its missing signature.
+            </summary>
+        </member>
+        <member name="M:Owid.Client.Extensions.ReadCounted(System.IO.BinaryReader,System.UInt32)">
+            <summary>
+            The payload from a stream whose length cannot be asked for,
+            read in bounded pieces so nothing is allocated from the
+            declared count alone. The result is exactly the declared count
+            or the read is refused, and the signature check that follows
+            refuses a stream that then ends short.
+            </summary>
+        </member>
+        <member name="T:Owid.Client.Model.ConfigurationPublicKeyStore">
+            <summary>
+            Default <see cref="T:Owid.Client.Model.IPublicKeyStore"/> backed by the single key in
+            <see cref="T:Owid.Client.Model.Configuration.OwidConfiguration"/>. A creator with one long-lived key has
+            no key history, so the date is ignored.
+            </summary>
+        </member>
+        <member name="M:Owid.Client.Model.ConfigurationPublicKeyStore.#ctor(Owid.Client.Model.Configuration.OwidConfiguration)">
+            <summary>
+            Designated constructor.
+            </summary>
+            <param name="configuration">The OWID creator configuration.</param>
+        </member>
+        <member name="M:Owid.Client.Model.ConfigurationPublicKeyStore.GetPublicKey(System.Nullable{System.UInt32})">
+            <inheritdoc/>
+        </member>
         <member name="T:Owid.Client.Model.Configuration.OwidConfiguration">
             <summary>
             Configuration for <see cref="T:Owid.Client.Creator"/>
@@ -493,6 +1269,55 @@
             <summary>
             The PEM format public key for the OWID creator.
             </summary>
+        </member>
+        <member name="T:Owid.Client.Model.DatedPublicKey">
+            <summary>
+            A signing public key together with the date it was created.
+            </summary>
+        </member>
+        <member name="P:Owid.Client.Model.DatedPublicKey.Created">
+            <summary>
+            The UTC date the key was created.
+            </summary>
+        </member>
+        <member name="P:Owid.Client.Model.DatedPublicKey.PublicKey">
+            <summary>
+            The public key in PEM form.
+            </summary>
+        </member>
+        <member name="T:Owid.Client.Model.DatedKeyStore">
+            <summary>
+            <see cref="T:Owid.Client.Model.IPublicKeyStore"/> over a set of dated keys. Returns the key
+            that was current at the requested date: the newest key created on or
+            before it. A date that predates every key yields null.
+            </summary>
+        </member>
+        <member name="M:Owid.Client.Model.DatedKeyStore.#ctor(System.Collections.Generic.IEnumerable{Owid.Client.Model.DatedPublicKey})">
+            <summary>
+            Designated constructor.
+            </summary>
+            <param name="keys">The known keys, in any order.</param>
+        </member>
+        <member name="M:Owid.Client.Model.DatedKeyStore.GetPublicKey(System.Nullable{System.UInt32})">
+            <inheritdoc/>
+        </member>
+        <member name="T:Owid.Client.Model.IPublicKeyStore">
+            <summary>
+            Source of the OWID creator's signing public keys for the public-key
+            end point. Implement this to serve historical keys for a creator that
+            rotates its signing key.
+            </summary>
+        </member>
+        <member name="M:Owid.Client.Model.IPublicKeyStore.GetPublicKey(System.Nullable{System.UInt32})">
+            <summary>
+            The public key (PEM) that was current at the given date, expressed
+            as minutes since 2020-01-01 UTC (the OWID date encoding). When the
+            date is null the current key is returned. Returns null when the date
+            predates the oldest known key.
+            </summary>
+            <param name="dateMinutes">
+            Minutes since 2020-01-01 UTC, or null for the current key.
+            </param>
         </member>
         <member name="T:Owid.Client.Model.Owid">
             <summary>

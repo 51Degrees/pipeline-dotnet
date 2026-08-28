@@ -11,7 +11,7 @@ the example is a web demo rather than a console program.
 
 | Example | Description |
 | --- | --- |
-| `CreatorContextWeb` | A demo web server that serves `page.html` and redeems the encrypted result server side, running the flow the way production does. ASP.NET Core minimal API, no packages. |
+| `CreatorContextWeb` | A demo web server that serves `page.html` and redeems the encrypted result server side, running the flow the way production does. ASP.NET Core minimal API using `DidClient` from the `FiftyOne.Did` package in this repository. |
 
 ## The flow
 
@@ -41,36 +41,42 @@ transaction.
 ## What to copy into your own server
 
 The one server-side piece is the redeem call, which is where the
-licence key is added, so the browser never sees it. The demo server's
-`/redeem` route in `CreatorContextWeb/Program.cs` does exactly this,
-and its essential lines are:
+licence key is added, so the browser never sees it. The demo server
+uses `DidClient` from the `FiftyOne.Did` package for it, one client for
+the process, and the `/redeem` route in
+`CreatorContextWeb/RedeemRoute.cs` does exactly this. Its essential
+lines are:
 
 ```csharp
-var url = $"{api}id/redeem/{resource}?51did={did}"
-    + $"&result={Uri.EscapeDataString(result)}"
-    + $"&challenge={Uri.EscapeDataString(challenge ?? "")}"
-    + $"&license={Uri.EscapeDataString(licence)}";
-var upstream = await http.GetAsync(url);
-return Results.Content(
-    await upstream.Content.ReadAsStringAsync(),
-    upstream.Content.Headers.ContentType?.ToString()
-        ?? "application/json",
-    statusCode: (int)upstream.StatusCode);
+using var client = new DidClient(resource, licence);
+
+// Per request. The page sends the 51Did in the URL-safe alphabet, which
+// FromBase64 accepts.
+var fodId = FodId.FromBase64(did);
+var serverSignature = await client.VerifySignatureAsync(fodId)
+    ? "verified" : "invalid";
+var redeemed = await client.RedeemAsync(fodId, result, challenge);
 ```
 
 `did`, `result` and `challenge` arrive from the page as the query
 parameters `51did`, `result` and `challenge` (the identifier parameter
 is named `51did` because the value is a 51Did and OWID is only the
 envelope format, and a C# parameter cannot start with a digit, so the
-route binds it with `[FromQuery(Name = "51did")] string did`), `api`
-is the cloud base from `FOD_CLOUD_API_URL`, and `resource` and
-`licence` are the account's resource key and licence key. The answer carries
-`signature`, `context`, `verifiedAt` and `secondsSinceVerified`, and
-`factors` when the context did not verify. The status, content type
-and body are relayed exactly as received, because the verdict the page
-shows (unconfirmed, replayed, expired) can arrive on a non-2xx status
-and a host without the feature answers 404 with a text body, which the
-page turns into a readable failure. A production server would also
+route binds it with `[FromQuery(Name = "51did")] string did`), and
+`resource` and `licence` are the account's resource key and licence
+key. The client reads the cloud base from `FOD_CLOUD_API_URL` itself.
+`VerifySignatureAsync` checks the signature offline against the
+published signing keys, which the client fetches once and caches, and
+`RedeemAsync` returns a typed `RedeemResult` with `Signature`,
+`Context`, `Factors` when the context did not verify, `VerifiedAt` and
+`SecondsSinceVerified`. The route answers the page with the cloud's
+status and a JSON body in the cloud's own shape built from that result,
+plus one extra field, `serverSignature`, carrying the offline outcome,
+which the page ignores. A host without the feature makes `RedeemAsync`
+throw `NotSupportedException`, which the route turns into a 404 with a
+text body, and an unreachable cloud makes it throw
+`HttpRequestException`, which becomes a 502 with an `error` field, so
+the page reports both readably. A production server would also
 remember the challenge it issued and reject a redemption carrying any
 other.
 
@@ -101,7 +107,10 @@ Every call the demo makes to `cloud.51degrees.com` is one use against
 the subscription behind the resource key. Checking a 51Did from the
 browser makes two, verify-full from the page and redeem from the
 server, so a browser-based context check is two uses every time.
-Checking only the signature with `verify` is one use.
+Checking only the signature with `verify` is one use. The server's
+offline signature check costs nothing per identifier, because the
+signing keys it uses are fetched once, one use, and then cached and
+refreshed at most daily.
 
 ## The web demo, and the copy-and-paste proof
 

@@ -20,8 +20,8 @@
  * such notice(s) shall fulfill the requirements of that article.
  * ********************************************************************* */
 
-// 51Did creator context demo server. ASP.NET Core minimal API, no
-// packages. Run:
+// 51Did creator context demo server. ASP.NET Core minimal API using the
+// FiftyOne.Did package's DidClient for the server side. Run:
 //   dotnet run    then open http://localhost:5100/
 //
 // Every 51Did the cloud issues carries a creator context, which binds the
@@ -35,11 +35,12 @@
 //    encrypted result that the browser cannot read or forge. The cloud
 //    observes the browser's live connection in this step.
 // 3. Redeem. The page hands the encrypted result to this server, which
-//    calls redeem with the 51Did, the encrypted result and the account's
-//    licence key, and receives the true creator context verdict, when
-//    the verification happened (verifiedAt) and how long ago that was
-//    (secondsSinceVerified). This server is the only party holding the
-//    licence key, which the browser never sees.
+//    parses the 51Did, checks its signature offline against the published
+//    keys, then calls redeem with the 51Did, the encrypted result and the
+//    account's licence key, and receives the true creator context verdict,
+//    when the verification happened (verifiedAt) and how long ago that
+//    was (secondsSinceVerified). This server is the only party holding
+//    the licence key, which the browser never sees. See RedeemRoute.cs.
 //
 // This server serves page.html with a fresh challenge per load, which the
 // cloud binds through both steps, and redeems the encrypted result server
@@ -50,7 +51,9 @@
 // What a run costs. Every call to cloud.51degrees.com is one use against
 // the subscription behind the resource key. A browser-based context check
 // makes two calls, verify-full from the page and redeem from this server,
-// so two uses every time, plus one use for the creation call.
+// so two uses every time, plus one use for the creation call. The
+// signing keys the offline check uses are fetched once, one use, and
+// then cached and refreshed at most daily.
 //
 // Environment variables:
 //   _51DEGREES_RESOURCE_KEY  the resource key, required (the legacy
@@ -61,22 +64,15 @@
 //   FOD_CLOUD_API_URL        the API base including the /api/v4/ segment,
 //                            defaults to https://cloud.51degrees.com/api/v4/
 //                            and is the same variable the cloud request
-//                            engine honours
+//                            engine and DidClient honour
 //   PORT                     the port to listen on, defaults to 5100
 //
 // See ../README.md for the flow and the copy-and-paste proof.
 using System.Security.Cryptography;
+using Examples.Did.CreatorContextWeb;
+using FiftyOne.Did.Client;
 using Microsoft.AspNetCore.Mvc;
 
-// The API base including the /api/v4/ segment, normalised to end in one
-// slash so every URL, here and in the page, is base plus its path. A
-// host other than cloud.51degrees.com would be used to (a) use an on
-// premise web server, or (b) use a privately hosted version of the
-// 51Degrees cloud for performance reasons. This is the private hosting
-// option of the cloud service. Both run the same service, so this demo
-// works unchanged against either.
-var api = (Environment.GetEnvironmentVariable("FOD_CLOUD_API_URL")
-    ?? "https://cloud.51degrees.com/api/v4/").TrimEnd('/') + "/";
 // The aligned _51DEGREES_RESOURCE_KEY environment variable is checked
 // first, then the legacy RESOURCE_KEY variable.
 var resource = Environment.GetEnvironmentVariable("_51DEGREES_RESOURCE_KEY");
@@ -94,7 +90,7 @@ if (string.IsNullOrEmpty(resource))
 var licence = Environment.GetEnvironmentVariable("_51DEGREES_LICENSE_KEY");
 if (string.IsNullOrEmpty(licence))
 {
-    licence = Environment.GetEnvironmentVariable("LICENSE_KEY") ?? "";
+    licence = Environment.GetEnvironmentVariable("LICENSE_KEY");
 }
 var port = Environment.GetEnvironmentVariable("PORT") ?? "5100";
 if (string.IsNullOrEmpty(licence))
@@ -112,6 +108,17 @@ if (string.IsNullOrEmpty(licence))
         + "unreadable where it holds some.");
 }
 
+// One client for the process. It reads FOD_CLOUD_API_URL itself and
+// normalises the base to end in one slash, and the page is given the same
+// base so every URL, here and in the browser, is base plus its path. A
+// host other than cloud.51degrees.com would be used to (a) use an on
+// premise web server, or (b) use a privately hosted version of the
+// 51Degrees cloud for performance reasons. This is the private hosting
+// option of the cloud service. Both run the same service, so this demo
+// works unchanged against either.
+using var client = new DidClient(resource, licence);
+var api = client.Endpoint;
+
 // Both are read PER REQUEST, not once at start-up. A demo left running
 // while its page is edited would otherwise keep serving the version it
 // started with, which looks exactly like an edit that did not work. The
@@ -122,8 +129,6 @@ string ReadPage() => File.ReadAllText(
     Path.Combine(AppContext.BaseDirectory, "page.html"));
 byte[] ReadCss() => File.ReadAllBytes(
     Path.Combine(AppContext.BaseDirectory, "examples-main.min.css"));
-var http = new HttpClient();
-http.DefaultRequestHeaders.UserAgent.ParseAdd("51did-demo-csharp");
 
 var builder = WebApplication.CreateBuilder(args);
 // The wildcard binding lets a second device open the copied link, which
@@ -144,39 +149,17 @@ app.MapGet("/examples-main.min.css", () =>
 
 // The identifier parameter is named 51did, because the value is a 51Did
 // and OWID is only the envelope format. A C# parameter cannot start with
-// a digit, so the query name is bound explicitly.
+// a digit, so the query name is bound explicitly. The work is in
+// RedeemRoute.HandleAsync, which is the part to copy into your own
+// server.
 app.MapGet("/redeem", async (
     [FromQuery(Name = "51did")] string did,
     string result,
     string? challenge) =>
 {
-    // The server-side step, where the licence key is added, here and only
-    // here, so the browser never sees it. The upstream status, content
-    // type and body are relayed exactly as received, because the verdict
-    // the page shows (unconfirmed, replayed, expired) can arrive on a
-    // non-2xx status, and a cloud that does not offer the endpoint yet
-    // answers 404 with a text body that the page turns into a readable
-    // failure. Forcing 200 or JSON here would hide both.
-    var url = $"{api}id/redeem/{resource}?51did={did}"
-        + $"&result={Uri.EscapeDataString(result)}"
-        + $"&challenge={Uri.EscapeDataString(challenge ?? "")}"
-        + $"&license={Uri.EscapeDataString(licence)}";
-    HttpResponseMessage upstream;
-    try
-    {
-        upstream = await http.GetAsync(url);
-    }
-    catch (HttpRequestException e)
-    {
-        return Results.Text(
-            $"redeem failed: no response from {url}: {e.Message}",
-            "text/plain", statusCode: 502);
-    }
+    var answer = await RedeemRoute.HandleAsync(client, did, result, challenge);
     return Results.Content(
-        await upstream.Content.ReadAsStringAsync(),
-        upstream.Content.Headers.ContentType?.ToString()
-            ?? "application/json",
-        statusCode: (int)upstream.StatusCode);
+        answer.Body, answer.ContentType, statusCode: answer.StatusCode);
 });
 
 Console.WriteLine($"51Did demo on http://localhost:{port}/");
