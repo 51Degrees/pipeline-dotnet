@@ -126,14 +126,15 @@ namespace FiftyOne.Did.Tests
         public Owid.Client.Model.Owid SignedOwid(
             byte[] payload,
             DateTime date,
-            OwidVersion version = OwidVersion.Version3)
+            OwidVersion version = OwidVersion.Version3,
+            string domain = TestDomain)
         {
             using var crypto = ECDsa.Create();
             crypto.ImportFromPem(_privatePem);
             var owid = new Owid.Client.Model.Owid
             {
                 Version = version,
-                Domain = TestDomain,
+                Domain = domain,
                 Date = date,
                 Payload = payload,
             };

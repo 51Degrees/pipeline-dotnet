@@ -205,6 +205,9 @@
             <exception cref="T:System.ArgumentNullException">
             Thrown when <paramref name="fodId"/> is null.
             </exception>
+            <exception cref="T:System.ArgumentException">
+            Thrown when the value is larger than a 51Did can be.
+            </exception>
             <exception cref="T:System.Net.Http.HttpRequestException">
             Thrown when a fetch was needed and the cloud could not be
             reached or answered with a status other than 200.

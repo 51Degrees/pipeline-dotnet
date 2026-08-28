@@ -99,6 +99,26 @@ namespace FiftyOne.Did.Client
         private static readonly TimeSpan BoundaryTolerance =
             TimeSpan.FromMinutes(15);
 
+        // Keep the current cloud-issued 51Did maximum at the client boundary
+        // rather than imposing this application policy on OWID, whose uint32
+        // payload field deliberately permits much larger data.
+        private const int MaximumPayloadLength = 56;
+        private const int OwidVersionLength = 1;
+        private const int OwidDomainLength = 6;
+        private const int OwidDomainTerminatorLength = 1;
+        private const int OwidVersion3DateLength = sizeof(uint);
+        private const int OwidPayloadLengthPrefix = sizeof(uint);
+        private const int OwidSignatureLength = 64;
+        private const int MaximumByteLength = OwidVersionLength
+            + OwidDomainLength
+            + OwidDomainTerminatorLength
+            + OwidVersion3DateLength
+            + OwidPayloadLengthPrefix
+            + MaximumPayloadLength
+            + OwidSignatureLength;
+        private const int MaximumBase64Length =
+            ((MaximumByteLength + 2) / 3) * 4;
+
         private readonly HttpClient _http;
         private readonly bool _ownsHttp;
         private readonly TimeProvider _time;
@@ -220,6 +240,9 @@ namespace FiftyOne.Did.Client
         /// <exception cref="ArgumentNullException">
         /// Thrown when <paramref name="fodId"/> is null.
         /// </exception>
+        /// <exception cref="ArgumentException">
+        /// Thrown when the value is larger than a 51Did can be.
+        /// </exception>
         /// <exception cref="HttpRequestException">
         /// Thrown when a fetch was needed and the cloud could not be
         /// reached or answered with a status other than 200.
@@ -229,6 +252,7 @@ namespace FiftyOne.Did.Client
             CancellationToken cancellationToken = default)
         {
             ArgumentNullException.ThrowIfNull(fodId);
+            EnsureWithinMaximumLength(fodId, nameof(fodId));
             var date = AsUtc(fodId.Date);
             var keys = await KeysCoveringAsync(date, cancellationToken)
                 .ConfigureAwait(false);
@@ -287,7 +311,7 @@ namespace FiftyOne.Did.Client
             {
                 return SignatureCheck.UnsupportedVersion;
             }
-            if (fodId.Payload is null
+            if (IsWithinMaximumLength(fodId) == false
                 || fodId.Payload.Length < BaseLength(fodId))
             {
                 return SignatureCheck.InvalidLength;
@@ -333,6 +357,7 @@ namespace FiftyOne.Did.Client
             CancellationToken cancellationToken = default)
         {
             ArgumentNullException.ThrowIfNull(fodId);
+            EnsureWithinMaximumLength(fodId, nameof(fodId));
             return VerifyAsync(fodId.AsBase64Url(), cancellationToken);
         }
 
@@ -358,11 +383,7 @@ namespace FiftyOne.Did.Client
             string fodId,
             CancellationToken cancellationToken = default)
         {
-            if (string.IsNullOrWhiteSpace(fodId))
-            {
-                throw new ArgumentException(
-                    "A 51Did is required.", nameof(fodId));
-            }
+            ValidateEncodedLength(fodId, nameof(fodId));
             // The documented parameter is 51did. The same value is sent
             // again as owid, the name the verify endpoint first went live
             // under, which a service that predates the 51did name reads
@@ -428,6 +449,7 @@ namespace FiftyOne.Did.Client
             CancellationToken cancellationToken = default)
         {
             ArgumentNullException.ThrowIfNull(fodId);
+            EnsureWithinMaximumLength(fodId, nameof(fodId));
             return RedeemAsync(
                 fodId.AsBase64Url(), result, challenge, cancellationToken);
         }
@@ -463,11 +485,7 @@ namespace FiftyOne.Did.Client
             string? challenge = null,
             CancellationToken cancellationToken = default)
         {
-            if (string.IsNullOrWhiteSpace(fodId))
-            {
-                throw new ArgumentException(
-                    "A 51Did is required.", nameof(fodId));
-            }
+            ValidateEncodedLength(fodId, nameof(fodId));
             // Everything travels in the form body, the resource key
             // included, because the redeem endpoint's POST route is the bare
             // path and reads its parameters from the form. Nothing here is
@@ -708,6 +726,58 @@ namespace FiftyOne.Did.Client
             => FodId.HeaderLength + (fodId.Type == IdType.Random
                 ? FodId.GuidLength
                 : FodId.HashLength);
+
+        private static bool IsWithinMaximumLength(FodId fodId)
+        {
+            if (fodId.Payload is null
+                || fodId.Payload.Length > MaximumPayloadLength
+                || fodId.Domain is null
+                || fodId.Signature is null
+                || fodId.Signature.Length != OwidSignatureLength)
+            {
+                return false;
+            }
+
+            // ASCII is the OWID domain encoding, where every UTF-16 code unit
+            // contributes at most one byte. This calculation cannot overflow
+            // and does not serialize or copy caller-controlled data.
+            var byteLength = (long)OwidVersionLength
+                + fodId.Domain.Length
+                + OwidDomainTerminatorLength
+                + OwidVersion3DateLength
+                + OwidPayloadLengthPrefix
+                + fodId.Payload.LongLength
+                + OwidSignatureLength;
+            return byteLength <= MaximumByteLength;
+        }
+
+        private static void EnsureWithinMaximumLength(
+            FodId fodId,
+            string paramName)
+        {
+            if (IsWithinMaximumLength(fodId) == false)
+            {
+                throw new ArgumentException(
+                    "The value is larger than a 51Did can be.", paramName);
+            }
+        }
+
+        private static void ValidateEncodedLength(string fodId, string paramName)
+        {
+            if (fodId is null || fodId.Length == 0)
+            {
+                throw new ArgumentException("A 51Did is required.", paramName);
+            }
+            if (fodId.Length > MaximumBase64Length)
+            {
+                throw new ArgumentException(
+                    "The value is larger than a 51Did can be.", paramName);
+            }
+            if (string.IsNullOrWhiteSpace(fodId))
+            {
+                throw new ArgumentException("A 51Did is required.", paramName);
+            }
+        }
 
         private static DateTime AsUtc(DateTime date)
             => date.Kind == DateTimeKind.Local

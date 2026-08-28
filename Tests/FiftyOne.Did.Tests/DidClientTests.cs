@@ -23,6 +23,7 @@
 using FiftyOne.Did.Client;
 using FiftyOne.Did.Model;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
+using Owid.Client;
 using Owid.Client.Model;
 using System;
 using System.Collections.Generic;
@@ -80,8 +81,15 @@ namespace FiftyOne.Did.Tests
                     ["publicKey"] = key.Pem,
                 }).ToArray());
 
-        private FodId SignedAt(DateTime date, byte[]? payload = null) =>
-            new FodId(_factory.SignedOwid(payload ?? CanonicalPayload(), date));
+        private FodId SignedAt(
+            DateTime date,
+            byte[]? payload = null,
+            string domain = TestDomain) =>
+            new FodId(_factory.SignedOwid(
+                payload ?? CanonicalPayload(),
+                date,
+                OwidVersion.Version3,
+                domain));
 
         private static IReadOnlyList<DidPublicKey> Schedule() =>
             new[]
@@ -265,6 +273,21 @@ namespace FiftyOne.Did.Tests
             Assert.AreEqual("pem0", first!.PublicKeyPem);
             Assert.AreSame(first, second);
             Assert.AreEqual(1, _handler.Requests.Count);
+        }
+
+        [TestMethod]
+        public async Task PublicKeyFor_OversizedValue_IsRejectedBeforeFetch()
+        {
+            using var client = NewClient();
+            var payload = new byte[57];
+            CanonicalPayload().CopyTo(payload, 0);
+
+            var error = await Assert.ThrowsExactlyAsync<ArgumentException>(
+                () => client.PublicKeyForAsync(
+                    SignedAt(T0.AddDays(1), payload, "51d.es")));
+
+            Assert.AreEqual("fodId", error.ParamName);
+            Assert.AreEqual(0, _handler.Requests.Count);
         }
 
         [TestMethod]
@@ -473,15 +496,27 @@ namespace FiftyOne.Did.Tests
         {
             _handler.Enqueue(HttpStatusCode.OK, KeysJson((T0, _factory.PublicPem), (T1, "pem1")));
             using var client = NewClient();
-            // A creator context section after the value: a version byte and
-            // eighteen tag bytes, as the cloud adds.
-            var payload = CanonicalPayload()
-                .Concat(Enumerable.Repeat((byte)0x5A, 19))
-                .ToArray();
+            // The largest payload the current cloud service issues.
+            var payload = new byte[56];
+            CanonicalPayload().CopyTo(payload, 0);
             payload[FodId.PayloadLength] = 0;
-            var fodId = SignedAt(T0.AddDays(1), payload);
+            var fodId = SignedAt(T0.AddDays(1), payload, "51d.es");
 
             Assert.IsTrue(await client.VerifySignatureAsync(fodId));
+        }
+
+        [TestMethod]
+        public async Task VerifySignature_PayloadBeyond51DidMaximum_IsInvalidLength()
+        {
+            using var client = NewClient();
+            var payload = new byte[57];
+            CanonicalPayload().CopyTo(payload, 0);
+            var fodId = SignedAt(T0.AddDays(1), payload, "51d.es");
+
+            Assert.AreEqual(
+                SignatureCheck.InvalidLength,
+                await client.VerifySignatureDetailedAsync(fodId));
+            Assert.AreEqual(0, _handler.Requests.Count);
         }
 
         [TestMethod]
@@ -549,6 +584,54 @@ namespace FiftyOne.Did.Tests
                 _handler.Requests.Single().Uri.Query);
             Assert.AreEqual(standard, query["51did"]);
             Assert.AreEqual(standard, query["owid"]);
+        }
+
+        [TestMethod]
+        public async Task Verify_StringAtMaximum51DidLength_IsAccepted()
+        {
+            _handler.Enqueue(HttpStatusCode.OK, "{\"valid\":true}");
+            _handler.Enqueue(HttpStatusCode.OK, "{\"valid\":true}");
+            using var client = NewClient();
+            var payload = new byte[56];
+            CanonicalPayload().CopyTo(payload, 0);
+            var standard = _factory.SignedOwid(
+                payload,
+                T0,
+                OwidVersion.Version3,
+                "51d.es").AsBase64();
+
+            Assert.AreEqual(184, standard.Length);
+            var url = FodId.ToBase64Url(standard);
+            Assert.AreEqual(182, url.Length);
+            Assert.IsTrue(await client.VerifyAsync(standard));
+            Assert.IsTrue(await client.VerifyAsync(url));
+            Assert.AreEqual(2, _handler.Requests.Count);
+        }
+
+        [TestMethod]
+        public async Task Verify_StringBeyond51DidMaximum_IsRejectedLocally()
+        {
+            using var client = NewClient();
+
+            var error = await Assert.ThrowsExactlyAsync<ArgumentException>(
+                () => client.VerifyAsync(new string('A', 185)));
+
+            Assert.AreEqual("fodId", error.ParamName);
+            Assert.AreEqual(0, _handler.Requests.Count);
+        }
+
+        [TestMethod]
+        public async Task Verify_ObjectBeyond51DidMaximum_IsRejectedLocally()
+        {
+            using var client = NewClient();
+            var payload = new byte[57];
+            CanonicalPayload().CopyTo(payload, 0);
+
+            var error = await Assert.ThrowsExactlyAsync<ArgumentException>(
+                () => client.VerifyAsync(SignedAt(T0, payload, "51d.es")));
+
+            Assert.AreEqual("fodId", error.ParamName);
+            Assert.AreEqual(0, _handler.Requests.Count);
         }
 
         [TestMethod]
@@ -746,6 +829,18 @@ namespace FiftyOne.Did.Tests
                 () => client.RedeemAsync("x", "sealed"));
 
             StringAssert.Contains(error.Message, "not a valid Base64-encoded 51Did");
+        }
+
+        [TestMethod]
+        public async Task Redeem_StringBeyond51DidMaximum_IsRejectedLocally()
+        {
+            using var client = NewClient();
+
+            var error = await Assert.ThrowsExactlyAsync<ArgumentException>(
+                () => client.RedeemAsync(new string('A', 185), "sealed"));
+
+            Assert.AreEqual("fodId", error.ParamName);
+            Assert.AreEqual(0, _handler.Requests.Count);
         }
 
         [TestMethod]
