@@ -122,13 +122,6 @@
             and its version.
             </summary>
         </member>
-        <member name="F:FiftyOne.Did.Client.DidClient.BoundaryTolerance">
-            <summary>
-            A key may be used for an identifier created this close to a
-            boundary in the schedule, at either end, so the key in force a
-            tolerance either side of the identifier's date is tried too.
-            </summary>
-        </member>
         <member name="M:FiftyOne.Did.Client.DidClient.#ctor(System.String,System.String,System.String,System.Net.Http.HttpClient,System.TimeProvider)">
             <summary>
             Creates a client.
@@ -233,9 +226,8 @@
             Random identifier. A longer payload carries a creator context
             section and is accepted, because the signature covers the whole
             payload. The keys tried are the one in force at the identifier's
-            date and, where they differ, the ones in force a short tolerance
-            before and after it, best first. Older keys are never tried,
-            because a key belongs to its own period.
+            date and, near a boundary in the schedule, the neighbouring key
+            where the two differ, best first.
             </summary>
             <param name="fodId">The identifier.</param>
             <param name="cancellationToken">Cancels a key fetch.</param>
@@ -360,9 +352,9 @@
         <member name="M:FiftyOne.Did.Client.DidClient.CandidatesForDate(System.Collections.Generic.IReadOnlyList{FiftyOne.Did.Client.DidPublicKey},System.DateTime)">
             <summary>
             The keys that may have signed something created at the moment,
-            best first: the entry in force, then the entries in force a
-            short tolerance earlier and later where those differ. Empty when
-            the moment precedes the whole schedule.
+            best first, being the entry in force and, near a boundary in the
+            schedule, the neighbouring entries where those differ. Empty
+            when the moment precedes the whole schedule.
             </summary>
             <param name="keys">The schedule, in any order.</param>
             <param name="at">The creation moment.</param>

@@ -91,11 +91,6 @@ namespace FiftyOne.Did.Client
         /// </summary>
         public static string UserAgent { get; } = BuildUserAgent();
 
-        /// <summary>
-        /// A key may be used for an identifier created this close to a
-        /// boundary in the schedule, at either end, so the key in force a
-        /// tolerance either side of the identifier's date is tried too.
-        /// </summary>
         private static readonly TimeSpan BoundaryTolerance =
             TimeSpan.FromMinutes(15);
 
@@ -271,9 +266,8 @@ namespace FiftyOne.Did.Client
         /// Random identifier. A longer payload carries a creator context
         /// section and is accepted, because the signature covers the whole
         /// payload. The keys tried are the one in force at the identifier's
-        /// date and, where they differ, the ones in force a short tolerance
-        /// before and after it, best first. Older keys are never tried,
-        /// because a key belongs to its own period.
+        /// date and, near a boundary in the schedule, the neighbouring key
+        /// where the two differ, best first.
         /// </summary>
         /// <param name="fodId">The identifier.</param>
         /// <param name="cancellationToken">Cancels a key fetch.</param>
@@ -550,9 +544,9 @@ namespace FiftyOne.Did.Client
 
         /// <summary>
         /// The keys that may have signed something created at the moment,
-        /// best first: the entry in force, then the entries in force a
-        /// short tolerance earlier and later where those differ. Empty when
-        /// the moment precedes the whole schedule.
+        /// best first, being the entry in force and, near a boundary in the
+        /// schedule, the neighbouring entries where those differ. Empty
+        /// when the moment precedes the whole schedule.
         /// </summary>
         /// <param name="keys">The schedule, in any order.</param>
         /// <param name="at">The creation moment.</param>
@@ -727,7 +721,7 @@ namespace FiftyOne.Did.Client
                 : DateTime.SpecifyKind(date, DateTimeKind.Utc);
 
         // Saturating, because the date comes off the wire as a raw count of
-        // minutes and could sit within the tolerance of either extreme.
+        // minutes and could sit close to either extreme.
         private static DateTime Shift(DateTime at, TimeSpan by)
         {
             var remaining = by > TimeSpan.Zero
