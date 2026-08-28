@@ -704,6 +704,16 @@
             shorter - see <see cref="F:FiftyOne.Did.Model.FodId.RandomPayloadLength"/>.
             </summary>
         </member>
+        <member name="F:FiftyOne.Did.Model.FodId.MaximumByteLength">
+            <summary>
+            Largest possible byte length of a serialized 51Did envelope,
+            including its signature.
+            </summary>
+            <remarks>
+            Callers that receive raw bytes can use this before attempting to
+            parse an identifier. All constructors enforce the same boundary.
+            </remarks>
+        </member>
         <member name="P:FiftyOne.Did.Model.FodId.Flags">
             <summary>
             The 1-byte usage flags bit-mask from the payload.
@@ -774,8 +784,9 @@
             is not valid Base64 in either alphabet.
             </exception>
             <exception cref="T:System.ArgumentException">
-            Thrown when the decoded payload is shorter than the minimum
-            for its identifier type.
+            Thrown when the decoded envelope exceeds
+            <see cref="F:FiftyOne.Did.Model.FodId.MaximumByteLength"/> or the payload length is outside
+            the range a 51Did can have.
             </exception>
         </member>
         <member name="M:FiftyOne.Did.Model.FodId.FromBase64(System.String)">
@@ -794,8 +805,9 @@
             either alphabet.
             </exception>
             <exception cref="T:System.ArgumentException">
-            Thrown when the decoded payload is shorter than the minimum
-            for its identifier type.
+            Thrown when the decoded envelope exceeds
+            <see cref="F:FiftyOne.Did.Model.FodId.MaximumByteLength"/> or the payload length is outside
+            the range a 51Did can have.
             </exception>
         </member>
         <member name="M:FiftyOne.Did.Model.FodId.AsBase64Url">
@@ -842,8 +854,8 @@
             Thrown when <paramref name="buffer"/> is <c>null</c>.
             </exception>
             <exception cref="T:System.ArgumentException">
-            Thrown when the payload is shorter than the minimum for its
-            identifier type.
+            Thrown when the envelope exceeds <see cref="F:FiftyOne.Did.Model.FodId.MaximumByteLength"/>
+            or the payload length is outside the range a 51Did can have.
             </exception>
         </member>
         <member name="M:FiftyOne.Did.Model.FodId.#ctor(Owid.Client.Model.Owid)">
@@ -857,9 +869,18 @@
             Thrown when <paramref name="owid"/> is <c>null</c>.
             </exception>
             <exception cref="T:System.ArgumentException">
-            Thrown when <paramref name="owid"/>'s payload is shorter than
-            the minimum for its identifier type.
+            Thrown when <paramref name="owid"/> would exceed
+            <see cref="F:FiftyOne.Did.Model.FodId.MaximumByteLength"/> or its payload length is outside
+            the range a 51Did can have.
             </exception>
+        </member>
+        <member name="M:FiftyOne.Did.Model.FodId.HasValidLength(FiftyOne.Did.Model.FodId)">
+            <summary>
+            Whether an already constructed instance still has the lengths a
+            signed 51Did may have. This is internal because constructors are
+            authoritative; the client uses it defensively because inherited
+            OWID fields are mutable.
+            </summary>
         </member>
         <member name="T:FiftyOne.Did.Model.FodIdExtensions">
             <summary>

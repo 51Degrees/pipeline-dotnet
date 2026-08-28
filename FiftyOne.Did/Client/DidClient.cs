@@ -99,25 +99,8 @@ namespace FiftyOne.Did.Client
         private static readonly TimeSpan BoundaryTolerance =
             TimeSpan.FromMinutes(15);
 
-        // Keep the current cloud-issued 51Did maximum at the client boundary
-        // rather than imposing this application policy on OWID, whose uint32
-        // payload field deliberately permits much larger data.
-        private const int MaximumPayloadLength = 56;
-        private const int OwidVersionLength = 1;
-        private const int OwidDomainLength = 6;
-        private const int OwidDomainTerminatorLength = 1;
-        private const int OwidVersion3DateLength = sizeof(uint);
-        private const int OwidPayloadLengthPrefix = sizeof(uint);
-        private const int OwidSignatureLength = 64;
-        private const int MaximumByteLength = OwidVersionLength
-            + OwidDomainLength
-            + OwidDomainTerminatorLength
-            + OwidVersion3DateLength
-            + OwidPayloadLengthPrefix
-            + MaximumPayloadLength
-            + OwidSignatureLength;
         private const int MaximumBase64Length =
-            ((MaximumByteLength + 2) / 3) * 4;
+            ((FodId.MaximumByteLength + 2) / 3) * 4;
 
         private readonly HttpClient _http;
         private readonly bool _ownsHttp;
@@ -727,29 +710,8 @@ namespace FiftyOne.Did.Client
                 ? FodId.GuidLength
                 : FodId.HashLength);
 
-        private static bool IsWithinMaximumLength(FodId fodId)
-        {
-            if (fodId.Payload is null
-                || fodId.Payload.Length > MaximumPayloadLength
-                || fodId.Domain is null
-                || fodId.Signature is null
-                || fodId.Signature.Length != OwidSignatureLength)
-            {
-                return false;
-            }
-
-            // ASCII is the OWID domain encoding, where every UTF-16 code unit
-            // contributes at most one byte. This calculation cannot overflow
-            // and does not serialize or copy caller-controlled data.
-            var byteLength = (long)OwidVersionLength
-                + fodId.Domain.Length
-                + OwidDomainTerminatorLength
-                + OwidVersion3DateLength
-                + OwidPayloadLengthPrefix
-                + fodId.Payload.LongLength
-                + OwidSignatureLength;
-            return byteLength <= MaximumByteLength;
-        }
+        private static bool IsWithinMaximumLength(FodId fodId) =>
+            FodId.HasValidLength(fodId);
 
         private static void EnsureWithinMaximumLength(
             FodId fodId,

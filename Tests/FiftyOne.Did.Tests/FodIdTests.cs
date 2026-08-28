@@ -59,6 +59,7 @@ namespace FiftyOne.Did.Tests
             Assert.AreEqual(
                 FodId.LicenseIdOffset + FodId.LicenseIdLength,
                 FodId.HashOffset);
+            Assert.AreEqual(136, FodId.MaximumByteLength);
 #pragma warning restore MSTEST0032
         }
 
@@ -242,23 +243,65 @@ namespace FiftyOne.Did.Tests
         }
 
         [TestMethod]
-        public void Constructor_PayloadLargerThanSpec_UsesFirst37Bytes()
+        public void Constructor_MaximumLength_UsesFirst37Bytes()
         {
-            // Build a 64-byte payload whose first 37 bytes match canonical;
-            // remaining bytes are 0xCC and should be ignored.
-            var payload = new byte[64];
+            var payload = new byte[56];
             Array.Copy(CanonicalPayload(), payload, FodId.PayloadLength);
             for (int i = FodId.PayloadLength; i < payload.Length; i++)
             {
                 payload[i] = 0xCC;
             }
 
-            var fodId = new FodId(_factory.SignedOwidBase64(payload));
+            var owid = _factory.SignedOwid(
+                payload, DateTime.UtcNow, domain: "51d.es");
+            var bytes = owid.AsByteArray();
+            Assert.AreEqual(FodId.MaximumByteLength, bytes.Length);
+
+            var fodId = new FodId(bytes);
 
             Assert.AreEqual(CanonicalFlags, fodId.Flags);
             Assert.AreEqual(CanonicalLicenseId, fodId.LicenseId);
             CollectionAssert.AreEqual(CanonicalHash, fodId.Hash);
             Assert.AreEqual(FodId.HashLength, fodId.Hash.Length);
+        }
+
+        [TestMethod]
+        public void Constructor_OneByteBeyondMaximum_ThrowsForEveryInput()
+        {
+            var payload = new byte[57];
+            Array.Copy(CanonicalPayload(), payload, FodId.PayloadLength);
+            var owid = _factory.SignedOwid(
+                payload, DateTime.UtcNow, domain: "51d.es");
+            var bytes = owid.AsByteArray();
+            Assert.AreEqual(FodId.MaximumByteLength + 1, bytes.Length);
+
+            Assert.ThrowsExactly<ArgumentException>(
+                () => new FodId(owid.AsBase64()));
+            Assert.ThrowsExactly<ArgumentException>(() => new FodId(bytes));
+            Assert.ThrowsExactly<ArgumentException>(() => new FodId(owid));
+        }
+
+        [TestMethod]
+        public void Constructor_OversizedPayloadInShortEnvelope_ExplainsPayload()
+        {
+            var payload = new byte[57];
+            Array.Copy(CanonicalPayload(), payload, FodId.PayloadLength);
+            var owid = _factory.SignedOwid(
+                payload, DateTime.UtcNow, domain: "x");
+            var bytes = owid.AsByteArray();
+            Assert.IsTrue(bytes.Length <= FodId.MaximumByteLength);
+
+            foreach (Action construct in new Action[]
+            {
+                () => new FodId(owid.AsBase64()),
+                () => new FodId(bytes),
+                () => new FodId(owid),
+            })
+            {
+                var error = Assert.ThrowsExactly<ArgumentException>(construct);
+                StringAssert.Contains(error.Message, "payload");
+                StringAssert.Contains(error.Message, "56 bytes");
+            }
         }
 
         [TestMethod]

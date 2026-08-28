@@ -91,6 +91,13 @@ namespace FiftyOne.Did.Tests
                 OwidVersion.Version3,
                 domain));
 
+        private static byte[] MaximumPayload()
+        {
+            var payload = new byte[56];
+            CanonicalPayload().CopyTo(payload, 0);
+            return payload;
+        }
+
         private static IReadOnlyList<DidPublicKey> Schedule() =>
             new[]
             {
@@ -279,12 +286,11 @@ namespace FiftyOne.Did.Tests
         public async Task PublicKeyFor_OversizedValue_IsRejectedBeforeFetch()
         {
             using var client = NewClient();
-            var payload = new byte[57];
-            CanonicalPayload().CopyTo(payload, 0);
+            var fodId = SignedAt(T0.AddDays(1), MaximumPayload(), "51d.es");
+            fodId.Payload = new byte[57];
 
             var error = await Assert.ThrowsExactlyAsync<ArgumentException>(
-                () => client.PublicKeyForAsync(
-                    SignedAt(T0.AddDays(1), payload, "51d.es")));
+                () => client.PublicKeyForAsync(fodId));
 
             Assert.AreEqual("fodId", error.ParamName);
             Assert.AreEqual(0, _handler.Requests.Count);
@@ -509,9 +515,8 @@ namespace FiftyOne.Did.Tests
         public async Task VerifySignature_PayloadBeyond51DidMaximum_IsInvalidLength()
         {
             using var client = NewClient();
-            var payload = new byte[57];
-            CanonicalPayload().CopyTo(payload, 0);
-            var fodId = SignedAt(T0.AddDays(1), payload, "51d.es");
+            var fodId = SignedAt(T0.AddDays(1), MaximumPayload(), "51d.es");
+            fodId.Payload = new byte[57];
 
             Assert.AreEqual(
                 SignatureCheck.InvalidLength,
@@ -624,11 +629,11 @@ namespace FiftyOne.Did.Tests
         public async Task Verify_ObjectBeyond51DidMaximum_IsRejectedLocally()
         {
             using var client = NewClient();
-            var payload = new byte[57];
-            CanonicalPayload().CopyTo(payload, 0);
+            var fodId = SignedAt(T0, MaximumPayload(), "51d.es");
+            fodId.Payload = new byte[57];
 
             var error = await Assert.ThrowsExactlyAsync<ArgumentException>(
-                () => client.VerifyAsync(SignedAt(T0, payload, "51d.es")));
+                () => client.VerifyAsync(fodId));
 
             Assert.AreEqual("fodId", error.ParamName);
             Assert.AreEqual(0, _handler.Requests.Count);
