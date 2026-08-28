@@ -101,8 +101,11 @@ If you want examples that demonstrate how to use 51Degrees products such as devi
 | CustomFlowElement\4. Cloud Engine         | Shows how to modify SimpleFlowElement to perform the star sign lookup via a cloud service rather than locally. |
 | ResultCaching                             | Shows how the result caching feature works. |
 | UsageSharing                              | Shows how to share usage with 51Degrees. This helps us to keep our products up to date and accurate. |
+| Did\CreatorContextWeb                     | A demo web server for the 51Did creator context flow, run the way production does, with the browser verifying and the server redeeming. See Examples\Did\README.md. |
 
 The CloudRequestEngine\GettingStarted example requires a resource key. It reads the aligned `_51DEGREES_RESOURCE_KEY` environment variable first, then the legacy `RESOURCE_KEY` variable. A resource key with the free properties used by the examples can be created at https://configure.51degrees.com/Wkqxf3Bs?utm_source=github&utm_medium=readme&utm_campaign=pipeline-dotnet&utm_content=readme.md&utm_term=pipeline-examples.
+
+Every example that calls the 51Degrees cloud (CloudRequestEngine\GettingStarted and Did\CreatorContextWeb) reads the service to call from the `FOD_CLOUD_API_URL` environment variable, which is the API base including the `/api/v4/` segment and defaults to `https://cloud.51degrees.com/api/v4/`. This is the same variable the `CloudRequestEngineBuilder` honours when no endpoint is set. A host other than `cloud.51degrees.com` would be used to (a) use an on premise web server, or (b) use a privately hosted version of the 51Degrees cloud for performance reasons. This is the private hosting option of the cloud service. Both run the same service, so the examples work unchanged against either. The CustomFlowElement\4. Cloud Engine tutorial calls the star sign example service built for that tutorial rather than the 51Degrees cloud, so its endpoint is fixed.
 
 ## Cancelling processing
 
