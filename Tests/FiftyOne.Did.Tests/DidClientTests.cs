@@ -381,7 +381,7 @@ namespace FiftyOne.Did.Tests
         [TestMethod]
         public void Candidates_JustAfterBoundary_AddsEarlierNeighbour()
         {
-            var candidates = DidClient.CandidatesForDate(Schedule(), T1.AddMinutes(5));
+            var candidates = DidClient.CandidatesForDate(Schedule(), T1.AddMinutes(1));
 
             CollectionAssert.AreEqual(
                 new[] { "pem1", "pem0" }, candidates.Select(c => c.PublicKeyPem).ToArray());
@@ -390,7 +390,7 @@ namespace FiftyOne.Did.Tests
         [TestMethod]
         public void Candidates_JustBeforeBoundary_AddsLaterNeighbour()
         {
-            var candidates = DidClient.CandidatesForDate(Schedule(), T1.AddMinutes(-5));
+            var candidates = DidClient.CandidatesForDate(Schedule(), T1.AddMinutes(-1));
 
             CollectionAssert.AreEqual(
                 new[] { "pem0", "pem1" }, candidates.Select(c => c.PublicKeyPem).ToArray());
@@ -399,8 +399,8 @@ namespace FiftyOne.Did.Tests
         [TestMethod]
         public void Candidates_OutsideTolerance_OnlyTheKeyInForce()
         {
-            var after = DidClient.CandidatesForDate(Schedule(), T1.AddMinutes(20));
-            var before = DidClient.CandidatesForDate(Schedule(), T1.AddMinutes(-20));
+            var after = DidClient.CandidatesForDate(Schedule(), T1.AddHours(1));
+            var before = DidClient.CandidatesForDate(Schedule(), T1.AddHours(-1));
 
             CollectionAssert.AreEqual(
                 new[] { "pem1" }, after.Select(c => c.PublicKeyPem).ToArray());
@@ -416,7 +416,7 @@ namespace FiftyOne.Did.Tests
             // Within the tolerance of the first start the first key is tried.
             CollectionAssert.AreEqual(
                 new[] { "pem0" },
-                DidClient.CandidatesForDate(Schedule(), T0.AddMinutes(-5))
+                DidClient.CandidatesForDate(Schedule(), T0.AddMinutes(-1))
                     .Select(c => c.PublicKeyPem).ToArray());
         }
 
@@ -464,16 +464,16 @@ namespace FiftyOne.Did.Tests
         [TestMethod]
         public async Task VerifySignature_TriesTheNeighbourAtABoundary()
         {
-            // Signed under the first key a few minutes into the second
-            // period, as a creator stamping its date just after rollover.
+            // Signed under the first key a moment into the second period,
+            // as a creator stamping its date just after rollover.
             _handler.Enqueue(HttpStatusCode.OK, KeysJson(
                 (T0, _factory.PublicPem),
                 (T1, new FodIdTestFactory().PublicPem),
                 (T1.AddDays(7), "pem2")));
             using var client = NewClient();
 
-            Assert.IsTrue(await client.VerifySignatureAsync(SignedAt(T1.AddMinutes(5))));
-            Assert.IsFalse(await client.VerifySignatureAsync(SignedAt(T1.AddMinutes(20))));
+            Assert.IsTrue(await client.VerifySignatureAsync(SignedAt(T1.AddMinutes(1))));
+            Assert.IsFalse(await client.VerifySignatureAsync(SignedAt(T1.AddHours(1))));
         }
 
         [TestMethod]
