@@ -99,8 +99,12 @@ namespace FiftyOne.Did.Client
         private static readonly TimeSpan BoundaryTolerance =
             TimeSpan.FromMinutes(15);
 
-        private const int MaximumBase64Length =
-            ((FodId.MaximumByteLength + 2) / 3) * 4;
+        // A guard against obviously malformed input, so the client does no
+        // work and makes no call for a value that cannot be an identifier.
+        // The figure is arbitrary and deliberately generous, well beyond
+        // anything the cloud issues, because the length of a 51Did is the
+        // cloud's business and not this package's.
+        private const int MaximumEncodedLength = 4096;
 
         private readonly HttpClient _http;
         private readonly bool _ownsHttp;
@@ -223,9 +227,6 @@ namespace FiftyOne.Did.Client
         /// <exception cref="ArgumentNullException">
         /// Thrown when <paramref name="fodId"/> is null.
         /// </exception>
-        /// <exception cref="ArgumentException">
-        /// Thrown when the value is larger than a 51Did can be.
-        /// </exception>
         /// <exception cref="HttpRequestException">
         /// Thrown when a fetch was needed and the cloud could not be
         /// reached or answered with a status other than 200.
@@ -235,7 +236,6 @@ namespace FiftyOne.Did.Client
             CancellationToken cancellationToken = default)
         {
             ArgumentNullException.ThrowIfNull(fodId);
-            EnsureWithinMaximumLength(fodId, nameof(fodId));
             var date = AsUtc(fodId.Date);
             var keys = await KeysCoveringAsync(date, cancellationToken)
                 .ConfigureAwait(false);
@@ -294,7 +294,7 @@ namespace FiftyOne.Did.Client
             {
                 return SignatureCheck.UnsupportedVersion;
             }
-            if (IsWithinMaximumLength(fodId) == false
+            if (fodId.Payload is null
                 || fodId.Payload.Length < BaseLength(fodId))
             {
                 return SignatureCheck.InvalidLength;
@@ -340,7 +340,6 @@ namespace FiftyOne.Did.Client
             CancellationToken cancellationToken = default)
         {
             ArgumentNullException.ThrowIfNull(fodId);
-            EnsureWithinMaximumLength(fodId, nameof(fodId));
             return VerifyAsync(fodId.AsBase64Url(), cancellationToken);
         }
 
@@ -366,7 +365,7 @@ namespace FiftyOne.Did.Client
             string fodId,
             CancellationToken cancellationToken = default)
         {
-            ValidateEncodedLength(fodId, nameof(fodId));
+            ValidateEncodedValue(fodId, nameof(fodId));
             // The documented parameter is 51did. The same value is sent
             // again as owid, the name the verify endpoint first went live
             // under, which a service that predates the 51did name reads
@@ -432,7 +431,6 @@ namespace FiftyOne.Did.Client
             CancellationToken cancellationToken = default)
         {
             ArgumentNullException.ThrowIfNull(fodId);
-            EnsureWithinMaximumLength(fodId, nameof(fodId));
             return RedeemAsync(
                 fodId.AsBase64Url(), result, challenge, cancellationToken);
         }
@@ -468,7 +466,7 @@ namespace FiftyOne.Did.Client
             string? challenge = null,
             CancellationToken cancellationToken = default)
         {
-            ValidateEncodedLength(fodId, nameof(fodId));
+            ValidateEncodedValue(fodId, nameof(fodId));
             // Everything travels in the form body, the resource key
             // included, because the redeem endpoint's POST route is the bare
             // path and reads its parameters from the form. Nothing here is
@@ -710,34 +708,16 @@ namespace FiftyOne.Did.Client
                 ? FodId.GuidLength
                 : FodId.HashLength);
 
-        private static bool IsWithinMaximumLength(FodId fodId) =>
-            FodId.HasValidLength(fodId);
-
-        private static void EnsureWithinMaximumLength(
-            FodId fodId,
-            string paramName)
+        private static void ValidateEncodedValue(string fodId, string paramName)
         {
-            if (IsWithinMaximumLength(fodId) == false)
-            {
-                throw new ArgumentException(
-                    "The value is larger than a 51Did can be.", paramName);
-            }
-        }
-
-        private static void ValidateEncodedLength(string fodId, string paramName)
-        {
-            if (fodId is null || fodId.Length == 0)
-            {
-                throw new ArgumentException("A 51Did is required.", paramName);
-            }
-            if (fodId.Length > MaximumBase64Length)
-            {
-                throw new ArgumentException(
-                    "The value is larger than a 51Did can be.", paramName);
-            }
             if (string.IsNullOrWhiteSpace(fodId))
             {
                 throw new ArgumentException("A 51Did is required.", paramName);
+            }
+            if (fodId.Length > MaximumEncodedLength)
+            {
+                throw new ArgumentException(
+                    "The value is too long to be a 51Did.", paramName);
             }
         }
 

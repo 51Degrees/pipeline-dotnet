@@ -55,12 +55,6 @@ LicenseId bytes hold an encrypted value that only 51Degrees can turn
 back into a licence identifier, so `LicenseId` is the raw field value
 and identifies nothing outside 51Degrees.
 
-The complete serialized envelope of a valid 51Did is at most 136 bytes.
-`FodId.MaximumByteLength` exposes that boundary for callers that want to
-check raw input before parsing; every `FodId` constructor also enforces it
-and rejects a longer value for its length. This is a limit on the identifier
-itself, not on an HTTP response that happens to carry one.
-
 `FodId` inherits from `Owid.Client.Model.Owid` (see
 [SWAN-community/owid-dotnet](https://github.com/SWAN-community/owid-dotnet)),
 so a `FodId` instance behaves as an OWID for all OWID-level concerns

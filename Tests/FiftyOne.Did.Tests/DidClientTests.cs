@@ -91,9 +91,12 @@ namespace FiftyOne.Did.Tests
                 OwidVersion.Version3,
                 domain));
 
-        private static byte[] MaximumPayload()
+        // A payload with a creator context section after the value. The
+        // section's length belongs to the cloud, so this is simply longer
+        // than the base and nothing here depends on how much longer.
+        private static byte[] PayloadWithContext()
         {
-            var payload = new byte[56];
+            var payload = new byte[FodId.PayloadLength + 128];
             CanonicalPayload().CopyTo(payload, 0);
             return payload;
         }
@@ -283,17 +286,25 @@ namespace FiftyOne.Did.Tests
         }
 
         [TestMethod]
-        public async Task PublicKeyFor_OversizedValue_IsRejectedBeforeFetch()
+        public async Task PublicKeyFor_LongDomainAndContext_IsServedAKey()
         {
+            // A self-hosted container signs with its own creator domain,
+            // which may be much longer than the public cloud's, and the
+            // context section length is the cloud's business, so neither
+            // stops a key being found.
+            _handler.Enqueue(
+                HttpStatusCode.OK, KeysJson((T0, "pem0"), (T1, "pem1")));
             using var client = NewClient();
-            var fodId = SignedAt(T0.AddDays(1), MaximumPayload(), "51d.es");
-            fodId.Payload = new byte[57];
+            var fodId = SignedAt(
+                T0.AddDays(1),
+                PayloadWithContext(),
+                "a-very-long-self-hosted-creator-domain.example.com");
 
-            var error = await Assert.ThrowsExactlyAsync<ArgumentException>(
-                () => client.PublicKeyForAsync(fodId));
+            var key = await client.PublicKeyForAsync(fodId);
 
-            Assert.AreEqual("fodId", error.ParamName);
-            Assert.AreEqual(0, _handler.Requests.Count);
+            Assert.IsNotNull(key);
+            Assert.AreEqual("pem0", key!.PublicKeyPem);
+            Assert.AreEqual(1, _handler.Requests.Count);
         }
 
         [TestMethod]
@@ -502,26 +513,14 @@ namespace FiftyOne.Did.Tests
         {
             _handler.Enqueue(HttpStatusCode.OK, KeysJson((T0, _factory.PublicPem), (T1, "pem1")));
             using var client = NewClient();
-            // The largest payload the current cloud service issues.
-            var payload = new byte[56];
-            CanonicalPayload().CopyTo(payload, 0);
+            // A creator context section after the value. Its length is the
+            // cloud's business, so the check only cares that the payload
+            // reaches its base length.
+            var payload = PayloadWithContext();
             payload[FodId.PayloadLength] = 0;
-            var fodId = SignedAt(T0.AddDays(1), payload, "51d.es");
+            var fodId = SignedAt(T0.AddDays(1), payload);
 
             Assert.IsTrue(await client.VerifySignatureAsync(fodId));
-        }
-
-        [TestMethod]
-        public async Task VerifySignature_PayloadBeyond51DidMaximum_IsInvalidLength()
-        {
-            using var client = NewClient();
-            var fodId = SignedAt(T0.AddDays(1), MaximumPayload(), "51d.es");
-            fodId.Payload = new byte[57];
-
-            Assert.AreEqual(
-                SignatureCheck.InvalidLength,
-                await client.VerifySignatureDetailedAsync(fodId));
-            Assert.AreEqual(0, _handler.Requests.Count);
         }
 
         [TestMethod]
@@ -592,48 +591,33 @@ namespace FiftyOne.Did.Tests
         }
 
         [TestMethod]
-        public async Task Verify_StringAtMaximum51DidLength_IsAccepted()
+        public async Task Verify_LongIdentifierString_IsAccepted()
         {
+            // A long creator domain and a long context section are both
+            // legitimate, so neither alphabet is refused for its length.
             _handler.Enqueue(HttpStatusCode.OK, "{\"valid\":true}");
             _handler.Enqueue(HttpStatusCode.OK, "{\"valid\":true}");
             using var client = NewClient();
-            var payload = new byte[56];
-            CanonicalPayload().CopyTo(payload, 0);
             var standard = _factory.SignedOwid(
-                payload,
+                PayloadWithContext(),
                 T0,
                 OwidVersion.Version3,
-                "51d.es").AsBase64();
+                "a-very-long-self-hosted-creator-domain.example.com")
+                .AsBase64();
 
-            Assert.AreEqual(184, standard.Length);
-            var url = FodId.ToBase64Url(standard);
-            Assert.AreEqual(182, url.Length);
             Assert.IsTrue(await client.VerifyAsync(standard));
-            Assert.IsTrue(await client.VerifyAsync(url));
+            Assert.IsTrue(
+                await client.VerifyAsync(FodId.ToBase64Url(standard)));
             Assert.AreEqual(2, _handler.Requests.Count);
         }
 
         [TestMethod]
-        public async Task Verify_StringBeyond51DidMaximum_IsRejectedLocally()
+        public async Task Verify_StringBeyondInputGuard_IsRejectedLocally()
         {
             using var client = NewClient();
 
             var error = await Assert.ThrowsExactlyAsync<ArgumentException>(
-                () => client.VerifyAsync(new string('A', 185)));
-
-            Assert.AreEqual("fodId", error.ParamName);
-            Assert.AreEqual(0, _handler.Requests.Count);
-        }
-
-        [TestMethod]
-        public async Task Verify_ObjectBeyond51DidMaximum_IsRejectedLocally()
-        {
-            using var client = NewClient();
-            var fodId = SignedAt(T0, MaximumPayload(), "51d.es");
-            fodId.Payload = new byte[57];
-
-            var error = await Assert.ThrowsExactlyAsync<ArgumentException>(
-                () => client.VerifyAsync(fodId));
+                () => client.VerifyAsync(new string('A', 4097)));
 
             Assert.AreEqual("fodId", error.ParamName);
             Assert.AreEqual(0, _handler.Requests.Count);
@@ -837,12 +821,12 @@ namespace FiftyOne.Did.Tests
         }
 
         [TestMethod]
-        public async Task Redeem_StringBeyond51DidMaximum_IsRejectedLocally()
+        public async Task Redeem_StringBeyondInputGuard_IsRejectedLocally()
         {
             using var client = NewClient();
 
             var error = await Assert.ThrowsExactlyAsync<ArgumentException>(
-                () => client.RedeemAsync(new string('A', 185), "sealed"));
+                () => client.RedeemAsync(new string('A', 4097), "sealed"));
 
             Assert.AreEqual("fodId", error.ParamName);
             Assert.AreEqual(0, _handler.Requests.Count);

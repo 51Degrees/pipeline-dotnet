@@ -118,21 +118,6 @@ namespace FiftyOne.Did.Model
         public const int PayloadLength = HashOffset + HashLength;
 
         /// <summary>
-        /// Largest possible byte length of a serialized 51Did envelope,
-        /// including its signature.
-        /// </summary>
-        /// <remarks>
-        /// Callers that receive raw bytes can use this before attempting to
-        /// parse an identifier. All constructors enforce the same boundary.
-        /// </remarks>
-        public const int MaximumByteLength = 136;
-
-        private const int MaximumPayloadLength = 56;
-        private const int SignatureLength = 64;
-        private const int MaximumBase64Length =
-            ((MaximumByteLength + 2) / 3) * 4;
-
-        /// <summary>
         /// The 1-byte usage flags bit-mask from the payload.
         /// </summary>
         public byte Flags { get; private set; }
@@ -213,14 +198,13 @@ namespace FiftyOne.Did.Model
         /// is not valid Base64 in either alphabet.
         /// </exception>
         /// <exception cref="ArgumentException">
-        /// Thrown when the decoded envelope exceeds
-        /// <see cref="MaximumByteLength"/> or the payload length is outside
-        /// the range a 51Did can have.
+        /// Thrown when the decoded payload is shorter than the minimum
+        /// for its identifier type. Anything beyond that minimum is a
+        /// creator context section, whose exact lengths belong to the
+        /// cloud, so any longer payload is accepted here.
         /// </exception>
-        public FodId(string base64)
-            : this(DecodeAndValidate(base64), nameof(base64))
-        {
-        }
+        public FodId(string base64) : base(NormaliseBase64(base64)!)
+            => Unpack(nameof(base64));
 
         /// <summary>
         /// Parse a 51Did from its base64-encoded OWID string, in either
@@ -237,9 +221,8 @@ namespace FiftyOne.Did.Model
         /// either alphabet.
         /// </exception>
         /// <exception cref="ArgumentException">
-        /// Thrown when the decoded envelope exceeds
-        /// <see cref="MaximumByteLength"/> or the payload length is outside
-        /// the range a 51Did can have.
+        /// Thrown when the decoded payload is shorter than the minimum
+        /// for its identifier type. Any longer payload is accepted.
         /// </exception>
         public static FodId FromBase64(string base64) => new FodId(base64);
 
@@ -255,9 +238,12 @@ namespace FiftyOne.Did.Model
         /// <summary>
         /// Restores a base64 string in either alphabet to the standard
         /// alphabet with padding, as <c>Convert.FromBase64String</c>
-        /// expects: <c>-</c> becomes <c>+</c>, <c>_</c> becomes <c>/</c>,
-        /// and padding is added when the length modulo 4 is 2 or 3. A
-        /// value already in the standard form is returned unchanged.
+        /// expects. Leading and trailing whitespace is removed first, so a
+        /// value read from a file or a header with a trailing newline
+        /// behaves as the clean value does, then <c>-</c> becomes
+        /// <c>+</c>, <c>_</c> becomes <c>/</c>, and padding is added when
+        /// the trimmed length modulo 4 is 2 or 3. A value already in the
+        /// standard form is returned unchanged apart from that trim.
         /// </summary>
         /// <param name="value">The base64 in either alphabet.</param>
         /// <returns>
@@ -270,7 +256,10 @@ namespace FiftyOne.Did.Model
             {
                 return null;
             }
-            var base64 = value.Replace('-', '+').Replace('_', '/');
+            // Trim before anything else, because the padding below is
+            // decided by the length and whitespace would make that length
+            // wrong.
+            var base64 = value.Trim().Replace('-', '+').Replace('_', '/');
             switch (base64.Length % 4)
             {
                 case 2: return base64 + "==";
@@ -306,19 +295,10 @@ namespace FiftyOne.Did.Model
         /// Thrown when <paramref name="buffer"/> is <c>null</c>.
         /// </exception>
         /// <exception cref="ArgumentException">
-        /// Thrown when the envelope exceeds <see cref="MaximumByteLength"/>
-        /// or the payload length is outside the range a 51Did can have.
+        /// Thrown when the payload is shorter than the minimum for its
+        /// identifier type. Any longer payload is accepted.
         /// </exception>
-        public FodId(byte[] buffer)
-            : this(ValidateBuffer(buffer, nameof(buffer)), nameof(buffer))
-        {
-        }
-
-        private FodId(byte[] buffer, string paramName) : base(buffer)
-        {
-            EnsureMaximumLength(this, paramName);
-            Unpack(paramName);
-        }
+        public FodId(byte[] buffer) : base(buffer) => Unpack(nameof(buffer));
 
         /// <summary>
         /// Promote an already-parsed OWID into a 51Did by unpacking its
@@ -330,9 +310,9 @@ namespace FiftyOne.Did.Model
         /// Thrown when <paramref name="owid"/> is <c>null</c>.
         /// </exception>
         /// <exception cref="ArgumentException">
-        /// Thrown when <paramref name="owid"/> would exceed
-        /// <see cref="MaximumByteLength"/> or its payload length is outside
-        /// the range a 51Did can have.
+        /// Thrown when <paramref name="owid"/>'s payload is shorter than
+        /// the minimum for its identifier type. Any longer payload is
+        /// accepted.
         /// </exception>
         public FodId(Owid.Client.Model.Owid owid) : base()
         {
@@ -345,107 +325,8 @@ namespace FiftyOne.Did.Model
             Date = owid.Date;
             Payload = owid.Payload;
             Signature = owid.Signature;
-            EnsureMaximumLength(this, nameof(owid));
             Unpack(nameof(owid));
         }
-
-        /// <summary>
-        /// Whether an already constructed instance still has the lengths a
-        /// signed 51Did may have. This is internal because constructors are
-        /// authoritative; the client uses it defensively because inherited
-        /// OWID fields are mutable.
-        /// </summary>
-        internal static bool HasValidLength(FodId fodId) =>
-            MaximumLengthValid(fodId)
-            && fodId.Signature is not null
-            && fodId.Signature.Length == SignatureLength;
-
-        private static byte[] DecodeAndValidate(string base64)
-        {
-            if (base64 == null)
-            {
-                throw new ArgumentNullException(nameof(base64));
-            }
-            var normalised = NormaliseBase64(base64)!;
-            if (normalised.Length > MaximumBase64Length)
-            {
-                throw TooLong(nameof(base64), null);
-            }
-            return ValidateBuffer(
-                Convert.FromBase64String(normalised), nameof(base64));
-        }
-
-        private static byte[] ValidateBuffer(byte[] buffer, string paramName)
-        {
-            if (buffer == null)
-            {
-                throw new ArgumentNullException(paramName);
-            }
-            if (buffer.Length > MaximumByteLength)
-            {
-                throw TooLong(paramName, buffer.Length);
-            }
-            return buffer;
-        }
-
-        private static bool MaximumLengthValid(Owid.Client.Model.Owid owid)
-        {
-            if (owid.Payload is null
-                || owid.Payload.Length > MaximumPayloadLength)
-            {
-                return false;
-            }
-            return MaximumEnvelopeLengthValid(owid);
-        }
-
-        private static bool MaximumEnvelopeLengthValid(
-            Owid.Client.Model.Owid owid)
-        {
-            if (owid.Domain is null
-                || owid.Domain.Length > MaximumByteLength)
-            {
-                return false;
-            }
-            try
-            {
-                return owid.GetByteCount() <= MaximumByteLength;
-            }
-            catch
-            {
-                return false;
-            }
-        }
-
-        private static void EnsureMaximumLength(
-            Owid.Client.Model.Owid owid,
-            string paramName)
-        {
-            if (MaximumEnvelopeLengthValid(owid) == false)
-            {
-                throw TooLong(paramName, null);
-            }
-            if (owid.Payload is not null
-                && owid.Payload.Length > MaximumPayloadLength)
-            {
-                throw PayloadTooLong(paramName, owid.Payload.Length);
-            }
-        }
-
-        private static ArgumentException TooLong(
-            string paramName,
-            int? actual) => new ArgumentException(
-                actual.HasValue
-                    ? $"A 51Did must not exceed {MaximumByteLength} bytes; "
-                        + $"got {actual.Value}."
-                    : $"A 51Did must not exceed {MaximumByteLength} bytes.",
-                paramName);
-
-        private static ArgumentException PayloadTooLong(
-            string paramName,
-            int actual) => new ArgumentException(
-                $"A 51Did payload must not exceed {MaximumPayloadLength} "
-                + $"bytes; got {actual}.",
-                paramName);
 
         private void Unpack(string paramName)
         {
@@ -462,6 +343,12 @@ namespace FiftyOne.Did.Model
                 | (Payload[LicenseIdOffset + 1] << 8)
                 | (Payload[LicenseIdOffset + 2] << 16)
                 | (Payload[LicenseIdOffset + 3] << 24));
+            // Only a lower bound is applied here. Anything beyond the base
+            // length for the type is a creator context section, whose exact
+            // lengths belong to the cloud, so any longer payload is
+            // accepted and left to the cloud to judge. The Reserved type
+            // takes everything after the header, at whatever length a
+            // future context version brings.
             var valueLength = Type switch
             {
                 IdType.Random => GuidLength,
