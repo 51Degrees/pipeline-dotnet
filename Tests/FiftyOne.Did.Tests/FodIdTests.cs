@@ -242,6 +242,40 @@ namespace FiftyOne.Did.Tests
         }
 
         [TestMethod]
+        [DataRow("\n")]
+        [DataRow("\r\n")]
+        [DataRow(" ")]
+        [DataRow("\t")]
+        public void Constructor_SurroundingWhitespace_ParsesAsCleanValue(
+            string whitespace)
+        {
+            // A value read from a file, a header or a copy and paste can
+            // arrive with a newline or a space around it, and must give the
+            // same identifier as the clean form in either alphabet.
+            var clean = _factory.SignedOwidBase64(CanonicalPayload());
+            var expected = new FodId(clean);
+            var cleanUrl = FodId.ToBase64Url(clean);
+
+            foreach (var value in new[] { clean, cleanUrl })
+            {
+                foreach (var dirty in new[]
+                {
+                    whitespace + value,
+                    value + whitespace,
+                    whitespace + value + whitespace,
+                })
+                {
+                    var fodId = new FodId(dirty);
+
+                    Assert.AreEqual(expected.AsBase64(), fodId.AsBase64());
+                    Assert.AreEqual(expected.Flags, fodId.Flags);
+                    Assert.AreEqual(expected.LicenseId, fodId.LicenseId);
+                    CollectionAssert.AreEqual(expected.Hash, fodId.Hash);
+                }
+            }
+        }
+
+        [TestMethod]
         public void Constructor_PayloadLargerThanSpec_UsesFirst37Bytes()
         {
             // Build a 64-byte payload whose first 37 bytes match canonical;
@@ -259,6 +293,41 @@ namespace FiftyOne.Did.Tests
             Assert.AreEqual(CanonicalLicenseId, fodId.LicenseId);
             CollectionAssert.AreEqual(CanonicalHash, fodId.Hash);
             Assert.AreEqual(FodId.HashLength, fodId.Hash.Length);
+        }
+
+        [TestMethod]
+        public void Constructor_LongCreatorDomain_Parses()
+        {
+            // The creator domain is a deployment parameter, so a
+            // self-hosted container may sign with a domain far longer than
+            // the one the public cloud uses and the identifier must still
+            // parse.
+            var owid = _factory.SignedOwid(
+                CanonicalPayload(),
+                DateTime.UtcNow,
+                domain: "a-very-long-self-hosted-creator-domain.example.com");
+
+            var fodId = new FodId(owid.AsBase64());
+
+            Assert.AreEqual(
+                "a-very-long-self-hosted-creator-domain.example.com",
+                fodId.Domain);
+            CollectionAssert.AreEqual(CanonicalHash, fodId.Hash);
+        }
+
+        [TestMethod]
+        public void Constructor_ReservedTypeWithLongSection_TakesWholeSection()
+        {
+            // A context section of a version this reader does not implement
+            // is accepted at any length, so an older reader keeps working
+            // when a newer version ships.
+            var payload = new byte[FodId.HashOffset + 500];
+            payload[FodId.FlagsOffset] = 0b1100_0000;
+
+            var fodId = new FodId(_factory.SignedOwidBase64(payload));
+
+            Assert.AreEqual(IdType.Reserved, fodId.Type);
+            Assert.AreEqual(500, fodId.Hash.Length);
         }
 
         [TestMethod]

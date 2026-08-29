@@ -20,6 +20,7 @@
  * such notice(s) shall fulfill the requirements of that article.
  * ********************************************************************* */
 
+using Owid.Client;
 using System;
 
 namespace FiftyOne.Did.Model
@@ -127,7 +128,12 @@ namespace FiftyOne.Did.Model
         public IdType Type => (IdType)((Flags >> 6) & 0b11);
 
         /// <summary>
-        /// The 4-byte little-endian License Id from the payload.
+        /// The 4-byte little-endian License Id from the payload, as the
+        /// raw value of the field. On an identifier carrying a creator
+        /// context these four bytes hold an encrypted value that only
+        /// 51Degrees can turn back into a licence identifier, so the
+        /// property identifies nothing outside 51Degrees and two
+        /// identifiers for the same licence need not share it.
         /// </summary>
         public uint LicenseId { get; private set; }
 
@@ -144,25 +150,142 @@ namespace FiftyOne.Did.Model
         public byte[] Hash { get; private set; } = Array.Empty<byte>();
 
         /// <summary>
-        /// Parse a 51Did from its base64-encoded OWID string.
+        /// The moment the envelope's date field counts minutes from,
+        /// 2020-01-01T00:00:00Z. See <see cref="DateMinutes"/>.
+        /// </summary>
+        public static readonly DateTime DateBase =
+            new DateTime(2020, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc);
+
+        /// <summary>
+        /// The envelope's own date as the unsigned 32-bit count of minutes
+        /// since <see cref="DateBase"/>, which is the value the field holds
+        /// on the wire and the value the OWID <c>public-key?date=</c>
+        /// parameter takes. Callers comparing creation times want this
+        /// integer rather than the converted
+        /// <see cref="global::Owid.Client.Model.Owid.Date"/>.
+        /// A date before the base gives zero.
+        /// </summary>
+        public uint DateMinutes
+        {
+            get
+            {
+                var minutes = (Date - DateBase).TotalMinutes;
+                if (minutes <= 0)
+                {
+                    return 0;
+                }
+                return minutes >= uint.MaxValue ? uint.MaxValue : (uint)minutes;
+            }
+        }
+
+        /// <summary>
+        /// Parse a 51Did from its base64-encoded OWID string, in either
+        /// base64 alphabet.
         /// </summary>
         /// <param name="base64">
         /// Base64 of the full OWID envelope (version + domain + date +
         /// length-prefixed payload + 64-byte signature) as produced by the
-        /// 51Degrees cloud service.
+        /// 51Degrees cloud service. The standard alphabet with padding, as
+        /// the cloud issues it, and the URL-safe alphabet with or without
+        /// padding, as a page puts it in a link, are both accepted. See
+        /// <see cref="NormaliseBase64"/>.
         /// </param>
         /// <exception cref="ArgumentNullException">
         /// Thrown when <paramref name="base64"/> is <c>null</c>.
         /// </exception>
         /// <exception cref="FormatException">
         /// Thrown by the underlying OWID parser when <paramref name="base64"/>
-        /// is not valid Base64.
+        /// is not valid Base64 in either alphabet.
         /// </exception>
         /// <exception cref="ArgumentException">
         /// Thrown when the decoded payload is shorter than the minimum
-        /// for its identifier type.
+        /// for its identifier type. Anything beyond that minimum is a
+        /// creator context section, whose exact lengths belong to the
+        /// cloud, so any longer payload is accepted here.
         /// </exception>
-        public FodId(string base64) : base(base64) => Unpack(nameof(base64));
+        public FodId(string base64) : base(NormaliseBase64(base64)!)
+            => Unpack(nameof(base64));
+
+        /// <summary>
+        /// Parse a 51Did from its base64-encoded OWID string, in either
+        /// base64 alphabet. The same as the string constructor, named so
+        /// the parse reads as one call.
+        /// </summary>
+        /// <param name="base64">The envelope as base64.</param>
+        /// <returns>The parsed 51Did.</returns>
+        /// <exception cref="ArgumentNullException">
+        /// Thrown when <paramref name="base64"/> is <c>null</c>.
+        /// </exception>
+        /// <exception cref="FormatException">
+        /// Thrown when <paramref name="base64"/> is not valid Base64 in
+        /// either alphabet.
+        /// </exception>
+        /// <exception cref="ArgumentException">
+        /// Thrown when the decoded payload is shorter than the minimum
+        /// for its identifier type. Any longer payload is accepted.
+        /// </exception>
+        public static FodId FromBase64(string base64) => new FodId(base64);
+
+        /// <summary>
+        /// The envelope in the URL-safe base64 alphabet without padding,
+        /// so it can be put in a URL without further conversion. The
+        /// inverse of <see cref="NormaliseBase64"/>, and accepted back by
+        /// <see cref="FromBase64"/> and every cloud endpoint.
+        /// </summary>
+        /// <returns>The URL-safe form.</returns>
+        public string AsBase64Url() => ToBase64Url(this.AsBase64());
+
+        /// <summary>
+        /// Restores a base64 string in either alphabet to the standard
+        /// alphabet with padding, as <c>Convert.FromBase64String</c>
+        /// expects. Leading and trailing whitespace is removed first, so a
+        /// value read from a file or a header with a trailing newline
+        /// behaves as the clean value does, then <c>-</c> becomes
+        /// <c>+</c>, <c>_</c> becomes <c>/</c>, and padding is added when
+        /// the trimmed length modulo 4 is 2 or 3. A value already in the
+        /// standard form is returned unchanged apart from that trim.
+        /// </summary>
+        /// <param name="value">The base64 in either alphabet.</param>
+        /// <returns>
+        /// The standard form, or <c>null</c> when <paramref name="value"/>
+        /// is <c>null</c>.
+        /// </returns>
+        public static string? NormaliseBase64(string? value)
+        {
+            if (value == null)
+            {
+                return null;
+            }
+            // Trim before anything else, because the padding below is
+            // decided by the length and whitespace would make that length
+            // wrong.
+            var base64 = value.Trim().Replace('-', '+').Replace('_', '/');
+            switch (base64.Length % 4)
+            {
+                case 2: return base64 + "==";
+                case 3: return base64 + "=";
+                default: return base64;
+            }
+        }
+
+        /// <summary>
+        /// Converts standard base64 to the URL-safe alphabet without
+        /// padding: <c>+</c> becomes <c>-</c>, <c>/</c> becomes <c>_</c>,
+        /// and trailing <c>=</c> is removed.
+        /// </summary>
+        /// <param name="base64">The standard base64.</param>
+        /// <returns>The URL-safe form.</returns>
+        /// <exception cref="ArgumentNullException">
+        /// Thrown when <paramref name="base64"/> is <c>null</c>.
+        /// </exception>
+        public static string ToBase64Url(string base64)
+        {
+            if (base64 == null)
+            {
+                throw new ArgumentNullException(nameof(base64));
+            }
+            return base64.Replace('+', '-').Replace('/', '_').TrimEnd('=');
+        }
 
         /// <summary>
         /// Parse a 51Did from the raw bytes of an OWID envelope.
@@ -173,7 +296,7 @@ namespace FiftyOne.Did.Model
         /// </exception>
         /// <exception cref="ArgumentException">
         /// Thrown when the payload is shorter than the minimum for its
-        /// identifier type.
+        /// identifier type. Any longer payload is accepted.
         /// </exception>
         public FodId(byte[] buffer) : base(buffer) => Unpack(nameof(buffer));
 
@@ -188,7 +311,8 @@ namespace FiftyOne.Did.Model
         /// </exception>
         /// <exception cref="ArgumentException">
         /// Thrown when <paramref name="owid"/>'s payload is shorter than
-        /// the minimum for its identifier type.
+        /// the minimum for its identifier type. Any longer payload is
+        /// accepted.
         /// </exception>
         public FodId(Owid.Client.Model.Owid owid) : base()
         {
@@ -219,6 +343,12 @@ namespace FiftyOne.Did.Model
                 | (Payload[LicenseIdOffset + 1] << 8)
                 | (Payload[LicenseIdOffset + 2] << 16)
                 | (Payload[LicenseIdOffset + 3] << 24));
+            // Only a lower bound is applied here. Anything beyond the base
+            // length for the type is a creator context section, whose exact
+            // lengths belong to the cloud, so any longer payload is
+            // accepted and left to the cloud to judge. The Reserved type
+            // takes everything after the header, at whatever length a
+            // future context version brings.
             var valueLength = Type switch
             {
                 IdType.Random => GuidLength,

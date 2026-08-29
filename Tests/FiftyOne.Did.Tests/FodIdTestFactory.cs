@@ -111,17 +111,35 @@ namespace FiftyOne.Did.Tests
         /// Create and sign a real OWID with the given payload, using this
         /// instance's key pair.
         /// </summary>
-        public Owid.Client.Model.Owid SignedOwid(byte[] payload)
+        public Owid.Client.Model.Owid SignedOwid(byte[] payload) =>
+            SignedOwid(payload, DateTime.UtcNow);
+
+        /// <summary>
+        /// Create and sign a real OWID with the given payload and date,
+        /// using this instance's key pair, at the given envelope version.
+        /// The date selects the signing key in the client tests, so it has
+        /// to be chosen rather than taken from the clock, and the OWID
+        /// library's Creator stamps the current time when it signs, so the
+        /// signature is made here the way Creator makes it, ECDSA P-256
+        /// over SHA-256 of the envelope bytes without the signature.
+        /// </summary>
+        public Owid.Client.Model.Owid SignedOwid(
+            byte[] payload,
+            DateTime date,
+            OwidVersion version = OwidVersion.Version3,
+            string domain = TestDomain)
         {
             using var crypto = ECDsa.Create();
             crypto.ImportFromPem(_privatePem);
-            var creator = new Creator(TestDomain, crypto);
             var owid = new Owid.Client.Model.Owid
             {
-                Date = DateTime.UtcNow,
+                Version = version,
+                Domain = domain,
+                Date = date,
                 Payload = payload,
             };
-            creator.Sign(owid);
+            owid.Signature = crypto.SignData(
+                owid.GetSignedBytes(), HashAlgorithmName.SHA256);
             return owid;
         }
 

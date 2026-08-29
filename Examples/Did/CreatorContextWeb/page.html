@@ -1,0 +1,453 @@
+<!DOCTYPE html>
+<!-- 51Did creator context demo page.
+     Served by the small server beside this file, which injects the
+     three placeholders and holds the licence key server side. This
+     page is identical in every language folder.
+
+     Styling follows the 51Degrees example pattern. The built
+     examples-main.min.css is vendored beside this page, exactly as the
+     device detection and IP intelligence example apps vendor it under
+     their own static folders, and its source of truth is
+     pattern-library/source/sass in the 51Degrees/documentation
+     repository. There are no styles of our own here: the status
+     colours this page needs were added to the design system as
+     06-examples/07-status.scss rather than written inline. -->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>51Did creator context demo</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Ctext y='14'%3E%F0%9F%94%90%3C/text%3E%3C/svg%3E">
+<link rel="stylesheet" href="examples-main.min.css">
+</head>
+<body>
+<div class="c-eg-page">
+  <h2 class="c-eg-page__title">🔐 51Did creator context demo</h2>
+  <p class="c-eg-page__lead">This page creates a 51Did in your browser,
+  verifies it from your browser, and redeems the encrypted creator
+  context result on its own server, which is the only place the licence
+  key lives.</p>
+
+  <h3 class="c-eg-page__heading">Result</h3>
+  <table class="c-eg-table">
+    <thead class="c-eg-table__head">
+      <tr class="c-eg-table__row">
+        <th class="c-eg-table__cell">Step</th>
+        <th class="c-eg-table__cell">Outcome</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr class="c-eg-table__row">
+        <td class="c-eg-table__cell c-eg-table__cell--key">Identifier</td>
+        <td class="c-eg-table__cell"><span id="s-create"
+          class="c-eg-status c-eg-status--none">working&#8230;</span></td>
+      </tr>
+      <tr class="c-eg-table__row c-eg-table__row--alt">
+        <td class="c-eg-table__cell c-eg-table__cell--key">Signature</td>
+        <td class="c-eg-table__cell"><span id="s-signature"
+          class="c-eg-status c-eg-status--none">waiting&#8230;</span></td>
+      </tr>
+      <tr class="c-eg-table__row">
+        <td class="c-eg-table__cell c-eg-table__cell--key">Creator
+          context</td>
+        <td class="c-eg-table__cell"><span id="s-context"
+          class="c-eg-status c-eg-status--none">waiting&#8230;</span></td>
+      </tr>
+    </tbody>
+  </table>
+
+  <div id="detail" style="display: none">
+    <h3 class="c-eg-page__heading">Why</h3>
+    <p class="c-eg-page__lead"><span id="s-detail"></span></p>
+    <table class="c-eg-table">
+      <thead class="c-eg-table__head">
+        <tr class="c-eg-table__row">
+          <th class="c-eg-table__cell">Check</th>
+          <th class="c-eg-table__cell">Result</th>
+        </tr>
+      </thead>
+      <tbody id="factorrows"></tbody>
+    </table>
+  </div>
+
+  <div id="ids" style="display: none">
+    <h3 class="c-eg-page__heading">Your 51Did identifiers</h3>
+    <p class="c-eg-page__lead">One request created every kind at once.
+    The probabilistic pair derives from this connection, the
+    deterministic pair derives from an email address (this demo uses
+    <span class="b-text--code">demo@51did.example</span>) so it is the
+    same on every device the same email appears on, and the random pair
+    is created fresh. Global identifiers are shared across customers,
+    licensed ones are scoped to the licence key. The rest of this page
+    carries the licensed probabilistic identifier through
+    verification.</p>
+    <table class="c-eg-table">
+      <thead class="c-eg-table__head">
+        <tr class="c-eg-table__row">
+          <th class="c-eg-table__cell">Kind</th>
+          <th class="c-eg-table__cell">Scope</th>
+          <th class="c-eg-table__cell">Identifier</th>
+          <th class="c-eg-table__cell">Test</th>
+        </tr>
+      </thead>
+      <tbody id="idrows"></tbody>
+    </table>
+  </div>
+
+  <div id="share" class="c-eg-message" style="display: none">
+    <div class="c-eg-message__text">
+      <p><b>🔗 Prove creator context verification.</b> Copy the
+      link below and open it in a <b>different browser</b> (not just a
+      new tab, a genuinely different browser, or another device). The
+      other browser loads this same page with the <b>same 51Did</b>.
+      The signature will still verify and the identifier will unpack,
+      because it is genuine. But the creator context will <b>not</b>
+      validate, because the context binds the identifier to the browser
+      and connection it was created on, and the other browser is
+      neither. A transplanted 51Degrees identifier contains everything
+      needed to tell if it is being used on a different device or
+      network.</p>
+      <p><input id="link" class="b-input b-input--block" readonly></p>
+      <p id="local-only" style="display: none"><b>Another device?</b>
+      This link names <span class="b-text--code">localhost</span>, which
+      on another device means that device, so it will not reach this
+      demo. Another browser on this machine is fine. For a second
+      device, open this page by this machine's network address instead
+      and copy the link again.</p>
+    </div>
+    <button id="copy" class="b-btn c-eg-message__cta">Copy link</button>
+  </div>
+
+  <div id="plain-http" class="c-eg-alert" style="display: none">
+    <p><b>Transport mismatches will not be identified.</b> This page is
+    calling the service over plain HTTP, so there is no TLS handshake
+    for the service to read, and the transport factor carries its
+    default value at creation and at verification, which always compare
+    as verified. Every other factor is checked as normal. To see the
+    transport factor at work, point the demo at an HTTPS address of the
+    service (the endpoint environment variable in the README) and open
+    the page again.</p>
+  </div>
+
+  <div id="caught" class="c-eg-alert" style="display: none">
+    <p><b>🎯 Detection demonstrated.</b> This page received a
+    51Did created in a <b>different browser</b>. The signature verified,
+    so the identifier is genuine, and it unpacked normally. The creator
+    context did <b>not</b> validate, because this browser and connection
+    are not the ones the identifier was created on. A copied, shared or
+    stolen identifier is caught the moment it is presented, with nothing
+    stored server side.</p>
+  </div>
+</div>
+
+<script>
+(function () {
+  "use strict";
+  var RESOURCE = "__RESOURCE__";
+  var CHALLENGE = "__CHALLENGE__";
+  // The cloud API base ending in /api/v4/, as the server read it from
+  // its endpoint environment variable.
+  var API = "__API__";
+  // Over plain HTTP the service sees no TLS handshake, so the transport
+  // factor is its default on both sides and can never mismatch. Say so
+  // up front rather than let a verified transport row mislead.
+  if (/^http:/i.test(API)) {
+    document.getElementById("plain-http").style.display = "";
+  }
+
+  // The four states of the design system's example status component.
+  var PASS = "c-eg-status c-eg-status--pass";
+  var FAIL = "c-eg-status c-eg-status--fail";
+  var PART = "c-eg-status c-eg-status--part";
+  var NONE = "c-eg-status c-eg-status--none";
+
+  function show(id, text, cls) {
+    var element = document.getElementById(id);
+    element.textContent = text;
+    element.className = cls;
+  }
+
+  // Cleared rather than set to a value, so each container falls back
+  // to whatever the design system gives it. The hidden attribute is not
+  // used, because it is only a user-agent display rule and any class
+  // that sets display, as the message component does, beats it.
+  function reveal(id) {
+    document.getElementById(id).style.display = "";
+  }
+
+  function urlSafe(owid) {
+    return owid.replace(/\+/g, "-").replace(/\//g, "_")
+      .replace(/=+$/, "");
+  }
+
+  // The link that puts one identifier through this page in another
+  // browser, which is the same link the section at the foot of the
+  // page offers for the identifier it carried.
+  function testLink(owid) {
+    return location.origin + location.pathname + "?51did="
+      + urlSafe(owid);
+  }
+
+  function linkButton(owid) {
+    var button = document.createElement("button");
+    button.type = "button";
+    // The table action keeps the control to the row's height, so the
+    // label does not wrap the column wide.
+    button.className = "b-btn b-btn--secondary c-eg-table__action";
+    button.textContent = "Copy link";
+    button.onclick = function () {
+      navigator.clipboard.writeText(testLink(owid));
+      button.textContent = "Copied";
+    };
+    return button;
+  }
+
+  // A response is only worth parsing when the service accepted the
+  // call. Anything else, such as a 404 from a service that does not
+  // offer these endpoints yet, or an error object from one that does,
+  // becomes a readable failure naming the status and the body, so the
+  // page says what the service said rather than "unexpected token".
+  function asJson(r) {
+    return r.text().then(function (body) {
+      if (r.status === 404) {
+        // The host answering does not offer the creator context
+        // endpoints at all, which is a service without the feature
+        // rather than a failed check, so it is reported as such.
+        var unsupported = new Error(UNSUPPORTED);
+        unsupported.unsupported = true;
+        throw unsupported;
+      }
+      if (!r.ok) {
+        throw new Error("HTTP " + r.status + " from " + r.url + ": "
+          + body.slice(0, 200));
+      }
+      try {
+        return JSON.parse(body);
+      } catch (error) {
+        throw new Error("not JSON from " + r.url + ": "
+          + body.slice(0, 200));
+      }
+    });
+  }
+
+  var UNSUPPORTED = "The service at " + API + " does not support the "
+    + "creator context. Point the demo at a service that does.";
+
+  function fail(step, error) {
+    if (error && error.unsupported) {
+      // Not a failure of the check but a host without the feature,
+      // so the row is left neutral and the message says which host.
+      show(step, "not supported by this host", NONE);
+      show("s-detail", String(error.message), "");
+      reveal("detail");
+      return;
+    }
+    show(step, "failed", FAIL);
+    show("s-detail", String(error), "");
+    reveal("detail");
+  }
+
+  // A check either matched, did not, or could not be judged on this
+  // connection. The third is not a failure, so it is neither green nor
+  // red.
+  function factorMark(result) {
+    if (result === "verified") { return ["✅", PASS]; }
+    if (result === "mismatch") { return ["❌", FAIL]; }
+    return ["➖", NONE];
+  }
+
+  function cell(className, text) {
+    var td = document.createElement("td");
+    td.className = className;
+    if (text !== undefined) { td.textContent = text; }
+    return td;
+  }
+
+  function row(table, index) {
+    var tr = document.createElement("tr");
+    tr.className = index % 2
+      ? "c-eg-table__row c-eg-table__row--alt"
+      : "c-eg-table__row";
+    document.getElementById(table).appendChild(tr);
+    return tr;
+  }
+
+  function factorRow(label, mark, text, cls) {
+    var rows = document.getElementById("factorrows");
+    var tr = row("factorrows", rows.children.length);
+    tr.appendChild(cell("c-eg-table__cell c-eg-table__cell--key", label));
+    var result = cell("c-eg-table__cell " + cls, mark + " " + text);
+    tr.appendChild(result);
+  }
+
+  var given = new URLSearchParams(location.search).get("51did");
+
+  // 1. The identifier: created for THIS browser's connection, or
+  // taken from the link when demonstrating the transplant.
+  var owidPromise = given
+    ? Promise.resolve(given).then(function (owid) {
+        // The row shows the identifier itself, truncated as the table
+        // below truncates every identifier, so the reader sees which
+        // 51Did the link carried rather than a description of it.
+        show("s-create", owid.slice(0, 30) + "…", NONE);
+        return owid;
+      })
+    : fetch(API + "json?resource=" + RESOURCE
+        + "&id.usage=non-marketing"
+        + "&id.email=" + encodeURIComponent("demo@51did.example")
+        + "&values=FODiD.IdProbGlobal&values=FODiD.IdProbLic"
+        + "&values=FODiD.IdHemGlobal&values=FODiD.IdHemLic"
+        + "&values=FODiD.IdRandGlobal&values=FODiD.IdRandLic")
+      .then(asJson)
+      .then(function (json) {
+        var families = [
+          ["Probabilistic", "Global", "idprobglobal"],
+          ["Probabilistic", "Licensed", "idproblic"],
+          ["Deterministic, hashed email address", "Global", "idhemglobal"],
+          ["Deterministic, hashed email address", "Licensed", "idhemlic"],
+          ["Random", "Global", "idrandglobal"],
+          ["Random", "Licensed", "idrandlic"],
+        ];
+        families.forEach(function (family, index) {
+          var value = json.fodid && json.fodid[family[2]];
+          var tr = row("idrows", index);
+          tr.appendChild(cell(
+            "c-eg-table__cell c-eg-table__cell--key", family[0]));
+          tr.appendChild(cell("c-eg-table__cell", family[1]));
+          var valueCell = cell(
+            "c-eg-table__cell c-eg-value",
+            value ? value.slice(0, 30) + "…" : "(not returned)");
+          if (value) { valueCell.title = value; }
+          tr.appendChild(valueCell);
+          // Each identifier gets its own link, so any of the six can be
+          // opened in another browser and put through the same check as
+          // the one this page carries below.
+          var testCell = cell("c-eg-table__cell");
+          if (value) { testCell.appendChild(linkButton(value)); }
+          tr.appendChild(testCell);
+        });
+        reveal("ids");
+        // The licensed identifier where the account holds licence keys,
+        // otherwise the global one. Both carry the creator context, which
+        // is what this page goes on to check, and they differ only in
+        // whether the match key is scoped to one licence or shared across
+        // customers. An account with no licence keys returns no licensed
+        // identifier at all, and without this the page would carry a null
+        // through verification and report a failure that was really just
+        // the account it was run against.
+        var owid = urlSafe(
+          json.fodid.idproblic || json.fodid.idprobglobal);
+        show("s-create", "created for this browser", PASS);
+        return owid;
+      })
+      .catch(function (error) {
+        // Without this, a creation failure would leave step 1 spinning
+        // and mark step 3 instead, the row furthest from the cause.
+        fail("s-create", error);
+        throw error;
+      });
+
+  owidPromise.then(function (owid) {
+    // 2. Verify from THIS browser, so the cloud observes this live
+    // connection. The verdict returns only as an encrypted result.
+    return fetch(API + "id/verify-full/" + RESOURCE + "/"
+        + owid + "?challenge=" + CHALLENGE)
+      .then(asJson)
+      .then(function (verified) {
+        if (!verified.result) {
+          // A deployment holding no context secret answers in the
+          // open, so there is nothing to redeem and both answers
+          // are already here.
+          show("s-signature", verified.signature || "unavailable",
+            verified.signature === "verified" ? PASS : FAIL);
+          show("s-context", verified.context
+            + " (readable, unkeyed deployment)", NONE);
+          return null;
+        }
+        // Everything the cloud concluded, the signature outcome
+        // included, is inside the encrypted result, so this page
+        // learns neither answer until its own server has redeemed it.
+        // A page could otherwise report whatever it liked.
+        show("s-signature", "sealed in the encrypted result", NONE);
+        // 3. Redeem on OUR server, which adds the licence key the
+        // browser never sees.
+        return fetch("/redeem?51did=" + owid
+            + "&result=" + encodeURIComponent(verified.result)
+            + "&challenge=" + CHALLENGE)
+          .then(asJson)
+          .then(function (redeemed) {
+            // The signature outcome comes out of the seal with the
+            // verdict, so it is only now that the page can show it.
+            show("s-signature", redeemed.signature || "unavailable",
+              redeemed.signature === "verified" ? PASS : FAIL);
+            var good = redeemed.context === "verified";
+            var factors = redeemed.factors;
+            var results = [];
+            if (factors) {
+              Object.keys(factors).forEach(function (name) {
+                results.push(factors[name]);
+              });
+            }
+            // Red only where nothing at all matched. Where some checks
+            // still hold, the identifier is not simply bad, so it is
+            // amber and the table below says which moved.
+            var anyHeld = results.indexOf("verified") >= 0;
+            show("s-context", redeemed.context,
+              good ? PASS : (anyHeld ? PART : FAIL));
+
+            // A clean verdict needs no explanation, so nothing is shown.
+            if (!good) {
+              reveal("detail");
+              if (factors) {
+                Object.keys(factors).forEach(function (name) {
+                  var mark = factorMark(factors[name]);
+                  factorRow(name, mark[0], factors[name], mark[1]);
+                });
+              }
+              // Whether the redemption was made in time, which is the
+              // only thing the elapsed seconds decided. The service
+              // refuses anything outside its window, so how old the
+              // result was tells a reader nothing more than this.
+              var inTime = redeemed.context !== "expired"
+                && redeemed.verifiedAt !== undefined;
+              factorRow(
+                "redemption time",
+                inTime ? "✅" : "❌",
+                inTime ? "valid" : "invalid",
+                inTime ? PASS : FAIL);
+              if (redeemed.context === "expired") {
+                show("s-detail",
+                  "the result was redeemed outside the service's "
+                  + "freshness window", "");
+              }
+            }
+            if (good && !given) {
+              var link = testLink(owid);
+              document.getElementById("link").value = link;
+              // A link naming localhost only resolves on this machine,
+              // so opening it on a second device reaches that device
+              // and not this demo. The server listens on every
+              // interface, so the fix is to reach the page by the
+              // machine's network address, and the visitor is told
+              // rather than left to work it out from a failed load.
+              if (location.hostname === "localhost"
+                  || location.hostname === "127.0.0.1") {
+                document.getElementById("local-only").style.display = "";
+              }
+              reveal("share");
+              document.getElementById("copy").onclick = function () {
+                navigator.clipboard.writeText(link);
+                this.textContent = "Copied";
+              };
+            }
+            if (!good && given) {
+              reveal("caught");
+            }
+            return null;
+          });
+      });
+  }).catch(function (error) { fail("s-context", error); });
+})();
+</script>
+</body>
+</html>
