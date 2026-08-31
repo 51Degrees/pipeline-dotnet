@@ -288,8 +288,12 @@ namespace FiftyOne.Did.Client
             {
                 return SignatureCheck.UnsupportedVersion;
             }
-            if (fodId.Payload is null
-                || fodId.Payload.Length < BaseLength(fodId))
+            // Reachable only for the Reserved type, which the parser accepts
+            // down to the five header bytes. The other types cannot reach
+            // here short, because the parser refuses them. The length is
+            // read through the OWID reference because on a FodId the name
+            // PayloadLength is the type's minimum constant.
+            if (((Owid.Client.Model.Owid)fodId).PayloadLength < BaseLength(fodId))
             {
                 return SignatureCheck.InvalidLength;
             }
@@ -334,7 +338,9 @@ namespace FiftyOne.Did.Client
             CancellationToken cancellationToken = default)
         {
             ArgumentNullException.ThrowIfNull(fodId);
-            return VerifyAsync(fodId.AsBase64Url(), cancellationToken);
+            // A parsed identifier is already known to be a 51Did, so the
+            // string surface's local check is not repeated.
+            return VerifyEncodedAsync(fodId.AsBase64Url(), cancellationToken);
         }
 
         /// <summary>
@@ -348,18 +354,27 @@ namespace FiftyOne.Did.Client
         /// <param name="cancellationToken">Cancels the call.</param>
         /// <returns>Whether the cloud found the signature valid.</returns>
         /// <exception cref="ArgumentException">
-        /// Thrown, with the cloud's message, when the cloud could not parse
-        /// the value as a 51Did.
+        /// Thrown when the value is not a 51Did. A value that does not
+        /// parse is refused here, naming the
+        /// <see cref="FodIdParseStatus"/>, before any call is made. A
+        /// value the cloud refuses is reported with the cloud's message.
         /// </exception>
         /// <exception cref="HttpRequestException">
         /// Thrown when the cloud cannot be reached or answers with an
         /// unexpected status.
         /// </exception>
-        public async Task<bool> VerifyAsync(
+        public Task<bool> VerifyAsync(
             string fodId,
             CancellationToken cancellationToken = default)
         {
             ValidateEncodedValue(fodId, nameof(fodId));
+            return VerifyEncodedAsync(fodId, cancellationToken);
+        }
+
+        private async Task<bool> VerifyEncodedAsync(
+            string fodId,
+            CancellationToken cancellationToken)
+        {
             // The documented parameter is 51did. The same value is sent
             // again as owid, the name the verify endpoint first went live
             // under, which a service that predates the 51did name reads
@@ -382,7 +397,7 @@ namespace FiftyOne.Did.Client
                     var errors = ReadErrors(body);
                     if (errors is not null)
                     {
-                        throw new ArgumentException(errors, nameof(fodId));
+                        throw new ArgumentException(errors, "fodId");
                     }
                 }
             }
@@ -425,7 +440,9 @@ namespace FiftyOne.Did.Client
             CancellationToken cancellationToken = default)
         {
             ArgumentNullException.ThrowIfNull(fodId);
-            return RedeemAsync(
+            // A parsed identifier is already known to be a 51Did, so the
+            // string surface's local check is not repeated.
+            return RedeemEncodedAsync(
                 fodId.AsBase64Url(), result, challenge, cancellationToken);
         }
 
@@ -443,8 +460,10 @@ namespace FiftyOne.Did.Client
         /// <param name="cancellationToken">Cancels the call.</param>
         /// <returns>The typed verdict.</returns>
         /// <exception cref="ArgumentException">
-        /// Thrown when <paramref name="fodId"/> is empty, or with the
-        /// cloud's message when the cloud answered 400.
+        /// Thrown when <paramref name="fodId"/> is empty or does not parse
+        /// as a 51Did, naming the <see cref="FodIdParseStatus"/>, before
+        /// any call is made, or with the cloud's message when the cloud
+        /// answered 400.
         /// </exception>
         /// <exception cref="NotSupportedException">
         /// Thrown when the host answered 404, meaning it does not offer the
@@ -454,13 +473,22 @@ namespace FiftyOne.Did.Client
         /// Thrown when the cloud cannot be reached or answers with any
         /// other unexpected status.
         /// </exception>
-        public async Task<RedeemResult> RedeemAsync(
+        public Task<RedeemResult> RedeemAsync(
             string fodId,
             string result,
             string? challenge = null,
             CancellationToken cancellationToken = default)
         {
             ValidateEncodedValue(fodId, nameof(fodId));
+            return RedeemEncodedAsync(fodId, result, challenge, cancellationToken);
+        }
+
+        private async Task<RedeemResult> RedeemEncodedAsync(
+            string fodId,
+            string result,
+            string? challenge,
+            CancellationToken cancellationToken)
+        {
             // Everything travels in the form body, the resource key
             // included, because the redeem endpoint's POST route is the bare
             // path and reads its parameters from the form. Nothing here is
@@ -487,7 +515,7 @@ namespace FiftyOne.Did.Client
                     return RedeemResult.FromResponse((int)status, body);
                 case HttpStatusCode.BadRequest:
                     throw new ArgumentException(
-                        ReadErrors(body) ?? body, nameof(fodId));
+                        ReadErrors(body) ?? body, "fodId");
                 case HttpStatusCode.NotFound:
                     throw new NotSupportedException(
                         $"The service at {Endpoint} does not support the "
@@ -702,6 +730,15 @@ namespace FiftyOne.Did.Client
                 ? FodId.GuidLength
                 : FodId.HashLength);
 
+        /// <summary>
+        /// Refuses a string that cannot be a 51Did before any key is
+        /// fetched or any call is made. The length guard comes first, so
+        /// that nothing is parsed for a value far larger than any
+        /// identifier, then the value is parsed, so that a malformed one
+        /// is named for what it is here rather than sent to the cloud to
+        /// be refused there. The parse says nothing about the signature,
+        /// which is the question the call is being made to answer.
+        /// </summary>
         private static void ValidateEncodedValue(string fodId, string paramName)
         {
             if (string.IsNullOrWhiteSpace(fodId))
@@ -712,6 +749,11 @@ namespace FiftyOne.Did.Client
             {
                 throw new ArgumentException(
                     "The value is too long to be a 51Did.", paramName);
+            }
+            if (FodId.TryParse(fodId, out _, out var status) == false)
+            {
+                throw new ArgumentException(
+                    $"The value is not a 51Did ({status}).", paramName);
             }
         }
 

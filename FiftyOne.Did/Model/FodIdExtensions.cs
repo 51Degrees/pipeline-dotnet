@@ -33,10 +33,12 @@ namespace FiftyOne.Did.Model
     /// This overload turns that string into a parsed <see cref="FodId"/> so a
     /// consumer can write, for example, <c>idString.As51Did()</c>.
     /// <para>
-    /// Error handling is delegated to the existing types rather than reinvented:
-    /// a value that is not a valid 51Did surfaces the <see cref="FodId"/>
-    /// constructor's own exceptions. See the per-method remarks for the exact
-    /// types.
+    /// Error handling is delegated to the existing types rather than
+    /// reinvented. A value that is not a valid 51Did surfaces the
+    /// <see cref="FodId"/> constructor's own exceptions, and code that
+    /// would rather have a reason than an exception uses
+    /// <see cref="FodId.TryParse(string, out FodId, out FodIdParseStatus)"/>
+    /// directly. See the per-method remarks for the exact types.
     /// </para>
     /// <para>
     /// Note this type intentionally takes no dependency on the pipeline: a
@@ -60,17 +62,20 @@ namespace FiftyOne.Did.Model
         /// </exception>
         /// <exception cref="FormatException">
         /// Thrown (by the <see cref="FodId"/> constructor) when
-        /// <paramref name="value"/> is not valid Base64.
+        /// <paramref name="value"/> is not valid Base64 in either alphabet
+        /// or does not decode to an OWID envelope.
         /// </exception>
         /// <exception cref="ArgumentException">
-        /// Thrown (by the <see cref="FodId"/> constructor) when the decoded
-        /// payload is shorter than the minimum for its identifier type.
+        /// Thrown (by the <see cref="FodId"/> constructor) when
+        /// <paramref name="value"/> is empty or the decoded payload is
+        /// shorter than the minimum for its identifier type.
         /// </exception>
         public static FodId As51Did(this string value)
         {
-            // FodId's constructor already throws ArgumentNullException for a null
-            // value, FormatException for invalid Base64 and ArgumentException for
-            // a payload that is too short. Relay those rather than reinvent them.
+            // FodId's constructor already throws ArgumentNullException for
+            // a null value, FormatException for a value that is not an
+            // envelope and ArgumentException for a payload that is too
+            // short. Relay those rather than reinvent them.
             return new FodId(value);
         }
     }

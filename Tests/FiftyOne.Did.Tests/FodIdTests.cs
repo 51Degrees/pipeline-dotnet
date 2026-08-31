@@ -51,7 +51,7 @@ namespace FiftyOne.Did.Tests
         {
             // Guards against someone changing one offset/length constant
             // without updating the others. The MSTEST0032 analyzer sees these
-            // as constant-folded so flags them — suppress locally.
+            // as constant-folded so flags them, so the warning is suppressed locally.
 #pragma warning disable MSTEST0032
             Assert.AreEqual(
                 FodId.HashOffset + FodId.HashLength,
@@ -110,9 +110,10 @@ namespace FiftyOne.Did.Tests
             Assert.AreEqual(owid.Domain, fodId.Domain);
             Assert.AreEqual(owid.Date, fodId.Date);
             Assert.AreEqual(owid.Version, fodId.Version);
-            // Payload and Signature are reference-copied to avoid re-parsing.
-            Assert.AreSame(owid.Payload, fodId.Payload);
-            Assert.AreSame(owid.Signature, fodId.Signature);
+            // The OWID hands out copies of its arrays, so the two are
+            // compared by content.
+            CollectionAssert.AreEqual(owid.Payload, fodId.Payload);
+            CollectionAssert.AreEqual(owid.Signature, fodId.Signature);
         }
 
         [TestMethod]
@@ -206,7 +207,7 @@ namespace FiftyOne.Did.Tests
         [TestMethod]
         public void Constructor_PayloadOneByteShort_Throws()
         {
-            // 36 bytes — one short of the minimum 37.
+            // 36 bytes, one short of the minimum 37.
             var base64 = _factory.SignedOwidBase64(new byte[FodId.PayloadLength - 1]);
 
             Assert.ThrowsExactly<ArgumentException>(() => new FodId(base64));
@@ -477,23 +478,25 @@ namespace FiftyOne.Did.Tests
 
         /// <summary>
         /// Constructing a <see cref="FodId"/> does not verify the signature.
-        /// An unsigned OWID still constructs and exposes all three fields, so a
-        /// later "verify on construction" change would be caught here.
+        /// An envelope whose signature bytes have been altered still
+        /// constructs and exposes all three fields, and then fails the
+        /// signature check, so a later "verify on construction" change
+        /// would be caught here.
         /// </summary>
         [TestMethod]
         public void Construction_DoesNotVerifySignature()
         {
-            var unsigned = new Owid.Client.Model.Owid
-            {
-                Date = DateTime.UtcNow,
-                Payload = CanonicalPayload(),
-            };
+            var bytes = _factory.SignedBytes(CanonicalPayload(), DateTime.UtcNow);
+            bytes[bytes.Length - 1] ^= 0xFF;
 
-            var fodId = new FodId(unsigned);
+            var fodId = new FodId(bytes);
 
             Assert.AreEqual(CanonicalFlags, fodId.Flags);
             Assert.AreEqual(CanonicalLicenseId, fodId.LicenseId);
             CollectionAssert.AreEqual(CanonicalHash, fodId.Hash);
+            Assert.AreEqual(
+                OwidSignatureStatus.SignatureInvalid,
+                fodId.SignatureStatus(_factory.PublicPem));
         }
 
         /// <summary>

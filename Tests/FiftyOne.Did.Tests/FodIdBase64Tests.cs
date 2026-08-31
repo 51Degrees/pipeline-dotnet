@@ -165,27 +165,29 @@ namespace FiftyOne.Did.Tests
         }
 
         [TestMethod]
-        public void DateMinutes_DateBeforeBase_IsZero()
+        public void DateMinutes_AtTheBase_IsZero()
         {
-            var fodId = new FodId(new Owid.Client.Model.Owid
-            {
-                Date = FodId.DateBase.AddMinutes(-5),
-                Payload = CanonicalPayload(),
-            });
+            // The wire field is an unsigned count, so the base itself is
+            // the earliest date an envelope can carry.
+            var fodId = new FodId(_factory.SignedBytes(
+                CanonicalPayload(), FodId.DateBase));
 
             Assert.AreEqual(0u, fodId.DateMinutes);
+            Assert.AreEqual(FodId.DateBase, fodId.Date);
         }
 
         [TestMethod]
         public void DateMinutes_SubMinuteIsTruncated()
         {
-            var fodId = new FodId(new Owid.Client.Model.Owid
-            {
-                Date = FodId.DateBase.AddMinutes(10).AddSeconds(59),
-                Payload = CanonicalPayload(),
-            });
+            // The wire carries whole minutes, so the seconds are lost when
+            // the envelope is written and the parsed date sits on the
+            // minute.
+            var fodId = new FodId(_factory.SignedBytes(
+                CanonicalPayload(),
+                FodId.DateBase.AddMinutes(10).AddSeconds(59)));
 
             Assert.AreEqual(10u, fodId.DateMinutes);
+            Assert.AreEqual(FodId.DateBase.AddMinutes(10), fodId.Date);
         }
     }
 }
