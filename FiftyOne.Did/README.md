@@ -116,7 +116,7 @@ the OWID reader named it.
 | `UnexpectedEnd` | The data stopped in the middle of an envelope field. |
 | `InvalidDomainEncoding` | The creator domain is not terminated, or is longer than the published maximum. |
 | `ByteCountMismatch` | The declared payload count disagrees with the bytes present. |
-| `ImplementationCapacityExceeded` | Structurally valid, but larger than this runtime can hold. |
+| `ImplementationCapacityExceeded` | Structurally valid, but larger than this runtime can hold, or dated past the end of the year 9999 where `DateTime` stops. The four byte minute count runs to 15 February 10186, and the read answers with this status rather than throwing on such a count. |
 | `MalformedEnvelope` | Malformed in a way none of the above describes. |
 | `AbsentNode` | The OWID version 0 marker, which stands for an absent node and is never a 51Did. |
 | `PayloadTooShort` | A valid OWID whose payload is shorter than the five byte 51Did header, so the type cannot be read. |

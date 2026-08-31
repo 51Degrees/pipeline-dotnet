@@ -398,6 +398,80 @@ namespace FiftyOne.Did.Tests
         }
 
         // ----------------------------------------------------------------
+        // A date the runtime cannot hold
+        // ----------------------------------------------------------------
+
+        /// <summary>
+        /// A signed envelope whose four byte minute count is 0xFFFFFFFF,
+        /// which the wire format allows and which lands on 15 February
+        /// 10186, past the end of the year 9999 where
+        /// <see cref="DateTime"/> stops. The bytes are changed after
+        /// signing, which is fine because the read refuses the date before
+        /// any signature is looked at.
+        /// </summary>
+        private byte[] DatedPastTheYear9999()
+        {
+            var bytes = _factory.SignedBytes(CanonicalPayload(), DateTime.UtcNow);
+            // The four little endian date bytes sit after the version byte,
+            // the domain and its terminator.
+            var dateOffset = 1 + TestDomain.Length + 1;
+            for (var i = 0; i < 4; i++)
+            {
+                bytes[dateOffset + i] = 0xFF;
+            }
+            return bytes;
+        }
+
+        [TestMethod]
+        public void TryParse_DatePastTheYear9999_ImplementationCapacityExceeded()
+        {
+            // The OWID reader judges the count before the arithmetic, so
+            // the read answers with a status instead of throwing, and the
+            // 51Did surface carries that status through unchanged on both
+            // the byte and the string surface. The same bytes read fine
+            // where the date type is wider, so the status is the runtime's
+            // limit and not a fault in the data.
+            var bytes = DatedPastTheYear9999();
+            Assert.IsFalse(
+                Owid.Client.Model.Owid.TryParse(bytes, out _, out var owidStatus));
+            Assert.AreEqual(
+                OwidParseStatus.ImplementationCapacityExceeded, owidStatus);
+
+            var fromBytes = FodId.TryParse(bytes, out var a, out var first);
+            var fromString = FodId.TryParse(
+                Convert.ToBase64String(bytes), out var b, out var second);
+
+            AssertRefused(
+                fromBytes, a, first,
+                FodIdParseStatus.ImplementationCapacityExceeded);
+            AssertRefused(
+                fromString, b, second,
+                FodIdParseStatus.ImplementationCapacityExceeded);
+        }
+
+        [TestMethod]
+        public void Throwing_DatePastTheYear9999_Format()
+        {
+            // The throwing surface runs the same walk, so the date the
+            // runtime cannot hold is a format problem with the status in
+            // the message, and never the ArgumentOutOfRangeException that
+            // the arithmetic would have thrown.
+            var bytes = DatedPastTheYear9999();
+
+            var fromString = Assert.ThrowsExactly<FormatException>(
+                () => FodId.FromBase64(Convert.ToBase64String(bytes)));
+            var fromBytes = Assert.ThrowsExactly<FormatException>(
+                () => new FodId(bytes));
+
+            StringAssert.Contains(
+                fromString.Message,
+                nameof(FodIdParseStatus.ImplementationCapacityExceeded));
+            StringAssert.Contains(
+                fromBytes.Message,
+                nameof(FodIdParseStatus.ImplementationCapacityExceeded));
+        }
+
+        // ----------------------------------------------------------------
         // Parsing is not verification
         // ----------------------------------------------------------------
 
