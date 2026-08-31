@@ -322,6 +322,7 @@ namespace FiftyOne.Pipeline.JsonBuilder.FlowElement
             }
 
             AddErrors(data, allProperties);
+            AddWarnings(data, allProperties);
 
             try
             {
@@ -503,6 +504,41 @@ namespace FiftyOne.Pipeline.JsonBuilder.FlowElement
 
                 allProperties.Add("errors", errors);
             }
+        }
+
+        /// <summary>
+        /// Add any warnings in the flow data object to the dictionary. These
+        /// tell the caller about something wrong with the request, such as
+        /// an evidence value that could not be used, whilst still returning
+        /// the rest of the data.
+        /// </summary>
+        /// <param name="data"></param>
+        /// <param name="allProperties"></param>
+        /// <exception cref="ArgumentNullException">
+        /// Thrown if one of the supplied parameters is null
+        /// </exception>
+        protected virtual void AddWarnings(IFlowData data,
+            Dictionary<string, object> allProperties)
+        {
+            if (data == null) throw new ArgumentNullException(nameof(data));
+            if (allProperties == null) throw new ArgumentNullException(nameof(allProperties));
+
+            var warnings = data.GetWarnings();
+            if (warnings.Count == 0)
+            {
+                return;
+            }
+
+            var messages = warnings.Select(w => w.Message);
+            // A subclass may already have written warnings of its own. Add
+            // to them rather than replacing them or throwing on the
+            // duplicate key.
+            if (allProperties.TryGetValue("warnings", out var existing)
+                && existing is IEnumerable<string> existingMessages)
+            {
+                messages = existingMessages.Concat(messages);
+            }
+            allProperties["warnings"] = messages.ToArray();
         }
 
         /// <summary>

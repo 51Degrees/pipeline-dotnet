@@ -51,7 +51,7 @@ namespace FiftyOne.Did.Tests
         {
             // Guards against someone changing one offset/length constant
             // without updating the others. The MSTEST0032 analyzer sees these
-            // as constant-folded so flags them — suppress locally.
+            // as constant-folded so flags them, so the warning is suppressed locally.
 #pragma warning disable MSTEST0032
             Assert.AreEqual(
                 FodId.HashOffset + FodId.HashLength,
@@ -79,18 +79,8 @@ namespace FiftyOne.Did.Tests
 
             Assert.AreEqual(CanonicalFlags, fodId.Flags);
             Assert.AreEqual(CanonicalLicenseId, fodId.LicenseId);
-            CollectionAssert.AreEqual(CanonicalHash, fodId.MatchKey);
+            CollectionAssert.AreEqual(CanonicalHash, fodId.Hash);
             Assert.AreEqual(TestDomain, fodId.Domain);
-        }
-
-        [TestMethod]
-        public void ObsoleteHash_ReturnsMatchKey()
-        {
-            var fodId = new FodId(_factory.SignedOwidBase64(CanonicalPayload()));
-
-#pragma warning disable CS0618 // deliberately exercising the obsolete alias
-            CollectionAssert.AreEqual(fodId.MatchKey, fodId.Hash);
-#pragma warning restore CS0618
         }
 
         [TestMethod]
@@ -103,7 +93,7 @@ namespace FiftyOne.Did.Tests
 
             Assert.AreEqual(CanonicalFlags, fodId.Flags);
             Assert.AreEqual(CanonicalLicenseId, fodId.LicenseId);
-            CollectionAssert.AreEqual(CanonicalHash, fodId.MatchKey);
+            CollectionAssert.AreEqual(CanonicalHash, fodId.Hash);
             Assert.AreEqual(TestDomain, fodId.Domain);
         }
 
@@ -116,13 +106,14 @@ namespace FiftyOne.Did.Tests
 
             Assert.AreEqual(CanonicalFlags, fodId.Flags);
             Assert.AreEqual(CanonicalLicenseId, fodId.LicenseId);
-            CollectionAssert.AreEqual(CanonicalHash, fodId.MatchKey);
+            CollectionAssert.AreEqual(CanonicalHash, fodId.Hash);
             Assert.AreEqual(owid.Domain, fodId.Domain);
             Assert.AreEqual(owid.Date, fodId.Date);
             Assert.AreEqual(owid.Version, fodId.Version);
-            // Payload and Signature are reference-copied to avoid re-parsing.
-            Assert.AreSame(owid.Payload, fodId.Payload);
-            Assert.AreSame(owid.Signature, fodId.Signature);
+            // The OWID hands out copies of its arrays, so the two are
+            // compared by content.
+            CollectionAssert.AreEqual(owid.Payload, fodId.Payload);
+            CollectionAssert.AreEqual(owid.Signature, fodId.Signature);
         }
 
         [TestMethod]
@@ -203,8 +194,8 @@ namespace FiftyOne.Did.Tests
         {
             var fodId = new FodId(_factory.SignedOwidBase64(CanonicalPayload()));
 
-            fodId.MatchKey[0] = 0x00;
-            fodId.MatchKey[FodId.HashLength - 1] = 0x00;
+            fodId.Hash[0] = 0x00;
+            fodId.Hash[FodId.HashLength - 1] = 0x00;
 
             // The inherited Payload bytes must not have been mutated.
             Assert.AreEqual(CanonicalHash[0], fodId.Payload[FodId.HashOffset]);
@@ -216,7 +207,7 @@ namespace FiftyOne.Did.Tests
         [TestMethod]
         public void Constructor_PayloadOneByteShort_Throws()
         {
-            // 36 bytes — one short of the minimum 37.
+            // 36 bytes, one short of the minimum 37.
             var base64 = _factory.SignedOwidBase64(new byte[FodId.PayloadLength - 1]);
 
             Assert.ThrowsExactly<ArgumentException>(() => new FodId(base64));
@@ -252,6 +243,40 @@ namespace FiftyOne.Did.Tests
         }
 
         [TestMethod]
+        [DataRow("\n")]
+        [DataRow("\r\n")]
+        [DataRow(" ")]
+        [DataRow("\t")]
+        public void Constructor_SurroundingWhitespace_ParsesAsCleanValue(
+            string whitespace)
+        {
+            // A value read from a file, a header or a copy and paste can
+            // arrive with a newline or a space around it, and must give the
+            // same identifier as the clean form in either alphabet.
+            var clean = _factory.SignedOwidBase64(CanonicalPayload());
+            var expected = new FodId(clean);
+            var cleanUrl = FodId.ToBase64Url(clean);
+
+            foreach (var value in new[] { clean, cleanUrl })
+            {
+                foreach (var dirty in new[]
+                {
+                    whitespace + value,
+                    value + whitespace,
+                    whitespace + value + whitespace,
+                })
+                {
+                    var fodId = new FodId(dirty);
+
+                    Assert.AreEqual(expected.AsBase64(), fodId.AsBase64());
+                    Assert.AreEqual(expected.Flags, fodId.Flags);
+                    Assert.AreEqual(expected.LicenseId, fodId.LicenseId);
+                    CollectionAssert.AreEqual(expected.Hash, fodId.Hash);
+                }
+            }
+        }
+
+        [TestMethod]
         public void Constructor_PayloadLargerThanSpec_UsesFirst37Bytes()
         {
             // Build a 64-byte payload whose first 37 bytes match canonical;
@@ -267,8 +292,43 @@ namespace FiftyOne.Did.Tests
 
             Assert.AreEqual(CanonicalFlags, fodId.Flags);
             Assert.AreEqual(CanonicalLicenseId, fodId.LicenseId);
-            CollectionAssert.AreEqual(CanonicalHash, fodId.MatchKey);
-            Assert.AreEqual(FodId.HashLength, fodId.MatchKey.Length);
+            CollectionAssert.AreEqual(CanonicalHash, fodId.Hash);
+            Assert.AreEqual(FodId.HashLength, fodId.Hash.Length);
+        }
+
+        [TestMethod]
+        public void Constructor_LongCreatorDomain_Parses()
+        {
+            // The creator domain is a deployment parameter, so a
+            // self-hosted container may sign with a domain far longer than
+            // the one the public cloud uses and the identifier must still
+            // parse.
+            var owid = _factory.SignedOwid(
+                CanonicalPayload(),
+                DateTime.UtcNow,
+                domain: "a-very-long-self-hosted-creator-domain.example.com");
+
+            var fodId = new FodId(owid.AsBase64());
+
+            Assert.AreEqual(
+                "a-very-long-self-hosted-creator-domain.example.com",
+                fodId.Domain);
+            CollectionAssert.AreEqual(CanonicalHash, fodId.Hash);
+        }
+
+        [TestMethod]
+        public void Constructor_ReservedTypeWithLongSection_TakesWholeSection()
+        {
+            // A context section of a version this reader does not implement
+            // is accepted at any length, so an older reader keeps working
+            // when a newer version ships.
+            var payload = new byte[FodId.HashOffset + 500];
+            payload[FodId.FlagsOffset] = 0b1100_0000;
+
+            var fodId = new FodId(_factory.SignedOwidBase64(payload));
+
+            Assert.AreEqual(IdType.Reserved, fodId.Type);
+            Assert.AreEqual(500, fodId.Hash.Length);
         }
 
         [TestMethod]
@@ -289,7 +349,7 @@ namespace FiftyOne.Did.Tests
 
             Assert.AreEqual(fodId1.Flags, fodId2.Flags);
             Assert.AreEqual(fodId1.LicenseId, fodId2.LicenseId);
-            CollectionAssert.AreEqual(fodId1.MatchKey, fodId2.MatchKey);
+            CollectionAssert.AreEqual(fodId1.Hash, fodId2.Hash);
             Assert.AreEqual(fodId1.Domain, fodId2.Domain);
         }
 
@@ -321,11 +381,11 @@ namespace FiftyOne.Did.Tests
             var fodId = new FodId(_factory.SignedOwidBase64(CanonicalRandomPayload()));
 
             Assert.AreEqual(CanonicalLicenseId, fodId.LicenseId);
-            Assert.AreEqual(FodId.GuidLength, fodId.MatchKey.Length);
+            Assert.AreEqual(FodId.GuidLength, fodId.Hash.Length);
             CollectionAssert.AreEqual(
                 Enumerable.Range(0x40, FodId.GuidLength)
                     .Select(i => (byte)i).ToArray(),
-                fodId.MatchKey);
+                fodId.Hash);
         }
 
         [TestMethod]
@@ -352,7 +412,7 @@ namespace FiftyOne.Did.Tests
             var fodId = new FodId(_factory.SignedOwidBase64(payload));
 
             Assert.AreEqual(IdType.Random, fodId.Type);
-            Assert.AreEqual(FodId.GuidLength, fodId.MatchKey.Length);
+            Assert.AreEqual(FodId.GuidLength, fodId.Hash.Length);
         }
 
         [TestMethod]
@@ -376,7 +436,7 @@ namespace FiftyOne.Did.Tests
             var fodId = new FodId(_factory.SignedOwidBase64(payload));
 
             Assert.AreEqual(IdType.Reserved, fodId.Type);
-            Assert.AreEqual(0, fodId.MatchKey.Length);
+            Assert.AreEqual(0, fodId.Hash.Length);
         }
 
         [TestMethod]
@@ -408,7 +468,7 @@ namespace FiftyOne.Did.Tests
             var b = new FodId(_factory.SignedOwidBase64(CanonicalPayload()));
 
             // The probabilistic value is stable across reissues.
-            CollectionAssert.AreEqual(a.MatchKey, b.MatchKey);
+            CollectionAssert.AreEqual(a.Hash, b.Hash);
             // The wrapping envelope is not (the signature is regenerated).
             Assert.IsFalse(a.Signature.SequenceEqual(b.Signature));
             Assert.AreNotEqual(a.AsBase64(), b.AsBase64());
@@ -418,23 +478,25 @@ namespace FiftyOne.Did.Tests
 
         /// <summary>
         /// Constructing a <see cref="FodId"/> does not verify the signature.
-        /// An unsigned OWID still constructs and exposes all three fields, so a
-        /// later "verify on construction" change would be caught here.
+        /// An envelope whose signature bytes have been altered still
+        /// constructs and exposes all three fields, and then fails the
+        /// signature check, so a later "verify on construction" change
+        /// would be caught here.
         /// </summary>
         [TestMethod]
         public void Construction_DoesNotVerifySignature()
         {
-            var unsigned = new Owid.Client.Model.Owid
-            {
-                Date = DateTime.UtcNow,
-                Payload = CanonicalPayload(),
-            };
+            var bytes = _factory.SignedBytes(CanonicalPayload(), DateTime.UtcNow);
+            bytes[bytes.Length - 1] ^= 0xFF;
 
-            var fodId = new FodId(unsigned);
+            var fodId = new FodId(bytes);
 
             Assert.AreEqual(CanonicalFlags, fodId.Flags);
             Assert.AreEqual(CanonicalLicenseId, fodId.LicenseId);
-            CollectionAssert.AreEqual(CanonicalHash, fodId.MatchKey);
+            CollectionAssert.AreEqual(CanonicalHash, fodId.Hash);
+            Assert.AreEqual(
+                OwidSignatureStatus.SignatureInvalid,
+                fodId.SignatureStatus(_factory.PublicPem));
         }
 
         /// <summary>
@@ -466,7 +528,7 @@ namespace FiftyOne.Did.Tests
 
             Assert.AreEqual(CanonicalFlags, roundTripped.Flags);
             Assert.AreEqual(CanonicalLicenseId, roundTripped.LicenseId);
-            CollectionAssert.AreEqual(CanonicalHash, roundTripped.MatchKey);
+            CollectionAssert.AreEqual(CanonicalHash, roundTripped.Hash);
         }
     }
 }

@@ -101,8 +101,11 @@ If you want examples that demonstrate how to use 51Degrees products such as devi
 | CustomFlowElement\4. Cloud Engine         | Shows how to modify SimpleFlowElement to perform the star sign lookup via a cloud service rather than locally. |
 | ResultCaching                             | Shows how the result caching feature works. |
 | UsageSharing                              | Shows how to share usage with 51Degrees. This helps us to keep our products up to date and accurate. |
+| Did\CreatorContextWeb                     | A demo web server for the 51Did creator context flow, run the way production does, with the browser verifying and the server redeeming. See Examples\Did\README.md. |
 
 The CloudRequestEngine\GettingStarted example requires a resource key. It reads the aligned `_51DEGREES_RESOURCE_KEY` environment variable first, then the legacy `RESOURCE_KEY` variable. A resource key with the free properties used by the examples can be created at https://configure.51degrees.com/Wkqxf3Bs?utm_source=github&utm_medium=readme&utm_campaign=pipeline-dotnet&utm_content=readme.md&utm_term=pipeline-examples.
+
+Every example that calls the 51Degrees cloud (CloudRequestEngine\GettingStarted and Did\CreatorContextWeb) reads the service to call from the `FOD_CLOUD_API_URL` environment variable, which is the API base including the `/api/v4/` segment and defaults to `https://cloud.51degrees.com/api/v4/`. This is the same variable the `CloudRequestEngineBuilder` honours when no endpoint is set. A host other than `cloud.51degrees.com` would be used to (a) use an on premise web server, or (b) use a privately hosted version of the 51Degrees cloud for performance reasons. This is the private hosting option of the cloud service. Both run the same service, so the examples work unchanged against either. The CustomFlowElement\4. Cloud Engine tutorial calls the star sign example service built for that tutorial rather than the 51Degrees cloud, so its endpoint is fixed.
 
 ## Cancelling processing
 
@@ -128,6 +131,37 @@ processing stops automatically when the client disconnects.
 
 An element with long-running work can check `flowData.GetStopToken()` itself
 to stop sooner; elements that don't are simply skipped once the token is cancelled.
+
+## Tracing
+
+The pipeline emits an OpenTelemetry-compatible tracing span for every flow
+element executed by `flowData.Process()`, from an `ActivitySource` named
+`FiftyOne.Pipeline` (also available as
+`FiftyOne.Pipeline.Core.Constants.TRACING_SOURCE_NAME`). Nothing is emitted
+unless something listens to that source, so there is no cost when tracing
+is not configured.
+
+Each span is named `element.<ElementDataKey>` (for example `element.device`)
+and carries `element.type` and `element.data_key` tags. Elements inside a
+parallel section each get their own span; the parallel wrapper itself does
+not emit one. An element that throws marks its span with error status;
+error handling is otherwise unchanged.
+
+The spans attach to the caller's current `Activity`, so they group into
+one trace when something already traces the request, as the ASP.NET Core
+instrumentation does. Without an ambient activity (a console application
+or a background worker), each element span becomes its own single-span
+trace; start an activity around `flowData.Process()` to group them.
+
+Register the source with your tracer to collect the spans:
+
+```csharp
+services.AddOpenTelemetry().WithTracing(tracing =>
+{
+    tracing.AddSource("FiftyOne.Pipeline");
+    // exporter configuration goes here
+});
+```
 
 ## Tests
 

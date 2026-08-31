@@ -25,6 +25,7 @@ using Microsoft.Extensions.Logging;
 using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
+using System.Diagnostics;
 using System.Linq;
 using System.Threading.Tasks;
 
@@ -132,16 +133,47 @@ namespace FiftyOne.Pipeline.Core.FlowElements
                     // Run each element on a new thread.
                     Task.Run(() =>
                     {
-                        element.Process(data);
+                        var activity = ElementTracing.StartElement(element);
+                        try
+                        {
+                            element.Process(data);
+                        }
+                        catch (Exception ex)
+                        {
+                            // Mark the span before the exception carries
+                            // on into the error handling below.
+                            activity?.SetStatus(
+                                ActivityStatusCode.Error, ex.Message);
+                            throw;
+                        }
+                        finally
+                        {
+                            activity?.Dispose();
+                        }
                     }).ContinueWith(t =>
                     {
                         // If any exceptions occurred then add them to the 
                         // flow data.
                         if (t.Exception != null)
                         {
+                            // As in Pipeline.Process, error level logging is
+                            // skipped when the pipeline suppresses process
+                            // exceptions. The error remains available through
+                            // IFlowData.Errors and is logged at debug level.
+                            // Pipeline is never null on a flow data created by
+                            // a pipeline, but stub implementations can leave it
+                            // unset, so treat that as 'do not suppress'.
+                            var suppress =
+                                data.Pipeline?.SuppressProcessExceptions ?? false;
                             foreach (var innerException in t.Exception.InnerExceptions)
                             {
-                                data.AddError(innerException, element);
+                                data.AddError(innerException, element, true, !suppress);
+                                if (suppress && Logger.IsEnabled(LogLevel.Debug))
+                                {
+                                    Logger.LogDebug(innerException,
+                                        "Suppressed error during processing of " +
+                                        $"'{element?.GetType().Name}'.");
+                                }
                             }
                         }
                     }, TaskScheduler.Default));

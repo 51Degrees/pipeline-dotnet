@@ -42,7 +42,15 @@ namespace GettingStarted
             var cfg = new LazyLoadingConfiguration(10000, ct);
 
             var engine = new CloudRequestEngineBuilder(_loggerFactory, _httpClient)
-                .SetEndPoint("https://cloud.51degrees.com/api/v4/json")
+                // The cloud service to call, read from FOD_CLOUD_API_URL
+                // and defaulting to https://cloud.51degrees.com/api/v4/.
+                // A host other than cloud.51degrees.com would be used to
+                // (a) use an on premise web server, or (b) use a privately
+                // hosted version of the 51Degrees cloud for performance
+                // reasons. This is the private hosting option of the cloud
+                // service. Both run the same service, so this example
+                // works unchanged against either.
+                .SetEndPoint(GetCloudEndpoint())
                 // A resource key with the properties needed by the examples
                 // can be created at https://configure.51degrees.com/Wkqxf3Bs?utm_source=code&utm_medium=example&utm_campaign=pipeline-dotnet&utm_content=examples-cloudrequestengine-gettingstarted-program.cs&utm_term=main.
                 // The aligned _51DEGREES_RESOURCE_KEY environment variable is
@@ -61,7 +69,31 @@ namespace GettingStarted
                 Console.WriteLine(result);
             }
 
-            Console.ReadKey();
+            // Only wait for a key where there is a keyboard to press one
+            // on, so the example also runs to completion from a script.
+            if (Console.IsInputRedirected == false)
+            {
+                Console.ReadKey();
+            }
+        }
+
+        /// <summary>
+        /// Get the cloud service to call. The FOD_CLOUD_API_URL environment
+        /// variable names the API base including the /api/v4/ segment,
+        /// which is the same variable the CloudRequestEngineBuilder honours
+        /// when no endpoint is set, and defaults to the public cloud at
+        /// https://cloud.51degrees.com/api/v4/. The value is normalised to
+        /// end in one slash because the builder appends the endpoint names
+        /// to it.
+        /// </summary>
+        private static string GetCloudEndpoint()
+        {
+            var endpoint = Environment.GetEnvironmentVariable("FOD_CLOUD_API_URL");
+            if (string.IsNullOrWhiteSpace(endpoint))
+            {
+                endpoint = "https://cloud.51degrees.com/api/v4/";
+            }
+            return endpoint.TrimEnd('/') + "/";
         }
 
         /// <summary>
