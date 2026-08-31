@@ -268,8 +268,10 @@
             <param name="cancellationToken">Cancels the call.</param>
             <returns>Whether the cloud found the signature valid.</returns>
             <exception cref="T:System.ArgumentException">
-            Thrown, with the cloud's message, when the cloud could not parse
-            the value as a 51Did.
+            Thrown when the value is not a 51Did. A value that does not
+            parse is refused here, naming the
+            <see cref="T:FiftyOne.Did.Model.FodIdParseStatus"/>, before any call is made. A
+            value the cloud refuses is reported with the cloud's message.
             </exception>
             <exception cref="T:System.Net.Http.HttpRequestException">
             Thrown when the cloud cannot be reached or answers with an
@@ -322,8 +324,10 @@
             <param name="cancellationToken">Cancels the call.</param>
             <returns>The typed verdict.</returns>
             <exception cref="T:System.ArgumentException">
-            Thrown when <paramref name="fodId"/> is empty, or with the
-            cloud's message when the cloud answered 400.
+            Thrown when <paramref name="fodId"/> is empty or does not parse
+            as a 51Did, naming the <see cref="T:FiftyOne.Did.Model.FodIdParseStatus"/>, before
+            any call is made, or with the cloud's message when the cloud
+            answered 400.
             </exception>
             <exception cref="T:System.NotSupportedException">
             Thrown when the host answered 404, meaning it does not offer the
@@ -375,6 +379,17 @@
             <exception cref="T:System.Text.Json.JsonException">
             Thrown when the body is not JSON.
             </exception>
+        </member>
+        <member name="M:FiftyOne.Did.Client.DidClient.ValidateEncodedValue(System.String,System.String)">
+            <summary>
+            Refuses a string that cannot be a 51Did before any key is
+            fetched or any call is made. The length guard comes first, so
+            that nothing is parsed for a value far larger than any
+            identifier, then the value is parsed, so that a malformed one
+            is named for what it is here rather than sent to the cloud to
+            be refused there. The parse says nothing about the signature,
+            which is the question the call is being made to answer.
+            </summary>
         </member>
         <member name="M:FiftyOne.Did.Client.DidClient.ReadErrors(System.String)">
             <summary>
@@ -633,14 +648,29 @@
               <item><term>5</term><term>16</term><term>Value: GUID (Random)</term></item>
             </list>
             <para>
-            Inherits <see cref="N:Owid"/> so callers can use OWID-level features
-            (signature verification, base64 round-tripping) directly on a
-            <see cref="T:FiftyOne.Did.Model.FodId"/> instance.
+            Only a lower bound is applied to the payload. Anything after the
+            value is a creator context section whose lengths belong to the
+            cloud, so a longer payload is accepted here and the same three
+            fields are exposed.
             </para>
             <para>
-            This class does NOT verify the OWID signature on construction. Callers
-            wanting cryptographic verification should call the extension methods on
-            <see cref="N:Owid"/> on this instance after construction.
+            How an instance comes to exist. An OWID cannot be assembled by a
+            caller, because an unsigned one would be indistinguishable from a
+            signed one downstream. A <see cref="T:FiftyOne.Did.Model.FodId"/> therefore reaches
+            calling code only by parsing bytes that were already a complete,
+            signed envelope, through
+            <see cref="M:FiftyOne.Did.Model.FodId.TryParse(System.String,FiftyOne.Did.Model.FodId@,FiftyOne.Did.Model.FodIdParseStatus@)"/>,
+            <see cref="M:FiftyOne.Did.Model.FodId.TryParse(System.Byte[],FiftyOne.Did.Model.FodId@,FiftyOne.Did.Model.FodIdParseStatus@)"/>,
+            or the throwing constructors and <see cref="M:FiftyOne.Did.Model.FodId.FromBase64(System.String)"/> built on
+            them. Every route runs the same walk, so the rules cannot drift.
+            </para>
+            <para>
+            Parsing is not verification. A parsed <see cref="T:FiftyOne.Did.Model.FodId"/> is
+            structurally a 51Did and nothing more. Whether the signature is
+            genuine is a separate question, answered by
+            <c>SignatureStatus</c> from the OWID library on this instance, or
+            by <c>DidClient.VerifySignatureDetailedAsync</c>, which also picks
+            the signing key in force at the identifier's date.
             </para>
             </remarks>
         </member>
@@ -692,6 +722,15 @@
             payload (Flags + LicenseId + Hash). Random payloads are
             shorter - see <see cref="F:FiftyOne.Did.Model.FodId.RandomPayloadLength"/>.
             </summary>
+            <remarks>
+            This constant predates the OWID library's instance property of
+            the same name, which reports how many bytes a particular
+            payload holds, and it is kept because callers reference it by
+            type. On a <see cref="T:FiftyOne.Did.Model.FodId"/> reference the name resolves to
+            this constant. The actual length of an instance's payload is
+            <c>Payload.Length</c>, or the inherited property through an
+            <see cref="T:Owid.Client.Model.Owid"/> reference.
+            </remarks>
         </member>
         <member name="P:FiftyOne.Did.Model.FodId.Flags">
             <summary>
@@ -742,10 +781,63 @@
             A date before the base gives zero.
             </summary>
         </member>
+        <member name="M:FiftyOne.Did.Model.FodId.TryParse(System.String,FiftyOne.Did.Model.FodId@,FiftyOne.Did.Model.FodIdParseStatus@)">
+            <summary>
+            Reads a 51Did from its base64 form, in either alphabet, saying
+            why rather than throwing when the value is not one.
+            </summary>
+            <param name="value">
+            The encoded envelope, which may be anything at all. The standard
+            alphabet with padding, as the cloud issues it, and the URL-safe
+            alphabet with or without padding, as a page puts it in a link,
+            are both accepted, and surrounding whitespace is ignored. See
+            <see cref="M:FiftyOne.Did.Model.FodId.NormaliseBase64(System.String)"/>.
+            </param>
+            <param name="fodId">
+            The 51Did when this returns true, otherwise null. A value is
+            never handed back for a failure, however far the read got.
+            </param>
+            <param name="status">
+            <see cref="F:FiftyOne.Did.Model.FodIdParseStatus.Parsed"/> when this returns true,
+            otherwise why the value is not a 51Did. A failure the OWID
+            reader found carries the OWID status unchanged.
+            </param>
+            <returns>
+            True when the value is a complete, structurally valid 51Did
+            whose payload meets the minimum for its type. This says nothing
+            about whether the signature is genuine, which is a separate
+            question with its own answer.
+            </returns>
+        </member>
+        <member name="M:FiftyOne.Did.Model.FodId.TryParse(System.Byte[],FiftyOne.Did.Model.FodId@,FiftyOne.Did.Model.FodIdParseStatus@)">
+            <summary>
+            Reads a 51Did from the raw bytes of an envelope, saying why
+            rather than throwing when the bytes are not one.
+            </summary>
+            <param name="buffer">
+            The bytes, which must be one whole envelope and nothing else.
+            </param>
+            <param name="fodId">
+            The 51Did when this returns true, otherwise null.
+            </param>
+            <param name="status">
+            <see cref="F:FiftyOne.Did.Model.FodIdParseStatus.Parsed"/> when this returns true,
+            otherwise why the bytes are not a 51Did. A failure the OWID
+            reader found carries the OWID status unchanged.
+            </param>
+            <returns>
+            True when the bytes are a complete, structurally valid 51Did
+            whose payload meets the minimum for its type. The signature has
+            not been checked.
+            </returns>
+        </member>
         <member name="M:FiftyOne.Did.Model.FodId.#ctor(System.String)">
             <summary>
             Parse a 51Did from its base64-encoded OWID string, in either
-            base64 alphabet.
+            base64 alphabet. The throwing form of
+            <see cref="M:FiftyOne.Did.Model.FodId.TryParse(System.String,FiftyOne.Did.Model.FodId@,FiftyOne.Did.Model.FodIdParseStatus@)"/>,
+            which runs the same walk and turns a failure into the exception
+            documented below.
             </summary>
             <param name="base64">
             Base64 of the full OWID envelope (version + domain + date +
@@ -758,15 +850,18 @@
             <exception cref="T:System.ArgumentNullException">
             Thrown when <paramref name="base64"/> is <c>null</c>.
             </exception>
-            <exception cref="T:System.FormatException">
-            Thrown by the underlying OWID parser when <paramref name="base64"/>
-            is not valid Base64 in either alphabet.
-            </exception>
             <exception cref="T:System.ArgumentException">
-            Thrown when the decoded payload is shorter than the minimum
-            for its identifier type. Anything beyond that minimum is a
-            creator context section, whose exact lengths belong to the
-            cloud, so any longer payload is accepted here.
+            Thrown when <paramref name="base64"/> is empty, or when the
+            decoded payload is shorter than the minimum for its identifier
+            type. Anything beyond that minimum is a creator context section,
+            whose exact lengths belong to the cloud, so any longer payload
+            is accepted here.
+            </exception>
+            <exception cref="T:System.FormatException">
+            Thrown when <paramref name="base64"/> is not valid Base64 in
+            either alphabet, or decodes to bytes that are not an OWID
+            envelope. The message names the
+            <see cref="T:FiftyOne.Did.Model.FodIdParseStatus"/> found.
             </exception>
         </member>
         <member name="M:FiftyOne.Did.Model.FodId.FromBase64(System.String)">
@@ -776,17 +871,19 @@
             the parse reads as one call.
             </summary>
             <param name="base64">The envelope as base64.</param>
-            <returns>The parsed 51Did.</returns>
+            <returns>The parsed 51Did, its signature not yet checked.</returns>
             <exception cref="T:System.ArgumentNullException">
             Thrown when <paramref name="base64"/> is <c>null</c>.
             </exception>
+            <exception cref="T:System.ArgumentException">
+            Thrown when <paramref name="base64"/> is empty, or when the
+            decoded payload is shorter than the minimum for its identifier
+            type. Any longer payload is accepted.
+            </exception>
             <exception cref="T:System.FormatException">
             Thrown when <paramref name="base64"/> is not valid Base64 in
-            either alphabet.
-            </exception>
-            <exception cref="T:System.ArgumentException">
-            Thrown when the decoded payload is shorter than the minimum
-            for its identifier type. Any longer payload is accepted.
+            either alphabet, or decodes to bytes that are not an OWID
+            envelope.
             </exception>
         </member>
         <member name="M:FiftyOne.Did.Model.FodId.AsBase64Url">
@@ -829,32 +926,91 @@
         </member>
         <member name="M:FiftyOne.Did.Model.FodId.#ctor(System.Byte[])">
             <summary>
-            Parse a 51Did from the raw bytes of an OWID envelope.
+            Parse a 51Did from the raw bytes of an OWID envelope. The
+            throwing form of
+            <see cref="M:FiftyOne.Did.Model.FodId.TryParse(System.Byte[],FiftyOne.Did.Model.FodId@,FiftyOne.Did.Model.FodIdParseStatus@)"/>.
             </summary>
             <param name="buffer">The OWID envelope bytes.</param>
             <exception cref="T:System.ArgumentNullException">
             Thrown when <paramref name="buffer"/> is <c>null</c>.
             </exception>
             <exception cref="T:System.ArgumentException">
-            Thrown when the payload is shorter than the minimum for its
-            identifier type. Any longer payload is accepted.
+            Thrown when <paramref name="buffer"/> is empty, or when the
+            payload is shorter than the minimum for its identifier type.
+            Any longer payload is accepted.
+            </exception>
+            <exception cref="T:System.FormatException">
+            Thrown when the bytes are not an OWID envelope. The message
+            names the <see cref="T:FiftyOne.Did.Model.FodIdParseStatus"/> found.
             </exception>
         </member>
         <member name="M:FiftyOne.Did.Model.FodId.#ctor(Owid.Client.Model.Owid)">
             <summary>
             Promote an already-parsed OWID into a 51Did by unpacking its
             payload fields. The OWID's Version, Domain, Date, Payload and
-            Signature are copied by reference onto the new instance.
+            Signature are carried onto the new instance. An OWID only
+            exists as the result of a successful parse or of a creator
+            signing one, so the envelope is complete and signed by the time
+            the payload rules run here.
             </summary>
             <param name="owid">The already-parsed OWID envelope.</param>
             <exception cref="T:System.ArgumentNullException">
             Thrown when <paramref name="owid"/> is <c>null</c>.
             </exception>
             <exception cref="T:System.ArgumentException">
-            Thrown when <paramref name="owid"/>'s payload is shorter than
-            the minimum for its identifier type. Any longer payload is
+            Thrown when the payload of <paramref name="owid"/> is shorter
+            than the minimum for its identifier type. Any longer payload is
             accepted.
             </exception>
+        </member>
+        <member name="M:FiftyOne.Did.Model.FodId.#ctor(FiftyOne.Did.Model.FodId.Unpacked@)">
+            <summary>
+            The one constructor that sets state, reached only with fields
+            that <see cref="M:FiftyOne.Did.Model.FodId.TryUnpack(Owid.Client.Model.Owid,FiftyOne.Did.Model.FodId@,FiftyOne.Did.Model.FodIdParseStatus@)"/> has already accepted. The envelope
+            fields are carried by reference from the parsed OWID, which is
+            safe because the OWID library never exposes those arrays
+            without copying.
+            </summary>
+        </member>
+        <member name="T:FiftyOne.Did.Model.FodId.Unpacked">
+            <summary>
+            The fields of a 51Did once the payload rules have accepted the
+            envelope, so that the constructor that sets state cannot be
+            reached with anything unchecked.
+            </summary>
+        </member>
+        <member name="M:FiftyOne.Did.Model.FodId.TryUnpack(Owid.Client.Model.Owid,FiftyOne.Did.Model.FodId@,FiftyOne.Did.Model.FodIdParseStatus@)">
+            <summary>
+            Builds the instance once <see cref="M:FiftyOne.Did.Model.FodId.Unpack(Owid.Client.Model.Owid,FiftyOne.Did.Model.FodId.Unpacked@)"/> has accepted the
+            envelope, or reports why the envelope is not a 51Did.
+            </summary>
+        </member>
+        <member name="M:FiftyOne.Did.Model.FodId.Unpack(Owid.Client.Model.Owid,FiftyOne.Did.Model.FodId.Unpacked@)">
+            <summary>
+            The 51Did payload rules, applied to an OWID the OWID reader has
+            already accepted. Every route into a <see cref="T:FiftyOne.Did.Model.FodId"/> passes
+            through here, so there is one walk and not two.
+            </summary>
+            <returns>
+            <see cref="F:FiftyOne.Did.Model.FodIdParseStatus.Parsed"/> with
+            <paramref name="unpacked"/> filled, or the reason the payload
+            is not a 51Did with <paramref name="unpacked"/> at its default.
+            </returns>
+        </member>
+        <member name="M:FiftyOne.Did.Model.FodId.Promote(Owid.Client.Model.Owid,System.String)">
+            <summary>
+            Runs the payload rules for the throwing surface, so that the
+            throwing constructors and the non-throwing parse share one
+            walk.
+            </summary>
+        </member>
+        <member name="M:FiftyOne.Did.Model.FodId.ExceptionFor(FiftyOne.Did.Model.FodIdParseStatus,System.String)">
+            <summary>
+            The exception the throwing surface documents for each failure.
+            Nothing supplied and a payload that breaks the 51Did rules are
+            argument problems. A value that is not an envelope at all,
+            whether the base64 or the bytes under it, is a format problem.
+            </summary>
         </member>
         <member name="T:FiftyOne.Did.Model.FodIdExtensions">
             <summary>
@@ -866,10 +1022,12 @@
             This overload turns that string into a parsed <see cref="T:FiftyOne.Did.Model.FodId"/> so a
             consumer can write, for example, <c>idString.As51Did()</c>.
             <para>
-            Error handling is delegated to the existing types rather than reinvented:
-            a value that is not a valid 51Did surfaces the <see cref="T:FiftyOne.Did.Model.FodId"/>
-            constructor's own exceptions. See the per-method remarks for the exact
-            types.
+            Error handling is delegated to the existing types rather than
+            reinvented. A value that is not a valid 51Did surfaces the
+            <see cref="T:FiftyOne.Did.Model.FodId"/> constructor's own exceptions, and code that
+            would rather have a reason than an exception uses
+            <see cref="M:FiftyOne.Did.Model.FodId.TryParse(System.String,FiftyOne.Did.Model.FodId@,FiftyOne.Did.Model.FodIdParseStatus@)"/>
+            directly. See the per-method remarks for the exact types.
             </para>
             <para>
             Note this type intentionally takes no dependency on the pipeline: a
@@ -893,12 +1051,115 @@
             </exception>
             <exception cref="T:System.FormatException">
             Thrown (by the <see cref="T:FiftyOne.Did.Model.FodId"/> constructor) when
-            <paramref name="value"/> is not valid Base64.
+            <paramref name="value"/> is not valid Base64 in either alphabet
+            or does not decode to an OWID envelope.
             </exception>
             <exception cref="T:System.ArgumentException">
-            Thrown (by the <see cref="T:FiftyOne.Did.Model.FodId"/> constructor) when the decoded
-            payload is shorter than the minimum for its identifier type.
+            Thrown (by the <see cref="T:FiftyOne.Did.Model.FodId"/> constructor) when
+            <paramref name="value"/> is empty or the decoded payload is
+            shorter than the minimum for its identifier type.
             </exception>
+        </member>
+        <member name="T:FiftyOne.Did.Model.FodIdParseStatus">
+            <summary>
+            Why a parse of a 51Did succeeded or failed.
+            </summary>
+            <remarks>
+            <para>
+            A 51Did is read from whatever a caller was given, which on a public
+            endpoint means anything at all, so every one of these outcomes is an
+            ordinary result rather than a fault. The vocabulary is the OWID one,
+            <see cref="T:Owid.Client.Model.OwidParseStatus"/>, carried through unchanged with the
+            same names and values, plus the two outcomes that belong to the
+            51Did payload rules. A failure the OWID reader found is reported
+            exactly as the OWID reader named it and is never collapsed into a
+            more general one.
+            </para>
+            <para>
+            <see cref="F:FiftyOne.Did.Model.FodIdParseStatus.Parsed"/> says the bytes form a 51Did. It says nothing
+            about the signature, which is a separate question answered by
+            <c>SignatureStatus</c> on the parsed value or by
+            <c>DidClient.VerifySignatureDetailedAsync</c>.
+            </para>
+            </remarks>
+        </member>
+        <member name="F:FiftyOne.Did.Model.FodIdParseStatus.Parsed">
+            <summary>
+            The bytes form a structurally valid 51Did whose payload meets the
+            minimum for its identifier type. The signature has not been
+            checked.
+            </summary>
+        </member>
+        <member name="F:FiftyOne.Did.Model.FodIdParseStatus.MissingInput">
+            <summary>
+            Nothing was supplied to parse.
+            </summary>
+        </member>
+        <member name="F:FiftyOne.Did.Model.FodIdParseStatus.InvalidInputType">
+            <summary>
+            The input was supplied in a form the surface cannot read.
+            </summary>
+        </member>
+        <member name="F:FiftyOne.Did.Model.FodIdParseStatus.InvalidBase64">
+            <summary>
+            The string is not valid base64 in either alphabet, so there are
+            no bytes to read.
+            </summary>
+        </member>
+        <member name="F:FiftyOne.Did.Model.FodIdParseStatus.UnsupportedVersion">
+            <summary>
+            The first byte names an OWID version this implementation does
+            not know.
+            </summary>
+        </member>
+        <member name="F:FiftyOne.Did.Model.FodIdParseStatus.UnexpectedEnd">
+            <summary>
+            The data stopped in the middle of an envelope field.
+            </summary>
+        </member>
+        <member name="F:FiftyOne.Did.Model.FodIdParseStatus.InvalidDomainEncoding">
+            <summary>
+            The creator domain is not terminated, or is longer than the
+            published maximum.
+            </summary>
+        </member>
+        <member name="F:FiftyOne.Did.Model.FodIdParseStatus.ByteCountMismatch">
+            <summary>
+            The declared payload byte count disagrees with the bytes
+            actually present.
+            </summary>
+        </member>
+        <member name="F:FiftyOne.Did.Model.FodIdParseStatus.ImplementationCapacityExceeded">
+            <summary>
+            The envelope is structurally consistent but larger than this
+            runtime can hold.
+            </summary>
+        </member>
+        <member name="F:FiftyOne.Did.Model.FodIdParseStatus.MalformedEnvelope">
+            <summary>
+            The envelope is malformed in a way no other status describes.
+            </summary>
+        </member>
+        <member name="F:FiftyOne.Did.Model.FodIdParseStatus.AbsentNode">
+            <summary>
+            The OWID version 0 marker, which stands for an absent node and
+            is never a 51Did.
+            </summary>
+        </member>
+        <member name="F:FiftyOne.Did.Model.FodIdParseStatus.PayloadTooShort">
+            <summary>
+            The envelope is a valid OWID but its payload is shorter than the
+            five byte 51Did header (one byte of flags and a four byte
+            licence id), so the identifier type cannot be read.
+            </summary>
+        </member>
+        <member name="F:FiftyOne.Did.Model.FodIdParseStatus.InvalidTypePayloadLength">
+            <summary>
+            The payload holds the header but is shorter than the minimum for
+            the identifier type the header names, being the header plus 16
+            GUID bytes for Random and the header plus 32 hash bytes for
+            Probabilistic and HashedEmail.
+            </summary>
         </member>
         <member name="T:FiftyOne.Did.Model.IdType">
             <summary>
@@ -941,6 +1202,20 @@
             The length of an OWID signature in bytes. 
             </summary>
         </member>
+        <member name="F:Owid.Client.Constants.MaximumDomainLength">
+            <summary>
+            The greatest number of characters a creator domain can have.
+            RFC 1035 section 2.3.4 "Size limits" says that "the total length
+            of a domain name (i.e., label octets and label length octets) is
+            restricted to 255 octets or less". Those 255 octets are the wire
+            format, which spends one length octet on every label and one zero
+            octet on the root, whereas an OWID stores the presentation form,
+            the text "example.com", where a dot stands in for every label
+            length octet apart from the first, which has no dot in front of
+            it, and the root octet has no text form at all, so the same limit
+            is 253 characters once those two octets are taken away.
+            </summary>
+        </member>
         <member name="F:Owid.Client.Constants.Empty">
             <summary>
             Used when cryptographic operations are required where there is no
@@ -971,8 +1246,11 @@
             <param name="configuration">
             Configuration to use.
             </param>
-            <exception cref="T:System.ArithmeticException">
+            <exception cref="T:System.ArgumentException">
             <paramref name="configuration"/>.<see cref="P:Owid.Client.Model.Configuration.OwidConfiguration.Domain"/> is empty or whitespace.
+            </exception>
+            <exception cref="T:System.ArgumentException">
+            <paramref name="configuration"/>.<see cref="P:Owid.Client.Model.Configuration.OwidConfiguration.Domain"/> is longer than a domain can be.
             </exception>
         </member>
         <member name="M:Owid.Client.Creator.#ctor(System.String,System.Security.Cryptography.ECDsa)">
@@ -990,6 +1268,9 @@
             </exception>
             <exception cref="T:System.ArgumentNullException">
               <paramref name="crypto" />'s <see cref="P:System.Security.Cryptography.HashAlgorithmName.Name" /> is <see langword="null" />.
+            </exception>
+            <exception cref="T:System.ArgumentException">
+              <paramref name="domain" /> is longer than a domain can be.
             </exception>
         </member>
         <member name="M:Owid.Client.Creator.Sign(Owid.Client.Model.Owid)">
@@ -1015,7 +1296,7 @@
             <param name="others"></param>
             <returns></returns>
         </member>
-        <member name="M:Owid.Client.Creator.Sign(System.String)">
+        <member name="M:Owid.Client.Creator.Create(System.String)">
             <summary>
             Create a new OWID for the creator containing the value as the 
             payload.
@@ -1023,13 +1304,45 @@
             <param name="value">Payload value</param>
             <returns>Signed OWID with payload provided.</returns>
         </member>
-        <member name="M:Owid.Client.Creator.Sign(System.Byte[])">
+        <member name="M:Owid.Client.Creator.Create(System.Byte[])">
             <summary>
             Create a new OWID for the creator containing the value as the 
             payload.
             </summary>
             <param name="value">Payload value</param>
             <returns>Signed OWID with payload provided.</returns>
+        </member>
+        <member name="M:Owid.Client.Creator.Create(System.Byte[],Owid.Client.Model.Owid[])">
+            <summary>
+            Creates and signs an OWID carrying the value, with the other OWIDs
+            covered by the signature so that a tree can be verified as a whole.
+            </summary>
+            <param name="value">Payload value</param>
+            <param name="others">
+            OWIDs this one is signed alongside.
+            </param>
+            <returns>Signed OWID with the payload provided.</returns>
+            <remarks>
+            This is one of only two ways an OWID reaches calling code, the
+            other being a successful parse. The creator owns the version, the
+            domain, the date and the signature; a caller supplies the payload
+            and nothing else, so there is no moment at which a partly built
+            OWID exists for anyone to hold or pass on.
+            </remarks>
+        </member>
+        <member name="M:Owid.Client.Creator.ValidateDomain(System.String,System.String)">
+            <summary>
+            Refuses a creator domain longer than the maximum a domain can
+            have, being the same maximum the envelope read uses, at the
+            point the caller supplies the domain. Taking the domain here
+            means the caller is told where they gave the value, before any
+            key is used and before anything is signed or serialised, rather
+            than at the consumer that later cannot parse the result. The
+            serialisation of the domain refuses the same value again, so a
+            domain that arrives by some other route is still refused. A
+            domain at or under the maximum, and an absent domain, behave
+            exactly as they did before.
+            </summary>
         </member>
         <member name="T:Owid.Client.CryptoExtensions">
             <summary>
@@ -1079,6 +1392,27 @@
             <param name="crypto"></param>
             <param name="others"></param>
             <returns></returns>
+        </member>
+        <member name="M:Owid.Client.CryptoExtensions.SignatureStatus(Owid.Client.Model.Owid,System.Security.Cryptography.ECDsa,Owid.Client.Model.Owid[])">
+            <summary>
+            Says whether the signature is genuine, or why that could not be
+            decided.
+            </summary>
+            <remarks>
+            Only two of the answers are about the signature. The rest say the
+            question could not be answered, which is a different thing and must
+            never be reported as a forgery. A key that cannot be decoded leaves
+            the signature unjudged, and a caller acting on "invalid" would
+            reject good identifiers during an outage. On 30 August 2026 the key
+            endpoints served PEM a strict parser rejects and every offline
+            verification failed, with the keys and the identifiers both fine.
+            </remarks>
+        </member>
+        <member name="M:Owid.Client.CryptoExtensions.SignatureStatus(Owid.Client.Model.Owid,System.String,Owid.Client.Model.Owid[])">
+            <summary>
+            Says whether the signature is genuine using the public key in PEM
+            form, or why that could not be decided.
+            </summary>
         </member>
         <member name="M:Owid.Client.CryptoExtensions.Verify(Owid.Client.Model.Owid,System.Security.Cryptography.ECDsa,Owid.Client.Model.Owid[])">
             <summary>
@@ -1199,9 +1533,17 @@
         </member>
         <member name="M:Owid.Client.Extensions.FromBuffer(Owid.Client.Model.Owid,System.IO.BinaryReader)">
             <summary>
-            Reads <see cref="N:Owid"/> data
-            from <paramref name="reader"/>.
+            Reads <see cref="N:Owid"/> data from <paramref name="reader"/> into
+            an existing instance, throwing on malformed data.
             </summary>
+            <remarks>
+            Internal because it writes into an instance the caller already
+            holds, which would let external code alter an OWID whose signature
+            was computed over the original bytes, the exact thing closing
+            construction is meant to prevent. External callers read with
+            <see cref="M:Owid.Client.Model.Owid.TryRead(System.IO.Stream,Owid.Client.Model.Owid@,Owid.Client.Model.OwidParseStatus@)"/>. This remains for the tests that
+            pin the legacy throwing behaviour.
+            </remarks>
             <param name="owid"></param>
             <param name="reader"></param>
             <exception cref="T:System.Exception"></exception>
@@ -1210,10 +1552,11 @@
             <summary>
             Reads the length-prefixed payload. The count is whatever the
             sender declared, so it is checked against the bytes actually
-            present before anything is sized by it. A valid OWID is the
-            declared payload followed by the signature and nothing else, so
-            the count must equal the bytes remaining less the signature
-            length, and any other count is refused here. Until 27 August
+            present before anything is sized by it. The count must leave at
+            least the fixed signature after the payload. A public stream reader
+            consumes exactly one OWID and leaves any framed data after it for
+            its caller; top-level byte-array parsing separately requires EOF.
+            Until 27 August
             2026 the count went straight to ReadBytes, which allocates the
             whole count before reading, so a 22 character identifier that
             declared 64 MiB cost 64 MiB of allocation per request before
@@ -1227,6 +1570,31 @@
             declared count alone. The result is exactly the declared count
             or the read is refused, and the signature check that follows
             refuses a stream that then ends short.
+            </summary>
+        </member>
+        <member name="M:Owid.Client.Extensions.ReadString(System.IO.BinaryReader)">
+            <summary>
+            Reads the creator domain, being the ASCII bytes up to the zero
+            terminator. The terminator is whatever the sender put there, so
+            the walk stops at Constants.MaximumDomainLength rather than at
+            the end of the buffer, and a domain that is longer than that, or
+            that has no terminator inside it, is refused without reading any
+            further. Until 30 August 2026 a missing or corrupted terminator
+            sent the walk to the end of the buffer and collected every byte
+            it passed, so the work a hostile envelope could ask for grew
+            with the bytes it sent rather than being fixed by the published
+            maximum for a domain.
+            </summary>
+        </member>
+        <member name="M:Owid.Client.Extensions.WriteString(System.IO.BinaryWriter,System.String)">
+            <summary>
+            Writes the creator domain as ASCII text followed by the zero
+            terminator the read stops at. A domain longer than the maximum
+            the read accepts is refused here, so the library cannot write an
+            OWID that this same library would then refuse to parse. Until 30
+            August 2026 only the read was bounded, so a creator configured
+            with a longer domain produced an OWID whose fault surfaced at
+            the consumer rather than at the creator that made it.
             </summary>
         </member>
         <member name="T:Owid.Client.Model.ConfigurationPublicKeyStore">
@@ -1318,9 +1686,25 @@
             </param>
         </member>
         <member name="T:Owid.Client.Model.Owid">
-            <summary>
-            OWID structure which can be used as a node in a tree.
-            </summary>
+             <summary>
+             OWID structure which can be used as a node in a tree.
+             </summary>
+             <remarks>
+             An OWID is a claim about who created some data and when, and it is only
+             worth anything because it is signed. A caller therefore cannot build
+             one. An instance reaches calling code by one of two routes: parsing
+             bytes that were already a complete OWID, or asking a
+             <see cref="T:Owid.Client.Creator"/> to sign one into existence. There is deliberately
+             no way to assemble a half-made one, because an unsigned OWID is
+             indistinguishable from a signed one to the code downstream of it, and
+             the difference only surfaces later when a verification fails somewhere
+             nobody is watching.
+            
+             The state is read-only for the same reason. A parsed OWID's signature
+             covers its fields as they arrived, so a caller changing a field
+             afterwards would be holding something whose signature no longer
+             describes it.
+             </remarks>
         </member>
         <member name="P:Owid.Client.Model.Owid.Version">
             <summary>
@@ -1341,6 +1725,20 @@
             <summary>
             Array of bytes that form the payload.
             </summary>
+            <remarks>
+            A copy, so that writing into the returned array cannot alter an
+            OWID whose signature was computed over the original bytes.
+            </remarks>
+        </member>
+        <member name="P:Owid.Client.Model.Owid.PayloadLength">
+            <summary>
+            How many bytes the payload holds, without copying it.
+            </summary>
+            <remarks>
+            <see cref="P:Owid.Client.Model.Owid.Payload"/> hands out a copy, so an application applying
+            a size limit to a large payload would pay for the copy it is about
+            to reject. This answers the size question on its own.
+            </remarks>
         </member>
         <member name="P:Owid.Client.Model.Owid.PayloadAsString">
             <summary>
@@ -1349,27 +1747,273 @@
         </member>
         <member name="P:Owid.Client.Model.Owid.Signature">
             <summary>
-            Signature for this OWID and it's ancestor. Generated by the 
+            Signature for this OWID and it's ancestor. Generated by the
             <see cref="T:Owid.Client.Creator"/> instance.
+            </summary>
+            <remarks>
+            A copy, for the same reason as <see cref="P:Owid.Client.Model.Owid.Payload"/>.
+            </remarks>
+        </member>
+        <member name="P:Owid.Client.Model.Owid.PayloadInternal">
+            <summary>
+            The payload without copying, for use inside this library where the
+            bytes are only read or are being set by a parser or the creator.
+            </summary>
+        </member>
+        <member name="P:Owid.Client.Model.Owid.SignatureInternal">
+            <summary>
+            The signature without copying, for use inside this library.
             </summary>
         </member>
         <member name="M:Owid.Client.Model.Owid.#ctor">
             <summary>
-            Make empty <see cref="T:Owid.Client.Model.Owid"/>
+            Not public. See the note on the class for why an OWID cannot be
+            assembled by a caller.
             </summary>
         </member>
-        <member name="M:Owid.Client.Model.Owid.#ctor(System.String)">
+        <member name="M:Owid.Client.Model.Owid.CreateForParser(Owid.Client.Model.OwidVersion,System.String,System.DateTime,System.Byte[],System.Byte[])">
             <summary>
-            Make <see cref="T:Owid.Client.Model.Owid"/> from Base64-encoded string.
+            Builds an instance from fields a parser has already validated.
             </summary>
         </member>
-        <member name="M:Owid.Client.Model.Owid.#ctor(System.Byte[])">
+        <member name="M:Owid.Client.Model.Owid.TryParse(System.String,Owid.Client.Model.Owid@,Owid.Client.Model.OwidParseStatus@)">
             <summary>
-            Make <see cref="T:Owid.Client.Model.Owid"/> from binary data.
+            Reads a complete OWID from its Base64 form.
             </summary>
+            <param name="value">
+            The encoded OWID, which may be anything at all. This is external
+            data, so failing to be an OWID is an ordinary outcome rather than
+            an error.
+            </param>
+            <param name="owid">
+            The OWID when this returns true, otherwise null.
+            </param>
+            <param name="status">
+            <see cref="F:Owid.Client.Model.OwidParseStatus.Parsed"/> when this returns true,
+            otherwise why the value is not an OWID.
+            </param>
+            <returns>
+            True when the value is a complete, structurally valid OWID. This
+            says nothing about whether the signature is genuine, which is a
+            separate question with its own answer.
+            </returns>
+        </member>
+        <member name="M:Owid.Client.Model.Owid.TryParse(System.Byte[],Owid.Client.Model.Owid@,Owid.Client.Model.OwidParseStatus@)">
+            <summary>
+            Reads a complete OWID from a buffer holding exactly one.
+            </summary>
+            <param name="buffer">
+            The bytes, which must be one whole OWID and nothing else. Data
+            after the envelope is rejected, because on this surface there is
+            nothing else it could belong to. A stream that carries several
+            envelopes is read with the reader in
+            <see cref="T:Owid.Client.Extensions"/> instead.
+            </param>
+            <param name="owid">
+            The OWID when this returns true, otherwise null.
+            </param>
+            <param name="status">
+            <see cref="F:Owid.Client.Model.OwidParseStatus.Parsed"/> when this returns true,
+            otherwise why the bytes are not an OWID.
+            </param>
+            <returns>
+            True when the bytes are a complete, structurally valid OWID.
+            </returns>
+        </member>
+        <member name="M:Owid.Client.Model.Owid.TryRead(System.IO.Stream,Owid.Client.Model.Owid@,Owid.Client.Model.OwidParseStatus@)">
+            <summary>
+            Reads one OWID from a stream that may carry more after it.
+            </summary>
+            <param name="stream">
+            The source, read forward only. Its length is never asked for, so a
+            stream that cannot answer that still works.
+            </param>
+            <param name="owid">
+            The OWID when this returns true, otherwise null.
+            </param>
+            <param name="status">
+            <see cref="F:Owid.Client.Model.OwidParseStatus.Parsed"/> when this returns true,
+            otherwise why the bytes are not an OWID.
+            <see cref="F:Owid.Client.Model.OwidParseStatus.MissingInput"/> means the stream had
+            nothing left, which is how a caller reading a sequence finds out it
+            has reached the end.
+            </param>
+            <returns>
+            True when one complete OWID was read. Bytes after it are left where
+            they are, because in a stream they may be the next envelope rather
+            than rubbish, which is the one way this differs from
+            <see cref="M:Owid.Client.Model.Owid.TryParse(System.Byte[],Owid.Client.Model.Owid@,Owid.Client.Model.OwidParseStatus@)"/>.
+            </returns>
+            <remarks>
+            Nothing is consumed when an envelope is refused beyond what had
+            already been read to discover the fault, so a caller that hits a
+            bad envelope should stop rather than expect the position to be
+            usable.
+            </remarks>
         </member>
         <member name="M:Owid.Client.Model.Owid.ToString">
             <inheritdoc/>
+        </member>
+        <member name="T:Owid.Client.Model.OwidParseStatus">
+             <summary>
+             Why a parse of external data succeeded or failed.
+             </summary>
+             <remarks>
+             Malformed data arriving from outside is expected, not exceptional. An
+             OWID is read from whatever a caller was given, which on a public
+             endpoint means anything at all, so every one of these outcomes is a
+             normal result rather than a fault. Reporting them as exceptions costs
+             the construction and unwinding of an exception per bad input, which is
+             a cost an attacker chooses the size of.
+            
+             These names are the cross-language vocabulary. Each implementation
+             spells the surface in its own idiom, but the set of facts reported is
+             the same everywhere, so a failure means the same thing whichever
+             language read the bytes.
+             </remarks>
+        </member>
+        <member name="F:Owid.Client.Model.OwidParseStatus.Parsed">
+            <summary>
+            The bytes form a structurally valid OWID. This says nothing about
+            the signature, which is a separate question answered separately.
+            </summary>
+        </member>
+        <member name="F:Owid.Client.Model.OwidParseStatus.MissingInput">
+            <summary>
+            Nothing was supplied to parse.
+            </summary>
+        </member>
+        <member name="F:Owid.Client.Model.OwidParseStatus.InvalidInputType">
+            <summary>
+            The input was supplied in a form this surface cannot read.
+            </summary>
+        </member>
+        <member name="F:Owid.Client.Model.OwidParseStatus.InvalidBase64">
+            <summary>
+            The string is not valid Base64, so there are no bytes to read.
+            </summary>
+        </member>
+        <member name="F:Owid.Client.Model.OwidParseStatus.UnsupportedVersion">
+            <summary>
+            The first byte names a version this implementation does not know.
+            </summary>
+        </member>
+        <member name="F:Owid.Client.Model.OwidParseStatus.UnexpectedEnd">
+            <summary>
+            The data stopped in the middle of a field. Distinct from
+            <see cref="F:Owid.Client.Model.OwidParseStatus.ByteCountMismatch"/>, which is a declaration that
+            disagrees with data that is all present.
+            </summary>
+        </member>
+        <member name="F:Owid.Client.Model.OwidParseStatus.InvalidDomainEncoding">
+            <summary>
+            The creator domain is not terminated, or is longer than the
+            published maximum.
+            </summary>
+        </member>
+        <member name="F:Owid.Client.Model.OwidParseStatus.ByteCountMismatch">
+            <summary>
+            The declared payload byte count disagrees with the bytes actually
+            present. Checked before anything is sized by the declaration, so a
+            sender cannot make a reader allocate by claiming a large payload it
+            did not send.
+            </summary>
+        </member>
+        <member name="F:Owid.Client.Model.OwidParseStatus.ImplementationCapacityExceeded">
+            <summary>
+            The envelope is structurally consistent but larger than this
+            runtime can represent or hold. Not a fault in the data, and
+            deliberately distinct from the data being wrong, because the same
+            bytes may be readable elsewhere.
+            </summary>
+        </member>
+        <member name="F:Owid.Client.Model.OwidParseStatus.MalformedEnvelope">
+            <summary>
+            The envelope is malformed in a way none of the above describes.
+            A fallback for the genuinely unclassified, not a substitute for
+            naming a failure that is already understood.
+            </summary>
+        </member>
+        <member name="F:Owid.Client.Model.OwidParseStatus.AbsentNode">
+            <summary>
+            The version 0 marker, which stands for an absent node inside a
+            stream.
+            </summary>
+            <remarks>
+            It is not an OWID and never produces one, because it carries no
+            signature and so can never verify. A framed read reports it and
+            moves past its one byte, so a caller walking a run of frames can
+            tell an absent node from a malformed one, which is the distinction
+            the marker exists for. The whole buffer read reports it too,
+            because the byte means the same thing wherever it appears. Calling
+            it an unsupported version was inaccurate, since version 0 is
+            supported and meaningful, it simply is not an OWID.
+            </remarks>
+        </member>
+        <member name="T:Owid.Client.Model.OwidSignatureStatus">
+             <summary>
+             The outcome of asking whether an OWID's signature is genuine.
+             </summary>
+             <remarks>
+             Only two of these say anything about the signature itself. The rest say
+             the question could not be answered, which is a different thing and must
+             never be reported as a forgery. A key that cannot be fetched, a key
+             that cannot be decoded, or a provider that fails leaves the signature
+             unjudged. Collapsing those into "invalid" tells a caller that data was
+             tampered with when all that happened is that we could not check, and a
+             caller acting on that would reject good identifiers during an outage.
+            
+             This is not hypothetical. On 30 August 2026 the key endpoints published
+             PEM wrapped at 76 characters, which a strict parser rejects, and every
+             offline verification against them failed. The keys were fine and the
+             identifiers were fine. Reported as InvalidKey that reads as the
+             operational fault it was; reported as SignatureInvalid it would have
+             read as an attack.
+             </remarks>
+        </member>
+        <member name="F:Owid.Client.Model.OwidSignatureStatus.SignatureValid">
+            <summary>
+            The signature is genuine for this data and this key.
+            </summary>
+        </member>
+        <member name="F:Owid.Client.Model.OwidSignatureStatus.SignatureInvalid">
+            <summary>
+            The signature is well formed and does not match. The data does not
+            belong to the key it claims. This is the only status that means the
+            identifier should be distrusted.
+            </summary>
+        </member>
+        <member name="F:Owid.Client.Model.OwidSignatureStatus.InvalidSignatureLength">
+            <summary>
+            A signature field of the wrong length reached a verification
+            surface directly. Truncation in raw external input is a parse
+            <see cref="F:Owid.Client.Model.OwidParseStatus.UnexpectedEnd"/> instead, because there
+            the envelope never formed.
+            </summary>
+        </member>
+        <member name="F:Owid.Client.Model.OwidSignatureStatus.KeyUnavailable">
+            <summary>
+            No key could be obtained, or none covers the identifier's date.
+            The signature was never examined.
+            </summary>
+        </member>
+        <member name="F:Owid.Client.Model.OwidSignatureStatus.InvalidKey">
+            <summary>
+            Key material arrived but cannot be decoded, imported, or used as
+            the required type. The fault is in the key, not the identifier.
+            </summary>
+        </member>
+        <member name="F:Owid.Client.Model.OwidSignatureStatus.ImplementationCapacityExceeded">
+            <summary>
+            The work required exceeds what this runtime can represent or hold.
+            </summary>
+        </member>
+        <member name="F:Owid.Client.Model.OwidSignatureStatus.VerificationError">
+            <summary>
+            The check could not be completed for a reason that is not the
+            identifier's fault, such as a malformed key-list response or a
+            cryptographic provider failing on valid inputs.
+            </summary>
         </member>
         <member name="T:Owid.Client.Model.OwidVersion">
             <summary>
@@ -1394,6 +2038,120 @@
         <member name="F:Owid.Client.Model.OwidVersion.Version3">
             <summary>
             Version 3.
+            </summary>
+        </member>
+        <member name="T:Owid.Client.OwidCapacityException">
+            <summary>
+            The OWID can be structurally valid, but the requested operation needs
+            a single byte array larger than this .NET implementation can provide.
+            This is an implementation-capacity failure, not a malformed OWID.
+            </summary>
+        </member>
+        <member name="P:Owid.Client.OwidCapacityException.RequiredBytes">
+            <summary>
+            The number of bytes the operation would need in one array.
+            </summary>
+        </member>
+        <member name="M:Owid.Client.OwidCapacityException.#ctor(System.Int64)">
+            <summary>
+            Creates an exception for the required byte count.
+            </summary>
+            <param name="requiredBytes">
+            The number of bytes the operation would need in one array.
+            </param>
+        </member>
+        <member name="T:Owid.Client.OwidReader">
+             <summary>
+             Reads a complete OWID from a buffer, reporting why rather than
+             throwing when the bytes are not one.
+             </summary>
+             <remarks>
+             This walks the buffer by index and checks every read against what is
+             left, so a malformed envelope is a comparison that fails rather than an
+             exception that unwinds. That matters because the data comes from
+             outside: an attacker chooses how often this fails and how large the
+             input is, and an exception per attempt is a cost they control.
+            
+             It deliberately does not call the throwing parser and catch. The
+             exception would still be constructed and unwound, so the cost would
+             remain and only the surface would look different.
+            
+             This is the exact-buffer contract: the envelope must end where the
+             buffer does. Framed reading, where an envelope may be followed by more
+             data, is <see cref="T:Owid.Client.OwidStreamReader"/>, which must not require the
+             end of the stream because what follows may be the next envelope
+             rather than rubbish.
+             </remarks>
+        </member>
+        <member name="M:Owid.Client.OwidReader.TryRead(System.Byte[],Owid.Client.Model.Owid@)">
+            <summary>
+            Reads one complete OWID occupying the whole of
+            <paramref name="buffer"/>.
+            </summary>
+            <returns>
+            <see cref="F:Owid.Client.Model.OwidParseStatus.Parsed"/> with
+            <paramref name="owid"/> set, or the reason it is not an OWID with
+            <paramref name="owid"/> null. Both outputs are always assigned.
+            </returns>
+        </member>
+        <member name="M:Owid.Client.OwidReader.ReadDomain(System.Byte[],System.Int32@,System.String@)">
+            <summary>
+            The creator domain, terminated by a zero byte and no longer than
+            the published maximum.
+            </summary>
+        </member>
+        <member name="M:Owid.Client.OwidReader.ReadDate(System.Byte[],System.Int32@,Owid.Client.Model.OwidVersion,System.DateTime@)">
+            <summary>
+            The creation date, whose width depends on the version.
+            </summary>
+        </member>
+        <member name="T:Owid.Client.OwidStreamReader">
+             <summary>
+             Reads one OWID from a stream that may carry more after it.
+             </summary>
+             <remarks>
+             This is the framed contract, and it differs from reading a whole buffer
+             in exactly one place. A whole buffer knows where the envelope ends, so
+             the declared payload must leave exactly the signature and nothing else.
+             A stream does not: what follows may be the next envelope rather than
+             rubbish, so this needs the declared payload and the signature to be
+             present and says nothing at all about the rest.
+            
+             It reads forward only and never asks the stream for its length, so it
+             works on a source that cannot answer that, and it reads the payload in
+             fixed pieces rather than allocating from the declared count. A sender
+             choosing that count must not be able to choose how much memory a reader
+             takes before it has seen the bytes to justify it.
+            
+             Every read goes through the stream's own end of data signal rather than
+             the helpers that throw at the end, because a stream ending early is an
+             ordinary outcome here and not a fault.
+             </remarks>
+        </member>
+        <member name="F:Owid.Client.OwidStreamReader.PieceLength">
+            <summary>
+            Bytes read at a time when collecting a payload, so that a declared
+            count cannot decide the allocation before the data is there.
+            </summary>
+        </member>
+        <member name="M:Owid.Client.OwidStreamReader.ReadDomain(System.IO.Stream,System.String@)">
+            <summary>
+            The creator domain, terminated by a zero byte and no longer than
+            the published maximum.
+            </summary>
+        </member>
+        <member name="M:Owid.Client.OwidStreamReader.ReadCounted(System.IO.Stream,System.UInt32,System.Byte[]@)">
+            <summary>
+            The payload, collected in fixed pieces so that nothing is sized by
+            the declared count before the bytes to justify it have arrived.
+            </summary>
+        </member>
+        <member name="M:Owid.Client.OwidStreamReader.ReadExactly(System.IO.Stream,System.Byte[],System.Int32)">
+            <summary>
+            Fills the first <paramref name="count"/> bytes of the buffer, or
+            reports that the stream ended first. A stream may hand back fewer
+            bytes than asked for without being at its end, so this loops rather
+            than treating a short read as the end.
             </summary>
         </member>
     </members>
