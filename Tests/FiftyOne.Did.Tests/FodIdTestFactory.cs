@@ -21,11 +21,13 @@
  * ********************************************************************* */
 
 using FiftyOne.Did.Model;
-using Owid.Client;
+using Microsoft.VisualStudio.TestTools.UnitTesting;
 using Owid.Client.Model;
 using System;
+using System.IO;
 using System.Linq;
 using System.Security.Cryptography;
+using System.Text;
 
 namespace FiftyOne.Did.Tests
 {
@@ -36,6 +38,19 @@ namespace FiftyOne.Did.Tests
     /// avoids duplicating the key-generation, signing and payload code across
     /// the test classes.
     /// </summary>
+    /// <remarks>
+    /// The envelope bytes are written here by hand rather than through the
+    /// OWID library, because an OWID can no longer be assembled by calling
+    /// code and the library's creator stamps the current time, whereas
+    /// these tests need to choose the date, the version and the domain. The
+    /// layout written is the one the OWID reader reads, being the version
+    /// byte, the ASCII domain with a zero terminator, the date (two big
+    /// endian bytes of hours for version 1, otherwise four little endian
+    /// bytes of minutes since 2020), the four byte little endian payload
+    /// length, the payload and the 64 byte signature. The signature is
+    /// ECDSA P-256 over SHA-256 of everything before it, which is what the
+    /// library's creator produces.
+    /// </remarks>
     internal sealed class FodIdTestFactory
     {
         /// <summary>The domain stamped into every signed test OWID.</summary>
@@ -55,6 +70,11 @@ namespace FiftyOne.Did.Tests
             .Range(0, FodId.HashLength)
             .Select(i => (byte)(0x20 + i))
             .ToArray();
+
+        /// <summary>
+        /// The length of an OWID signature, fixed by the OWID format.
+        /// </summary>
+        public const int SignatureLength = 64;
 
         private readonly string _privatePem;
 
@@ -116,12 +136,9 @@ namespace FiftyOne.Did.Tests
 
         /// <summary>
         /// Create and sign a real OWID with the given payload and date,
-        /// using this instance's key pair, at the given envelope version.
-        /// The date selects the signing key in the client tests, so it has
-        /// to be chosen rather than taken from the clock, and the OWID
-        /// library's Creator stamps the current time when it signs, so the
-        /// signature is made here the way Creator makes it, ECDSA P-256
-        /// over SHA-256 of the envelope bytes without the signature.
+        /// using this instance's key pair, at the given envelope version,
+        /// handed back through the OWID library's own parse so that what
+        /// the tests hold is exactly what a caller would hold.
         /// </summary>
         public Owid.Client.Model.Owid SignedOwid(
             byte[] payload,
@@ -129,25 +146,76 @@ namespace FiftyOne.Did.Tests
             OwidVersion version = OwidVersion.Version3,
             string domain = TestDomain)
         {
-            using var crypto = ECDsa.Create();
-            crypto.ImportFromPem(_privatePem);
-            var owid = new Owid.Client.Model.Owid
-            {
-                Version = version,
-                Domain = domain,
-                Date = date,
-                Payload = payload,
-            };
-            owid.Signature = crypto.SignData(
-                owid.GetSignedBytes(), HashAlgorithmName.SHA256);
-            return owid;
+            var bytes = SignedBytes(payload, date, version, domain);
+            Assert.IsTrue(
+                Owid.Client.Model.Owid.TryParse(
+                    bytes, out var owid, out var status),
+                $"The factory wrote an envelope the OWID reader refused: {status}");
+            return owid!;
         }
 
         /// <summary>
         /// Sign the given payload and return the OWID as base64.
         /// </summary>
         public string SignedOwidBase64(byte[] payload) =>
-            SignedOwid(payload).AsBase64();
+            Convert.ToBase64String(SignedBytes(
+                payload, DateTime.UtcNow, OwidVersion.Version3, TestDomain));
+
+        /// <summary>
+        /// The raw bytes of a signed envelope, for tests that need to
+        /// damage the envelope after signing.
+        /// </summary>
+        public byte[] SignedBytes(
+            byte[] payload,
+            DateTime date,
+            OwidVersion version = OwidVersion.Version3,
+            string domain = TestDomain)
+        {
+            var unsigned = UnsignedBytes(payload, date, version, domain);
+            using var crypto = ECDsa.Create();
+            crypto.ImportFromPem(_privatePem);
+            var signature = crypto.SignData(unsigned, HashAlgorithmName.SHA256);
+            Assert.AreEqual(SignatureLength, signature.Length);
+            var bytes = new byte[unsigned.Length + signature.Length];
+            unsigned.CopyTo(bytes, 0);
+            signature.CopyTo(bytes, unsigned.Length);
+            return bytes;
+        }
+
+        /// <summary>
+        /// The bytes of an envelope up to but not including the signature,
+        /// which is the data the signature covers.
+        /// </summary>
+        public static byte[] UnsignedBytes(
+            byte[] payload,
+            DateTime date,
+            OwidVersion version = OwidVersion.Version3,
+            string domain = TestDomain)
+        {
+            using var stream = new MemoryStream();
+            using var writer = new BinaryWriter(stream);
+            writer.Write((byte)version);
+            writer.Write(Encoding.ASCII.GetBytes(domain));
+            writer.Write((byte)0);
+            var utc = date.Kind == DateTimeKind.Local
+                ? date.ToUniversalTime()
+                : DateTime.SpecifyKind(date, DateTimeKind.Utc);
+            if (version == OwidVersion.Version1)
+            {
+                var hours = (int)(utc - FodId.DateBase).TotalHours;
+                writer.Write((byte)(hours >> 8));
+                writer.Write((byte)hours);
+            }
+            else
+            {
+                var minutes = (utc - FodId.DateBase).TotalMinutes;
+                writer.Write(minutes <= 0 ? 0u : (uint)minutes);
+            }
+            writer.Write((uint)payload.Length);
+            writer.Write(payload);
+            writer.Flush();
+            return stream.ToArray();
+        }
 
         private static void WriteCanonicalLicenseId(byte[] payload)
         {

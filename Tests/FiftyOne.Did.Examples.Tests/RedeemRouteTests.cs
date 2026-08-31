@@ -24,9 +24,9 @@ using Examples.Did.CreatorContextWeb;
 using FiftyOne.Did.Client;
 using FiftyOne.Did.Model;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
-using Owid.Client;
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Net;
 using System.Net.Http;
 using System.Security.Cryptography;
@@ -84,18 +84,26 @@ namespace FiftyOne.Did.Examples.Tests
             {
                 payload[i] = (byte)i;
             }
-            // Signed directly rather than through the OWID library's
-            // Creator, which stamps the current time, because the date has
-            // to sit inside the key's period.
-            var owid = new Owid.Client.Model.Owid
+            // The envelope is written by hand and signed directly rather
+            // than through the OWID library's Creator, which stamps the
+            // current time, because the date has to sit inside the key's
+            // period. The layout is the version byte, the zero terminated
+            // domain, the little endian minutes since 2020, the little
+            // endian payload length, the payload and the signature.
+            using var stream = new MemoryStream();
+            using (var writer = new BinaryWriter(stream, Encoding.ASCII, true))
             {
-                Domain = "51degrees.com",
-                Date = KeyStart.AddDays(1),
-                Payload = payload,
-            };
-            owid.Signature = _signer.SignData(
-                owid.GetSignedBytes(), HashAlgorithmName.SHA256);
-            return new FodId(owid);
+                writer.Write((byte)3);
+                writer.Write(Encoding.ASCII.GetBytes("51degrees.com"));
+                writer.Write((byte)0);
+                writer.Write((uint)(KeyStart.AddDays(1) - FodId.DateBase).TotalMinutes);
+                writer.Write((uint)payload.Length);
+                writer.Write(payload);
+            }
+            var unsigned = stream.ToArray();
+            var signature = _signer.SignData(unsigned, HashAlgorithmName.SHA256);
+            stream.Write(signature, 0, signature.Length);
+            return new FodId(stream.ToArray());
         }
 
         private void QueueKeys(string pem)

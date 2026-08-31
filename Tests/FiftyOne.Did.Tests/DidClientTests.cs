@@ -635,15 +635,19 @@ namespace FiftyOne.Did.Tests
         [TestMethod]
         public async Task Verify_400Errors_ThrowsArgumentException()
         {
+            // A value that parses here can still be refused by the cloud,
+            // whose message is relayed. A value that does not parse never
+            // reaches the cloud, see DidClientMalformedInputTests.
             _handler.Enqueue(
                 HttpStatusCode.BadRequest,
-                "{\"errors\":[\"Value for 51did is not a valid Base64-encoded 51Did: 'x'.\"]}");
+                "{\"errors\":[\"The resource key does not include the 51Did properties.\"]}");
             using var client = NewClient();
 
             var error = await Assert.ThrowsExactlyAsync<ArgumentException>(
-                () => client.VerifyAsync("x"));
+                () => client.VerifyAsync(_factory.SignedOwidBase64(CanonicalPayload())));
 
-            StringAssert.Contains(error.Message, "not a valid Base64-encoded 51Did");
+            StringAssert.Contains(error.Message, "does not include the 51Did properties");
+            Assert.AreEqual(1, _handler.Requests.Count);
         }
 
         [TestMethod]
@@ -810,14 +814,19 @@ namespace FiftyOne.Did.Tests
         [TestMethod]
         public async Task Redeem_400Errors_ThrowsArgumentException()
         {
+            // A value that parses here can still be refused by the cloud,
+            // whose message is relayed. A value that does not parse never
+            // reaches the cloud, see DidClientMalformedInputTests.
             _handler.Enqueue(HttpStatusCode.BadRequest,
-                "{\"errors\":[\"'x' is not a valid Base64-encoded 51Did.\"]}");
+                "{\"errors\":[\"The resource key does not include the 51Did properties.\"]}");
             using var client = NewClient();
 
             var error = await Assert.ThrowsExactlyAsync<ArgumentException>(
-                () => client.RedeemAsync("x", "sealed"));
+                () => client.RedeemAsync(
+                    _factory.SignedOwidBase64(CanonicalPayload()), "sealed"));
 
-            StringAssert.Contains(error.Message, "not a valid Base64-encoded 51Did");
+            StringAssert.Contains(error.Message, "does not include the 51Did properties");
+            Assert.AreEqual(1, _handler.Requests.Count);
         }
 
         [TestMethod]
