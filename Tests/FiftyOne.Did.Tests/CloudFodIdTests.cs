@@ -242,17 +242,17 @@ namespace FiftyOne.Did.Tests
         /// <summary>
         /// Asserts that <paramref name="base64"/> is a real 51Did: a signed
         /// OWID envelope whose payload carries the three 51Did fields,
-        /// including the 32-byte probabilistic hash.
+        /// including the 32-byte probabilistic match key.
         /// </summary>
         private static void AssertValid51Did(string label, string base64)
         {
             var fodId = new FodId(base64);
 
             // A 51Did wraps a payload of at least PayloadLength bytes carrying
-            // a HashLength byte probabilistic value, inside a domain bearing
-            // envelope.
+            // a HashLength byte probabilistic match key, inside a domain
+            // bearing envelope.
             Assert.AreEqual(FodId.HashLength, fodId.MatchKey.Length,
-                $"{label}: hash length");
+                $"{label}: match key length");
             Assert.IsTrue(fodId.Payload.Length >= FodId.PayloadLength,
                 $"{label}: payload length {fodId.Payload.Length} is below " +
                 $"the {FodId.PayloadLength} byte minimum");
@@ -263,13 +263,13 @@ namespace FiftyOne.Did.Tests
             // same probabilistic value.
             var reparsed = new FodId(fodId.AsBase64());
             CollectionAssert.AreEqual(fodId.MatchKey, reparsed.MatchKey,
-                $"{label}: hash should survive a base64 round trip");
+                $"{label}: match key should survive a base64 round trip");
 
             Console.WriteLine(
                 $"{label}: domain={fodId.Domain} " +
                 $"flags=0x{fodId.Flags:X2} " +
                 $"licenseId=0x{fodId.LicenseId:X8} " +
-                $"hash={Convert.ToHexString(fodId.MatchKey)}");
+                $"matchKey={Convert.ToHexString(fodId.MatchKey)}");
         }
     }
 }

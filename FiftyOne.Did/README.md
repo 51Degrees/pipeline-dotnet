@@ -18,26 +18,27 @@ deliberately.
   payload and signature, and it changes byte-for-byte every time the cloud
   issues one, even for the same inputs, because the date and signature
   change with each call.
-- The **value** is the part of the envelope that is stable and comparable.
-  It is the payload bytes after Flags and LicenseId, a 32-byte SHA-256 for
-  Probabilistic and HashedEmail identifiers, or a 16-byte GUID for Random.
-  Two 51Dids for the same inputs share the same value even though their
-  envelopes differ.
+- The **match key** is the part of the envelope that is stable and
+  comparable. It is the payload bytes after Flags and LicenseId, a 32-byte
+  SHA-256 for Probabilistic and HashedEmail identifiers, or a 16-byte GUID
+  for Random. Two 51Dids for the same inputs share the same match key even
+  though their envelopes differ.
 
-Comparing two 51Dids means comparing their values, never their envelopes.
+Comparing two 51Dids means comparing their match keys, never their
+envelopes.
 
 ## Payload layout
 
 The header is shared by every identifier type. Bits 6-7 of Flags
-select the type and the length of the value that follows.
+select the type and the length of the match key that follows.
 
 | Offset | Length | Field      | Type                                            |
 |-------:|-------:|------------|-------------------------------------------------|
 |      0 |      1 | Flags      | uint8: bits 0-2 usage, bits 6-7 identifier type |
 |      1 |      4 | LicenseId  | uint32 (little-endian)                          |
-|      5 |  16/32 | Value      | SHA-256 (Probabilistic, HashedEmail) or GUID bytes (Random) |
+|      5 |  16/32 | Match key  | SHA-256 (Probabilistic, HashedEmail) or GUID bytes (Random) |
 
-| Bits 7-6 | `FodId.Type`    | Value length | Minimum payload |
+| Bits 7-6 | `FodId.Type`    | Match key length | Minimum payload |
 |---------:|-----------------|-------------:|----------------:|
 |     `00` | `Probabilistic` |           32 |              37 |
 |     `01` | `Random`        |           16 |              21 |
@@ -50,7 +51,7 @@ and decode as `Probabilistic`.
 The minimum payload is a lower bound and the only length rule this
 package applies. A 51Did that carries a creator context, which binds
 the identifier to the browser and connection it was created on, has a
-section after the value, so its payload is longer than the minimum.
+section after the match key, so its payload is longer than the minimum.
 The lengths of that section belong to the cloud, and this package has
 no upper bound of its own, so a longer payload is accepted and the
 same three fields are exposed. An older reader therefore keeps working
@@ -143,7 +144,7 @@ var fodId = FodId.FromBase64(base64FromCloudService);
 byte    flags     = fodId.Flags;
 IdType  type      = fodId.Type;        // Probabilistic / Random / HashedEmail
 uint    licenseId = fodId.LicenseId;
-byte[]  hash      = fodId.Hash;        // SHA-256 or GUID bytes, see Type
+byte[]  matchKey  = fodId.MatchKey;    // SHA-256 or GUID bytes, see Type
 
 // Inherited OWID-level fields.
 string   domain   = fodId.Domain;
@@ -166,12 +167,12 @@ var b = FodId.FromBase64(idprobglobalB);
 bool sameDate = a.Date == b.Date;                           // false
 bool sameSig  = a.Signature.SequenceEqual(b.Signature);     // false
 
-// The value inside the payload IS stable. This is what you
+// The match key inside the payload IS stable. This is what you
 // actually compare:
-bool sameValue = a.Hash.SequenceEqual(b.Hash);              // true
+bool sameMatchKey = a.MatchKey.SequenceEqual(b.MatchKey);   // true
 ```
 
-Use `FodId.Hash` as the cache / dedup key. The same value means the
+Use `FodId.MatchKey` as the cache / dedup key. The same match key means the
 same browser instance under the same usage policy on the same License
 Key (for `idproblic`) or across all callers (for `idprobglobal`).
 
@@ -368,4 +369,4 @@ whose signature covers the original bytes. Compare them by content.
   with signature verification and a "Live 51d.es v3" sample.
 - The [51Did comparer](https://51degrees.com/developers/51did-comparer?utm_source=github&utm_medium=readme&utm_campaign=pipeline-dotnet&utm_content=fiftyone.did-readme.md&utm_term=see-also)
   for a side-by-side, byte-by-byte comparison of two 51Dids that
-  highlights the envelope-vs-value distinction in action.
+  highlights the envelope-vs-match-key distinction in action.

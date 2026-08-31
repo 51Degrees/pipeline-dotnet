@@ -79,8 +79,18 @@ namespace FiftyOne.Did.Tests
 
             Assert.AreEqual(CanonicalFlags, fodId.Flags);
             Assert.AreEqual(CanonicalLicenseId, fodId.LicenseId);
-            CollectionAssert.AreEqual(CanonicalHash, fodId.Hash);
+            CollectionAssert.AreEqual(CanonicalHash, fodId.MatchKey);
             Assert.AreEqual(TestDomain, fodId.Domain);
+        }
+
+        [TestMethod]
+        public void ObsoleteHash_ReturnsMatchKey()
+        {
+            var fodId = new FodId(_factory.SignedOwidBase64(CanonicalPayload()));
+
+#pragma warning disable 618 // deliberately exercising the obsolete alias
+            CollectionAssert.AreEqual(fodId.MatchKey, fodId.Hash);
+#pragma warning restore 618
         }
 
         [TestMethod]
@@ -93,7 +103,7 @@ namespace FiftyOne.Did.Tests
 
             Assert.AreEqual(CanonicalFlags, fodId.Flags);
             Assert.AreEqual(CanonicalLicenseId, fodId.LicenseId);
-            CollectionAssert.AreEqual(CanonicalHash, fodId.Hash);
+            CollectionAssert.AreEqual(CanonicalHash, fodId.MatchKey);
             Assert.AreEqual(TestDomain, fodId.Domain);
         }
 
@@ -106,7 +116,7 @@ namespace FiftyOne.Did.Tests
 
             Assert.AreEqual(CanonicalFlags, fodId.Flags);
             Assert.AreEqual(CanonicalLicenseId, fodId.LicenseId);
-            CollectionAssert.AreEqual(CanonicalHash, fodId.Hash);
+            CollectionAssert.AreEqual(CanonicalHash, fodId.MatchKey);
             Assert.AreEqual(owid.Domain, fodId.Domain);
             Assert.AreEqual(owid.Date, fodId.Date);
             Assert.AreEqual(owid.Version, fodId.Version);
@@ -190,12 +200,12 @@ namespace FiftyOne.Did.Tests
         }
 
         [TestMethod]
-        public void Hash_IsDefensiveCopy()
+        public void MatchKey_IsDefensiveCopy()
         {
             var fodId = new FodId(_factory.SignedOwidBase64(CanonicalPayload()));
 
-            fodId.Hash[0] = 0x00;
-            fodId.Hash[FodId.HashLength - 1] = 0x00;
+            fodId.MatchKey[0] = 0x00;
+            fodId.MatchKey[FodId.HashLength - 1] = 0x00;
 
             // The inherited Payload bytes must not have been mutated.
             Assert.AreEqual(CanonicalHash[0], fodId.Payload[FodId.HashOffset]);
@@ -271,7 +281,7 @@ namespace FiftyOne.Did.Tests
                     Assert.AreEqual(expected.AsBase64(), fodId.AsBase64());
                     Assert.AreEqual(expected.Flags, fodId.Flags);
                     Assert.AreEqual(expected.LicenseId, fodId.LicenseId);
-                    CollectionAssert.AreEqual(expected.Hash, fodId.Hash);
+                    CollectionAssert.AreEqual(expected.MatchKey, fodId.MatchKey);
                 }
             }
         }
@@ -292,8 +302,8 @@ namespace FiftyOne.Did.Tests
 
             Assert.AreEqual(CanonicalFlags, fodId.Flags);
             Assert.AreEqual(CanonicalLicenseId, fodId.LicenseId);
-            CollectionAssert.AreEqual(CanonicalHash, fodId.Hash);
-            Assert.AreEqual(FodId.HashLength, fodId.Hash.Length);
+            CollectionAssert.AreEqual(CanonicalHash, fodId.MatchKey);
+            Assert.AreEqual(FodId.HashLength, fodId.MatchKey.Length);
         }
 
         [TestMethod]
@@ -313,7 +323,7 @@ namespace FiftyOne.Did.Tests
             Assert.AreEqual(
                 "a-very-long-self-hosted-creator-domain.example.com",
                 fodId.Domain);
-            CollectionAssert.AreEqual(CanonicalHash, fodId.Hash);
+            CollectionAssert.AreEqual(CanonicalHash, fodId.MatchKey);
         }
 
         [TestMethod]
@@ -328,7 +338,7 @@ namespace FiftyOne.Did.Tests
             var fodId = new FodId(_factory.SignedOwidBase64(payload));
 
             Assert.AreEqual(IdType.Reserved, fodId.Type);
-            Assert.AreEqual(500, fodId.Hash.Length);
+            Assert.AreEqual(500, fodId.MatchKey.Length);
         }
 
         [TestMethod]
@@ -349,7 +359,7 @@ namespace FiftyOne.Did.Tests
 
             Assert.AreEqual(fodId1.Flags, fodId2.Flags);
             Assert.AreEqual(fodId1.LicenseId, fodId2.LicenseId);
-            CollectionAssert.AreEqual(fodId1.Hash, fodId2.Hash);
+            CollectionAssert.AreEqual(fodId1.MatchKey, fodId2.MatchKey);
             Assert.AreEqual(fodId1.Domain, fodId2.Domain);
         }
 
@@ -381,11 +391,11 @@ namespace FiftyOne.Did.Tests
             var fodId = new FodId(_factory.SignedOwidBase64(CanonicalRandomPayload()));
 
             Assert.AreEqual(CanonicalLicenseId, fodId.LicenseId);
-            Assert.AreEqual(FodId.GuidLength, fodId.Hash.Length);
+            Assert.AreEqual(FodId.GuidLength, fodId.MatchKey.Length);
             CollectionAssert.AreEqual(
                 Enumerable.Range(0x40, FodId.GuidLength)
                     .Select(i => (byte)i).ToArray(),
-                fodId.Hash);
+                fodId.MatchKey);
         }
 
         [TestMethod]
@@ -412,7 +422,7 @@ namespace FiftyOne.Did.Tests
             var fodId = new FodId(_factory.SignedOwidBase64(payload));
 
             Assert.AreEqual(IdType.Random, fodId.Type);
-            Assert.AreEqual(FodId.GuidLength, fodId.Hash.Length);
+            Assert.AreEqual(FodId.GuidLength, fodId.MatchKey.Length);
         }
 
         [TestMethod]
@@ -436,7 +446,7 @@ namespace FiftyOne.Did.Tests
             var fodId = new FodId(_factory.SignedOwidBase64(payload));
 
             Assert.AreEqual(IdType.Reserved, fodId.Type);
-            Assert.AreEqual(0, fodId.Hash.Length);
+            Assert.AreEqual(0, fodId.MatchKey.Length);
         }
 
         [TestMethod]
@@ -451,24 +461,24 @@ namespace FiftyOne.Did.Tests
 
         // ----------------------------------------------------------------
         // Additional coverage for the reader's semantic guarantees, which the
-        // cases above do not exercise: comparison by value, construction
+        // cases above do not exercise: comparison by match key, construction
         // without verification, a failing verification, and a bytes-first
         // round trip.
         // ----------------------------------------------------------------
 
         /// <summary>
-        /// Two 51Dids issued for the same payload carry the same probabilistic
-        /// value (Hash) even though their envelopes differ. This is the whole
-        /// reason the reader exists, so compare hashes, never identifiers.
+        /// Two 51Dids issued for the same payload carry the same match key
+        /// (MatchKey) even though their envelopes differ. This is the whole
+        /// reason the reader exists, so compare match keys, never envelopes.
         /// </summary>
         [TestMethod]
-        public void SamePayload_SameHash_DifferentEnvelope()
+        public void SamePayload_SameMatchKey_DifferentEnvelope()
         {
             var a = new FodId(_factory.SignedOwidBase64(CanonicalPayload()));
             var b = new FodId(_factory.SignedOwidBase64(CanonicalPayload()));
 
-            // The probabilistic value is stable across reissues.
-            CollectionAssert.AreEqual(a.Hash, b.Hash);
+            // The probabilistic match key is stable across reissues.
+            CollectionAssert.AreEqual(a.MatchKey, b.MatchKey);
             // The wrapping envelope is not (the signature is regenerated).
             Assert.IsFalse(a.Signature.SequenceEqual(b.Signature));
             Assert.AreNotEqual(a.AsBase64(), b.AsBase64());
@@ -493,7 +503,7 @@ namespace FiftyOne.Did.Tests
 
             Assert.AreEqual(CanonicalFlags, fodId.Flags);
             Assert.AreEqual(CanonicalLicenseId, fodId.LicenseId);
-            CollectionAssert.AreEqual(CanonicalHash, fodId.Hash);
+            CollectionAssert.AreEqual(CanonicalHash, fodId.MatchKey);
             Assert.AreEqual(
                 OwidSignatureStatus.SignatureInvalid,
                 fodId.SignatureStatus(_factory.PublicPem));
@@ -528,7 +538,7 @@ namespace FiftyOne.Did.Tests
 
             Assert.AreEqual(CanonicalFlags, roundTripped.Flags);
             Assert.AreEqual(CanonicalLicenseId, roundTripped.LicenseId);
-            CollectionAssert.AreEqual(CanonicalHash, roundTripped.Hash);
+            CollectionAssert.AreEqual(CanonicalHash, roundTripped.MatchKey);
         }
     }
 }

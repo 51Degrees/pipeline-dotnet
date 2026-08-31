@@ -81,7 +81,7 @@ namespace FiftyOne.Did.Tests
             Assert.AreEqual(standard, fromStandard.AsBase64());
             Assert.AreEqual(standard, fromUrlSafePadded.AsBase64());
             Assert.AreEqual(standard, fromUrlSafe.AsBase64());
-            CollectionAssert.AreEqual(CanonicalHash, fromUrlSafe.Hash);
+            CollectionAssert.AreEqual(CanonicalHash, fromUrlSafe.MatchKey);
             Assert.AreEqual(CanonicalLicenseId, fromUrlSafe.LicenseId);
         }
 
