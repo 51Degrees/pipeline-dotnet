@@ -95,8 +95,18 @@ namespace FiftyOne.Did.Model
 
         /// <summary>
         /// The envelope is structurally consistent but larger than this
-        /// runtime can hold.
+        /// runtime can hold, or dated past the end of the year 9999 where
+        /// <see cref="System.DateTime"/> stops.
         /// </summary>
+        /// <remarks>
+        /// The four byte minute count of OWID versions 2 and 3 runs to 15
+        /// February 10186. A count past the end of 9999 is one the wire
+        /// format allows and this runtime cannot represent, so the OWID
+        /// reader judges the count before the arithmetic and answers with
+        /// this status rather than throwing. The same bytes read fine
+        /// where the date type is wider, so the status is not a fault in
+        /// the data.
+        /// </remarks>
         ImplementationCapacityExceeded =
             (int)OwidParseStatus.ImplementationCapacityExceeded,
 
