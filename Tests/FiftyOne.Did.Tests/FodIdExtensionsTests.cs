@@ -51,7 +51,7 @@ namespace FiftyOne.Did.Tests
             Assert.AreEqual(IdType.HashedEmail, fodId.Type);
             Assert.AreEqual(CanonicalLicenseId, fodId.LicenseId);
             Assert.AreEqual(TestDomain, fodId.Domain);
-            Assert.AreEqual(FodId.HashLength, fodId.Hash.Length);
+            Assert.AreEqual(FodId.HashLength, fodId.MatchKey.Length);
         }
 
         [TestMethod]

@@ -65,7 +65,7 @@ namespace FiftyOne.Did.Tests
         /// <summary>The canonical little-endian License Id, 0x12345678.</summary>
         public const uint CanonicalLicenseId = 0x12345678u;
 
-        /// <summary>The canonical 32-byte hash value, bytes 0x20..0x3F.</summary>
+        /// <summary>The canonical 32-byte match key, bytes 0x20..0x3F.</summary>
         public static readonly byte[] CanonicalHash = Enumerable
             .Range(0, FodId.HashLength)
             .Select(i => (byte)(0x20 + i))

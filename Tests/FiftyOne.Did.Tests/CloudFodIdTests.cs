@@ -242,17 +242,17 @@ namespace FiftyOne.Did.Tests
         /// <summary>
         /// Asserts that <paramref name="base64"/> is a real 51Did: a signed
         /// OWID envelope whose payload carries the three 51Did fields,
-        /// including the 32-byte probabilistic hash.
+        /// including the 32-byte probabilistic match key.
         /// </summary>
         private static void AssertValid51Did(string label, string base64)
         {
             var fodId = new FodId(base64);
 
             // A 51Did wraps a payload of at least PayloadLength bytes carrying
-            // a HashLength byte probabilistic value, inside a domain bearing
-            // envelope.
-            Assert.AreEqual(FodId.HashLength, fodId.Hash.Length,
-                $"{label}: hash length");
+            // a HashLength byte probabilistic match key, inside a domain
+            // bearing envelope.
+            Assert.AreEqual(FodId.HashLength, fodId.MatchKey.Length,
+                $"{label}: match key length");
             Assert.IsTrue(fodId.Payload.Length >= FodId.PayloadLength,
                 $"{label}: payload length {fodId.Payload.Length} is below " +
                 $"the {FodId.PayloadLength} byte minimum");
@@ -262,14 +262,14 @@ namespace FiftyOne.Did.Tests
             // The identifier round trips byte for byte and re-parses to the
             // same probabilistic value.
             var reparsed = new FodId(fodId.AsBase64());
-            CollectionAssert.AreEqual(fodId.Hash, reparsed.Hash,
-                $"{label}: hash should survive a base64 round trip");
+            CollectionAssert.AreEqual(fodId.MatchKey, reparsed.MatchKey,
+                $"{label}: match key should survive a base64 round trip");
 
             Console.WriteLine(
                 $"{label}: domain={fodId.Domain} " +
                 $"flags=0x{fodId.Flags:X2} " +
                 $"licenseId=0x{fodId.LicenseId:X8} " +
-                $"hash={Convert.ToHexString(fodId.Hash)}");
+                $"matchKey={Convert.ToHexString(fodId.MatchKey)}");
         }
     }
 }

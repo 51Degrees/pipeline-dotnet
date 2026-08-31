@@ -96,7 +96,7 @@ namespace FiftyOne.Did.Tests
             AssertParsed(ok, fodId, status);
             Assert.AreEqual(CanonicalFlags, fodId!.Flags);
             Assert.AreEqual(CanonicalLicenseId, fodId.LicenseId);
-            CollectionAssert.AreEqual(CanonicalHash, fodId.Hash);
+            CollectionAssert.AreEqual(CanonicalHash, fodId.MatchKey);
             Assert.AreEqual(TestDomain, fodId.Domain);
         }
 
@@ -109,7 +109,7 @@ namespace FiftyOne.Did.Tests
                 out var status);
 
             AssertParsed(ok, fodId, status);
-            CollectionAssert.AreEqual(CanonicalHash, fodId!.Hash);
+            CollectionAssert.AreEqual(CanonicalHash, fodId!.MatchKey);
         }
 
         [TestMethod]
@@ -140,13 +140,13 @@ namespace FiftyOne.Did.Tests
 
             AssertParsed(ok, fodId, status);
             Assert.AreEqual(domain, fodId!.Domain);
-            CollectionAssert.AreEqual(CanonicalHash, fodId.Hash);
+            CollectionAssert.AreEqual(CanonicalHash, fodId.MatchKey);
         }
 
         [TestMethod]
         public void TryParse_LongerContextSection_Parses()
         {
-            // A creator context section follows the value. Its length is
+            // A creator context section follows the match key. Its length is
             // the cloud's business, so an older reader accepts it at any
             // length and still exposes the same three fields.
             var payload = new byte[FodId.PayloadLength + 300];
@@ -162,7 +162,7 @@ namespace FiftyOne.Did.Tests
             AssertParsed(ok, fodId, status);
             Assert.AreEqual(CanonicalFlags, fodId!.Flags);
             Assert.AreEqual(CanonicalLicenseId, fodId.LicenseId);
-            CollectionAssert.AreEqual(CanonicalHash, fodId.Hash);
+            CollectionAssert.AreEqual(CanonicalHash, fodId.MatchKey);
             Assert.AreEqual(payload.Length, fodId.Payload.Length);
         }
 
@@ -257,7 +257,7 @@ namespace FiftyOne.Did.Tests
                 _factory.SignedOwidBase64(payload), out var fodId, out var status);
 
             AssertParsed(ok, fodId, status);
-            Assert.AreEqual(0, fodId!.Hash.Length);
+            Assert.AreEqual(0, fodId!.MatchKey.Length);
         }
 
         // ----------------------------------------------------------------

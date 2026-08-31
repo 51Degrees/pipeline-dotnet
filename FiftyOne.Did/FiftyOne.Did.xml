@@ -620,7 +620,7 @@
             <summary>
             An OWID whose payload encodes the three fields of a 51Did: a 1-byte
             flags bitmask (usage tier and identifier type), a 4-byte
-            little-endian License Id, and the identifier value.
+            little-endian License Id, and the match key.
             </summary>
             <remarks>
             <para>
@@ -628,28 +628,28 @@
             the identifier as a whole, meaning the concept and its rules. The
             envelope is the data model that carries it, this OWID, holding the
             version, domain, date, payload and signature, re-issued fresh on
-            every call. The value is the part of the envelope that is stable
+            every call. The match key is the part of the envelope that is stable
             and comparable, the payload bytes after Flags and LicenseId,
-            exposed as <see cref="P:FiftyOne.Did.Model.FodId.Hash"/>. Two responses for the same inputs
-            share the same value but differ at the byte level because the
+            exposed as <see cref="P:FiftyOne.Did.Model.FodId.MatchKey"/>. Two responses for the same inputs
+            share the same match key but differ at the byte level because the
             envelope embeds a fresh date and signature on each call. Compare
-            values, never envelopes.
+            match keys, never envelopes.
             </para>
             <para>
             Payload layout. The header (offsets 0-4) is shared by every
             identifier type; bits 6-7 of Flags select the type and the length
-            of the value that follows:
+            of the match key that follows:
             </para>
             <list type="table">
               <listheader><term>Offset</term><term>Length</term><term>Field</term></listheader>
               <item><term>0</term><term>1</term><term>Flags (bits 0-2 usage, bits 6-7 type)</term></item>
               <item><term>1</term><term>4</term><term>LicenseId (uint32 LE)</term></item>
-              <item><term>5</term><term>32</term><term>Value: SHA-256 (Probabilistic, HashedEmail)</term></item>
-              <item><term>5</term><term>16</term><term>Value: GUID (Random)</term></item>
+              <item><term>5</term><term>32</term><term>Match key: SHA-256 (Probabilistic, HashedEmail)</term></item>
+              <item><term>5</term><term>16</term><term>Match key: GUID (Random)</term></item>
             </list>
             <para>
             Only a lower bound is applied to the payload. Anything after the
-            value is a creator context section whose lengths belong to the
+            match key is a creator context section whose lengths belong to the
             cloud, so a longer payload is accepted here and the same three
             fields are exposed.
             </para>
@@ -691,12 +691,12 @@
         </member>
         <member name="F:FiftyOne.Did.Model.FodId.HashOffset">
             <summary>
-            Byte offset of the Hash field within the payload.
+            Byte offset of the match key field within the payload.
             </summary>
         </member>
         <member name="F:FiftyOne.Did.Model.FodId.HashLength">
             <summary>
-            Byte length of the Hash field (SHA-256).
+            Byte length of the match key field (SHA-256).
             </summary>
         </member>
         <member name="F:FiftyOne.Did.Model.FodId.HeaderLength">
@@ -707,7 +707,7 @@
         </member>
         <member name="F:FiftyOne.Did.Model.FodId.GuidLength">
             <summary>
-            Byte length of the GUID value carried by Random identifiers.
+            Byte length of the GUID match key carried by Random identifiers.
             </summary>
         </member>
         <member name="F:FiftyOne.Did.Model.FodId.RandomPayloadLength">
@@ -719,7 +719,7 @@
         <member name="F:FiftyOne.Did.Model.FodId.PayloadLength">
             <summary>
             Minimum byte length of a Probabilistic or HashedEmail 51Did
-            payload (Flags + LicenseId + Hash). Random payloads are
+            payload (Flags + LicenseId + MatchKey). Random payloads are
             shorter - see <see cref="F:FiftyOne.Did.Model.FodId.RandomPayloadLength"/>.
             </summary>
             <remarks>
@@ -752,16 +752,21 @@
             identifiers for the same licence need not share it.
             </summary>
         </member>
-        <member name="P:FiftyOne.Did.Model.FodId.Hash">
+        <member name="P:FiftyOne.Did.Model.FodId.MatchKey">
             <summary>
-            The value bytes from the payload, a 32-byte SHA-256 for
+            The match key from the payload, a 32-byte SHA-256 for
             Probabilistic and HashedEmail identifiers, or 16 GUID bytes for
             Random ones. This is the stable, comparable part of the
-            envelope. Two 51Dids for the same inputs share the same value
-            even though their envelopes (date, signature) differ on every
-            issue. Treat it as the cache / dedup key. SHA-256 is the
-            underlying hash function for the probabilistic and hashed-email
-            types, and the property is named Hash to reflect that.
+            envelope. Two 51Dids for the same inputs share the same match
+            key even though their envelopes (date, signature) differ on
+            every issue. Treat it as the cache / dedup key.
+            </summary>
+        </member>
+        <member name="P:FiftyOne.Did.Model.FodId.Hash">
+            <summary>
+            Obsolete alias for <see cref="P:FiftyOne.Did.Model.FodId.MatchKey"/>. The stable, comparable
+            part of a 51Did is now called the match key, mirroring the Model
+            Terms for Marketing vocabulary.
             </summary>
         </member>
         <member name="F:FiftyOne.Did.Model.FodId.DateBase">
