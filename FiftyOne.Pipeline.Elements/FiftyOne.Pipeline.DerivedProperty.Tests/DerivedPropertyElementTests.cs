@@ -302,9 +302,7 @@ public class DerivedPropertyElementTests
         var builder = new DerivedPropertyElementBuilder(_loggerFactory);
         var exception = Assert.ThrowsExactly<ArgumentNullException>(
             () => builder.Build());
-        Assert.IsTrue(
-            exception.Message.Contains("At least one script"),
-            exception.Message);
+        Assert.Contains("At least one script", exception.Message);
     }
 
     /// <summary>
@@ -361,9 +359,7 @@ public class DerivedPropertyElementTests
         var exception =
             Assert.ThrowsExactly<DerivedScriptValidationException>(
                 () => builder.Build());
-        Assert.IsTrue(
-            exception.Message.Contains("write the property 'Same'"),
-            exception.Message);
+        Assert.Contains("write the property 'Same'", exception.Message);
     }
 
     // -----------------------------------------------------------------
@@ -391,7 +387,7 @@ public class DerivedPropertyElementTests
                 first.ElementDataKey);
 
             var filter = (EvidenceKeyFilterWhitelist)first.EvidenceKeyFilter;
-            Assert.AreEqual(0, filter.Whitelist.Count);
+            Assert.IsEmpty(filter.Whitelist);
             Assert.IsFalse(first.EvidenceKeyFilter.Include("header.user-agent"));
             Assert.IsFalse(first.EvidenceKeyFilter.Include("query.anything"));
 
@@ -522,11 +518,11 @@ public class DerivedPropertyElementTests
             Assert.AreEqual(DerivedValueType.String, output.ValueType);
             Assert.AreEqual("Unknown", output.DefaultValue);
             Assert.IsFalse(output.IsList);
-            Assert.AreEqual(true, output.IsMandatory);
-            Assert.AreEqual(false, output.IsObsolete);
+            Assert.IsTrue(output.IsMandatory);
+            Assert.IsFalse(output.IsObsolete);
             Assert.AreEqual("General", output.Category);
-            Assert.AreEqual(true, output.IsPopular);
-            Assert.AreEqual(true, output.ExportValues);
+            Assert.IsTrue(output.IsPopular);
+            Assert.IsTrue(output.ExportValues);
             Assert.AreEqual(
                 "https://51degrees.com/documentation", output.Url);
             Assert.AreEqual(7, output.DisplayOrder);
@@ -565,12 +561,9 @@ public class DerivedPropertyElementTests
 
         var exception = Assert.ThrowsExactly<PipelineConfigurationException>(
             () => builder.Build());
-        Assert.IsTrue(
-            exception.Message.Contains("'device.IsVisible'"),
-            exception.Message);
-        Assert.IsTrue(
-            exception.Message.Contains("no element in the pipeline supplies"),
-            exception.Message);
+        Assert.Contains("'device.IsVisible'", exception.Message);
+        Assert.Contains(
+            "no element in the pipeline supplies", exception.Message);
         element.Dispose();
     }
 
@@ -591,12 +584,9 @@ public class DerivedPropertyElementTests
 
         var exception = Assert.ThrowsExactly<PipelineConfigurationException>(
             () => builder.Build());
-        Assert.IsTrue(
-            exception.Message.Contains("StubSourceElement"),
-            exception.Message);
-        Assert.IsTrue(
-            exception.Message.Contains(
-                "placed after the derived property element"),
+        Assert.Contains("StubSourceElement", exception.Message);
+        Assert.Contains(
+            "placed after the derived property element",
             exception.Message);
         element.Dispose();
     }
@@ -620,7 +610,7 @@ public class DerivedPropertyElementTests
                 .Where(e => e.Contains("names the optional property"))
                 .ToList();
             Assert.HasCount(1, lines);
-            Assert.IsTrue(lines[0].Contains("'a.P'"), lines[0]);
+            Assert.Contains("'a.P'", lines[0]);
 
             // Absent on every request, so the rule that needs it never
             // matches and the Else supplies the answer.
@@ -654,10 +644,8 @@ public class DerivedPropertyElementTests
 
         var exception = Assert.ThrowsExactly<PipelineConfigurationException>(
             () => builder.Build());
-        Assert.IsTrue(
-            exception.Message.Contains(
-                "already writes a property of that name"),
-            exception.Message);
+        Assert.Contains(
+            "already writes a property of that name", exception.Message);
         first.Dispose();
         second.Dispose();
     }
@@ -726,11 +714,11 @@ public class DerivedPropertyElementTests
                 .ToList();
             Assert.HasCount(1, lines);
             var line = lines[0];
-            Assert.IsTrue(line.Contains("version 1.0.0"), line);
-            Assert.IsTrue(line.Contains("format 1"), line);
-            Assert.IsTrue(line.Contains("from code"), line);
-            Assert.IsTrue(line.Contains("'LoggedOutput'"), line);
-            Assert.IsTrue(line.Contains("as string"), line);
+            Assert.Contains("version 1.0.0", line);
+            Assert.Contains("format 1", line);
+            Assert.Contains("from code", line);
+            Assert.Contains("'LoggedOutput'", line);
+            Assert.Contains("as string", line);
         }
     }
 
@@ -770,9 +758,8 @@ public class DerivedPropertyElementTests
                 .Where(e => e.Contains("is deprecated"))
                 .ToList();
             Assert.HasCount(1, lines);
-            Assert.IsTrue(lines[0].Contains("'Old'"), lines[0]);
-            Assert.IsTrue(
-                lines[0].Contains("Use the New script instead."), lines[0]);
+            Assert.Contains("'Old'", lines[0]);
+            Assert.Contains("Use the New script instead.", lines[0]);
         }
     }
 
@@ -793,10 +780,10 @@ public class DerivedPropertyElementTests
                 .ToList();
             Assert.HasCount(1, lines);
             var line = lines[0];
-            Assert.IsTrue(line.Contains("compiled to"), line);
-            Assert.IsTrue(line.Contains("\"Format\""), line);
-            Assert.IsTrue(line.Contains("\"Output\""), line);
-            Assert.IsTrue(line.Contains("\"Rules\""), line);
+            Assert.Contains("compiled to", line);
+            Assert.Contains("\"Format\"", line);
+            Assert.Contains("\"Output\"", line);
+            Assert.Contains("\"Rules\"", line);
         }
     }
 

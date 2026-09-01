@@ -801,9 +801,7 @@ Rules:
             "Strict",
             Values("device.WebDriver", "None"));
         Assert.IsFalse(value.HasValue);
-        Assert.IsTrue(
-            value.NoValueMessage.Contains("'device.IsVisible'"),
-            value.NoValueMessage);
+        Assert.Contains("'device.IsVisible'", value.NoValueMessage);
     }
 
     /// <summary>
@@ -839,9 +837,8 @@ Rules:
             "Strict",
             Values("device.IsVisible", true));
         Assert.IsFalse(value.HasValue);
-        Assert.IsTrue(
-            value.NoValueMessage.Contains(
-                "because 1 required property was not available."),
+        Assert.Contains(
+            "because 1 required property was not available.",
             value.NoValueMessage);
     }
 
@@ -862,10 +859,9 @@ Rules:
                     NoValueMessage = "the JavaScript has not run yet"
                 }));
         Assert.IsFalse(value.HasValue);
-        Assert.IsTrue(
-            value.NoValueMessage.Contains(
-                "'device.WebDriver' (element 'device' has no value for " +
-                "'WebDriver': the JavaScript has not run yet)."),
+        Assert.Contains(
+            "'device.WebDriver' (element 'device' has no value for " +
+            "'WebDriver': the JavaScript has not run yet).",
             value.NoValueMessage);
     }
 
@@ -883,10 +879,8 @@ Rules:
                 "device.IsVisible", "N/A",
                 "device.WebDriver", "None"));
         Assert.IsFalse(value.HasValue);
-        Assert.IsTrue(
-            value.NoValueMessage.Contains(
-                "'device.IsVisible' (held 'N/A' which cannot be read as " +
-                "bool)."),
+        Assert.Contains(
+            "'device.IsVisible' (held 'N/A' which cannot be read as bool).",
             value.NoValueMessage);
     }
 
