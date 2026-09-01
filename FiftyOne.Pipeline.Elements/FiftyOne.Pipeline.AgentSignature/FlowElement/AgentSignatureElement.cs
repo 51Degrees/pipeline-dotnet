@@ -513,26 +513,44 @@ namespace FiftyOne.Pipeline.AgentSignature.FlowElement
         {
             var result = new Dictionary<string, AgentCard>(
                 StringComparer.Ordinal);
-            using (var source = new CancellationTokenSource(
-                _configuration.FetchTimeout))
+            try
             {
-                foreach (var registry in _configuration.Registries)
+                using (var source = new CancellationTokenSource(
+                    _configuration.FetchTimeout))
                 {
-                    var cardUrls = await _fetcher
-                        .FetchRegistryAsync(registry, source.Token)
-                        .ConfigureAwait(false);
-                    foreach (var cardUrl in cardUrls)
+                    foreach (var registry in _configuration.Registries)
                     {
-                        var card = await _fetcher
-                            .FetchCardAsync(cardUrl, source.Token)
+                        var cardUrls = await _fetcher
+                            .FetchRegistryAsync(registry, source.Token)
                             .ConfigureAwait(false);
-                        if (card != null &&
-                            string.IsNullOrEmpty(card.JwksUri) == false)
+                        foreach (var cardUrl in cardUrls)
                         {
-                            result[card.JwksUri] = card;
+                            var card = await _fetcher
+                                .FetchCardAsync(cardUrl, source.Token)
+                                .ConfigureAwait(false);
+                            if (card != null &&
+                                string.IsNullOrEmpty(card.JwksUri) == false)
+                            {
+                                result[card.JwksUri] = card;
+                            }
                         }
                     }
                 }
+            }
+#pragma warning disable CA1031 // Do not catch general exception types
+            catch (Exception exception)
+#pragma warning restore CA1031
+            {
+                // The catch is deliberately broad, for the same reason as the
+                // one in the directory cache. A request reads this task with
+                // Result, and an agent card never changes whether a signature
+                // is valid, so a registry that cannot be read must cost the
+                // request nothing more than the card properties.
+                Logger.LogWarning(string.Format(
+                    CultureInfo.InvariantCulture,
+                    Messages.LogRegistryFetchFailed,
+                    string.Join(", ", _configuration.Registries),
+                    exception.Message));
             }
             return result;
         }

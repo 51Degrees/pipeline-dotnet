@@ -122,10 +122,16 @@ namespace FiftyOne.Pipeline.AgentSignature.Keys
             // entry the cache drops cannot be served whilst a fresh copy is
             // fetched. This class ages entries itself so that a stale
             // directory keeps working until its replacement arrives.
+            //
+            // The concurrency is held at or below the size because the cache
+            // splits its room evenly across that many lists and never lets a
+            // list hold nothing. A concurrency above the size would therefore
+            // give one slot per list and hold more directories than the size
+            // asks for, which would make SetCacheSize say something untrue.
             _cache = new LruPutCacheBuilder()
                 .SetUpdateExisting(false)
-                .SetConcurrency(concurrency)
-                .Build<string, DirectorySlot>(size);
+                .SetConcurrency(Math.Max(1, Math.Min(concurrency, size)))
+                .Build<string, DirectorySlot>(Math.Max(1, size));
         }
 
         /// <summary>
@@ -184,11 +190,27 @@ namespace FiftyOne.Pipeline.AgentSignature.Keys
         private async Task<DirectoryEntry> Load(string url, string type)
         {
             Interlocked.Increment(ref _fetchCount);
-            using (var source = new CancellationTokenSource(_fetchTimeout))
+            try
             {
-                return await _fetcher
-                    .FetchAsync(url, type, source.Token)
-                    .ConfigureAwait(false);
+                using (var source = new CancellationTokenSource(_fetchTimeout))
+                {
+                    return await _fetcher
+                        .FetchAsync(url, type, source.Token)
+                        .ConfigureAwait(false);
+                }
+            }
+#pragma warning disable CA1031 // Do not catch general exception types
+            catch (Exception exception)
+#pragma warning restore CA1031
+            {
+                // The catch is deliberately broad. A request reads this task
+                // with Result, so a task that faulted would throw into the
+                // pipeline and break the promise that the element never
+                // throws whatever an agent sends. Any failure at all becomes
+                // an entry saying the directory could not be obtained, which
+                // reads as Unverified rather than as evidence against the
+                // agent.
+                return DirectoryEntry.Failed(_clock(), exception.Message);
             }
         }
 
