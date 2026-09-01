@@ -1,0 +1,223 @@
+[
+  {
+    "name": "minimal signature using rsa-pss-sha512",
+    "section": "B.2.1",
+    "algorithm": "rsa-pss-sha512",
+    "label": "sig-b21",
+    "supported": true,
+    "signature_base": "\"@signature-params\": ();created=1618884473;keyid=\"test-key-rsa-pss\";nonce=\"b3k2pp5k7z-50gnwp.yemd\"",
+    "signature_input_header": "sig-b21=();created=1618884473;keyid=\"test-key-rsa-pss\";nonce=\"b3k2pp5k7z-50gnwp.yemd\"",
+    "signature_header": "sig-b21=:d2pmTvmbncD3xQm8E9ZV2828BjQWGgiwAaw5bAkgibUopemLJcWDy/lkbbHAve4cRAtx31Iq786U7it++wgGxbtRxf8Udx7zFZsckzXaJMkA7ChG52eSkFxykJeNqsrWH5S+oxNFlD4dzVuwe8DhTSja8xxbR/Z2cOGdCbzR72rgFWhzx2VjBqJzsPLMIQKhO4DGezXehhWwE56YCE+O6c0mKZsfxVrogUvA4HELjVKWmAvtl6UnCh8jYzuVG5WSb/QEVPnP5TmcAnLH1g+s++v6d4s8m0gCw1fV5/SITLq9mhho8K3+7EPYTU8IU1bLhdxO5Nyt8C8ssinQ98Xw9Q==:",
+    "signature_params": "();created=1618884473;keyid=\"test-key-rsa-pss\";nonce=\"b3k2pp5k7z-50gnwp.yemd\"",
+    "components": [],
+    "key_name": "test-key-rsa-pss",
+    "key": {
+      "kty": "RSA",
+      "kid": "test-key-rsa-pss",
+      "e": "AQAB",
+      "n": "r4tmm3r20Wd_PbqvP1s2-QEtvpuRaV8Yq40gjUR8y2Rjxa6dpG2GXHbPfvMs8ct-Lh1GH45x28Rw3Ry53mm-oAXjyQ86OnDkZ5N8lYbggD4O3w6M6pAvLkhk95AndTrifbIFPNU8PPMO7OyrFAHqgDsznjPFmTOtCEcN2Z1FpWgchwuYLPL-Wokqltd11nqqzi-bJ9cvSKADYdUAAN5WUtzdpiy6LbTgSxP7ociU4Tn0g5I6aDZJ7A8Lzo0KSyZYoA485mqcO0GVAdVw9lq4aOT9v6d-nb4bnNkQVklLQ3fVAvJm-xdDOp9LCNCN48V2pnDOkFV6-U9nV5oyc6XI2w"
+    },
+    "notes": "The covered components list is empty, which the standard itself warns against because such a signature can be lifted onto an unrelated message. The RSA-PSS algorithm is not deterministic, so the RFC says this signature can be checked against the key but will not be produced again by signing."
+  },
+  {
+    "name": "selective covered components using rsa-pss-sha512",
+    "section": "B.2.2",
+    "algorithm": "rsa-pss-sha512",
+    "label": "sig-b22",
+    "supported": true,
+    "signature_base": "\"@authority\": example.com\n\"content-digest\": sha-512=:WZDPaVn/7XgHaAy8pmojAkGWoRx2UFChF41A2svX+TaPm+AbwAgBWnrIiYllu7BNNyealdVLvRwEmTHWXvJwew==:\n\"@query-param\";name=\"Pet\": dog\n\"@signature-params\": (\"@authority\" \"content-digest\" \"@query-param\";name=\"Pet\");created=1618884473;keyid=\"test-key-rsa-pss\";tag=\"header-example\"",
+    "signature_input_header": "sig-b22=(\"@authority\" \"content-digest\" \"@query-param\";name=\"Pet\");created=1618884473;keyid=\"test-key-rsa-pss\";tag=\"header-example\"",
+    "signature_header": "sig-b22=:LjbtqUbfmvjj5C5kr1Ugj4PmLYvx9wVjZvD9GsTT4F7GrcQEdJzgI9qHxICagShLRiLMlAJjtq6N4CDfKtjvuJyE5qH7KT8UCMkSowOB4+ECxCmT8rtAmj/0PIXxi0A0nxKyB09RNrCQibbUjsLS/2YyFYXEu4TRJQzRw1rLEuEfY17SARYhpTlaqwZVtR8NV7+4UKkjqpcAoFqWFQh62s7Cl+H2fjBSpqfZUJcsIk4N6wiKYd4je2U/lankenQ99PZfB4jY3I5rSV2DSBVkSFsURIjYErOs0tFTQosMTAoxk//0RoKUqiYY8Bh0aaUEb0rQl3/XaVe4bXTugEjHSw==:",
+    "signature_params": "(\"@authority\" \"content-digest\" \"@query-param\";name=\"Pet\");created=1618884473;keyid=\"test-key-rsa-pss\";tag=\"header-example\"",
+    "components": [
+      {
+        "identifier": "\"@authority\"",
+        "value": "example.com"
+      },
+      {
+        "identifier": "\"content-digest\"",
+        "value": "sha-512=:WZDPaVn/7XgHaAy8pmojAkGWoRx2UFChF41A2svX+TaPm+AbwAgBWnrIiYllu7BNNyealdVLvRwEmTHWXvJwew==:"
+      },
+      {
+        "identifier": "\"@query-param\";name=\"Pet\"",
+        "value": "dog"
+      }
+    ],
+    "key_name": "test-key-rsa-pss",
+    "key": {
+      "kty": "RSA",
+      "kid": "test-key-rsa-pss",
+      "e": "AQAB",
+      "n": "r4tmm3r20Wd_PbqvP1s2-QEtvpuRaV8Yq40gjUR8y2Rjxa6dpG2GXHbPfvMs8ct-Lh1GH45x28Rw3Ry53mm-oAXjyQ86OnDkZ5N8lYbggD4O3w6M6pAvLkhk95AndTrifbIFPNU8PPMO7OyrFAHqgDsznjPFmTOtCEcN2Z1FpWgchwuYLPL-Wokqltd11nqqzi-bJ9cvSKADYdUAAN5WUtzdpiy6LbTgSxP7ociU4Tn0g5I6aDZJ7A8Lzo0KSyZYoA485mqcO0GVAdVw9lq4aOT9v6d-nb4bnNkQVklLQ3fVAvJm-xdDOp9LCNCN48V2pnDOkFV6-U9nV5oyc6XI2w"
+    },
+    "notes": "Covers a named query parameter, which the element cannot rebuild from pipeline evidence today. The RSA-PSS algorithm is not deterministic, so the RFC says this signature can be checked against the key but will not be produced again by signing."
+  },
+  {
+    "name": "full coverage using rsa-pss-sha512",
+    "section": "B.2.3",
+    "algorithm": "rsa-pss-sha512",
+    "label": "sig-b23",
+    "supported": true,
+    "signature_base": "\"date\": Tue, 20 Apr 2021 02:07:55 GMT\n\"@method\": POST\n\"@path\": /foo\n\"@query\": ?param=Value&Pet=dog\n\"@authority\": example.com\n\"content-type\": application/json\n\"content-digest\": sha-512=:WZDPaVn/7XgHaAy8pmojAkGWoRx2UFChF41A2svX+TaPm+AbwAgBWnrIiYllu7BNNyealdVLvRwEmTHWXvJwew==:\n\"content-length\": 18\n\"@signature-params\": (\"date\" \"@method\" \"@path\" \"@query\" \"@authority\" \"content-type\" \"content-digest\" \"content-length\");created=1618884473;keyid=\"test-key-rsa-pss\"",
+    "signature_input_header": "sig-b23=(\"date\" \"@method\" \"@path\" \"@query\" \"@authority\" \"content-type\" \"content-digest\" \"content-length\");created=1618884473;keyid=\"test-key-rsa-pss\"",
+    "signature_header": "sig-b23=:bbN8oArOxYoyylQQUU6QYwrTuaxLwjAC9fbY2F6SVWvh0yBiMIRGOnMYwZ/5MR6fb0Kh1rIRASVxFkeGt683+qRpRRU5p2voTp768ZrCUb38K0fUxN0O0iC59DzYx8DFll5GmydPxSmme9v6ULbMFkl+V5B1TP/yPViV7KsLNmvKiLJH1pFkh/aYA2HXXZzNBXmIkoQoLd7YfW91kE9o/CCoC1xMy7JA1ipwvKvfrs65ldmlu9bpG6A9BmzhuzF8Eim5f8ui9eH8LZH896+QIF61ka39VBrohr9iyMUJpvRX2Zbhl5ZJzSRxpJyoEZAFL2FUo5fTIztsDZKEgM4cUA==:",
+    "signature_params": "(\"date\" \"@method\" \"@path\" \"@query\" \"@authority\" \"content-type\" \"content-digest\" \"content-length\");created=1618884473;keyid=\"test-key-rsa-pss\"",
+    "components": [
+      {
+        "identifier": "\"date\"",
+        "value": "Tue, 20 Apr 2021 02:07:55 GMT"
+      },
+      {
+        "identifier": "\"@method\"",
+        "value": "POST"
+      },
+      {
+        "identifier": "\"@path\"",
+        "value": "/foo"
+      },
+      {
+        "identifier": "\"@query\"",
+        "value": "?param=Value&Pet=dog"
+      },
+      {
+        "identifier": "\"@authority\"",
+        "value": "example.com"
+      },
+      {
+        "identifier": "\"content-type\"",
+        "value": "application/json"
+      },
+      {
+        "identifier": "\"content-digest\"",
+        "value": "sha-512=:WZDPaVn/7XgHaAy8pmojAkGWoRx2UFChF41A2svX+TaPm+AbwAgBWnrIiYllu7BNNyealdVLvRwEmTHWXvJwew==:"
+      },
+      {
+        "identifier": "\"content-length\"",
+        "value": "18"
+      }
+    ],
+    "key_name": "test-key-rsa-pss",
+    "key": {
+      "kty": "RSA",
+      "kid": "test-key-rsa-pss",
+      "e": "AQAB",
+      "n": "r4tmm3r20Wd_PbqvP1s2-QEtvpuRaV8Yq40gjUR8y2Rjxa6dpG2GXHbPfvMs8ct-Lh1GH45x28Rw3Ry53mm-oAXjyQ86OnDkZ5N8lYbggD4O3w6M6pAvLkhk95AndTrifbIFPNU8PPMO7OyrFAHqgDsznjPFmTOtCEcN2Z1FpWgchwuYLPL-Wokqltd11nqqzi-bJ9cvSKADYdUAAN5WUtzdpiy6LbTgSxP7ociU4Tn0g5I6aDZJ7A8Lzo0KSyZYoA485mqcO0GVAdVw9lq4aOT9v6d-nb4bnNkQVklLQ3fVAvJm-xdDOp9LCNCN48V2pnDOkFV6-U9nV5oyc6XI2w"
+    },
+    "notes": "Covers the method, the path and the query, none of which the element rebuilds from pipeline evidence today. The RSA-PSS algorithm is not deterministic, so the RFC says this signature can be checked against the key but will not be produced again by signing."
+  },
+  {
+    "name": "signing a response using ecdsa-p256-sha256",
+    "section": "B.2.4",
+    "algorithm": "ecdsa-p256-sha256",
+    "label": "sig-b24",
+    "supported": true,
+    "signature_base": "\"@status\": 200\n\"content-type\": application/json\n\"content-digest\": sha-512=:mEWXIS7MaLRuGgxOBdODa3xqM1XdEvxoYhvlCFJ41QJgJc4GTsPp29l5oGX69wWdXymyU0rjJuahq4l5aGgfLQ==:\n\"content-length\": 23\n\"@signature-params\": (\"@status\" \"content-type\" \"content-digest\" \"content-length\");created=1618884473;keyid=\"test-key-ecc-p256\"",
+    "signature_input_header": "sig-b24=(\"@status\" \"content-type\" \"content-digest\" \"content-length\");created=1618884473;keyid=\"test-key-ecc-p256\"",
+    "signature_header": "sig-b24=:wNmSUAhwb5LxtOtOpNa6W5xj067m5hFrj0XQ4fvpaCLx0NKocgPquLgyahnzDnDAUy5eCdlYUEkLIj+32oiasw==:",
+    "signature_params": "(\"@status\" \"content-type\" \"content-digest\" \"content-length\");created=1618884473;keyid=\"test-key-ecc-p256\"",
+    "components": [
+      {
+        "identifier": "\"@status\"",
+        "value": "200"
+      },
+      {
+        "identifier": "\"content-type\"",
+        "value": "application/json"
+      },
+      {
+        "identifier": "\"content-digest\"",
+        "value": "sha-512=:mEWXIS7MaLRuGgxOBdODa3xqM1XdEvxoYhvlCFJ41QJgJc4GTsPp29l5oGX69wWdXymyU0rjJuahq4l5aGgfLQ==:"
+      },
+      {
+        "identifier": "\"content-length\"",
+        "value": "23"
+      }
+    ],
+    "key_name": "test-key-ecc-p256",
+    "key": {
+      "kty": "EC",
+      "crv": "P-256",
+      "kid": "test-key-ecc-p256",
+      "x": "qIVYZVLCrPZHGHjP17CTW0_-D9Lfw0EkjqF7xB4FivA",
+      "y": "Mc4nN9LTDOBhfoUeg8Ye9WedFRhnZXZJA12Qp0zZ6F0"
+    },
+    "notes": "A response signature, so it covers the status code. The element signs nothing and checks requests, so it never rebuilds a status line. The ECDSA algorithm is not deterministic, so the RFC says this signature can be checked against the key but will not be produced again by signing."
+  },
+  {
+    "name": "signing a request using hmac-sha256",
+    "section": "B.2.5",
+    "algorithm": "hmac-sha256",
+    "label": "sig-b25",
+    "supported": false,
+    "signature_base": "\"date\": Tue, 20 Apr 2021 02:07:55 GMT\n\"@authority\": example.com\n\"content-type\": application/json\n\"@signature-params\": (\"date\" \"@authority\" \"content-type\");created=1618884473;keyid=\"test-shared-secret\"",
+    "signature_input_header": "sig-b25=(\"date\" \"@authority\" \"content-type\");created=1618884473;keyid=\"test-shared-secret\"",
+    "signature_header": "sig-b25=:pxcQw6G3AjtMBQjwo8XzkZf/bws5LelbaMk5rGIGtE8=:",
+    "signature_params": "(\"date\" \"@authority\" \"content-type\");created=1618884473;keyid=\"test-shared-secret\"",
+    "components": [
+      {
+        "identifier": "\"date\"",
+        "value": "Tue, 20 Apr 2021 02:07:55 GMT"
+      },
+      {
+        "identifier": "\"@authority\"",
+        "value": "example.com"
+      },
+      {
+        "identifier": "\"content-type\"",
+        "value": "application/json"
+      }
+    ],
+    "key_name": "test-shared-secret",
+    "key": {
+      "kty": "oct",
+      "kid": "test-shared-secret"
+    },
+    "notes": "A shared secret rather than a public key. Web Bot Auth forbids shared secrets, so the element refuses this algorithm rather than checking it. The key object here is the 'oct' wrapper the element would be handed, because B.1.5 prints the secret as base64 rather than as a JSON Web Key. The secret itself is in shared_secret_base64.",
+    "shared_secret_base64": "uzvJfB4u3N0Jy4T7NZ75MDVcr8zSTInedJtkgcu46YW4XByzNJjxBdtjUkdJPBtbmHhIDi6pcl8jsasjlTMtDQ=="
+  },
+  {
+    "name": "signing a request using ed25519",
+    "section": "B.2.6",
+    "algorithm": "ed25519",
+    "label": "sig-b26",
+    "supported": true,
+    "signature_base": "\"date\": Tue, 20 Apr 2021 02:07:55 GMT\n\"@method\": POST\n\"@path\": /foo\n\"@authority\": example.com\n\"content-type\": application/json\n\"content-length\": 18\n\"@signature-params\": (\"date\" \"@method\" \"@path\" \"@authority\" \"content-type\" \"content-length\");created=1618884473;keyid=\"test-key-ed25519\"",
+    "signature_input_header": "sig-b26=(\"date\" \"@method\" \"@path\" \"@authority\" \"content-type\" \"content-length\");created=1618884473;keyid=\"test-key-ed25519\"",
+    "signature_header": "sig-b26=:wqcAqbmYJ2ji2glfAMaRy4gruYYnx2nEFN2HN6jrnDnQCK1u02Gb04v9EDgwUPiu4A0w6vuQv5lIp5WPpBKRCw==:",
+    "signature_params": "(\"date\" \"@method\" \"@path\" \"@authority\" \"content-type\" \"content-length\");created=1618884473;keyid=\"test-key-ed25519\"",
+    "components": [
+      {
+        "identifier": "\"date\"",
+        "value": "Tue, 20 Apr 2021 02:07:55 GMT"
+      },
+      {
+        "identifier": "\"@method\"",
+        "value": "POST"
+      },
+      {
+        "identifier": "\"@path\"",
+        "value": "/foo"
+      },
+      {
+        "identifier": "\"@authority\"",
+        "value": "example.com"
+      },
+      {
+        "identifier": "\"content-type\"",
+        "value": "application/json"
+      },
+      {
+        "identifier": "\"content-length\"",
+        "value": "18"
+      }
+    ],
+    "key_name": "test-key-ed25519",
+    "key": {
+      "kty": "OKP",
+      "crv": "Ed25519",
+      "kid": "test-key-ed25519",
+      "x": "JrQLj5P_89iXES9-vFgrIy29clF9CC_oPPsw3c5D0bs"
+    },
+    "notes": "Covers the method and the path, which the element does not rebuild from pipeline evidence today. Ed25519 is deterministic, so unlike the RSA-PSS and ECDSA examples this signature would come out the same way every time it was made."
+  }
+]
