@@ -260,24 +260,17 @@
         </member>
         <member name="T:FiftyOne.Pipeline.DerivedProperty.Data.DerivedAggregateComparison">
             <summary>
-            Compares a count of checks against a whole number or against another
-            count.
+            Compares a count of checks against a whole number. A count is never
+            compared with another count, because no script needs it.
             </summary>
         </member>
-        <member name="M:FiftyOne.Pipeline.DerivedProperty.Data.DerivedAggregateComparison.#ctor(FiftyOne.Pipeline.DerivedProperty.Data.DerivedAggregateValue,FiftyOne.Pipeline.DerivedProperty.Data.DerivedOperator,System.Int32,FiftyOne.Pipeline.DerivedProperty.Data.DerivedAggregateValue)">
+        <member name="M:FiftyOne.Pipeline.DerivedProperty.Data.DerivedAggregateComparison.#ctor(FiftyOne.Pipeline.DerivedProperty.Data.DerivedAggregateValue,FiftyOne.Pipeline.DerivedProperty.Data.DerivedOperator,System.Int32)">
             <summary>
             Create a new instance.
             </summary>
             <param name="left">The count on the left of the comparison.</param>
             <param name="op">How to compare.</param>
-            <param name="operand">
-            The whole number to compare against, where the right side is a
-            number.
-            </param>
-            <param name="right">
-            The count to compare against, or null where the right side is a
-            number.
-            </param>
+            <param name="operand">The whole number to compare against.</param>
         </member>
         <member name="P:FiftyOne.Pipeline.DerivedProperty.Data.DerivedAggregateComparison.Left">
             <summary>The count on the left of the comparison.</summary>
@@ -286,16 +279,7 @@
             <summary>How the two sides are compared.</summary>
         </member>
         <member name="P:FiftyOne.Pipeline.DerivedProperty.Data.DerivedAggregateComparison.Operand">
-            <summary>
-            The whole number on the right of the comparison, where
-            <see cref="P:FiftyOne.Pipeline.DerivedProperty.Data.DerivedAggregateComparison.Right"/> is null.
-            </summary>
-        </member>
-        <member name="P:FiftyOne.Pipeline.DerivedProperty.Data.DerivedAggregateComparison.Right">
-            <summary>
-            The count on the right of the comparison, or null where the
-            right side is the whole number in <see cref="P:FiftyOne.Pipeline.DerivedProperty.Data.DerivedAggregateComparison.Operand"/>.
-            </summary>
+            <summary>The whole number on the right of the comparison.</summary>
         </member>
         <member name="M:FiftyOne.Pipeline.DerivedProperty.Data.DerivedAggregateComparison.Evaluate(FiftyOne.Pipeline.DerivedProperty.Data.DerivedEvaluationContext)">
             <inheritdoc/>
@@ -1577,13 +1561,6 @@
             <summary>
             The HumanConfidence script, embedded from
             scripts/HumanConfidence.yaml of the derived-properties
-            repository.
-            </summary>
-        </member>
-        <member name="F:FiftyOne.Pipeline.DerivedProperty.BuiltInScript.HumanConfidenceEvaluated">
-            <summary>
-            The HumanConfidenceEvaluated script, embedded from
-            scripts/HumanConfidenceEvaluated.yaml of the derived-properties
             repository.
             </summary>
         </member>

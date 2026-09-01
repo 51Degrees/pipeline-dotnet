@@ -305,19 +305,9 @@ namespace FiftyOne.Pipeline.DerivedProperty.Data
             DerivedScript script)
         {
             var left = aggregate.Left;
-            var right = aggregate.Right;
-            var op = NameOf(aggregate.Operator);
-
             var result = new JsonObject();
             result.Add(NameOf(left.Aggregate), Group(left.Group, script));
-            if (right == null)
-            {
-                result.AddValue(op, aggregate.Operand);
-                return result;
-            }
-            var nested = new JsonObject();
-            nested.Add(NameOf(right.Aggregate), Group(right.Group, script));
-            result.Add(op, nested);
+            result.AddValue(NameOf(aggregate.Operator), aggregate.Operand);
             return result;
         }
 

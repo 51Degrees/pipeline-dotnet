@@ -1530,47 +1530,19 @@ namespace FiftyOne.Pipeline.DerivedProperty.Data
                 return _unreadable;
             }
 
+            // A count is compared with a whole number and never with
+            // another count. Comparing one count against another was
+            // allowed until 1 September 2026 and was removed with the rest
+            // of the format's second layer, because no script needs it.
             var operandNode = mapping.Get(operatorKeys[0]);
-            if (operandNode is DerivedMapping nested)
-            {
-                var nestedKeys = nested.Names
-                    .Where(n => _aggregateNames.Any(
-                        a => string.Equals(
-                            a, n, StringComparison.OrdinalIgnoreCase)))
-                    .ToList();
-                if (nested.Names.Count != 1 || nestedKeys.Count != 1)
-                {
-                    context.Fault(path + "." + op, nested, string.Format(
-                        CultureInfo.InvariantCulture,
-                        "an aggregate is compared with an integer or " +
-                        "another aggregate such as {{ Failed: Checks }}, " +
-                        "found {0}",
-                        string.Join(", ", nested.Names)));
-                    return _unreadable;
-                }
-                var nestedAggregate = ParseAggregate(nestedKeys[0]);
-                var nestedGroup = ReadGroup(
-                    context,
-                    nested.Get(nestedKeys[0]),
-                    string.Format(
-                        CultureInfo.InvariantCulture,
-                        "{0}.{1}.{2}", path, op, nestedAggregate),
-                    nested);
-                return new DerivedAggregateComparison(
-                    new DerivedAggregateValue(aggregate, group),
-                    op,
-                    0,
-                    new DerivedAggregateValue(nestedAggregate, nestedGroup));
-            }
-
             if (!(operandNode is DerivedScalar operandScalar) ||
                 !(operandScalar.Value is int operand))
             {
                 context.Fault(
                     path + "." + op, operandNode ?? mapping, string.Format(
                         CultureInfo.InvariantCulture,
-                        "an aggregate is compared with an integer or " +
-                        "another aggregate, found {0}",
+                        "an aggregate is compared with a whole number, " +
+                        "found {0}",
                         Describe(operandNode)));
                 return _unreadable;
             }
@@ -1578,8 +1550,7 @@ namespace FiftyOne.Pipeline.DerivedProperty.Data
             return new DerivedAggregateComparison(
                 new DerivedAggregateValue(aggregate, group),
                 op,
-                operand,
-                null);
+                operand);
         }
 
         /// <summary>

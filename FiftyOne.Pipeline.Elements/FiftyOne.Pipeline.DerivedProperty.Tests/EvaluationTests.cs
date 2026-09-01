@@ -559,20 +559,28 @@ public class EvaluationTests
     }
 
     /// <summary>
-    /// One aggregate may be compared with another, which is how a script
-    /// asks whether more checks passed than failed.
+    /// A count is compared with a whole number and never with another
+    /// count, so a script asking whether more checks passed than failed is
+    /// refused rather than answered.
     /// </summary>
     [TestMethod]
-    public void Aggregate_MayBeComparedWithAnotherAggregate()
+    public void Aggregate_IsNotComparedWithAnotherAggregate()
     {
-        Assert.AreEqual("yes", RunCondition(
-            "{ Passed: Checks, Gt: { Failed: Checks } }",
-            Values("a.P", true, "a.Q", true, "a.R", false),
-            AggregateChecks));
-        Assert.AreEqual("no", RunCondition(
-            "{ Passed: Checks, Gt: { Failed: Checks } }",
-            Values("a.P", true, "a.Q", false, "a.R", false),
-            AggregateChecks));
+        var result = DerivedScriptValidator.Validate(
+            ConditionScript(
+                "{ Passed: Checks, Gt: { Failed: Checks } }",
+                AggregateChecks),
+            "Probe",
+            "code");
+        Assert.IsFalse(result.IsValid);
+        Assert.IsTrue(
+            result.Faults.Any(f =>
+                string.Equals(
+                    f.Path, "Rules[0].When.Gt", StringComparison.Ordinal) &&
+                f.Message.Contains(
+                    "an aggregate is compared with a whole number",
+                    StringComparison.Ordinal)),
+            DerivedScriptValidationException.Describe(result.Faults));
     }
 
     // -----------------------------------------------------------------

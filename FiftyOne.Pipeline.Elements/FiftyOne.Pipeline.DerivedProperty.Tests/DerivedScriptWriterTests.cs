@@ -84,7 +84,7 @@ public class DerivedScriptWriterTests
               - { Property: device.Year, Gt: 0 }
               - { Not: { Property: device.Year, Gt: 3000 } }
         Rules:
-          - When: { Passed: Checks, Ge: { Failed: Checks } }
+          - When: { Passed: Checks, Ge: 2 }
             Then: High
           - When: { Passed: [NotCrawler, Fresh], Ge: 1 }
             Then: High
@@ -133,7 +133,7 @@ public class DerivedScriptWriterTests
             }
           },
           "Rules": [
-            { "When": { "Passed": "Checks", "Ge": { "Failed": "Checks" } },
+            { "When": { "Passed": "Checks", "Ge": 2 },
               "Then": "High" },
             { "When": { "Passed": ["NotCrawler", "Fresh"], "Ge": 1 },
               "Then": "High" },
@@ -224,9 +224,7 @@ public class DerivedScriptWriterTests
             {
               "When": {
                 "Passed": "Checks",
-                "Ge": {
-                  "Failed": "Checks"
-                }
+                "Ge": 2
               },
               "Then": "High"
             },

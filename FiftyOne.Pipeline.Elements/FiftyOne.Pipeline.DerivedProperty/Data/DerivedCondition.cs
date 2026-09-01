@@ -341,39 +341,29 @@ namespace FiftyOne.Pipeline.DerivedProperty.Data
     }
 
     /// <summary>
-    /// Compares a count of checks against a whole number or against another
-    /// count.
+    /// Compares a count of checks against a whole number. A count is never
+    /// compared with another count, because no script needs it.
     /// </summary>
     public sealed class DerivedAggregateComparison : DerivedCondition
     {
         private readonly DerivedAggregateValue _left;
         private readonly DerivedOperator _operator;
         private readonly int _operand;
-        private readonly DerivedAggregateValue _right;
 
         /// <summary>
         /// Create a new instance.
         /// </summary>
         /// <param name="left">The count on the left of the comparison.</param>
         /// <param name="op">How to compare.</param>
-        /// <param name="operand">
-        /// The whole number to compare against, where the right side is a
-        /// number.
-        /// </param>
-        /// <param name="right">
-        /// The count to compare against, or null where the right side is a
-        /// number.
-        /// </param>
+        /// <param name="operand">The whole number to compare against.</param>
         public DerivedAggregateComparison(
             DerivedAggregateValue left,
             DerivedOperator op,
-            int operand,
-            DerivedAggregateValue right)
+            int operand)
         {
             _left = left;
             _operator = op;
             _operand = operand;
-            _right = right;
         }
 
         /// <summary>The count on the left of the comparison.</summary>
@@ -382,26 +372,13 @@ namespace FiftyOne.Pipeline.DerivedProperty.Data
         /// <summary>How the two sides are compared.</summary>
         public DerivedOperator Operator => _operator;
 
-        /// <summary>
-        /// The whole number on the right of the comparison, where
-        /// <see cref="Right"/> is null.
-        /// </summary>
+        /// <summary>The whole number on the right of the comparison.</summary>
         public int Operand => _operand;
-
-        /// <summary>
-        /// The count on the right of the comparison, or null where the
-        /// right side is the whole number in <see cref="Operand"/>.
-        /// </summary>
-        public DerivedAggregateValue Right => _right;
 
         /// <inheritdoc/>
         public override bool Evaluate(DerivedEvaluationContext context)
         {
-            var left = _left.Count(context);
-            var right = _right == null
-                ? _operand
-                : _right.Count(context);
-            return Holds(left, right);
+            return Holds(_left.Count(context), _operand);
         }
 
         private bool Holds(int left, int right)
