@@ -1,0 +1,58 @@
+# An example derived property script, written for this example alone.
+#
+# The scripts 51Degrees ships inside the FiftyOne.Pipeline.DerivedProperty
+# package come from the derived-properties repository at
+# https://github.com/51Degrees/derived-properties, and are selected by the
+# Scripts build parameter. This file is not one of them, so the example
+# runs the same whether or not that repository is present.
+#
+# The reference for everything below is docs/format-1.md in that same
+# repository.
+
+Format: 1
+Name: ReaderEngagement
+Version: "1.0.0"
+Output:
+  Name: ReaderEngagement
+  Description: How far the visitor appears to have engaged with the page, judged only from properties another element has already produced. Returns one of High, Medium, Low or Unknown.
+  ValueType: string
+  DefaultValue: Unknown
+  IsList: false
+  IsMandatory: true
+  IsObsolete: false
+  Category: Example
+  IsPopular: false
+  ExportValues: true
+  Values:
+    - Name: High
+      Description: Every test that could be answered went in favour of engagement, and enough tests were answered to say so.
+    - Name: Medium
+      Description: At most one test went against engagement, or too few tests could be answered to say High.
+    - Name: Low
+      Description: More than one test went against engagement.
+    - Name: Unknown
+      Description: No test could be answered, so the script claims nothing.
+
+# Only PointerMoved may be missing. The other two source properties are
+# required, so a request without either of them produces no value at all
+# rather than a value resting on nothing.
+Optional:
+  - session.PointerMoved
+
+Checks:
+  SeveralPages: { Property: session.PagesViewed, Ge: 3 }
+  LongEnough:   { Property: session.SecondsSincePageLoad, Ge: 30 }
+  PointerMoved: { Property: session.PointerMoved, Eq: true }
+
+# Rules are read in order and the first one whose When is true wins.
+Rules:
+  - When: { Evaluated: Checks, Eq: 0 }
+    Then: Unknown
+  - When:
+      All:
+        - { Failed: Checks, Eq: 0 }
+        - { Evaluated: Checks, Ge: 3 }
+    Then: High
+  - When: { Failed: Checks, Le: 1 }
+    Then: Medium
+  - Else: Low

@@ -67,6 +67,16 @@ namespace FiftyOne.Pipeline.Examples.Tests
         }
 
         /// <summary>
+        /// Test that the derived property example runs successfully.
+        /// </summary>
+        [TestMethod]
+        public void TestDerivedPropertyExample()
+        {
+            var example = new Ex.DerivedProperty.Program();
+            example.RunExample();
+        }
+
+        /// <summary>
         /// Test that the usage sharing example runs successfully.
         /// </summary>
         [TestMethod]

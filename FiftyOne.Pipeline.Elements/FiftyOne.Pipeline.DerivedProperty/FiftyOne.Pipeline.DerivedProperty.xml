@@ -1,0 +1,1715 @@
+<?xml version="1.0"?>
+<doc>
+    <assembly>
+        <name>FiftyOne.Pipeline.DerivedProperty</name>
+    </assembly>
+    <members>
+        <member name="T:FiftyOne.Pipeline.DerivedProperty.Data.CompiledScript">
+             <summary>
+             One script, turned at build into the smallest thing that can answer
+             a request. Everything expensive happens once here rather than on
+             every request, being the element data keys to read, the converter for
+             each source property, the condition tree and the rule array.
+            
+             Every field of an instance is read only once the constructor
+             returns, so one instance serves every request and every thread with
+             no locking. Each request gets its own
+             <see cref="T:FiftyOne.Pipeline.DerivedProperty.Data.DerivedEvaluationContext"/> holding the values read for
+             that request, and nothing in a request is written back.
+            
+             One thing is shared and does change, being the static cache of
+             readers for weighted value types further down this file. The cache
+             is a <see cref="T:System.Collections.Concurrent.ConcurrentDictionary`2"/> filled through
+             GetOrAdd, so a type may be worked out twice under a race and the
+             answer is the same either way.
+            
+             A test processes the same evidence on 32 threads and asserts every
+             answer equals the single threaded answer, which is what would fail
+             if any of the above stopped being true.
+             </summary>
+        </member>
+        <member name="F:FiftyOne.Pipeline.DerivedProperty.Data.CompiledScript.UsualCauses">
+            <summary>
+            The sentence appended to every message saying a derived property
+            has no value, naming the things that usually cause a source
+            property to be missing. The wording matches the JavaScript
+            reference evaluator and every other language.
+            </summary>
+        </member>
+        <member name="M:FiftyOne.Pipeline.DerivedProperty.Data.CompiledScript.#ctor(FiftyOne.Pipeline.DerivedProperty.Data.DerivedScript)">
+            <summary>
+            Compile a validated script.
+            </summary>
+            <param name="script">The script.</param>
+            <exception cref="T:System.ArgumentNullException">
+            Thrown where the script is null.
+            </exception>
+        </member>
+        <member name="P:FiftyOne.Pipeline.DerivedProperty.Data.CompiledScript.Script">
+            <summary>The script this was compiled from.</summary>
+        </member>
+        <member name="P:FiftyOne.Pipeline.DerivedProperty.Data.CompiledScript.OutputName">
+            <summary>
+            The name of the property this script writes, which is the key it
+            writes under in the derived element data.
+            </summary>
+        </member>
+        <member name="M:FiftyOne.Pipeline.DerivedProperty.Data.CompiledScript.Process(FiftyOne.Pipeline.Core.Data.IFlowData,FiftyOne.Pipeline.DerivedProperty.Data.IDerivedPropertyData)">
+            <summary>
+            Run the script for one request and write one value, or one value
+            that has no value with the reason, into the element data.
+            </summary>
+            <param name="data">The flow data for the request.</param>
+            <param name="output">The derived element data to write into.</param>
+            <exception cref="T:System.ArgumentNullException">
+            Thrown where either argument is null.
+            </exception>
+        </member>
+        <member name="M:FiftyOne.Pipeline.DerivedProperty.Data.CompiledScript.Evaluate(FiftyOne.Pipeline.Core.Data.IFlowData,FiftyOne.Pipeline.DerivedProperty.Data.DerivedTrace)">
+            <summary>
+            Run the script for one request and give back the value written,
+            optionally filling in a trace of what happened. The trace is for
+            tests and for tooling, and nothing on the request path asks for
+            one.
+            </summary>
+            <param name="data">The flow data for the request.</param>
+            <param name="trace">
+            A trace to fill in, or null for no trace.
+            </param>
+            <returns>The value, which may be a value that has no value.</returns>
+            <exception cref="T:System.ArgumentNullException">
+            Thrown where the flow data is null.
+            </exception>
+        </member>
+        <member name="M:FiftyOne.Pipeline.DerivedProperty.Data.CompiledScript.TryTakeHeaviest(System.Collections.IEnumerable,System.Object@)">
+            <summary>
+            Takes the value with the highest weight out of a list of weighted
+            values. Any other list is refused, because a script names one
+            property and compares one value.
+            </summary>
+        </member>
+        <member name="M:FiftyOne.Pipeline.DerivedProperty.Data.CompiledScript.GetWeightedReader(System.Type)">
+            <summary>
+            Builds and caches a reader for one weighted value type. The
+            reflection happens once for each type ever seen and the request
+            path then calls a compiled delegate.
+            </summary>
+        </member>
+        <member name="T:FiftyOne.Pipeline.DerivedProperty.Data.DerivedState">
+            <summary>
+            The answer a condition can give. A condition is unknown where a
+            property the condition needs was not available, which is different
+            from the condition being false.
+            </summary>
+        </member>
+        <member name="F:FiftyOne.Pipeline.DerivedProperty.Data.DerivedState.Unknown">
+            <summary>
+            A property the condition needs was not available, so the
+            condition could not be answered.
+            </summary>
+        </member>
+        <member name="F:FiftyOne.Pipeline.DerivedProperty.Data.DerivedState.False">
+            <summary>The condition does not hold.</summary>
+        </member>
+        <member name="F:FiftyOne.Pipeline.DerivedProperty.Data.DerivedState.True">
+            <summary>The condition holds.</summary>
+        </member>
+        <member name="T:FiftyOne.Pipeline.DerivedProperty.Data.DerivedEvaluationContext">
+            <summary>
+            What one request supplies to a condition, being the converted value
+            of every source property and the answer of every check evaluated so
+            far. One instance belongs to one request on one thread, and nothing
+            in it is shared.
+            </summary>
+        </member>
+        <member name="M:FiftyOne.Pipeline.DerivedProperty.Data.DerivedEvaluationContext.#ctor(System.Int32,System.Int32)">
+            <summary>
+            Create a new instance.
+            </summary>
+            <param name="slotCount">How many source properties there are.</param>
+            <param name="checkCount">How many checks there are.</param>
+        </member>
+        <member name="P:FiftyOne.Pipeline.DerivedProperty.Data.DerivedEvaluationContext.Available">
+            <summary>
+            Whether each source property was available and valid on this
+            request, indexed the same way as the script's property list.
+            </summary>
+        </member>
+        <member name="P:FiftyOne.Pipeline.DerivedProperty.Data.DerivedEvaluationContext.Values">
+            <summary>
+            The converted value of each source property, where available.
+            </summary>
+        </member>
+        <member name="P:FiftyOne.Pipeline.DerivedProperty.Data.DerivedEvaluationContext.Reasons">
+            <summary>
+            Why each source property was not available, where it was not.
+            </summary>
+        </member>
+        <member name="P:FiftyOne.Pipeline.DerivedProperty.Data.DerivedEvaluationContext.Checks">
+            <summary>
+            The answer of each check, filled in before the rules are read.
+            </summary>
+        </member>
+        <member name="T:FiftyOne.Pipeline.DerivedProperty.Data.DerivedCondition">
+            <summary>
+            A condition in a script, compiled into a small object that answers
+            itself. Every instance is immutable once built, so one compiled
+            script serves every request and every thread with no locking.
+            </summary>
+        </member>
+        <member name="M:FiftyOne.Pipeline.DerivedProperty.Data.DerivedCondition.Evaluate(FiftyOne.Pipeline.DerivedProperty.Data.DerivedEvaluationContext)">
+            <summary>
+            Answer the condition for one request.
+            </summary>
+            <param name="context">The values for this request.</param>
+            <returns>True, false, or unknown.</returns>
+        </member>
+        <member name="T:FiftyOne.Pipeline.DerivedProperty.Data.DerivedComparison">
+            <summary>
+            Compares one source property against a literal.
+            </summary>
+        </member>
+        <member name="M:FiftyOne.Pipeline.DerivedProperty.Data.DerivedComparison.#ctor(System.Int32,FiftyOne.Pipeline.DerivedProperty.Data.DerivedOperator,System.Object,System.Collections.Generic.IReadOnlyList{System.Object},FiftyOne.Pipeline.DerivedProperty.Data.DerivedValueType)">
+            <summary>
+            Create a new instance.
+            </summary>
+            <param name="slot">
+            Which source property to read, by index into the script's
+            property list.
+            </param>
+            <param name="op">How to compare.</param>
+            <param name="operand">
+            The literal to compare against, for every operator except In and
+            NotIn.
+            </param>
+            <param name="operandList">
+            The literals to compare against, for In and NotIn.
+            </param>
+            <param name="valueType">The type the comparison reads.</param>
+        </member>
+        <member name="P:FiftyOne.Pipeline.DerivedProperty.Data.DerivedComparison.Slot">
+            <summary>
+            Which source property is read, by index.
+            </summary>
+        </member>
+        <member name="P:FiftyOne.Pipeline.DerivedProperty.Data.DerivedComparison.Operator">
+            <summary>How the value is compared.</summary>
+        </member>
+        <member name="P:FiftyOne.Pipeline.DerivedProperty.Data.DerivedComparison.Operand">
+            <summary>
+            The literal compared against, for every operator except In and
+            NotIn, where the value is null and <see cref="P:FiftyOne.Pipeline.DerivedProperty.Data.DerivedComparison.OperandList"/>
+            holds the literals instead.
+            </summary>
+        </member>
+        <member name="P:FiftyOne.Pipeline.DerivedProperty.Data.DerivedComparison.OperandList">
+            <summary>
+            The literals compared against for In and NotIn, or null for
+            every other operator.
+            </summary>
+        </member>
+        <member name="P:FiftyOne.Pipeline.DerivedProperty.Data.DerivedComparison.ValueType">
+            <summary>The type the comparison reads the value as.</summary>
+        </member>
+        <member name="M:FiftyOne.Pipeline.DerivedProperty.Data.DerivedComparison.Evaluate(FiftyOne.Pipeline.DerivedProperty.Data.DerivedEvaluationContext)">
+            <inheritdoc/>
+        </member>
+        <member name="T:FiftyOne.Pipeline.DerivedProperty.Data.DerivedPresence">
+            <summary>
+            Asks whether a source property was available and valid, which is
+            always answerable and so is never unknown.
+            </summary>
+        </member>
+        <member name="M:FiftyOne.Pipeline.DerivedProperty.Data.DerivedPresence.#ctor(System.Int32,System.Boolean)">
+            <summary>
+            Create a new instance.
+            </summary>
+            <param name="slot">Which source property to read.</param>
+            <param name="expected">
+            True to hold where the property is available, false to hold where
+            the property is absent.
+            </param>
+        </member>
+        <member name="P:FiftyOne.Pipeline.DerivedProperty.Data.DerivedPresence.Slot">
+            <summary>
+            Which source property is read, by index.
+            </summary>
+        </member>
+        <member name="P:FiftyOne.Pipeline.DerivedProperty.Data.DerivedPresence.Expected">
+            <summary>
+            True where the condition holds when the property is available,
+            false where the condition holds when the property is absent.
+            </summary>
+        </member>
+        <member name="M:FiftyOne.Pipeline.DerivedProperty.Data.DerivedPresence.Evaluate(FiftyOne.Pipeline.DerivedProperty.Data.DerivedEvaluationContext)">
+            <inheritdoc/>
+        </member>
+        <member name="T:FiftyOne.Pipeline.DerivedProperty.Data.DerivedCheckReference">
+            <summary>
+            Reuses the answer of a named check.
+            </summary>
+        </member>
+        <member name="M:FiftyOne.Pipeline.DerivedProperty.Data.DerivedCheckReference.#ctor(System.Int32)">
+            <summary>
+            Create a new instance.
+            </summary>
+            <param name="index">
+            Which check to reuse, by index into the script's check list.
+            </param>
+        </member>
+        <member name="P:FiftyOne.Pipeline.DerivedProperty.Data.DerivedCheckReference.Index">
+            <summary>Which check is reused, by index.</summary>
+        </member>
+        <member name="M:FiftyOne.Pipeline.DerivedProperty.Data.DerivedCheckReference.Evaluate(FiftyOne.Pipeline.DerivedProperty.Data.DerivedEvaluationContext)">
+            <inheritdoc/>
+        </member>
+        <member name="T:FiftyOne.Pipeline.DerivedProperty.Data.DerivedAggregateValue">
+            <summary>
+            Counts how many checks in a group passed, failed, or could be
+            evaluated at all.
+            </summary>
+        </member>
+        <member name="M:FiftyOne.Pipeline.DerivedProperty.Data.DerivedAggregateValue.#ctor(FiftyOne.Pipeline.DerivedProperty.Data.DerivedAggregate,System.Int32[])">
+            <summary>
+            Create a new instance.
+            </summary>
+            <param name="aggregate">Which count to take.</param>
+            <param name="group">
+            The checks to count, by index, or null for every check.
+            </param>
+        </member>
+        <member name="P:FiftyOne.Pipeline.DerivedProperty.Data.DerivedAggregateValue.Aggregate">
+            <summary>Which count is taken.</summary>
+        </member>
+        <member name="P:FiftyOne.Pipeline.DerivedProperty.Data.DerivedAggregateValue.Group">
+            <summary>
+            The checks counted, by index, or null for every check.
+            </summary>
+        </member>
+        <member name="M:FiftyOne.Pipeline.DerivedProperty.Data.DerivedAggregateValue.Count(FiftyOne.Pipeline.DerivedProperty.Data.DerivedEvaluationContext)">
+            <summary>
+            Take the count for one request.
+            </summary>
+            <param name="context">The values for this request.</param>
+            <returns>The count, which is always known.</returns>
+        </member>
+        <member name="T:FiftyOne.Pipeline.DerivedProperty.Data.DerivedAggregateComparison">
+            <summary>
+            Compares a count of checks against a whole number or against another
+            count. A count is always known, so this condition is never unknown.
+            </summary>
+        </member>
+        <member name="M:FiftyOne.Pipeline.DerivedProperty.Data.DerivedAggregateComparison.#ctor(FiftyOne.Pipeline.DerivedProperty.Data.DerivedAggregateValue,FiftyOne.Pipeline.DerivedProperty.Data.DerivedOperator,System.Int32,FiftyOne.Pipeline.DerivedProperty.Data.DerivedAggregateValue)">
+            <summary>
+            Create a new instance.
+            </summary>
+            <param name="left">The count on the left of the comparison.</param>
+            <param name="op">How to compare.</param>
+            <param name="operand">
+            The whole number to compare against, where the right side is a
+            number.
+            </param>
+            <param name="right">
+            The count to compare against, or null where the right side is a
+            number.
+            </param>
+        </member>
+        <member name="P:FiftyOne.Pipeline.DerivedProperty.Data.DerivedAggregateComparison.Left">
+            <summary>The count on the left of the comparison.</summary>
+        </member>
+        <member name="P:FiftyOne.Pipeline.DerivedProperty.Data.DerivedAggregateComparison.Operator">
+            <summary>How the two sides are compared.</summary>
+        </member>
+        <member name="P:FiftyOne.Pipeline.DerivedProperty.Data.DerivedAggregateComparison.Operand">
+            <summary>
+            The whole number on the right of the comparison, where
+            <see cref="P:FiftyOne.Pipeline.DerivedProperty.Data.DerivedAggregateComparison.Right"/> is null.
+            </summary>
+        </member>
+        <member name="P:FiftyOne.Pipeline.DerivedProperty.Data.DerivedAggregateComparison.Right">
+            <summary>
+            The count on the right of the comparison, or null where the
+            right side is the whole number in <see cref="P:FiftyOne.Pipeline.DerivedProperty.Data.DerivedAggregateComparison.Operand"/>.
+            </summary>
+        </member>
+        <member name="M:FiftyOne.Pipeline.DerivedProperty.Data.DerivedAggregateComparison.Evaluate(FiftyOne.Pipeline.DerivedProperty.Data.DerivedEvaluationContext)">
+            <inheritdoc/>
+        </member>
+        <member name="T:FiftyOne.Pipeline.DerivedProperty.Data.DerivedAll">
+            <summary>
+            Holds where every listed condition holds. False as soon as one is
+            false, and unknown where none is false but one could not be answered.
+            </summary>
+        </member>
+        <member name="M:FiftyOne.Pipeline.DerivedProperty.Data.DerivedAll.#ctor(FiftyOne.Pipeline.DerivedProperty.Data.DerivedCondition[])">
+            <summary>
+            Create a new instance.
+            </summary>
+            <param name="items">The conditions that must all hold.</param>
+        </member>
+        <member name="P:FiftyOne.Pipeline.DerivedProperty.Data.DerivedAll.Items">
+            <summary>The conditions that must all hold.</summary>
+        </member>
+        <member name="M:FiftyOne.Pipeline.DerivedProperty.Data.DerivedAll.Evaluate(FiftyOne.Pipeline.DerivedProperty.Data.DerivedEvaluationContext)">
+            <inheritdoc/>
+        </member>
+        <member name="T:FiftyOne.Pipeline.DerivedProperty.Data.DerivedAny">
+            <summary>
+            Holds where at least one listed condition holds. True as soon as one
+            is true, and unknown where none is true but one could not be
+            answered.
+            </summary>
+        </member>
+        <member name="M:FiftyOne.Pipeline.DerivedProperty.Data.DerivedAny.#ctor(FiftyOne.Pipeline.DerivedProperty.Data.DerivedCondition[])">
+            <summary>
+            Create a new instance.
+            </summary>
+            <param name="items">The conditions, of which one must hold.</param>
+        </member>
+        <member name="P:FiftyOne.Pipeline.DerivedProperty.Data.DerivedAny.Items">
+            <summary>The conditions, of which one must hold.</summary>
+        </member>
+        <member name="M:FiftyOne.Pipeline.DerivedProperty.Data.DerivedAny.Evaluate(FiftyOne.Pipeline.DerivedProperty.Data.DerivedEvaluationContext)">
+            <inheritdoc/>
+        </member>
+        <member name="T:FiftyOne.Pipeline.DerivedProperty.Data.DerivedNot">
+            <summary>
+            Turns true into false and false into true. A condition that could not
+            be answered stays unanswered.
+            </summary>
+        </member>
+        <member name="M:FiftyOne.Pipeline.DerivedProperty.Data.DerivedNot.#ctor(FiftyOne.Pipeline.DerivedProperty.Data.DerivedCondition)">
+            <summary>
+            Create a new instance.
+            </summary>
+            <param name="item">The condition to negate.</param>
+        </member>
+        <member name="P:FiftyOne.Pipeline.DerivedProperty.Data.DerivedNot.Item">
+            <summary>The condition negated.</summary>
+        </member>
+        <member name="M:FiftyOne.Pipeline.DerivedProperty.Data.DerivedNot.Evaluate(FiftyOne.Pipeline.DerivedProperty.Data.DerivedEvaluationContext)">
+            <inheritdoc/>
+        </member>
+        <member name="T:FiftyOne.Pipeline.DerivedProperty.Data.DerivedPropertyData">
+            <summary>
+            Data populated by
+            <see cref="T:FiftyOne.Pipeline.DerivedProperty.FlowElements.DerivedPropertyElement"/>.
+            </summary>
+        </member>
+        <member name="M:FiftyOne.Pipeline.DerivedProperty.Data.DerivedPropertyData.#ctor(Microsoft.Extensions.Logging.ILogger{FiftyOne.Pipeline.DerivedProperty.Data.DerivedPropertyData},FiftyOne.Pipeline.Core.FlowElements.IPipeline)">
+            <summary>
+            Create a new instance.
+            </summary>
+            <param name="logger">The logger for the data instance.</param>
+            <param name="pipeline">The pipeline the data belongs to.</param>
+        </member>
+        <member name="M:FiftyOne.Pipeline.DerivedProperty.Data.DerivedPropertyData.#ctor(Microsoft.Extensions.Logging.ILogger{FiftyOne.Pipeline.Core.Data.ElementDataBase},FiftyOne.Pipeline.Core.FlowElements.IPipeline,System.Collections.Generic.IDictionary{System.String,System.Object})">
+            <summary>
+            Create a new instance using an existing dictionary.
+            </summary>
+            <param name="logger">The logger for the data instance.</param>
+            <param name="pipeline">The pipeline the data belongs to.</param>
+            <param name="dictionary">The values to start with.</param>
+        </member>
+        <member name="T:FiftyOne.Pipeline.DerivedProperty.Data.DerivedValueType">
+            <summary>
+            The types a source property can be read as. The type is worked out
+            from the literal a condition compares the property against, so a
+            script never declares one.
+            </summary>
+        </member>
+        <member name="F:FiftyOne.Pipeline.DerivedProperty.Data.DerivedValueType.Bool">
+            <summary>
+            True or false.
+            </summary>
+        </member>
+        <member name="F:FiftyOne.Pipeline.DerivedProperty.Data.DerivedValueType.Int">
+            <summary>
+            A whole number.
+            </summary>
+        </member>
+        <member name="F:FiftyOne.Pipeline.DerivedProperty.Data.DerivedValueType.Double">
+            <summary>
+            A number that may carry a fractional part.
+            </summary>
+        </member>
+        <member name="F:FiftyOne.Pipeline.DerivedProperty.Data.DerivedValueType.String">
+            <summary>
+            Text.
+            </summary>
+        </member>
+        <member name="T:FiftyOne.Pipeline.DerivedProperty.Data.DerivedOperator">
+            <summary>
+            The ways one value can be compared with another.
+            </summary>
+        </member>
+        <member name="F:FiftyOne.Pipeline.DerivedProperty.Data.DerivedOperator.Eq">
+            <summary>Equal.</summary>
+        </member>
+        <member name="F:FiftyOne.Pipeline.DerivedProperty.Data.DerivedOperator.Ne">
+            <summary>Not equal.</summary>
+        </member>
+        <member name="F:FiftyOne.Pipeline.DerivedProperty.Data.DerivedOperator.Gt">
+            <summary>Greater than.</summary>
+        </member>
+        <member name="F:FiftyOne.Pipeline.DerivedProperty.Data.DerivedOperator.Ge">
+            <summary>Greater than or equal to.</summary>
+        </member>
+        <member name="F:FiftyOne.Pipeline.DerivedProperty.Data.DerivedOperator.Lt">
+            <summary>Less than.</summary>
+        </member>
+        <member name="F:FiftyOne.Pipeline.DerivedProperty.Data.DerivedOperator.Le">
+            <summary>Less than or equal to.</summary>
+        </member>
+        <member name="F:FiftyOne.Pipeline.DerivedProperty.Data.DerivedOperator.In">
+            <summary>A member of the list given.</summary>
+        </member>
+        <member name="F:FiftyOne.Pipeline.DerivedProperty.Data.DerivedOperator.NotIn">
+            <summary>Not a member of the list given.</summary>
+        </member>
+        <member name="F:FiftyOne.Pipeline.DerivedProperty.Data.DerivedOperator.StartsWith">
+            <summary>Text starting with the text given.</summary>
+        </member>
+        <member name="F:FiftyOne.Pipeline.DerivedProperty.Data.DerivedOperator.EndsWith">
+            <summary>Text ending with the text given.</summary>
+        </member>
+        <member name="F:FiftyOne.Pipeline.DerivedProperty.Data.DerivedOperator.Contains">
+            <summary>Text holding the text given.</summary>
+        </member>
+        <member name="F:FiftyOne.Pipeline.DerivedProperty.Data.DerivedOperator.Present">
+            <summary>Whether the property is available and valid.</summary>
+        </member>
+        <member name="T:FiftyOne.Pipeline.DerivedProperty.Data.DerivedAggregate">
+            <summary>
+            The counts a rule can take over a group of checks.
+            </summary>
+        </member>
+        <member name="F:FiftyOne.Pipeline.DerivedProperty.Data.DerivedAggregate.Passed">
+            <summary>How many checks in the group were true.</summary>
+        </member>
+        <member name="F:FiftyOne.Pipeline.DerivedProperty.Data.DerivedAggregate.Failed">
+            <summary>How many checks in the group were false.</summary>
+        </member>
+        <member name="F:FiftyOne.Pipeline.DerivedProperty.Data.DerivedAggregate.Evaluated">
+            <summary>
+            How many checks in the group were either true or false, so how
+            many could be answered at all.
+            </summary>
+        </member>
+        <member name="T:FiftyOne.Pipeline.DerivedProperty.Data.DerivedValueMetaData">
+            <summary>
+            One value a property can return, with what the value means.
+            </summary>
+        </member>
+        <member name="M:FiftyOne.Pipeline.DerivedProperty.Data.DerivedValueMetaData.#ctor(System.String,System.String)">
+            <summary>
+            Create a new instance.
+            </summary>
+            <param name="name">The value as the property returns it.</param>
+            <param name="description">What the value means, or null.</param>
+        </member>
+        <member name="P:FiftyOne.Pipeline.DerivedProperty.Data.DerivedValueMetaData.Name">
+            <summary>
+            The value as the property returns it.
+            </summary>
+        </member>
+        <member name="P:FiftyOne.Pipeline.DerivedProperty.Data.DerivedValueMetaData.Description">
+            <summary>
+            What the value means, or null where the script gives no
+            description.
+            </summary>
+        </member>
+        <member name="T:FiftyOne.Pipeline.DerivedProperty.Data.DerivedPropertyMetaData">
+            <summary>
+            The property definition a script carries, holding every field of the
+            51Degrees common-metadata property schema so that a script is a
+            complete property definition rather than only a name and a type.
+            </summary>
+        </member>
+        <member name="M:FiftyOne.Pipeline.DerivedProperty.Data.DerivedPropertyMetaData.#ctor(System.String,System.String,FiftyOne.Pipeline.DerivedProperty.Data.DerivedValueType,System.Boolean,System.String,System.Collections.Generic.IReadOnlyList{FiftyOne.Pipeline.DerivedProperty.Data.DerivedValueMetaData},System.String,System.Nullable{System.Boolean},System.Nullable{System.Boolean},System.Nullable{System.Boolean},System.Nullable{System.Boolean},System.String,System.Nullable{System.Int32},System.Nullable{System.Int32},System.String,System.Collections.Generic.IReadOnlyList{System.String},System.Collections.Generic.IReadOnlyList{System.String})">
+            <summary>
+            Create a new instance. Only the first four arguments are
+            required, matching the format reference.
+            </summary>
+            <param name="name">The property name.</param>
+            <param name="description">What the property asserts.</param>
+            <param name="valueType">The type of the value returned.</param>
+            <param name="isList">
+            Always false in format 1. List outputs are deferred.
+            </param>
+            <param name="defaultValue">
+            The string form of the value returned where no rule matches, or
+            null where the script gives none.
+            </param>
+            <param name="values">
+            The values the property can return, or null where the script
+            lists none.
+            </param>
+            <param name="category">The category, or null.</param>
+            <param name="isMandatory">Carried through unchanged.</param>
+            <param name="isObsolete">Carried through unchanged.</param>
+            <param name="isPopular">Carried through unchanged.</param>
+            <param name="exportValues">Carried through unchanged.</param>
+            <param name="url">Carried through unchanged.</param>
+            <param name="displayOrder">Carried through unchanged.</param>
+            <param name="propertyId">Carried through unchanged.</param>
+            <param name="storedValueType">Carried through unchanged.</param>
+            <param name="vendorIds">Carried through unchanged.</param>
+            <param name="dependencies">
+            Every source property the checks and rules name, computed by the
+            validator where the script does not give the list.
+            </param>
+        </member>
+        <member name="P:FiftyOne.Pipeline.DerivedProperty.Data.DerivedPropertyMetaData.Name">
+            <summary>The property name.</summary>
+        </member>
+        <member name="P:FiftyOne.Pipeline.DerivedProperty.Data.DerivedPropertyMetaData.Description">
+            <summary>What the property asserts.</summary>
+        </member>
+        <member name="P:FiftyOne.Pipeline.DerivedProperty.Data.DerivedPropertyMetaData.ValueType">
+            <summary>The type of the value returned.</summary>
+        </member>
+        <member name="P:FiftyOne.Pipeline.DerivedProperty.Data.DerivedPropertyMetaData.IsList">
+            <summary>Always false in format 1.</summary>
+        </member>
+        <member name="P:FiftyOne.Pipeline.DerivedProperty.Data.DerivedPropertyMetaData.DefaultValue">
+            <summary>
+            The string form of the value returned where no rule matches and
+            the script has no Else, or null where the script gives none.
+            </summary>
+        </member>
+        <member name="P:FiftyOne.Pipeline.DerivedProperty.Data.DerivedPropertyMetaData.Values">
+            <summary>
+            The values the property can return, or null where the script
+            lists none.
+            </summary>
+        </member>
+        <member name="P:FiftyOne.Pipeline.DerivedProperty.Data.DerivedPropertyMetaData.Category">
+            <summary>The category, or null.</summary>
+        </member>
+        <member name="P:FiftyOne.Pipeline.DerivedProperty.Data.DerivedPropertyMetaData.IsMandatory">
+            <summary>True where the property must be populated.</summary>
+        </member>
+        <member name="P:FiftyOne.Pipeline.DerivedProperty.Data.DerivedPropertyMetaData.IsObsolete">
+            <summary>True where the property should no longer be used.</summary>
+        </member>
+        <member name="P:FiftyOne.Pipeline.DerivedProperty.Data.DerivedPropertyMetaData.IsPopular">
+            <summary>True where the property is highlighted to users.</summary>
+        </member>
+        <member name="P:FiftyOne.Pipeline.DerivedProperty.Data.DerivedPropertyMetaData.ExportValues">
+            <summary>True where the values are published externally.</summary>
+        </member>
+        <member name="P:FiftyOne.Pipeline.DerivedProperty.Data.DerivedPropertyMetaData.Url">
+            <summary>A page giving more about the property, or null.</summary>
+        </member>
+        <member name="P:FiftyOne.Pipeline.DerivedProperty.Data.DerivedPropertyMetaData.DisplayOrder">
+            <summary>Where the property sits in a display order.</summary>
+        </member>
+        <member name="P:FiftyOne.Pipeline.DerivedProperty.Data.DerivedPropertyMetaData.PropertyId">
+            <summary>The identifier the property carries elsewhere.</summary>
+        </member>
+        <member name="P:FiftyOne.Pipeline.DerivedProperty.Data.DerivedPropertyMetaData.StoredValueType">
+            <summary>
+            The type the value is held as in a data file, carried through
+            from the script unchanged.
+            </summary>
+        </member>
+        <member name="P:FiftyOne.Pipeline.DerivedProperty.Data.DerivedPropertyMetaData.VendorIds">
+            <summary>The vendors the property belongs to.</summary>
+        </member>
+        <member name="P:FiftyOne.Pipeline.DerivedProperty.Data.DerivedPropertyMetaData.Dependencies">
+            <summary>
+            Every source property the checks and rules name, in
+            elementKey.PropertyName form.
+            </summary>
+        </member>
+        <member name="M:FiftyOne.Pipeline.DerivedProperty.Data.DerivedPropertyMetaData.GetClrType">
+            <summary>
+            The CLR type a value of <see cref="P:FiftyOne.Pipeline.DerivedProperty.Data.DerivedPropertyMetaData.ValueType"/> is returned as.
+            </summary>
+            <returns>The type.</returns>
+        </member>
+        <member name="T:FiftyOne.Pipeline.DerivedProperty.Data.DerivedSourceProperty">
+            <summary>
+            One source property a script reads, with the type worked out from the
+            literals it is compared against.
+            </summary>
+        </member>
+        <member name="M:FiftyOne.Pipeline.DerivedProperty.Data.DerivedSourceProperty.#ctor(System.String,System.String,System.String,System.Nullable{FiftyOne.Pipeline.DerivedProperty.Data.DerivedValueType},System.Boolean)">
+            <summary>
+            Create a new instance.
+            </summary>
+            <param name="name">
+            The property in elementKey.PropertyName form, as the script wrote
+            it.
+            </param>
+            <param name="elementDataKey">
+            The element the property comes from.
+            </param>
+            <param name="propertyName">The property on that element.</param>
+            <param name="valueType">
+            The type the value is read as, or null where the script only ever
+            asks whether the property is present.
+            </param>
+            <param name="required">
+            False where the script lists the property under Optional.
+            </param>
+        </member>
+        <member name="P:FiftyOne.Pipeline.DerivedProperty.Data.DerivedSourceProperty.Name">
+            <summary>
+            The property in elementKey.PropertyName form.
+            </summary>
+        </member>
+        <member name="P:FiftyOne.Pipeline.DerivedProperty.Data.DerivedSourceProperty.ElementDataKey">
+            <summary>The element the property comes from.</summary>
+        </member>
+        <member name="P:FiftyOne.Pipeline.DerivedProperty.Data.DerivedSourceProperty.PropertyName">
+            <summary>The property on that element.</summary>
+        </member>
+        <member name="P:FiftyOne.Pipeline.DerivedProperty.Data.DerivedSourceProperty.ValueType">
+            <summary>
+            The type the value is read as, or null where the script only ever
+            asks whether the property is present.
+            </summary>
+        </member>
+        <member name="P:FiftyOne.Pipeline.DerivedProperty.Data.DerivedSourceProperty.Required">
+            <summary>
+            False where the script lists the property under Optional, meaning
+            the script can produce a value without it.
+            </summary>
+        </member>
+        <member name="T:FiftyOne.Pipeline.DerivedProperty.Data.DerivedCheck">
+            <summary>
+            A named condition, so a rule can reuse one and an aggregate can count
+            how many of them held.
+            </summary>
+        </member>
+        <member name="M:FiftyOne.Pipeline.DerivedProperty.Data.DerivedCheck.#ctor(System.String,FiftyOne.Pipeline.DerivedProperty.Data.DerivedCondition)">
+            <summary>
+            Create a new instance.
+            </summary>
+            <param name="name">The name the script gave the check.</param>
+            <param name="condition">The condition itself.</param>
+        </member>
+        <member name="P:FiftyOne.Pipeline.DerivedProperty.Data.DerivedCheck.Name">
+            <summary>The name the script gave the check.</summary>
+        </member>
+        <member name="P:FiftyOne.Pipeline.DerivedProperty.Data.DerivedCheck.Condition">
+            <summary>The condition itself.</summary>
+        </member>
+        <member name="T:FiftyOne.Pipeline.DerivedProperty.Data.DerivedRule">
+            <summary>
+            One rule. Rules are read in order and the first rule whose condition
+            is true supplies the output.
+            </summary>
+        </member>
+        <member name="M:FiftyOne.Pipeline.DerivedProperty.Data.DerivedRule.#ctor(FiftyOne.Pipeline.DerivedProperty.Data.DerivedCondition,FiftyOne.Pipeline.DerivedProperty.Data.DerivedRuleValue)">
+            <summary>
+            Create a new instance.
+            </summary>
+            <param name="condition">
+            The condition, or null for an Else, which always matches and is
+            only allowed on the last rule.
+            </param>
+            <param name="value">The value the rule supplies.</param>
+        </member>
+        <member name="P:FiftyOne.Pipeline.DerivedProperty.Data.DerivedRule.Condition">
+            <summary>
+            The condition, or null for an Else.
+            </summary>
+        </member>
+        <member name="P:FiftyOne.Pipeline.DerivedProperty.Data.DerivedRule.Value">
+            <summary>The value the rule supplies.</summary>
+        </member>
+        <member name="P:FiftyOne.Pipeline.DerivedProperty.Data.DerivedRule.IsElse">
+            <summary>
+            True where the rule is an Else, which always matches.
+            </summary>
+        </member>
+        <member name="T:FiftyOne.Pipeline.DerivedProperty.Data.DerivedRuleValue">
+            <summary>
+            What a rule supplies, being either a literal or a count of checks.
+            </summary>
+        </member>
+        <member name="M:FiftyOne.Pipeline.DerivedProperty.Data.DerivedRuleValue.FromLiteral(System.Object)">
+            <summary>
+            A rule value that is a literal of the output's value type.
+            </summary>
+            <param name="literal">The value.</param>
+            <returns>The rule value.</returns>
+        </member>
+        <member name="M:FiftyOne.Pipeline.DerivedProperty.Data.DerivedRuleValue.FromAggregate(FiftyOne.Pipeline.DerivedProperty.Data.DerivedAggregate,System.Collections.Generic.IReadOnlyList{System.Int32})">
+            <summary>
+            A rule value that is a count of checks, which an int output uses
+            to expose how much evidence it had.
+            </summary>
+            <param name="aggregate">Which count to take.</param>
+            <param name="group">
+            The checks to count, by index, or null for every check.
+            </param>
+            <returns>The rule value.</returns>
+        </member>
+        <member name="P:FiftyOne.Pipeline.DerivedProperty.Data.DerivedRuleValue.Literal">
+            <summary>
+            The literal, where the rule value is a literal.
+            </summary>
+        </member>
+        <member name="P:FiftyOne.Pipeline.DerivedProperty.Data.DerivedRuleValue.Aggregate">
+            <summary>
+            Which count to take, where the rule value is a count.
+            </summary>
+        </member>
+        <member name="P:FiftyOne.Pipeline.DerivedProperty.Data.DerivedRuleValue.Group">
+            <summary>
+            The checks to count, by index, or null for every check.
+            </summary>
+        </member>
+        <member name="P:FiftyOne.Pipeline.DerivedProperty.Data.DerivedRuleValue.IsAggregate">
+            <summary>
+            True where the rule value is a count of checks rather than a
+            literal.
+            </summary>
+        </member>
+        <member name="T:FiftyOne.Pipeline.DerivedProperty.Data.DerivedScript">
+            <summary>
+            One script, after parsing and validation. Every field is read only,
+            so one instance is shared by every request and by every thread.
+            </summary>
+        </member>
+        <member name="M:FiftyOne.Pipeline.DerivedProperty.Data.DerivedScript.#ctor(System.Int32,System.String,System.String,System.Boolean,System.String,System.String,FiftyOne.Pipeline.DerivedProperty.Data.DerivedPropertyMetaData,System.Collections.Generic.IReadOnlyList{FiftyOne.Pipeline.DerivedProperty.Data.DerivedSourceProperty},System.Collections.Generic.IReadOnlyList{FiftyOne.Pipeline.DerivedProperty.Data.DerivedCheck},System.Collections.Generic.IReadOnlyList{FiftyOne.Pipeline.DerivedProperty.Data.DerivedRule})">
+            <summary>
+            Create a new instance.
+            </summary>
+            <param name="format">The script language version, always 1.</param>
+            <param name="name">
+            What configuration selects the script by.
+            </param>
+            <param name="version">The author's semantic version.</param>
+            <param name="deprecated">True where the script is deprecated.</param>
+            <param name="deprecationNote">
+            What to use instead, where the script is deprecated.
+            </param>
+            <param name="source">
+            Where the script came from, being a built in name, a file path,
+            or the word code.
+            </param>
+            <param name="output">The property definition.</param>
+            <param name="properties">
+            The source properties, in the order the script first named them.
+            </param>
+            <param name="checks">The named conditions, in script order.</param>
+            <param name="rules">The rules, in script order.</param>
+        </member>
+        <member name="P:FiftyOne.Pipeline.DerivedProperty.Data.DerivedScript.Format">
+            <summary>The script language version, always 1.</summary>
+        </member>
+        <member name="P:FiftyOne.Pipeline.DerivedProperty.Data.DerivedScript.Name">
+            <summary>What configuration selects the script by.</summary>
+        </member>
+        <member name="P:FiftyOne.Pipeline.DerivedProperty.Data.DerivedScript.Version">
+            <summary>
+            The author's semantic version. Printed in the build log and
+            playing no part in selection.
+            </summary>
+        </member>
+        <member name="P:FiftyOne.Pipeline.DerivedProperty.Data.DerivedScript.Deprecated">
+            <summary>
+            True where the script still works but should no longer be used.
+            </summary>
+        </member>
+        <member name="P:FiftyOne.Pipeline.DerivedProperty.Data.DerivedScript.DeprecationNote">
+            <summary>
+            What to use instead, where the script is deprecated.
+            </summary>
+        </member>
+        <member name="P:FiftyOne.Pipeline.DerivedProperty.Data.DerivedScript.Source">
+            <summary>
+            Where the script came from, being a built in name, a file path,
+            or the word code.
+            </summary>
+        </member>
+        <member name="P:FiftyOne.Pipeline.DerivedProperty.Data.DerivedScript.Output">
+            <summary>The property definition.</summary>
+        </member>
+        <member name="P:FiftyOne.Pipeline.DerivedProperty.Data.DerivedScript.Properties">
+            <summary>
+            The source properties, in the order the script first named them.
+            </summary>
+        </member>
+        <member name="P:FiftyOne.Pipeline.DerivedProperty.Data.DerivedScript.Checks">
+            <summary>The named conditions, in script order.</summary>
+        </member>
+        <member name="P:FiftyOne.Pipeline.DerivedProperty.Data.DerivedScript.Rules">
+            <summary>The rules, in script order.</summary>
+        </member>
+        <member name="T:FiftyOne.Pipeline.DerivedProperty.Data.DerivedScriptFault">
+            <summary>
+            One thing wrong with a script. Validation collects every fault rather
+            than stopping at the first, so an author sees everything wrong with a
+            file in one go.
+            </summary>
+        </member>
+        <member name="M:FiftyOne.Pipeline.DerivedProperty.Data.DerivedScriptFault.#ctor(System.String,System.String,System.String,System.Int32,System.String)">
+            <summary>
+            Create a new instance.
+            </summary>
+            <param name="script">
+            The name of the script, or null where the script has no readable
+            name.
+            </param>
+            <param name="source">
+            Where the script came from, being a built in name, a file path,
+            or the word code.
+            </param>
+            <param name="path">
+            The place in the document, such as Rules[3].When.All[1], or an
+            empty string for the document as a whole.
+            </param>
+            <param name="line">
+            The one based line, or zero where the line is not known.
+            </param>
+            <param name="message">What is wrong, in plain words.</param>
+        </member>
+        <member name="P:FiftyOne.Pipeline.DerivedProperty.Data.DerivedScriptFault.Script">
+            <summary>
+            The name of the script, or null where the script has no readable
+            name.
+            </summary>
+        </member>
+        <member name="P:FiftyOne.Pipeline.DerivedProperty.Data.DerivedScriptFault.Source">
+            <summary>
+            Where the script came from, being a built in name, a file path,
+            or the word code.
+            </summary>
+        </member>
+        <member name="P:FiftyOne.Pipeline.DerivedProperty.Data.DerivedScriptFault.Path">
+            <summary>
+            The place in the document, such as Rules[3].When.All[1], or an
+            empty string for the document as a whole.
+            </summary>
+        </member>
+        <member name="P:FiftyOne.Pipeline.DerivedProperty.Data.DerivedScriptFault.Line">
+            <summary>
+            The one based line, or zero where the line is not known.
+            </summary>
+        </member>
+        <member name="P:FiftyOne.Pipeline.DerivedProperty.Data.DerivedScriptFault.Message">
+            <summary>What is wrong, in plain words.</summary>
+        </member>
+        <member name="M:FiftyOne.Pipeline.DerivedProperty.Data.DerivedScriptFault.ToString">
+            <summary>
+            The fault as one line, naming the script, the source, the line
+            and the place.
+            </summary>
+            <returns>The line.</returns>
+        </member>
+        <member name="T:FiftyOne.Pipeline.DerivedProperty.Data.DerivedScriptValidationException">
+            <summary>
+            Raised where one or more scripts do not validate. The message lists
+            every fault, one per line, so a build failure says everything that
+            has to be fixed rather than only the first thing found.
+            </summary>
+        </member>
+        <member name="M:FiftyOne.Pipeline.DerivedProperty.Data.DerivedScriptValidationException.#ctor">
+            <summary>
+            Create a new instance with no faults.
+            </summary>
+        </member>
+        <member name="M:FiftyOne.Pipeline.DerivedProperty.Data.DerivedScriptValidationException.#ctor(System.String)">
+            <summary>
+            Create a new instance.
+            </summary>
+            <param name="message">What went wrong.</param>
+        </member>
+        <member name="M:FiftyOne.Pipeline.DerivedProperty.Data.DerivedScriptValidationException.#ctor(System.String,System.Exception)">
+            <summary>
+            Create a new instance.
+            </summary>
+            <param name="message">What went wrong.</param>
+            <param name="innerException">The failure underneath.</param>
+        </member>
+        <member name="M:FiftyOne.Pipeline.DerivedProperty.Data.DerivedScriptValidationException.#ctor(System.Collections.Generic.IReadOnlyList{FiftyOne.Pipeline.DerivedProperty.Data.DerivedScriptFault})">
+            <summary>
+            Create a new instance listing every fault found.
+            </summary>
+            <param name="faults">The faults.</param>
+        </member>
+        <member name="P:FiftyOne.Pipeline.DerivedProperty.Data.DerivedScriptValidationException.Faults">
+            <summary>
+            Every fault found, in the order they were found.
+            </summary>
+        </member>
+        <member name="M:FiftyOne.Pipeline.DerivedProperty.Data.DerivedScriptValidationException.Describe(System.Collections.Generic.IReadOnlyList{FiftyOne.Pipeline.DerivedProperty.Data.DerivedScriptFault})">
+            <summary>
+            The faults as one line each, without the leading count.
+            </summary>
+            <param name="faults">The faults.</param>
+            <returns>The lines.</returns>
+        </member>
+        <member name="T:FiftyOne.Pipeline.DerivedProperty.Data.DerivedNode">
+            <summary>
+            A place in a parsed script, being a mapping, a sequence or a single
+            value, with the line the place started on so a fault can point at it.
+            </summary>
+        </member>
+        <member name="M:FiftyOne.Pipeline.DerivedProperty.Data.DerivedNode.#ctor(System.Int32)">
+            <summary>
+            Create a new instance.
+            </summary>
+            <param name="line">
+            The one based line the place started on, or zero where the line
+            is not known.
+            </param>
+        </member>
+        <member name="P:FiftyOne.Pipeline.DerivedProperty.Data.DerivedNode.Line">
+            <summary>
+            The one based line the place started on, or zero where the line
+            is not known.
+            </summary>
+        </member>
+        <member name="T:FiftyOne.Pipeline.DerivedProperty.Data.DerivedMapping">
+            <summary>
+            A mapping of names to places. Names are matched without regard to
+            case, as configuration files and common-metadata do.
+            </summary>
+        </member>
+        <member name="M:FiftyOne.Pipeline.DerivedProperty.Data.DerivedMapping.#ctor(System.Int32)">
+            <summary>
+            Create a new instance.
+            </summary>
+            <param name="line">The line the mapping started on.</param>
+        </member>
+        <member name="P:FiftyOne.Pipeline.DerivedProperty.Data.DerivedMapping.Names">
+            <summary>
+            The names, in the order the script wrote them and with the
+            letter case the script used.
+            </summary>
+        </member>
+        <member name="M:FiftyOne.Pipeline.DerivedProperty.Data.DerivedMapping.Add(System.String,FiftyOne.Pipeline.DerivedProperty.Data.DerivedNode)">
+            <summary>
+            Add a name and the place it leads to.
+            </summary>
+            <param name="name">The name as the script wrote it.</param>
+            <param name="value">The place.</param>
+            <exception cref="T:System.ArgumentException">
+            Thrown where the name is already present, ignoring case.
+            </exception>
+        </member>
+        <member name="M:FiftyOne.Pipeline.DerivedProperty.Data.DerivedMapping.Get(System.String)">
+            <summary>
+            Find a name, without regard to case.
+            </summary>
+            <param name="name">The name to find.</param>
+            <returns>The place, or null where the name is not present.</returns>
+        </member>
+        <member name="M:FiftyOne.Pipeline.DerivedProperty.Data.DerivedMapping.Has(System.String)">
+            <summary>
+            Whether a name is present, without regard to case.
+            </summary>
+            <param name="name">The name to look for.</param>
+            <returns>True where the name is present.</returns>
+        </member>
+        <member name="T:FiftyOne.Pipeline.DerivedProperty.Data.DerivedSequence">
+            <summary>
+            An ordered list of places.
+            </summary>
+        </member>
+        <member name="M:FiftyOne.Pipeline.DerivedProperty.Data.DerivedSequence.#ctor(System.Int32,System.Collections.Generic.List{FiftyOne.Pipeline.DerivedProperty.Data.DerivedNode})">
+            <summary>
+            Create a new instance.
+            </summary>
+            <param name="line">The line the list started on.</param>
+            <param name="items">The places in the list.</param>
+        </member>
+        <member name="P:FiftyOne.Pipeline.DerivedProperty.Data.DerivedSequence.Items">
+            <summary>The places in the list.</summary>
+        </member>
+        <member name="T:FiftyOne.Pipeline.DerivedProperty.Data.DerivedScalar">
+            <summary>
+            A single value written in the script.
+            </summary>
+        </member>
+        <member name="M:FiftyOne.Pipeline.DerivedProperty.Data.DerivedScalar.#ctor(System.Int32,System.Object,System.String)">
+            <summary>
+            Create a new instance.
+            </summary>
+            <param name="line">The line the value was written on.</param>
+            <param name="value">
+            The value as its own type, being a boolean, a whole number, a
+            number, text, or null where the script wrote nothing.
+            </param>
+            <param name="text">The value exactly as written.</param>
+        </member>
+        <member name="P:FiftyOne.Pipeline.DerivedProperty.Data.DerivedScalar.Value">
+            <summary>
+            The value as its own type, being a boolean, an int, a double,
+            a string, or null where the script wrote nothing.
+            </summary>
+        </member>
+        <member name="P:FiftyOne.Pipeline.DerivedProperty.Data.DerivedScalar.Text">
+            <summary>The value exactly as written.</summary>
+        </member>
+        <member name="T:FiftyOne.Pipeline.DerivedProperty.Data.DerivedScriptParseException">
+            <summary>
+            Raised where the text of a script is not YAML or JSON at all, or
+            where the script is not a mapping at the top level. Every other
+            problem is a validation fault rather than a parse failure, so that
+            an author sees every fault at once.
+            </summary>
+        </member>
+        <member name="M:FiftyOne.Pipeline.DerivedProperty.Data.DerivedScriptParseException.#ctor">
+            <summary>
+            Create a new instance.
+            </summary>
+        </member>
+        <member name="M:FiftyOne.Pipeline.DerivedProperty.Data.DerivedScriptParseException.#ctor(System.String)">
+            <summary>
+            Create a new instance.
+            </summary>
+            <param name="message">What went wrong.</param>
+        </member>
+        <member name="M:FiftyOne.Pipeline.DerivedProperty.Data.DerivedScriptParseException.#ctor(System.String,System.Exception)">
+            <summary>
+            Create a new instance.
+            </summary>
+            <param name="message">What went wrong.</param>
+            <param name="innerException">The failure underneath.</param>
+        </member>
+        <member name="P:FiftyOne.Pipeline.DerivedProperty.Data.DerivedScriptParseException.Line">
+            <summary>
+            The one based line the failure was found on, or zero where the
+            line is not known.
+            </summary>
+        </member>
+        <member name="T:FiftyOne.Pipeline.DerivedProperty.Data.DerivedScriptParser">
+             <summary>
+             Reads the text of a script into a tree of
+             <see cref="T:FiftyOne.Pipeline.DerivedProperty.Data.DerivedNode"/>, keeping the line each place started on.
+            
+             YAML and JSON both go through the same reader, because JSON is a
+             subset of YAML 1.2, so the two formats give one tree and everything
+             after parsing is unaware of which one was written.
+             </summary>
+        </member>
+        <member name="M:FiftyOne.Pipeline.DerivedProperty.Data.DerivedScriptParser.LooksLikeJson(System.String)">
+            <summary>
+            Whether the text is JSON, worked out from the first character
+            that is not white space being an opening brace. Only used to
+            name the format in a message, since one reader handles both.
+            </summary>
+            <param name="text">The script text.</param>
+            <returns>True where the text looks like JSON.</returns>
+        </member>
+        <member name="M:FiftyOne.Pipeline.DerivedProperty.Data.DerivedScriptParser.Parse(System.String)">
+            <summary>
+            Read the text of a script.
+            </summary>
+            <param name="text">The script as YAML or as JSON.</param>
+            <returns>The top level mapping.</returns>
+            <exception cref="T:FiftyOne.Pipeline.DerivedProperty.Data.DerivedScriptParseException">
+            Thrown where the text is not YAML or JSON, or where the script is
+            not a mapping at the top level.
+            </exception>
+        </member>
+        <member name="M:FiftyOne.Pipeline.DerivedProperty.Data.DerivedScriptParser.ReadScalar(YamlDotNet.RepresentationModel.YamlScalarNode)">
+            <summary>
+            Works out what a single value written in a script means, using
+            the YAML 1.2 core rules, which JSON also follows. A value in
+            quotes is always text, so an author can force a number or the
+            word true to stay as text by quoting it.
+            </summary>
+        </member>
+        <member name="T:FiftyOne.Pipeline.DerivedProperty.Data.DerivedScriptValidationResult">
+            <summary>
+            What validating one script produced, being either a script or a list
+            of faults, never both.
+            </summary>
+        </member>
+        <member name="M:FiftyOne.Pipeline.DerivedProperty.Data.DerivedScriptValidationResult.#ctor(FiftyOne.Pipeline.DerivedProperty.Data.DerivedScript,System.Collections.Generic.IReadOnlyList{FiftyOne.Pipeline.DerivedProperty.Data.DerivedScriptFault})">
+            <summary>
+            Create a new instance.
+            </summary>
+            <param name="script">The script, where it validated.</param>
+            <param name="faults">The faults, where it did not.</param>
+        </member>
+        <member name="P:FiftyOne.Pipeline.DerivedProperty.Data.DerivedScriptValidationResult.Script">
+            <summary>
+            The script, or null where the script did not validate.
+            </summary>
+        </member>
+        <member name="P:FiftyOne.Pipeline.DerivedProperty.Data.DerivedScriptValidationResult.Faults">
+            <summary>
+            Every fault found, empty where the script validated.
+            </summary>
+        </member>
+        <member name="P:FiftyOne.Pipeline.DerivedProperty.Data.DerivedScriptValidationResult.IsValid">
+            <summary>True where the script validated.</summary>
+        </member>
+        <member name="T:FiftyOne.Pipeline.DerivedProperty.Data.DerivedScriptValidator">
+             <summary>
+             Checks a parsed script against format 1 and turns it into a
+             <see cref="T:FiftyOne.Pipeline.DerivedProperty.Data.DerivedScript"/>. Every fault is collected rather than
+             stopping at the first.
+            
+             The faults here have to match the JavaScript reference validator in
+             the derived-properties repository, because the rejection cases under
+             that repository's tests folder name the path and a fragment of the
+             message, and every language runs the same cases.
+             </summary>
+        </member>
+        <member name="M:FiftyOne.Pipeline.DerivedProperty.Data.DerivedScriptValidator.Validate(System.String,System.String,System.String)">
+            <summary>
+            Read and check the text of a script.
+            </summary>
+            <param name="text">The script as YAML or as JSON.</param>
+            <param name="name">
+            The file name without its extension, which the script's Name must
+            equal. Null where the script did not come from a file.
+            </param>
+            <param name="source">
+            Where the script came from, for the fault messages.
+            </param>
+            <returns>The script, or the faults.</returns>
+        </member>
+        <member name="M:FiftyOne.Pipeline.DerivedProperty.Data.DerivedScriptValidator.ReadGroup(FiftyOne.Pipeline.DerivedProperty.Data.DerivedScriptValidator.Context,FiftyOne.Pipeline.DerivedProperty.Data.DerivedNode,System.String,FiftyOne.Pipeline.DerivedProperty.Data.DerivedNode)">
+            <summary>
+            A group is the word Checks, meaning every check, or a list of
+            check names. Null stands for every check.
+            </summary>
+        </member>
+        <member name="M:FiftyOne.Pipeline.DerivedProperty.Data.DerivedScriptValidator.InferType(System.Object)">
+            <summary>
+            The type a literal written in a script stands for.
+            </summary>
+        </member>
+        <member name="M:FiftyOne.Pipeline.DerivedProperty.Data.DerivedScriptValidator.Matches(System.Nullable{FiftyOne.Pipeline.DerivedProperty.Data.DerivedValueType},FiftyOne.Pipeline.DerivedProperty.Data.DerivedValueType)">
+            <summary>
+            Whether a literal of one type may stand for a value of another.
+            </summary>
+        </member>
+        <member name="M:FiftyOne.Pipeline.DerivedProperty.Data.DerivedScriptValidator.Describe(FiftyOne.Pipeline.DerivedProperty.Data.DerivedNode)">
+            <summary>
+            How a place in the document is named in a fault message.
+            </summary>
+        </member>
+        <member name="T:FiftyOne.Pipeline.DerivedProperty.Data.DerivedScriptWriter">
+             <summary>
+             Prints a validated script as canonical JSON. The element writes the
+             result to its debug log at build, so that anyone holding the log can
+             reconstruct exactly what was evaluated without the script file.
+            
+             The text produced here must match the JavaScript reference at
+             tools/canonical.mjs of the derived-properties repository character
+             for character, because both are quoted in documentation and because
+             matching text is how the two implementations are shown to build one
+             model. A YAML script and the JSON script that mirrors it therefore
+             print the same text.
+            
+             The form is PascalCase keys in the order of the format reference,
+             two space indent, no trailing newline, and literal types kept as they
+             were written, so false prints as false rather than as "false".
+             </summary>
+        </member>
+        <member name="M:FiftyOne.Pipeline.DerivedProperty.Data.DerivedScriptWriter.ToCanonicalJson(FiftyOne.Pipeline.DerivedProperty.Data.DerivedScript)">
+            <summary>
+            Print a script as canonical JSON.
+            </summary>
+            <param name="script">The script, after validation.</param>
+            <returns>The canonical JSON, without a trailing newline.</returns>
+            <exception cref="T:System.ArgumentNullException">
+            Thrown where no script is given.
+            </exception>
+        </member>
+        <member name="M:FiftyOne.Pipeline.DerivedProperty.Data.DerivedScriptWriter.Output(FiftyOne.Pipeline.DerivedProperty.Data.DerivedPropertyMetaData)">
+            <summary>
+            The output block, in the order of the format reference, leaving
+            out every field the script did not give and printing Values last.
+            </summary>
+        </member>
+        <member name="M:FiftyOne.Pipeline.DerivedProperty.Data.DerivedScriptWriter.Group(System.Collections.Generic.IReadOnlyList{System.Int32},FiftyOne.Pipeline.DerivedProperty.Data.DerivedScript)">
+            <summary>
+            A group is the word Checks where it covers every check, and the
+            list of check names otherwise.
+            </summary>
+        </member>
+        <member name="M:FiftyOne.Pipeline.DerivedProperty.Data.DerivedScriptWriter.PrintText(System.String,System.Text.StringBuilder)">
+            <summary>
+            Writes a string the way JSON requires. Non ASCII characters are
+            not escaped, because JSON.stringify does not escape them either,
+            and a surrogate without its pair is written as an escape, which
+            is what JSON.stringify does to keep its output well formed.
+            </summary>
+        </member>
+        <member name="M:FiftyOne.Pipeline.DerivedProperty.Data.DerivedScriptWriter.PrintNumber(System.Double)">
+            <summary>
+            Writes a number the way JavaScript writes one, so a whole valued
+            double prints with no decimal point and no trailing zero and 2.0
+            prints as 2. The rule is the one in the JavaScript language
+            standard, where a number is written in plain form while its
+            decimal exponent sits between -6 and 21 and in exponent form
+            outside that range.
+            </summary>
+        </member>
+        <member name="M:FiftyOne.Pipeline.DerivedProperty.Data.DerivedScriptWriter.Digits(System.String,System.String@,System.Int32@)">
+            <summary>
+            Splits the shortest round trip form of a number into its
+            significant digits and the decimal exponent, so that the value is
+            0.digits multiplied by ten to the power of the exponent. The input
+            has no sign and is either plain, such as 12.5, or in the exponent
+            form .NET writes, such as 1.25E+05.
+            </summary>
+        </member>
+        <member name="T:FiftyOne.Pipeline.DerivedProperty.Data.DerivedTracedProperty">
+            <summary>
+            What one source property did on one request.
+            </summary>
+        </member>
+        <member name="M:FiftyOne.Pipeline.DerivedProperty.Data.DerivedTracedProperty.#ctor(System.String,System.Boolean,System.Boolean,System.Object,System.String)">
+            <summary>
+            Create a new instance.
+            </summary>
+            <param name="name">The property in elementKey.PropertyName form.</param>
+            <param name="required">
+            False where the script lists the property under Optional.
+            </param>
+            <param name="available">
+            True where the property was there and could be read.
+            </param>
+            <param name="value">The value read, where it was read.</param>
+            <param name="reason">
+            Why the property could not be read, where it could not.
+            </param>
+        </member>
+        <member name="P:FiftyOne.Pipeline.DerivedProperty.Data.DerivedTracedProperty.Name">
+            <summary>The property in elementKey.PropertyName form.</summary>
+        </member>
+        <member name="P:FiftyOne.Pipeline.DerivedProperty.Data.DerivedTracedProperty.Required">
+            <summary>
+            False where the script lists the property under Optional.
+            </summary>
+        </member>
+        <member name="P:FiftyOne.Pipeline.DerivedProperty.Data.DerivedTracedProperty.Available">
+            <summary>
+            True where the property was there and could be read.
+            </summary>
+        </member>
+        <member name="P:FiftyOne.Pipeline.DerivedProperty.Data.DerivedTracedProperty.Value">
+            <summary>The value read, where it was read.</summary>
+        </member>
+        <member name="P:FiftyOne.Pipeline.DerivedProperty.Data.DerivedTracedProperty.Reason">
+            <summary>
+            Why the property could not be read, where it could not.
+            </summary>
+        </member>
+        <member name="T:FiftyOne.Pipeline.DerivedProperty.Data.DerivedTracedCheck">
+            <summary>
+            What one check answered on one request.
+            </summary>
+        </member>
+        <member name="M:FiftyOne.Pipeline.DerivedProperty.Data.DerivedTracedCheck.#ctor(System.String,FiftyOne.Pipeline.DerivedProperty.Data.DerivedState)">
+            <summary>
+            Create a new instance.
+            </summary>
+            <param name="name">The name the script gave the check.</param>
+            <param name="state">What the check answered.</param>
+        </member>
+        <member name="P:FiftyOne.Pipeline.DerivedProperty.Data.DerivedTracedCheck.Name">
+            <summary>The name the script gave the check.</summary>
+        </member>
+        <member name="P:FiftyOne.Pipeline.DerivedProperty.Data.DerivedTracedCheck.State">
+            <summary>What the check answered.</summary>
+        </member>
+        <member name="T:FiftyOne.Pipeline.DerivedProperty.Data.DerivedTrace">
+             <summary>
+             A record of one run of one script, being what every source property
+             did, what every check answered, and which rule supplied the answer.
+            
+             A trace is for tests, for the tester page and for anyone working out
+             why a script gave the answer it gave. Nothing on the request path
+             asks for one, so running a pipeline costs nothing for the trace to
+             exist.
+             </summary>
+        </member>
+        <member name="P:FiftyOne.Pipeline.DerivedProperty.Data.DerivedTrace.Properties">
+            <summary>
+            Every source property the script names, in the order the script
+            first named them.
+            </summary>
+        </member>
+        <member name="P:FiftyOne.Pipeline.DerivedProperty.Data.DerivedTrace.Checks">
+            <summary>
+            Every check, in script order. Empty where a required property
+            was missing, because the checks are then never reached.
+            </summary>
+        </member>
+        <member name="P:FiftyOne.Pipeline.DerivedProperty.Data.DerivedTrace.MatchedRule">
+            <summary>
+            Which rule supplied the answer, by index, or null where no rule
+            matched.
+            </summary>
+        </member>
+        <member name="P:FiftyOne.Pipeline.DerivedProperty.Data.DerivedTrace.MatchedElse">
+            <summary>
+            True where the rule that matched was the Else.
+            </summary>
+        </member>
+        <member name="P:FiftyOne.Pipeline.DerivedProperty.Data.DerivedTrace.UsedDefault">
+            <summary>
+            True where no rule matched and the answer came from
+            Output.DefaultValue.
+            </summary>
+        </member>
+        <member name="P:FiftyOne.Pipeline.DerivedProperty.Data.DerivedTrace.NoValueMessage">
+            <summary>
+            The message saying why there is no value, where there is none.
+            </summary>
+        </member>
+        <member name="M:FiftyOne.Pipeline.DerivedProperty.Data.DerivedTrace.Fill(FiftyOne.Pipeline.DerivedProperty.Data.DerivedScript,FiftyOne.Pipeline.DerivedProperty.Data.DerivedEvaluationContext)">
+            <summary>
+            Record what every source property did. Called by the evaluator.
+            </summary>
+            <param name="script">The script being run.</param>
+            <param name="context">The values for this request.</param>
+        </member>
+        <member name="M:FiftyOne.Pipeline.DerivedProperty.Data.DerivedTrace.FillChecks(FiftyOne.Pipeline.DerivedProperty.Data.DerivedScript,FiftyOne.Pipeline.DerivedProperty.Data.DerivedEvaluationContext)">
+            <summary>
+            Record what every check answered. Called by the evaluator.
+            </summary>
+            <param name="script">The script being run.</param>
+            <param name="context">The values for this request.</param>
+        </member>
+        <member name="M:FiftyOne.Pipeline.DerivedProperty.Data.DerivedTrace.SetMatch(System.Int32,System.Boolean)">
+            <summary>
+            Record which rule matched. Called by the evaluator.
+            </summary>
+            <param name="index">The rule, by index.</param>
+            <param name="isElse">True where the rule is the Else.</param>
+        </member>
+        <member name="M:FiftyOne.Pipeline.DerivedProperty.Data.DerivedTrace.SetDefault">
+            <summary>
+            Record that the answer came from Output.DefaultValue because no
+            rule matched. Called by the evaluator.
+            </summary>
+        </member>
+        <member name="M:FiftyOne.Pipeline.DerivedProperty.Data.DerivedTrace.SetNoValue(System.String)">
+            <summary>
+            Record that there is no value, and why. Called by the evaluator.
+            </summary>
+            <param name="message">The reason there is no value.</param>
+        </member>
+        <member name="T:FiftyOne.Pipeline.DerivedProperty.Data.DerivedValueConverter">
+             <summary>
+             Reads a source value as the type a script inferred for the property.
+            
+             Values are never coerced loosely, so the strings N/A, Unknown and an
+             empty string never become false or zero. A value that cannot be read
+             as the inferred type makes the property absent, and every condition
+             on the property is then unanswered rather than false.
+            
+             The behaviour here has to match the JavaScript reference evaluator in
+             the derived-properties repository exactly, and the conformance cases
+             under that repository's tests folder are what prove the two agree.
+             </summary>
+        </member>
+        <member name="M:FiftyOne.Pipeline.DerivedProperty.Data.DerivedValueConverter.TryConvert(System.Object,FiftyOne.Pipeline.DerivedProperty.Data.DerivedValueType,System.Object@)">
+            <summary>
+            Read a value that arrived as its native type or as a string.
+            </summary>
+            <param name="raw">The value as the source element gave it.</param>
+            <param name="type">The type the script inferred.</param>
+            <param name="converted">The value read, where reading worked.</param>
+            <returns>True where the value could be read.</returns>
+        </member>
+        <member name="M:FiftyOne.Pipeline.DerivedProperty.Data.DerivedValueConverter.TryConvertString(System.String,FiftyOne.Pipeline.DerivedProperty.Data.DerivedValueType,System.Object@)">
+            <summary>
+            Read the string form of a value, which is how a value from a data
+            file or from a cloud response usually arrives.
+            </summary>
+            <param name="raw">The string form.</param>
+            <param name="type">The type the script inferred.</param>
+            <param name="converted">The value read, where reading worked.</param>
+            <returns>True where the value could be read.</returns>
+        </member>
+        <member name="M:FiftyOne.Pipeline.DerivedProperty.Data.DerivedValueConverter.Display(System.Object)">
+            <summary>
+            The text shown for a value in a message saying the value could
+            not be read.
+            </summary>
+            <param name="raw">The value.</param>
+            <returns>The text.</returns>
+        </member>
+        <member name="M:FiftyOne.Pipeline.DerivedProperty.Data.DerivedValueConverter.NameOf(FiftyOne.Pipeline.DerivedProperty.Data.DerivedValueType)">
+            <summary>
+            The name of a type as the messages write it.
+            </summary>
+            <param name="type">The type.</param>
+            <returns>The name.</returns>
+        </member>
+        <member name="T:FiftyOne.Pipeline.DerivedProperty.Data.IDerivedPropertyData">
+             <summary>
+             The element data holding the properties every derived property
+             element in a pipeline has computed. One script writes one property,
+             named by the Output block of that script.
+            
+             Every derived property element in a pipeline shares one instance,
+             under the element data key derived, in the same way every Translation
+             engine shares one.
+             </summary>
+        </member>
+        <member name="T:FiftyOne.Pipeline.DerivedProperty.FlowElements.DerivedPropertyElement">
+             <summary>
+             Computes new properties from properties other elements have already
+             put into the flow data, following one or more scripts.
+            
+             The element holds no data file, makes no request and uses no resource
+             key, so it is a plain flow element rather than an aspect engine.
+             </summary>
+        </member>
+        <member name="F:FiftyOne.Pipeline.DerivedProperty.FlowElements.DerivedPropertyElement.DerivedElementDataKey">
+            <summary>
+            The element data key every derived property element in a
+            pipeline shares, in the same way every Translation engine shares
+            the key translation.
+            </summary>
+        </member>
+        <member name="M:FiftyOne.Pipeline.DerivedProperty.FlowElements.DerivedPropertyElement.#ctor(System.Collections.Generic.IReadOnlyCollection{FiftyOne.Pipeline.DerivedProperty.Data.DerivedScript},Microsoft.Extensions.Logging.ILogger{FiftyOne.Pipeline.Core.FlowElements.FlowElementBase{FiftyOne.Pipeline.DerivedProperty.Data.IDerivedPropertyData,FiftyOne.Pipeline.Core.Data.IElementPropertyMetaData}},System.Func{FiftyOne.Pipeline.Core.FlowElements.IPipeline,FiftyOne.Pipeline.Core.FlowElements.FlowElementBase{FiftyOne.Pipeline.DerivedProperty.Data.IDerivedPropertyData,FiftyOne.Pipeline.Core.Data.IElementPropertyMetaData},FiftyOne.Pipeline.DerivedProperty.Data.IDerivedPropertyData})">
+            <summary>
+            Create a new instance.
+            </summary>
+            <param name="scripts">
+            The scripts to run, already validated.
+            </param>
+            <param name="logger">The logger for the element.</param>
+            <param name="elementDataFactory">
+            How the element makes its element data.
+            </param>
+            <exception cref="T:System.ArgumentNullException">
+            Thrown where no scripts were given.
+            </exception>
+            <exception cref="T:FiftyOne.Pipeline.DerivedProperty.Data.DerivedScriptValidationException">
+            Thrown where two scripts write the same output property.
+            </exception>
+        </member>
+        <member name="P:FiftyOne.Pipeline.DerivedProperty.FlowElements.DerivedPropertyElement.ElementDataKey">
+            <inheritdoc/>
+        </member>
+        <member name="P:FiftyOne.Pipeline.DerivedProperty.FlowElements.DerivedPropertyElement.EvidenceKeyFilter">
+            <summary>
+            The element takes no evidence at all, because every input is a
+            property another element has already produced, so the filter is
+            empty.
+            </summary>
+        </member>
+        <member name="P:FiftyOne.Pipeline.DerivedProperty.FlowElements.DerivedPropertyElement.Properties">
+            <inheritdoc/>
+        </member>
+        <member name="P:FiftyOne.Pipeline.DerivedProperty.FlowElements.DerivedPropertyElement.Scripts">
+            <inheritdoc/>
+        </member>
+        <member name="M:FiftyOne.Pipeline.DerivedProperty.FlowElements.DerivedPropertyElement.AddPipeline(FiftyOne.Pipeline.Core.FlowElements.IPipeline)">
+            <summary>
+            Checks the rest of the pipeline for the source properties every
+            script needs, which cannot be done when the element is built
+            because the element cannot see the pipeline then.
+            </summary>
+            <param name="pipeline">The pipeline being built.</param>
+            <exception cref="T:FiftyOne.Pipeline.Core.Exceptions.PipelineConfigurationException">
+            Thrown where a required source property has no supplier earlier
+            in the pipeline, or where another element already writes one of
+            the derived property names this element writes.
+            </exception>
+        </member>
+        <member name="M:FiftyOne.Pipeline.DerivedProperty.FlowElements.DerivedPropertyElement.ProcessInternal(FiftyOne.Pipeline.Core.Data.IFlowData)">
+            <inheritdoc/>
+        </member>
+        <member name="M:FiftyOne.Pipeline.DerivedProperty.FlowElements.DerivedPropertyElement.ManagedResourcesCleanup">
+            <inheritdoc/>
+        </member>
+        <member name="M:FiftyOne.Pipeline.DerivedProperty.FlowElements.DerivedPropertyElement.UnmanagedResourcesCleanup">
+            <inheritdoc/>
+        </member>
+        <member name="M:FiftyOne.Pipeline.DerivedProperty.FlowElements.DerivedPropertyElement.CheckPipeline(FiftyOne.Pipeline.Core.FlowElements.IPipeline)">
+            <summary>
+            The check from the design, run when the pipeline adds the
+            element. The element can see every element in the pipeline at
+            that point, including ones placed after itself, which is what
+            lets a source property supplied too late be named rather than
+            simply reported missing on every request.
+            </summary>
+        </member>
+        <member name="M:FiftyOne.Pipeline.DerivedProperty.FlowElements.DerivedPropertyElement.Supplies(FiftyOne.Pipeline.Core.FlowElements.IFlowElement,System.String)">
+            <summary>
+            Whether an element says it produces a property, read from the
+            element's own metadata. An element that cannot answer yet is
+            treated as not supplying the property, so a build never fails
+            because a cloud engine had not finished starting.
+            </summary>
+        </member>
+        <member name="T:FiftyOne.Pipeline.DerivedProperty.FlowElements.DerivedPropertyElementBuilder">
+             <summary>
+             Builds a <see cref="T:FiftyOne.Pipeline.DerivedProperty.FlowElements.DerivedPropertyElement"/>.
+            
+             Scripts reach the builder three ways, being a script built into this
+             package, a file in your own environment, or a string of script text
+             from your own code. The three may be mixed in one element. There is
+             no way to name a URL, because a script has to be readable at build
+             and cannot change under a running pipeline.
+            
+             Once <see cref="M:FiftyOne.Pipeline.DerivedProperty.FlowElements.DerivedPropertyElementBuilder.Build"/> returns, the element holds only the
+             compiled scripts. No path, no text and no reference to where a
+             script came from is kept.
+             </summary>
+        </member>
+        <member name="M:FiftyOne.Pipeline.DerivedProperty.FlowElements.DerivedPropertyElementBuilder.#ctor(Microsoft.Extensions.Logging.ILoggerFactory)">
+            <summary>
+            Create a new instance.
+            </summary>
+            <param name="loggerFactory">
+            How the element and its data make their loggers.
+            </param>
+            <exception cref="T:System.ArgumentNullException">
+            Thrown where the logger factory is null.
+            </exception>
+        </member>
+        <member name="M:FiftyOne.Pipeline.DerivedProperty.FlowElements.DerivedPropertyElementBuilder.AddScript(FiftyOne.Pipeline.DerivedProperty.BuiltInScript)">
+            <summary>
+            Add a script that ships inside this package.
+            </summary>
+            <param name="script">Which script to add.</param>
+            <returns>The builder, so calls can be chained.</returns>
+        </member>
+        <member name="M:FiftyOne.Pipeline.DerivedProperty.FlowElements.DerivedPropertyElementBuilder.SetScripts(System.Collections.Generic.List{System.String})">
+            <summary>
+            Add the scripts that ship inside this package, by name. This is
+            what the configuration key Scripts binds to.
+            </summary>
+            <param name="names">The script names.</param>
+            <returns>The builder, so calls can be chained.</returns>
+            <exception cref="T:System.ArgumentNullException">
+            Thrown where the list is null.
+            </exception>
+        </member>
+        <member name="M:FiftyOne.Pipeline.DerivedProperty.FlowElements.DerivedPropertyElementBuilder.AddScriptFile(System.String)">
+            <summary>
+            Add a script file. A path may hold a wildcard, in which case
+            every file matching it is added, in the same way the Translation
+            engine builder takes its sources.
+            </summary>
+            <param name="path">The path to the file.</param>
+            <returns>The builder, so calls can be chained.</returns>
+            <exception cref="T:System.ArgumentNullException">
+            Thrown where the path is null.
+            </exception>
+        </member>
+        <member name="M:FiftyOne.Pipeline.DerivedProperty.FlowElements.DerivedPropertyElementBuilder.SetScriptFiles(System.Collections.Generic.List{System.String})">
+            <summary>
+            Add script files by path. Wildcards are allowed. This is what
+            the configuration key ScriptFiles binds to.
+            </summary>
+            <param name="paths">The paths.</param>
+            <returns>The builder, so calls can be chained.</returns>
+            <exception cref="T:System.ArgumentNullException">
+            Thrown where the list is null.
+            </exception>
+        </member>
+        <member name="M:FiftyOne.Pipeline.DerivedProperty.FlowElements.DerivedPropertyElementBuilder.AddScript(System.String,System.String)">
+            <summary>
+            Add a script held as a string in your own code. YAML and JSON
+            are both accepted and give the same element.
+            </summary>
+            <param name="name">
+            The name to know the script by, which the script's own Name must
+            equal.
+            </param>
+            <param name="content">The script text.</param>
+            <returns>The builder, so calls can be chained.</returns>
+            <exception cref="T:System.ArgumentNullException">
+            Thrown where the name or the content is null.
+            </exception>
+        </member>
+        <member name="M:FiftyOne.Pipeline.DerivedProperty.FlowElements.DerivedPropertyElementBuilder.Build">
+            <summary>
+            Validate and compile every script added, then build the element.
+            </summary>
+            <returns>The element.</returns>
+            <exception cref="T:FiftyOne.Pipeline.DerivedProperty.Data.DerivedScriptValidationException">
+            Thrown where any script does not validate. The message lists
+            every fault in every script, one per line, so one build failure
+            says everything that has to be fixed.
+            </exception>
+            <exception cref="T:System.ArgumentNullException">
+            Thrown where no script was added.
+            </exception>
+        </member>
+        <member name="M:FiftyOne.Pipeline.DerivedProperty.FlowElements.DerivedPropertyElementBuilder.ScriptNameOf(System.String)">
+            <summary>
+            The script name inside an embedded resource name, being the part
+            between the prefix every script resource carries and the file
+            extension.
+            </summary>
+        </member>
+        <member name="T:FiftyOne.Pipeline.DerivedProperty.FlowElements.IDerivedPropertyElement">
+             <summary>
+             An element that computes new properties from properties other
+             elements have already put into the flow data, following a script.
+            
+             The element does property transformation and nothing else. Work that
+             needs a network call, work that keeps state between requests and work
+             that reads evidence out of the request all belong in an element of
+             your own.
+             </summary>
+        </member>
+        <member name="P:FiftyOne.Pipeline.DerivedProperty.FlowElements.IDerivedPropertyElement.Scripts">
+            <summary>
+            The scripts the element runs, in the order they were added. Each
+            carries the full property definition from its Output block, so a
+            JSON builder, the cloud or a documentation generator can read
+            every metadata field rather than only the name and the type.
+            </summary>
+        </member>
+        <member name="T:FiftyOne.Pipeline.DerivedProperty.BuiltInScript">
+            <summary>
+            The derived property scripts shipped inside this package, taken
+            from the derived-properties submodule when the package was built.
+            A member is added for each script file, so a new script in the
+            submodule needs no change to this package.
+            </summary>
+        </member>
+        <member name="F:FiftyOne.Pipeline.DerivedProperty.BuiltInScript.HumanConfidence">
+            <summary>
+            The HumanConfidence script, embedded from
+            scripts/HumanConfidence.yaml of the derived-properties
+            repository.
+            </summary>
+        </member>
+        <member name="F:FiftyOne.Pipeline.DerivedProperty.BuiltInScript.HumanConfidenceEvaluated">
+            <summary>
+            The HumanConfidenceEvaluated script, embedded from
+            scripts/HumanConfidenceEvaluated.yaml of the derived-properties
+            repository.
+            </summary>
+        </member>
+        <member name="T:FiftyOne.Pipeline.DerivedProperty.BuiltInScripts">
+            <summary>
+            Where the built in scripts came from, and how to read them back
+            out of the assembly.
+            </summary>
+        </member>
+        <member name="F:FiftyOne.Pipeline.DerivedProperty.BuiltInScripts.SubmoduleCommit">
+            <summary>
+            The commit of the derived-properties repository the scripts in
+            this package were taken from, or the word unknown where the
+            submodule was not checked out when the package was built. The
+            element writes the value to the build log so that anyone
+            holding the log can find the exact scripts that ran.
+            </summary>
+        </member>
+        <member name="F:FiftyOne.Pipeline.DerivedProperty.BuiltInScripts.ResourceNames">
+            <summary>
+            The embedded resource name of each built in script, in the same
+            order as the members of <see cref="T:FiftyOne.Pipeline.DerivedProperty.BuiltInScript"/>, so that
+            casting a member to an int gives the index of its resource.
+            </summary>
+        </member>
+    </members>
+</doc>

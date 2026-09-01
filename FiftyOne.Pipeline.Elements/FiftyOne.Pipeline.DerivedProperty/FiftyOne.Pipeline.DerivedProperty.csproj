@@ -1,0 +1,166 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>netstandard2.0</TargetFramework>
+    <!-- Following FiftyOne.Pipeline.JavaScriptBuilder, which raises the
+         language version on a netstandard2.0 target. This only enables newer
+         syntax and does not change the framework the package runs on. -->
+    <LangVersion>latest</LangVersion>
+    <Platforms>AnyCPU</Platforms>
+    <PublishRepositoryUrl>true</PublishRepositoryUrl>
+    <EmbedUntrackedSources>true</EmbedUntrackedSources>
+    <DocumentationFile>FiftyOne.Pipeline.DerivedProperty.xml</DocumentationFile>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <WarningsAsErrors />
+
+    <!-- NuGet package properties -->
+    <PackageId>FiftyOne.Pipeline.DerivedProperty</PackageId>
+    <Title>Derived property element for the 51Degrees Pipeline API</Title>
+    <PackageDescription>The 51Degrees Pipeline API provides a fast, modern architecture for consuming real-time digital data services. This package contains an element that computes new properties from properties already in the flow data, according to a script written in YAML or JSON.</PackageDescription>
+    <Authors>51Degrees Engineering</Authors>
+    <PackageLicenseExpression>EUPL-1.2</PackageLicenseExpression>
+    <PackageIconUrl>https://51degrees.com/portals/0/Logos/Square%20Logo.png?width=64</PackageIconUrl>
+    <Copyright>51Degrees Mobile Experts Limited</Copyright>
+    <PackageTags>51degrees,pipeline,data service,derived,properties,rules</PackageTags>
+    <RepositoryUrl>https://github.com/51Degrees/pipeline-dotnet</RepositoryUrl>
+    <PackageIcon>51d-logo.png</PackageIcon>
+    <RepositoryType>git</RepositoryType>
+    <NeutralLanguage>en</NeutralLanguage>
+    <Description>The 51Degrees Pipeline API provides a fast, modern architecture for consuming real-time digital data services. This package contains an element that computes new properties from properties already in the flow data, according to a script written in YAML or JSON.</Description>
+    <PackageProjectUrl>https://51degrees.com?utm_source=nuget&amp;utm_medium=package&amp;utm_campaign=pipeline-dotnet&amp;utm_content=fiftyone.pipeline.elements-fiftyone.pipeline.derivedproperty-fiftyone.pipeline.derivedproperty.csproj&amp;utm_term=packageprojecturl</PackageProjectUrl>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(Configuration)'=='Debug'">
+    <DebugType>full</DebugType>
+    <DebugSymbols>true</DebugSymbols>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <None Include="..\..\README.md">
+      <Pack>True</Pack>
+      <PackagePath>\</PackagePath>
+    </None>
+    <None Include="..\..\Images\51d-logo.png">
+      <Pack>True</Pack>
+      <PackagePath></PackagePath>
+    </None>
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- The same YAML library the Translation element uses. JSON is a subset
+         of YAML 1.2, so one library reads both script formats and no second
+         YAML dependency is added. -->
+    <PackageReference Include="YamlDotNet" Version="16.3.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\FiftyOne.Pipeline.Engines\FiftyOne.Pipeline.Engines.csproj" />
+  </ItemGroup>
+
+  <!-- Every script in the derived-properties submodule is embedded in the
+       package, in the way FiftyOne.Pipeline.JavaScriptBuilder embeds its
+       mustache template from the javascript-templates submodule. The glob
+       means a new script in the submodule needs no change here.
+
+       The submodule is not checked out on every machine, and a build must
+       never depend on the content of another repository, so nothing below
+       fails when the folder is empty or missing. -->
+  <PropertyGroup>
+    <!-- The prefix every embedded script resource name carries. The
+         generated BuiltInScripts.ResourceNames repeats it, so both are
+         written from one place. -->
+    <_ScriptResourcePrefix>FiftyOne.Pipeline.DerivedProperty.Scripts.</_ScriptResourcePrefix>
+    <!-- Where the scripts are read from. The default is the scripts folder
+         of the derived-properties submodule. A build may point the property
+         somewhere else, which is how the empty folder case is tested
+         without touching the submodule. -->
+    <DerivedScriptSourceFolder Condition="'$(DerivedScriptSourceFolder)' == ''">Scripts\scripts</DerivedScriptSourceFolder>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <EmbeddedResource Include="$(DerivedScriptSourceFolder)\*.yaml"
+                      LogicalName="$(_ScriptResourcePrefix)%(Filename)%(Extension)" />
+    <EmbeddedResource Include="$(DerivedScriptSourceFolder)\*.yml"
+                      LogicalName="$(_ScriptResourcePrefix)%(Filename)%(Extension)" />
+    <EmbeddedResource Include="$(DerivedScriptSourceFolder)\*.json"
+                      LogicalName="$(_ScriptResourcePrefix)%(Filename)%(Extension)" />
+  </ItemGroup>
+
+  <!-- BuiltInScript.cs.template is the shape of the generated file. It is
+       packed with the source but never compiled directly, because the
+       placeholders in it are not C#. -->
+  <ItemGroup>
+    <None Include="BuiltInScript.cs.template" />
+  </ItemGroup>
+
+  <!-- Writes BuiltInScript.g.cs, declaring one enumeration member per
+       embedded script, the resource name of each, and the commit of the
+       derived-properties submodule the package was built from. Runs before
+       compile so the generated file is part of the build.
+
+       With no scripts the enumeration and the resource name array are both
+       empty, which is valid C#, so a build never depends on the content of
+       the submodule and a machine without the submodule checked out still
+       builds. -->
+  <Target Name="GenerateBuiltInScripts"
+          BeforeTargets="BeforeCompile;CoreCompile"
+          Inputs="@(EmbeddedResource);$(MSBuildThisFileDirectory)BuiltInScript.cs.template;$(MSBuildThisFileDirectory)Scripts\.git;$(MSBuildThisFileFullPath)"
+          Outputs="$(IntermediateOutputPath)BuiltInScript.g.cs">
+
+    <!-- The submodule commit. A machine without the submodule, or without
+         git on the path, gets the word unknown rather than a failed build. -->
+    <Exec Command="git -C &quot;$(MSBuildThisFileDirectory)Scripts&quot; rev-parse HEAD"
+          ConsoleToMSBuild="true"
+          ContinueOnError="true"
+          StandardOutputImportance="low"
+          EchoOff="true">
+      <Output TaskParameter="ConsoleOutput" PropertyName="_ScriptsCommitRaw" />
+      <Output TaskParameter="ExitCode" PropertyName="_ScriptsCommitExitCode" />
+    </Exec>
+    <PropertyGroup>
+      <_ScriptsCommit Condition="'$(_ScriptsCommitExitCode)' == '0'">$(_ScriptsCommitRaw.Trim())</_ScriptsCommit>
+      <_ScriptsCommit Condition="'$(_ScriptsCommit)' == ''">unknown</_ScriptsCommit>
+    </PropertyGroup>
+
+    <ItemGroup>
+      <_BuiltInScript Include="@(EmbeddedResource)"
+                      Condition="$([System.String]::Copy('%(EmbeddedResource.LogicalName)').StartsWith('$(_ScriptResourcePrefix)'))" />
+    </ItemGroup>
+
+    <!-- An enumeration member has to be a C# identifier, so a script file
+         whose name is not one is named rather than silently turned into
+         code that will not compile. -->
+    <ItemGroup>
+      <_BadScriptName Include="@(_BuiltInScript)"
+                      Condition="!$([System.Text.RegularExpressions.Regex]::IsMatch('%(Filename)', '^[A-Za-z][A-Za-z0-9]*$'))" />
+    </ItemGroup>
+    <Error Condition="'@(_BadScriptName)' != ''"
+           Text="The derived property script file(s) @(_BadScriptName->'%(Filename)%(Extension)', ', ') cannot be turned into a member of the BuiltInScript enumeration. A script file name must start with a letter and hold only letters and digits." />
+
+    <PropertyGroup>
+      <!-- Each member carries an XML documentation comment, because the
+           project sets DocumentationFile with TreatWarningsAsErrors, so a
+           public member without one fails the build. -->
+      <_ScriptMembers>@(_BuiltInScript->'        /// &lt;summary&gt;%0A        /// The %(Filename) script, embedded from%0A        /// scripts/%(Filename)%(Extension) of the derived-properties%0A        /// repository.%0A        /// &lt;/summary&gt;%0A        %(Filename)%2C', '%0A')</_ScriptMembers>
+      <_ScriptResources>@(_BuiltInScript->'            &quot;$(_ScriptResourcePrefix)%(Filename)%(Extension)&quot;%2C', '%0A')</_ScriptResources>
+      <_ScriptTemplate>$([System.IO.File]::ReadAllText('$(MSBuildThisFileDirectory)BuiltInScript.cs.template'))</_ScriptTemplate>
+      <_ScriptGenerated>$(_ScriptTemplate.Replace('$MEMBERS$', '$(_ScriptMembers)').Replace('$RESOURCES$', '$(_ScriptResources)').Replace('$COMMIT$', '$(_ScriptsCommit)'))</_ScriptGenerated>
+      <!-- WriteLinesToFile splits its Lines on semicolons, and the generated
+           C# is full of them, so every one is escaped before writing and
+           MSBuild puts them back as it makes the item. -->
+      <_ScriptGeneratedSafe>$(_ScriptGenerated.Replace(';', '%3B'))</_ScriptGeneratedSafe>
+    </PropertyGroup>
+
+    <WriteLinesToFile File="$(IntermediateOutputPath)BuiltInScript.g.cs"
+                      Lines="$(_ScriptGeneratedSafe)"
+                      Overwrite="true"
+                      WriteOnlyWhenDifferent="true" />
+
+    <ItemGroup>
+      <Compile Include="$(IntermediateOutputPath)BuiltInScript.g.cs" />
+      <FileWrites Include="$(IntermediateOutputPath)BuiltInScript.g.cs" />
+    </ItemGroup>
+  </Target>
+
+</Project>

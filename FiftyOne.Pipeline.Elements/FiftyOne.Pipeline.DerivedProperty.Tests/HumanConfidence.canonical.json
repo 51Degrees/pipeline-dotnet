@@ -1,0 +1,165 @@
+{
+  "Format": 1,
+  "Name": "HumanConfidence",
+  "Version": "0.1.0",
+  "Output": {
+    "Name": "HumanConfidence",
+    "Description": "The confidence that the request came from a device being used by a human who is viewing the page. Returns one of High, Medium, Low, or Unknown.",
+    "ValueType": "string",
+    "DefaultValue": "Unknown",
+    "IsList": false,
+    "IsMandatory": true,
+    "IsObsolete": false,
+    "Category": "General",
+    "IsPopular": true,
+    "ExportValues": true,
+    "Dependencies": [
+      "device.IsCrawler",
+      "device.IsHeadless",
+      "device.WebDriver",
+      "device.IsVisible",
+      "device.BrowserReleaseYear",
+      "device.BrowserReleaseAge",
+      "ip.HumanProbability"
+    ],
+    "Values": [
+      {
+        "Name": "High",
+        "Description": "High confidence that the request is from a device being used by a human who is viewing the page."
+      },
+      {
+        "Name": "Medium",
+        "Description": "The evidence is mixed and the request cannot be placed either way. A human may be viewing the page."
+      },
+      {
+        "Name": "Low",
+        "Description": "Almost certainly no human is directly involved in viewing the page content."
+      },
+      {
+        "Name": "Unknown",
+        "Description": "There was not enough evidence to rate the confidence. This is the default where none of the checks could be evaluated."
+      }
+    ]
+  },
+  "Optional": [
+    "device.IsCrawler",
+    "device.IsHeadless",
+    "device.WebDriver",
+    "device.IsVisible",
+    "device.BrowserReleaseYear",
+    "device.BrowserReleaseAge",
+    "ip.HumanProbability"
+  ],
+  "Properties": {
+    "device.IsCrawler": {
+      "Type": "bool",
+      "Required": false
+    },
+    "device.IsHeadless": {
+      "Type": "bool",
+      "Required": false
+    },
+    "device.WebDriver": {
+      "Type": "string",
+      "Required": false
+    },
+    "device.IsVisible": {
+      "Type": "bool",
+      "Required": false
+    },
+    "device.BrowserReleaseYear": {
+      "Type": "int",
+      "Required": false
+    },
+    "device.BrowserReleaseAge": {
+      "Type": "int",
+      "Required": false
+    },
+    "ip.HumanProbability": {
+      "Type": "int",
+      "Required": false
+    }
+  },
+  "Checks": {
+    "NotCrawler": {
+      "Property": "device.IsCrawler",
+      "Eq": false
+    },
+    "NotHeadless": {
+      "Property": "device.IsHeadless",
+      "Eq": false
+    },
+    "NoWebDriver": {
+      "Property": "device.WebDriver",
+      "Eq": "None"
+    },
+    "Visible": {
+      "Property": "device.IsVisible",
+      "Eq": true
+    },
+    "Current": {
+      "All": [
+        {
+          "Property": "device.BrowserReleaseYear",
+          "Gt": 0
+        },
+        {
+          "Property": "device.BrowserReleaseAge",
+          "Lt": 2
+        }
+      ]
+    },
+    "Human": {
+      "Property": "ip.HumanProbability",
+      "Ge": 8
+    }
+  },
+  "Rules": [
+    {
+      "When": {
+        "Property": "device.IsCrawler",
+        "Eq": true
+      },
+      "Then": "Low"
+    },
+    {
+      "When": {
+        "Property": "device.IsHeadless",
+        "Eq": true
+      },
+      "Then": "Low"
+    },
+    {
+      "When": {
+        "Evaluated": "Checks",
+        "Eq": 0
+      },
+      "Then": "Unknown"
+    },
+    {
+      "When": {
+        "All": [
+          {
+            "Failed": "Checks",
+            "Eq": 0
+          },
+          {
+            "Evaluated": "Checks",
+            "Ge": 4
+          }
+        ]
+      },
+      "Then": "High"
+    },
+    {
+      "When": {
+        "Failed": "Checks",
+        "Le": 1
+      },
+      "Then": "Medium"
+    },
+    {
+      "Else": "Low"
+    }
+  ]
+}
