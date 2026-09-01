@@ -1,14 +1,13 @@
 {
   "Format": 1,
   "Name": "HumanConfidence",
-  "Version": "0.1.0",
+  "Version": "0.2.0",
   "Output": {
     "Name": "HumanConfidence",
-    "Description": "The confidence that the request came from a device being used by a human who is viewing the page. Returns one of High, Medium, Low, or Unknown.",
+    "Description": "The confidence that the request came from a device being used by a human who is viewing the page. Returns one of High, Medium, or Low.",
     "ValueType": "string",
-    "DefaultValue": "Unknown",
     "IsList": false,
-    "IsMandatory": true,
+    "IsMandatory": false,
     "IsObsolete": false,
     "Category": "General",
     "IsPopular": true,
@@ -31,10 +30,6 @@
       {
         "Name": "Low",
         "Description": "Almost certainly no human is directly involved in viewing the page content."
-      },
-      {
-        "Name": "Unknown",
-        "Description": "There was not enough evidence to rate the confidence. This is the default where none of the checks could be evaluated."
       }
     ]
   },
@@ -69,9 +64,17 @@
         }
       ]
     },
-    "Human": {
-      "Property": "ip.HumanProbability",
-      "Ge": 8
+    "HumanOrUnrated": {
+      "Any": [
+        {
+          "Property": "ip.HumanProbability",
+          "Ge": 8
+        },
+        {
+          "Property": "ip.HumanProbability",
+          "Lt": 0
+        }
+      ]
     }
   },
   "Rules": [
