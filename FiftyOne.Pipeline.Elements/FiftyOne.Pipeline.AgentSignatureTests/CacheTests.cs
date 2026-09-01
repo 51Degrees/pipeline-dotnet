@@ -515,7 +515,10 @@ namespace FiftyOne.Pipeline.AgentSignature.Tests
                         origin + Constants.DIRECTORY_PATH, publicKey);
                 }
                 var fetcher = new DirectoryFetcher(
-                    httpClient, NullLogger.Instance, () => now);
+                    httpClient,
+                    NullLogger.Instance,
+                    () => now,
+                    Constants.DEFAULT_MAX_RESPONSE_BYTES);
                 using (var cache = new DirectoryCache(
                     fetcher,
                     () => now,
@@ -589,7 +592,10 @@ namespace FiftyOne.Pipeline.AgentSignature.Tests
                     Fixtures.SignatureAgentDirectoryUrl,
                     RequestSigner.PublicPart(Fixtures.Ed25519Key()));
                 var fetcher = new DirectoryFetcher(
-                    httpClient, NullLogger.Instance, () => now);
+                    httpClient,
+                    NullLogger.Instance,
+                    () => now,
+                    Constants.DEFAULT_MAX_RESPONSE_BYTES);
                 using (var cache = new DirectoryCache(
                     fetcher,
                     () => now,

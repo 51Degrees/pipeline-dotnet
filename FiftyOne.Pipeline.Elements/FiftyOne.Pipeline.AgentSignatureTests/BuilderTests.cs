@@ -105,9 +105,11 @@ namespace FiftyOne.Pipeline.AgentSignature.Tests
                     .SetFetchTimeout(TimeSpan.FromSeconds(3))
                     .SetClockSkew(TimeSpan.FromSeconds(90))
                     .SetMaxLifetime(TimeSpan.FromMinutes(5))
+                    .SetMaxResponseBytes(4096)
                     .SetRegistry(FirstRegistry)
                     .SetRegistry(SecondRegistry)
-                    .SetAllowLegacySignatureAgent(false);
+                    .SetAllowLegacySignatureAgent(false)
+                    .SetAllowInlineDirectory(true);
 
                 var settings = builder.Settings;
                 Assert.AreSame(
@@ -143,10 +145,18 @@ namespace FiftyOne.Pipeline.AgentSignature.Tests
                     TimeSpan.FromMinutes(5),
                     settings.MaxLifetime,
                     "Expected the maximum lifetime given to the builder.");
+                Assert.AreEqual(
+                    4096,
+                    settings.MaxResponseBytes,
+                    "Expected the response limit given to the builder.");
                 Assert.IsFalse(
                     settings.AllowLegacySignatureAgent,
                     "Expected the legacy header form to be refused, " +
                     "because the builder was told to refuse it.");
+                Assert.IsTrue(
+                    settings.AllowInlineDirectory,
+                    "Expected a key set carried in the header to be " +
+                    "accepted, because the builder was told to accept one.");
                 Assert.AreEqual(
                     2,
                     settings.Registries.Count,
@@ -163,6 +173,209 @@ namespace FiftyOne.Pipeline.AgentSignature.Tests
                     "Expected the second registry given to the builder.");
             }
         }
+
+        #region Settings the builder refuses
+
+        /// <summary>
+        /// The six settings that are given a period, each with a way to set
+        /// it and a way to read it back. A period that reached the request
+        /// path and threw there would put the blame on whichever request
+        /// happened to arrive first rather than on the setting.
+        /// </summary>
+        /// <returns>The setters.</returns>
+        public static IEnumerable<object[]> PeriodSetters()
+        {
+            yield return PeriodSetter(
+                "SetCacheLifetime",
+                (builder, value) => builder.SetCacheLifetime(value),
+                settings => settings.CacheLifetime);
+            yield return PeriodSetter(
+                "SetNegativeCacheLifetime",
+                (builder, value) => builder.SetNegativeCacheLifetime(value),
+                settings => settings.NegativeCacheLifetime);
+            yield return PeriodSetter(
+                "SetWaitBudget",
+                (builder, value) => builder.SetWaitBudget(value),
+                settings => settings.WaitBudget);
+            yield return PeriodSetter(
+                "SetFetchTimeout",
+                (builder, value) => builder.SetFetchTimeout(value),
+                settings => settings.FetchTimeout);
+            yield return PeriodSetter(
+                "SetClockSkew",
+                (builder, value) => builder.SetClockSkew(value),
+                settings => settings.ClockSkew);
+            yield return PeriodSetter(
+                "SetMaxLifetime",
+                (builder, value) => builder.SetMaxLifetime(value),
+                settings => settings.MaxLifetime);
+        }
+
+        /// <summary>
+        /// A period setter refuses a negative period, because no setting
+        /// this element has means anything before the moment it is read.
+        /// </summary>
+        /// <param name="name">The name of the setter.</param>
+        /// <param name="set">The setter.</param>
+        /// <param name="read">The way to read the setting back.</param>
+        [DataTestMethod]
+        [DynamicData(nameof(PeriodSetters), DynamicDataSourceType.Method)]
+        public void PeriodSetterRefusesANegativePeriod(
+            string name,
+            Action<AgentSignatureElementBuilder, TimeSpan> set,
+            Func<AgentSignatureConfiguration, TimeSpan> read)
+        {
+            AssertPeriodRefused(name, set, read, TimeSpan.FromSeconds(-1));
+        }
+
+        /// <summary>
+        /// A period setter refuses a period longer than the maximum, which
+        /// is a year. The bound keeps the waiting and the clock arithmetic
+        /// inside what the framework can hold, and no sensible setting comes
+        /// near it.
+        /// </summary>
+        /// <param name="name">The name of the setter.</param>
+        /// <param name="set">The setter.</param>
+        /// <param name="read">The way to read the setting back.</param>
+        [DataTestMethod]
+        [DynamicData(nameof(PeriodSetters), DynamicDataSourceType.Method)]
+        public void PeriodSetterRefusesAPeriodBeyondTheMaximum(
+            string name,
+            Action<AgentSignatureElementBuilder, TimeSpan> set,
+            Func<AgentSignatureConfiguration, TimeSpan> read)
+        {
+            AssertPeriodRefused(
+                name,
+                set,
+                read,
+                Constants.MAXIMUM_PERIOD + TimeSpan.FromSeconds(1));
+        }
+
+        /// <summary>
+        /// A period the element can work with still reaches the settings, so
+        /// the two checks above refuse the periods they are meant to and
+        /// nothing else. The maximum itself is allowed, because the bound is
+        /// on periods longer than it.
+        /// </summary>
+        /// <param name="name">The name of the setter.</param>
+        /// <param name="set">The setter.</param>
+        /// <param name="read">The way to read the setting back.</param>
+        [DataTestMethod]
+        [DynamicData(nameof(PeriodSetters), DynamicDataSourceType.Method)]
+        public void PeriodSetterKeepsAPeriodItAccepts(
+            string name,
+            Action<AgentSignatureElementBuilder, TimeSpan> set,
+            Func<AgentSignatureConfiguration, TimeSpan> read)
+        {
+            foreach (var period in new[]
+            {
+                TimeSpan.Zero,
+                TimeSpan.FromSeconds(42),
+                Constants.MAXIMUM_PERIOD,
+            })
+            {
+                var builder = new TestBuilder();
+                set(builder, period);
+                Assert.AreEqual(
+                    period,
+                    read(builder.Settings),
+                    "Expected '" + name + "' to put " + period + " into the " +
+                    "settings, and the settings hold " +
+                    read(builder.Settings) + ".");
+            }
+        }
+
+        /// <summary>
+        /// A cache told to hold fewer than one directory could hold nothing
+        /// at all, so the builder refuses it rather than leaving the element
+        /// to make sense of it.
+        /// </summary>
+        /// <param name="size">The size to try.</param>
+        [DataTestMethod]
+        [DataRow(0)]
+        [DataRow(-1)]
+        [DataRow(int.MinValue)]
+        public void CacheSizeBelowOneIsRefused(int size)
+        {
+            var builder = new TestBuilder();
+            var failure = Assert.ThrowsExactly<ArgumentOutOfRangeException>(
+                () => { builder.SetCacheSize(size); },
+                "Expected a cache size of " + size + " to be refused.");
+            Assert.AreEqual(
+                "size",
+                failure.ParamName,
+                "Expected the refusal to name the parameter it is about, " +
+                "and it named '" + failure.ParamName + "'.");
+            Assert.AreEqual(
+                Constants.DEFAULT_CACHE_SIZE,
+                builder.Settings.CacheSize,
+                "Expected the cache size to be left as it was when a size " +
+                "of " + size + " was refused, and the settings hold " +
+                builder.Settings.CacheSize + ".");
+        }
+
+        /// <summary>
+        /// A cache size of one is the smallest the builder accepts, and it
+        /// reaches the settings.
+        /// </summary>
+        [TestMethod]
+        public void CacheSizeOfOneIsKept()
+        {
+            var builder = new TestBuilder();
+            builder.SetCacheSize(1);
+            Assert.AreEqual(
+                1,
+                builder.Settings.CacheSize,
+                "Expected a cache size of one to reach the settings, and " +
+                "the settings hold " + builder.Settings.CacheSize + ".");
+        }
+
+        /// <summary>
+        /// A response limit below one byte would refuse every document, so
+        /// the builder refuses the limit instead.
+        /// </summary>
+        /// <param name="bytes">The limit to try.</param>
+        [DataTestMethod]
+        [DataRow(0)]
+        [DataRow(-1)]
+        [DataRow(int.MinValue)]
+        public void MaxResponseBytesBelowOneIsRefused(int bytes)
+        {
+            var builder = new TestBuilder();
+            var failure = Assert.ThrowsExactly<ArgumentOutOfRangeException>(
+                () => { builder.SetMaxResponseBytes(bytes); },
+                "Expected a response limit of " + bytes + " to be refused.");
+            Assert.AreEqual(
+                "bytes",
+                failure.ParamName,
+                "Expected the refusal to name the parameter it is about, " +
+                "and it named '" + failure.ParamName + "'.");
+            Assert.AreEqual(
+                Constants.DEFAULT_MAX_RESPONSE_BYTES,
+                builder.Settings.MaxResponseBytes,
+                "Expected the response limit to be left as it was when a " +
+                "limit of " + bytes + " was refused, and the settings hold " +
+                builder.Settings.MaxResponseBytes + ".");
+        }
+
+        /// <summary>
+        /// A response limit of one byte is the smallest the builder accepts,
+        /// and it reaches the settings.
+        /// </summary>
+        [TestMethod]
+        public void MaxResponseBytesOfOneIsKept()
+        {
+            var builder = new TestBuilder();
+            builder.SetMaxResponseBytes(1);
+            Assert.AreEqual(
+                1,
+                builder.Settings.MaxResponseBytes,
+                "Expected a response limit of one byte to reach the " +
+                "settings, and the settings hold " +
+                builder.Settings.MaxResponseBytes + ".");
+        }
+
+        #endregion
 
         /// <summary>
         /// The client given to the builder is the one the element fetches
@@ -667,6 +880,55 @@ namespace FiftyOne.Pipeline.AgentSignature.Tests
                     ? "nothing"
                     : ownedFailure.GetType().Name + " saying '" +
                         ownedFailure.Message + "'."));
+        }
+
+        /// <summary>
+        /// Build one case for the table of period setters.
+        /// </summary>
+        /// <param name="name">The name of the setter.</param>
+        /// <param name="set">The setter.</param>
+        /// <param name="read">The way to read the setting back.</param>
+        /// <returns>The case.</returns>
+        private static object[] PeriodSetter(
+            string name,
+            Action<AgentSignatureElementBuilder, TimeSpan> set,
+            Func<AgentSignatureConfiguration, TimeSpan> read)
+        {
+            return new object[] { name, set, read };
+        }
+
+        /// <summary>
+        /// Check that a period setter refuses the period given, that it says
+        /// which parameter it is about, and that it leaves the setting as it
+        /// was rather than half applying the period it refused.
+        /// </summary>
+        /// <param name="name">The name of the setter.</param>
+        /// <param name="set">The setter.</param>
+        /// <param name="read">The way to read the setting back.</param>
+        /// <param name="period">The period it should refuse.</param>
+        private static void AssertPeriodRefused(
+            string name,
+            Action<AgentSignatureElementBuilder, TimeSpan> set,
+            Func<AgentSignatureConfiguration, TimeSpan> read,
+            TimeSpan period)
+        {
+            var builder = new TestBuilder();
+            var before = read(builder.Settings);
+            var failure = Assert.ThrowsExactly<ArgumentOutOfRangeException>(
+                () => { set(builder, period); },
+                "Expected '" + name + "' to refuse the period " + period +
+                ", because a period must be no less than nothing and no " +
+                "longer than " + Constants.MAXIMUM_PERIOD + ".");
+            Assert.IsFalse(
+                string.IsNullOrEmpty(failure.ParamName),
+                "Expected '" + name + "' to say which parameter it refused, " +
+                "and it named nothing.");
+            Assert.AreEqual(
+                before,
+                read(builder.Settings),
+                "Expected '" + name + "' to leave the setting holding " +
+                before + " when it refused " + period + ", and the " +
+                "settings now hold " + read(builder.Settings) + ".");
         }
 
         /// <summary>

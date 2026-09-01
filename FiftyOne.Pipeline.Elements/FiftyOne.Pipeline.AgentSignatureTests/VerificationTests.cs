@@ -755,7 +755,10 @@ namespace FiftyOne.Pipeline.AgentSignature.Tests
                 AssertHeaderPresent(response, "signature-input");
                 AssertHeaderPresent(response, "content-digest");
                 var fetcher = new DirectoryFetcher(
-                    client, NullLogger.Instance, () => SigningTime);
+                    client,
+                    NullLogger.Instance,
+                    () => SigningTime,
+                    Constants.DEFAULT_MAX_RESPONSE_BYTES);
                 var accepted = fetcher.TryVerifyResponseSignature(
                     vector.TargetUrl,
                     response,

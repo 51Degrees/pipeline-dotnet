@@ -23,6 +23,7 @@
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using System.Net;
 using System.Net.Http;
@@ -60,6 +61,55 @@ namespace FiftyOne.Pipeline.AgentSignature.Tests.Helpers
         /// asks for nothing.
         /// </summary>
         public TimeSpan? MaxAge { get; set; }
+
+        /// <summary>
+        /// The URL the response says it arrived from, or null when it
+        /// arrived from the URL that was asked for. A client that follows a
+        /// redirect hands back a response whose request names the address it
+        /// ended up at, so a test sets this to stand for a redirect.
+        /// </summary>
+        public string FinalUrl { get; set; }
+
+        /// <summary>
+        /// True when the response states how long its body is, which is what
+        /// a server normally does. A test sets this to false to serve a body
+        /// whose length is not stated, which is what a chunked response
+        /// looks like to the reader.
+        /// </summary>
+        public bool DeclareLength { get; set; } = true;
+    }
+
+    /// <summary>
+    /// Body content that states no length, so that a test can serve a
+    /// response the reader has to measure for itself as the bytes arrive.
+    /// </summary>
+    public sealed class UnmeasuredContent : HttpContent
+    {
+        private readonly byte[] _content;
+
+        /// <summary>
+        /// Construct content holding the UTF-8 bytes of the given text.
+        /// </summary>
+        /// <param name="text">The body text.</param>
+        public UnmeasuredContent(string text)
+        {
+            _content = Encoding.UTF8.GetBytes(text ?? string.Empty);
+        }
+
+        /// <inheritdoc/>
+        protected override Task SerializeToStreamAsync(
+            Stream stream,
+            TransportContext context)
+        {
+            return stream.WriteAsync(_content, 0, _content.Length);
+        }
+
+        /// <inheritdoc/>
+        protected override bool TryComputeLength(out long length)
+        {
+            length = 0;
+            return false;
+        }
     }
 
     /// <summary>
@@ -254,9 +304,17 @@ namespace FiftyOne.Pipeline.AgentSignature.Tests.Helpers
 
             var message = new HttpResponseMessage(configured.StatusCode)
             {
-                Content = new StringContent(
-                    configured.Body, Encoding.UTF8),
-                RequestMessage = request,
+                Content = configured.DeclareLength
+                    ? (HttpContent)new StringContent(
+                        configured.Body, Encoding.UTF8)
+                    : new UnmeasuredContent(configured.Body),
+                // A client that followed a redirect hands back a response
+                // whose request names the address it ended up at, so a
+                // response with a final URL of its own stands for one.
+                RequestMessage = configured.FinalUrl == null
+                    ? request
+                    : new HttpRequestMessage(
+                        request.Method, configured.FinalUrl),
             };
             message.Content.Headers.ContentType =
                 new MediaTypeHeaderValue(configured.MediaType)

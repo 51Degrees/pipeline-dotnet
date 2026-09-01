@@ -189,7 +189,8 @@ namespace FiftyOne.Pipeline.AgentSignature.Tests
                 var fetcher = new DirectoryFetcher(
                     client,
                     NullLogger.Instance,
-                    () => DateTimeOffset.UtcNow);
+                    () => DateTimeOffset.UtcNow,
+                    Constants.DEFAULT_MAX_RESPONSE_BYTES);
                 DirectoryEntry entry;
                 using (var source = new CancellationTokenSource(LiveTimeout))
                 {

@@ -97,6 +97,27 @@ namespace FiftyOne.Pipeline.AgentSignature.Tests.Helpers
             DateTimeOffset.FromUnixTimeSeconds(4889289600);
 
         /// <summary>
+        /// The text to write as the 'created' parameter, or null to write
+        /// <see cref="Created"/> as Unix seconds. A test uses this to send a
+        /// number no point in time can be written as, such as one far
+        /// outside the range the framework holds.
+        /// </summary>
+        public string CreatedText { get; set; }
+
+        /// <summary>
+        /// The text to write as the 'expires' parameter, or null to write
+        /// <see cref="Expires"/> as Unix seconds.
+        /// </summary>
+        public string ExpiresText { get; set; }
+
+        /// <summary>
+        /// True to cover '@authority', which every well behaved agent does.
+        /// A test sets this to false to send a signature that is tied to
+        /// nothing about the request it arrived on.
+        /// </summary>
+        public bool CoverAuthority { get; set; } = true;
+
+        /// <summary>
         /// The key id to name, which defaults to the thumbprint of the
         /// Ed25519 test key.
         /// </summary>
@@ -147,11 +168,12 @@ namespace FiftyOne.Pipeline.AgentSignature.Tests.Helpers
         /// <returns>The headers to put into evidence.</returns>
         public static SignedRequest Sign(SigningOptions options)
         {
-            var components = new List<KeyValuePair<string, string>>
+            var components = new List<KeyValuePair<string, string>>();
+            if (options.CoverAuthority)
             {
-                new KeyValuePair<string, string>(
-                    "\"@authority\"", options.Host.ToLowerInvariant()),
-            };
+                components.Add(new KeyValuePair<string, string>(
+                    "\"@authority\"", options.Host.ToLowerInvariant()));
+            }
 
             string signatureAgentHeader = null;
             if (options.SignatureAgent != null)
@@ -191,11 +213,13 @@ namespace FiftyOne.Pipeline.AgentSignature.Tests.Helpers
 
             var parameters = new StringBuilder(innerList.ToString());
             Append(parameters, "created",
-                options.Created.ToUnixTimeSeconds().ToString(
-                    CultureInfo.InvariantCulture));
+                options.CreatedText ??
+                    options.Created.ToUnixTimeSeconds().ToString(
+                        CultureInfo.InvariantCulture));
             Append(parameters, "expires",
-                options.Expires.ToUnixTimeSeconds().ToString(
-                    CultureInfo.InvariantCulture));
+                options.ExpiresText ??
+                    options.Expires.ToUnixTimeSeconds().ToString(
+                        CultureInfo.InvariantCulture));
             if (options.OmitKeyId == false)
             {
                 AppendQuoted(parameters, "keyid", options.KeyId);
