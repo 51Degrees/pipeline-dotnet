@@ -70,7 +70,7 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "FiftyOne.Did.Examples.Tests
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "AgentSignature", "AgentSignature", "{30E7DA46-FE10-4BC8-973B-8F856E6352A0}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Examples.AgentSignature", "Examples\AgentSignature\Examples.AgentSignature.csproj", "{7F6A8F6C-88B7-4639-82E7-B85E2230FB25}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Examples.AgentSignature", "Examples\AgentSignature\Examples.AgentSignature.csproj", "{7F6A8F6C-88B7-4639-82E7-B85E2230FB25}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution

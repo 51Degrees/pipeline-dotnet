@@ -33,10 +33,19 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <!-- The engines project brings FiftyOne.Pipeline.Core, FiftyOne.Caching
-         and, per target framework, the JSON library this project parses the
-         key directory and the agent card with. See JsonReader.cs. -->
+    <!-- The engines project brings FiftyOne.Pipeline.Core and
+         FiftyOne.Caching. -->
     <ProjectReference Include="..\..\FiftyOne.Pipeline.Engines\FiftyOne.Pipeline.Engines.csproj" />
+  </ItemGroup>
+
+  <ItemGroup Condition="'$(TargetFramework)'=='netstandard2.0'">
+    <!-- The key directory and the agent card are JSON. The net8.0 build
+         reads them with System.Text.Json from the base library, and this
+         build reads them with Newtonsoft. See JsonReader.cs. The package
+         is named here rather than being taken from the engines project,
+         so that this project keeps compiling and keeps asking for what it
+         needs whatever the engines project depends on later. -->
+    <PackageReference Include="Newtonsoft.Json" Version="13.0.4" />
   </ItemGroup>
 
   <ItemGroup>

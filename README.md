@@ -64,6 +64,7 @@ Rather than wait, the Stubble source is vendored under [`vendor/Stubble/`](vendo
   - *FiftyOne.Pipeline.Web.Minify* - FlowElement which takes the JavaScript function from the JavaScriptBundler element and minifies it.
   - *FiftyOne.Pipeline.Web.Shared* - Shared code that is used by both Core and Framework ASP.NET integrations.
 - **FiftyOne.Pipeline.Elements** - Projects for various common Flow Elements that are used by multiple other solutions.
+  - *FiftyOne.Pipeline.AgentSignature* - An element that checks the request signature an automated agent sends under the IETF Web Bot Auth protocol and reports which agent signed the request.
   - *FiftyOne.Pipeline.JavaScriptBuilder* - An element that packages values from all 'JavaScript' properties from all engines into a single JavaScript function.
   - *FiftyOne.Pipeline.JsonBuilder* - An element that serializes all properties from all engines into JSON format.
 - **FiftyOne.CloudRequestEngine** - Projects related to making general requests to the 51Degrees cloud.
@@ -81,6 +82,7 @@ Install-Package FiftyOne.Pipeline.Web
 Install-Package FiftyOne.Pipeline.Web.Minify
 Install-Package FiftyOne.Pipeline.JsonBuilder
 Install-Package FiftyOne.Pipeline.JavaScriptBuilder
+Install-Package FiftyOne.Pipeline.AgentSignature
 Install-Package FiftyOne.Pipeline.CloudRequestEngine
 ```
 

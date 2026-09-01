@@ -84,17 +84,13 @@ namespace FiftyOne.Pipeline.AgentSignature.Keys
 #endif
                 return true;
             }
-#if NET8_0_OR_GREATER
+            // 'JsonException' names the exception of whichever library the
+            // using directives above brought in, so the one catch covers
+            // both target frameworks.
             catch (JsonException)
             {
                 return false;
             }
-#else
-            catch (JsonException)
-            {
-                return false;
-            }
-#endif
             catch (ArgumentException)
             {
                 return false;

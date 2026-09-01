@@ -29,9 +29,9 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "FiftyOne.Pipeline.Translati
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "FiftyOne.Pipeline.TranslationTests", "FiftyOne.Pipeline.Elements\FiftyOne.Pipeline.Translation.Tests\FiftyOne.Pipeline.TranslationTests.csproj", "{EC33BDCE-D147-4899-A18C-9FAD556E3CFB}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "FiftyOne.Pipeline.AgentSignature", "FiftyOne.Pipeline.Elements\FiftyOne.Pipeline.AgentSignature\FiftyOne.Pipeline.AgentSignature.csproj", "{0909A279-8B9A-43D4-82D8-0ECC114FC4B2}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "FiftyOne.Pipeline.AgentSignature", "FiftyOne.Pipeline.Elements\FiftyOne.Pipeline.AgentSignature\FiftyOne.Pipeline.AgentSignature.csproj", "{0909A279-8B9A-43D4-82D8-0ECC114FC4B2}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "FiftyOne.Pipeline.AgentSignatureTests", "FiftyOne.Pipeline.Elements\FiftyOne.Pipeline.AgentSignatureTests\FiftyOne.Pipeline.AgentSignatureTests.csproj", "{DEFCBE89-0837-4519-BC38-6CD395E64EAA}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "FiftyOne.Pipeline.AgentSignatureTests", "FiftyOne.Pipeline.Elements\FiftyOne.Pipeline.AgentSignatureTests\FiftyOne.Pipeline.AgentSignatureTests.csproj", "{DEFCBE89-0837-4519-BC38-6CD395E64EAA}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -131,16 +131,16 @@ Global
 		{EC33BDCE-D147-4899-A18C-9FAD556E3CFB}.Release|Any CPU.Build.0 = Release|Any CPU
 		{0909A279-8B9A-43D4-82D8-0ECC114FC4B2}.CoreDebug|Any CPU.ActiveCfg = Debug|Any CPU
 		{0909A279-8B9A-43D4-82D8-0ECC114FC4B2}.CoreDebug|Any CPU.Build.0 = Debug|Any CPU
-		{0909A279-8B9A-43D4-82D8-0ECC114FC4B2}.CoreRelease|Any CPU.ActiveCfg = Debug|Any CPU
-		{0909A279-8B9A-43D4-82D8-0ECC114FC4B2}.CoreRelease|Any CPU.Build.0 = Debug|Any CPU
+		{0909A279-8B9A-43D4-82D8-0ECC114FC4B2}.CoreRelease|Any CPU.ActiveCfg = Release|Any CPU
+		{0909A279-8B9A-43D4-82D8-0ECC114FC4B2}.CoreRelease|Any CPU.Build.0 = Release|Any CPU
 		{0909A279-8B9A-43D4-82D8-0ECC114FC4B2}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
 		{0909A279-8B9A-43D4-82D8-0ECC114FC4B2}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{0909A279-8B9A-43D4-82D8-0ECC114FC4B2}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{0909A279-8B9A-43D4-82D8-0ECC114FC4B2}.Release|Any CPU.Build.0 = Release|Any CPU
 		{DEFCBE89-0837-4519-BC38-6CD395E64EAA}.CoreDebug|Any CPU.ActiveCfg = Debug|Any CPU
 		{DEFCBE89-0837-4519-BC38-6CD395E64EAA}.CoreDebug|Any CPU.Build.0 = Debug|Any CPU
-		{DEFCBE89-0837-4519-BC38-6CD395E64EAA}.CoreRelease|Any CPU.ActiveCfg = Debug|Any CPU
-		{DEFCBE89-0837-4519-BC38-6CD395E64EAA}.CoreRelease|Any CPU.Build.0 = Debug|Any CPU
+		{DEFCBE89-0837-4519-BC38-6CD395E64EAA}.CoreRelease|Any CPU.ActiveCfg = Release|Any CPU
+		{DEFCBE89-0837-4519-BC38-6CD395E64EAA}.CoreRelease|Any CPU.Build.0 = Release|Any CPU
 		{DEFCBE89-0837-4519-BC38-6CD395E64EAA}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
 		{DEFCBE89-0837-4519-BC38-6CD395E64EAA}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{DEFCBE89-0837-4519-BC38-6CD395E64EAA}.Release|Any CPU.ActiveCfg = Release|Any CPU
