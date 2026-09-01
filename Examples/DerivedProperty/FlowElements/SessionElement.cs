@@ -39,7 +39,8 @@ namespace Examples.DerivedProperty.FlowElements
     /// The element reads three items of evidence and publishes each one it
     /// finds as a property under the element data key session. Evidence
     /// that is not supplied leaves the matching property absent, which is
-    /// how the example shows a script working with less evidence.
+    /// how the example shows a script producing no value and naming what
+    /// was missing.
     /// </summary>
     public class SessionElement :
         FlowElementBase<ISessionData, IElementPropertyMetaData>
@@ -134,7 +135,7 @@ namespace Examples.DerivedProperty.FlowElements
 
             // A property is written only where the request carried the
             // evidence for it. A property that is never written stays
-            // absent, and the script decides what absence means.
+            // absent, and a script naming it then produces no value.
             if (data.TryGetEvidence(
                 PagesViewedEvidenceKey, out int pagesViewed))
             {

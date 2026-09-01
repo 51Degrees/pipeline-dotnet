@@ -81,9 +81,7 @@ namespace FiftyOne.Pipeline.DerivedProperty.Data
         private readonly ITypedKey<IElementData>[] _typedKeys;
         private readonly int[] _slotElementIndex;
         private readonly string[] _slotPropertyName;
-        private readonly DerivedValueType?[] _slotValueType;
-        private readonly bool[] _slotRequired;
-        private readonly bool _anyRequired;
+        private readonly DerivedValueType[] _slotValueType;
 
         private readonly Func<object, IAspectPropertyValue> _valueFactory;
         private readonly Func<string, IAspectPropertyValue> _noValueFactory;
@@ -103,8 +101,7 @@ namespace FiftyOne.Pipeline.DerivedProperty.Data
             var count = script.Properties.Count;
             _slotElementIndex = new int[count];
             _slotPropertyName = new string[count];
-            _slotValueType = new DerivedValueType?[count];
-            _slotRequired = new bool[count];
+            _slotValueType = new DerivedValueType[count];
 
             for (var i = 0; i < count; i++)
             {
@@ -122,11 +119,6 @@ namespace FiftyOne.Pipeline.DerivedProperty.Data
                 _slotElementIndex[i] = index;
                 _slotPropertyName[i] = property.PropertyName;
                 _slotValueType[i] = property.ValueType;
-                _slotRequired[i] = property.Required;
-                if (property.Required)
-                {
-                    _anyRequired = true;
-                }
             }
 
             _elementDataKeys = keys.ToArray();
@@ -181,6 +173,11 @@ namespace FiftyOne.Pipeline.DerivedProperty.Data
         /// <exception cref="ArgumentNullException">
         /// Thrown where the flow data is null.
         /// </exception>
+        /// <exception cref="InvalidOperationException">
+        /// Thrown where the rules do not end in an Else, which the validator
+        /// does not allow and so can only happen where a script was built by
+        /// hand rather than read from a file.
+        /// </exception>
         public IAspectPropertyValue Evaluate(
             IFlowData data,
             DerivedTrace trace)
@@ -205,15 +202,15 @@ namespace FiftyOne.Pipeline.DerivedProperty.Data
                 trace.Fill(_script, context);
             }
 
-            if (_anyRequired)
+            // A property is either there or it is not. Where any one of the
+            // properties the script names is missing, the script says so
+            // rather than answering on part of the evidence.
+            var missing = Missing(context);
+            if (missing != null)
             {
-                var missing = MissingRequired(context);
-                if (missing != null)
-                {
-                    var value = _noValueFactory(missing);
-                    trace?.SetNoValue(value.NoValueMessage);
-                    return value;
-                }
+                var value = _noValueFactory(missing);
+                trace?.SetNoValue(value.NoValueMessage);
+                return value;
             }
 
             for (var i = 0; i < _script.Checks.Count; i++)
@@ -226,46 +223,21 @@ namespace FiftyOne.Pipeline.DerivedProperty.Data
             for (var i = 0; i < _script.Rules.Count; i++)
             {
                 var rule = _script.Rules[i];
-                if (rule.IsElse ||
-                    rule.Condition.Evaluate(context) == DerivedState.True)
+                if (rule.IsElse || rule.Condition.Evaluate(context))
                 {
                     trace?.SetMatch(i, rule.IsElse);
-                    return _valueFactory(ResolveValue(rule.Value, context));
+                    return _valueFactory(rule.Value);
                 }
             }
 
-            if (_script.Output.DefaultValue != null &&
-                DerivedValueConverter.TryConvertString(
-                    _script.Output.DefaultValue,
-                    _script.Output.ValueType,
-                    out var defaulted))
-            {
-                trace?.SetDefault();
-                return _valueFactory(defaulted);
-            }
-
-            var noMatch = _noValueFactory(string.Format(
+            // Every script ends in an Else, which the validator enforces, so
+            // the loop above always returns. Reaching here means a script was
+            // built by hand rather than read and validated.
+            throw new InvalidOperationException(string.Format(
                 CultureInfo.InvariantCulture,
-                "Derived property '{0}' has no value because no rule " +
-                "matched and the script has no Else or DefaultValue.",
+                "the rules of '{0}' do not end in an Else, which format 1 " +
+                "does not allow",
                 _script.Output.Name));
-            trace?.SetNoValue(noMatch.NoValueMessage);
-            return noMatch;
-        }
-
-        private object ResolveValue(
-            DerivedRuleValue value,
-            DerivedEvaluationContext context)
-        {
-            if (value.IsAggregate == false)
-            {
-                return value.Literal;
-            }
-            var group = value.Group == null
-                ? null
-                : value.Group.ToArray();
-            return new DerivedAggregateValue(value.Aggregate.Value, group)
-                .Count(context);
         }
 
         // ---------------------------------------------------------------
@@ -380,24 +352,15 @@ namespace FiftyOne.Pipeline.DerivedProperty.Data
             }
 
             var valueType = _slotValueType[slot];
-            if (valueType.HasValue == false)
-            {
-                // A property the script only ever asks about with Present
-                // has no type, so the value is kept as it arrived.
-                context.Available[slot] = true;
-                context.Values[slot] = raw;
-                return;
-            }
-
             if (DerivedValueConverter.TryConvert(
-                raw, valueType.Value, out var converted) == false)
+                raw, valueType, out var converted) == false)
             {
                 context.Available[slot] = false;
                 context.Reasons[slot] = string.Format(
                     CultureInfo.InvariantCulture,
                     "held '{0}' which cannot be read as {1}",
                     DerivedValueConverter.Display(raw),
-                    DerivedValueConverter.NameOf(valueType.Value));
+                    DerivedValueConverter.NameOf(valueType));
                 return;
             }
 
@@ -418,12 +381,17 @@ namespace FiftyOne.Pipeline.DerivedProperty.Data
                 detail);
         }
 
-        private string MissingRequired(DerivedEvaluationContext context)
+        /// <summary>
+        /// The message saying which source properties were not available and
+        /// what the element that supplies each one said, or null where every
+        /// property the script names was read.
+        /// </summary>
+        private string Missing(DerivedEvaluationContext context)
         {
             var count = 0;
-            for (var i = 0; i < _slotRequired.Length; i++)
+            for (var i = 0; i < context.Available.Length; i++)
             {
-                if (_slotRequired[i] && context.Available[i] == false)
+                if (context.Available[i] == false)
                 {
                     count++;
                 }
@@ -442,14 +410,14 @@ namespace FiftyOne.Pipeline.DerivedProperty.Data
                 "Derived property '{0}' has no value because ",
                 _script.Output.Name);
             builder.Append(count == 1
-                ? "1 required property was not available."
+                ? "1 source property was not available."
                 : string.Format(
                     CultureInfo.InvariantCulture,
-                    "{0} required properties were not available.",
+                    "{0} source properties were not available.",
                     count));
-            for (var i = 0; i < _slotRequired.Length; i++)
+            for (var i = 0; i < context.Available.Length; i++)
             {
-                if (_slotRequired[i] == false || context.Available[i])
+                if (context.Available[i])
                 {
                     continue;
                 }

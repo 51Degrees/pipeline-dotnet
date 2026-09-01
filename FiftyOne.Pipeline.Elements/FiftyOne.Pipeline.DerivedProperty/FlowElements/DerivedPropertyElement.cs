@@ -132,9 +132,9 @@ namespace FiftyOne.Pipeline.DerivedProperty.FlowElements
         /// </summary>
         /// <param name="pipeline">The pipeline being built.</param>
         /// <exception cref="PipelineConfigurationException">
-        /// Thrown where a required source property has no supplier earlier
-        /// in the pipeline, or where another element already writes one of
-        /// the derived property names this element writes.
+        /// Thrown where a source property has no supplier earlier in the
+        /// pipeline, or where another element already writes one of the
+        /// derived property names this element writes.
         /// </exception>
         public override void AddPipeline(IPipeline pipeline)
         {
@@ -379,39 +379,30 @@ namespace FiftyOne.Pipeline.DerivedProperty.FlowElements
                         continue;
                     }
 
-                    if (property.Required)
-                    {
-                        faults.Add(later.Count > 0
-                            ? string.Format(
-                                CultureInfo.InvariantCulture,
-                                "The script '{0}' needs the property '{1}', " +
-                                "which is supplied by {2}, placed after the " +
-                                "derived property element rather than " +
-                                "before it. Move the derived property " +
-                                "element after {2}.",
-                                script.Name,
-                                property.Name,
-                                string.Join(", ", later))
-                            : string.Format(
-                                CultureInfo.InvariantCulture,
-                                "The script '{0}' needs the property '{1}', " +
-                                "and no element in the pipeline supplies " +
-                                "it. Either add the element that supplies " +
-                                "'{1}', or list '{1}' under Optional in the " +
-                                "script.",
-                                script.Name,
-                                property.Name));
-                        continue;
-                    }
-
-                    Logger.LogInformation(
-                        "The script '{Name}' names the optional property " +
-                        "'{Property}', which no element earlier in the " +
-                        "pipeline supplies, so the property is absent on " +
-                        "every request and the checks that need it are " +
-                        "never evaluated.",
-                        script.Name,
-                        property.Name);
+                    // Every property a script names is needed, so a pipeline
+                    // that cannot supply one would produce no value on every
+                    // request. Failing the build says so at the point the
+                    // mistake was made rather than on the first request.
+                    faults.Add(later.Count > 0
+                        ? string.Format(
+                            CultureInfo.InvariantCulture,
+                            "The script '{0}' needs the property '{1}', " +
+                            "which is supplied by {2}, placed after the " +
+                            "derived property element rather than before " +
+                            "it. Move the derived property element after " +
+                            "{2}.",
+                            script.Name,
+                            property.Name,
+                            string.Join(", ", later))
+                        : string.Format(
+                            CultureInfo.InvariantCulture,
+                            "The script '{0}' needs the property '{1}', " +
+                            "and no element in the pipeline supplies it. " +
+                            "Either add the element that supplies '{1}', " +
+                            "or change the script so that it does not name " +
+                            "'{1}'.",
+                            script.Name,
+                            property.Name));
                 }
             }
         }

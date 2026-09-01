@@ -79,25 +79,19 @@ namespace FiftyOne.Pipeline.DerivedProperty.Data
         /// <summary>Text ending with the text given.</summary>
         EndsWith,
         /// <summary>Text holding the text given.</summary>
-        Contains,
-        /// <summary>Whether the property is available and valid.</summary>
-        Present
+        Contains
     }
 
     /// <summary>
-    /// The counts a rule can take over a group of checks.
+    /// The counts a rule can take over a group of checks. Every check is
+    /// true or false, so the two always add up to the size of the group.
     /// </summary>
     public enum DerivedAggregate
     {
         /// <summary>How many checks in the group were true.</summary>
         Passed,
         /// <summary>How many checks in the group were false.</summary>
-        Failed,
-        /// <summary>
-        /// How many checks in the group were either true or false, so how
-        /// many could be answered at all.
-        /// </summary>
-        Evaluated
+        Failed
     }
 
     /// <summary>
@@ -146,8 +140,10 @@ namespace FiftyOne.Pipeline.DerivedProperty.Data
         /// Always false in format 1. List outputs are deferred.
         /// </param>
         /// <param name="defaultValue">
-        /// The string form of the value returned where no rule matches, or
-        /// null where the script gives none.
+        /// The string form of the value common-metadata records as the
+        /// default, or null where the script gives none. It is carried
+        /// through to the metadata and nothing reads it while a request is
+        /// being processed.
         /// </param>
         /// <param name="values">
         /// The values the property can return, or null where the script
@@ -218,8 +214,10 @@ namespace FiftyOne.Pipeline.DerivedProperty.Data
         public bool IsList { get; }
 
         /// <summary>
-        /// The string form of the value returned where no rule matches and
-        /// the script has no Else, or null where the script gives none.
+        /// The string form of the value common-metadata records as the
+        /// default, or null where the script gives none. Every script ends
+        /// in an Else and so always chooses a value, which is why nothing
+        /// reads this while a request is being processed.
         /// </summary>
         public string DefaultValue { get; }
 
@@ -302,24 +300,19 @@ namespace FiftyOne.Pipeline.DerivedProperty.Data
         /// </param>
         /// <param name="propertyName">The property on that element.</param>
         /// <param name="valueType">
-        /// The type the value is read as, or null where the script only ever
-        /// asks whether the property is present.
-        /// </param>
-        /// <param name="required">
-        /// False where the script lists the property under Optional.
+        /// The type the value is read as, worked out from the literals the
+        /// property is compared against.
         /// </param>
         public DerivedSourceProperty(
             string name,
             string elementDataKey,
             string propertyName,
-            DerivedValueType? valueType,
-            bool required)
+            DerivedValueType valueType)
         {
             Name = name;
             ElementDataKey = elementDataKey;
             PropertyName = propertyName;
             ValueType = valueType;
-            Required = required;
         }
 
         /// <summary>
@@ -334,16 +327,10 @@ namespace FiftyOne.Pipeline.DerivedProperty.Data
         public string PropertyName { get; }
 
         /// <summary>
-        /// The type the value is read as, or null where the script only ever
-        /// asks whether the property is present.
+        /// The type the value is read as, worked out from the literals the
+        /// property is compared against.
         /// </summary>
-        public DerivedValueType? ValueType { get; }
-
-        /// <summary>
-        /// False where the script lists the property under Optional, meaning
-        /// the script can produce a value without it.
-        /// </summary>
-        public bool Required { get; }
+        public DerivedValueType ValueType { get; }
     }
 
     /// <summary>
@@ -372,7 +359,9 @@ namespace FiftyOne.Pipeline.DerivedProperty.Data
 
     /// <summary>
     /// One rule. Rules are read in order and the first rule whose condition
-    /// is true supplies the output.
+    /// is true supplies the output. The last rule of every script is an
+    /// Else, so a script always chooses a value once its source properties
+    /// have been read.
     /// </summary>
     public sealed class DerivedRule
     {
@@ -383,8 +372,10 @@ namespace FiftyOne.Pipeline.DerivedProperty.Data
         /// The condition, or null for an Else, which always matches and is
         /// only allowed on the last rule.
         /// </param>
-        /// <param name="value">The value the rule supplies.</param>
-        public DerivedRule(DerivedCondition condition, DerivedRuleValue value)
+        /// <param name="value">
+        /// The literal the rule supplies, of the output's value type.
+        /// </param>
+        public DerivedRule(DerivedCondition condition, object value)
         {
             Condition = condition;
             Value = value;
@@ -395,76 +386,15 @@ namespace FiftyOne.Pipeline.DerivedProperty.Data
         /// </summary>
         public DerivedCondition Condition { get; }
 
-        /// <summary>The value the rule supplies.</summary>
-        public DerivedRuleValue Value { get; }
+        /// <summary>
+        /// The literal the rule supplies, of the output's value type.
+        /// </summary>
+        public object Value { get; }
 
         /// <summary>
         /// True where the rule is an Else, which always matches.
         /// </summary>
         public bool IsElse => Condition == null;
-    }
-
-    /// <summary>
-    /// What a rule supplies, being either a literal or a count of checks.
-    /// </summary>
-    public sealed class DerivedRuleValue
-    {
-        private DerivedRuleValue(
-            object literal,
-            DerivedAggregate? aggregate,
-            IReadOnlyList<int> group)
-        {
-            Literal = literal;
-            Aggregate = aggregate;
-            Group = group;
-        }
-
-        /// <summary>
-        /// A rule value that is a literal of the output's value type.
-        /// </summary>
-        /// <param name="literal">The value.</param>
-        /// <returns>The rule value.</returns>
-        public static DerivedRuleValue FromLiteral(object literal)
-        {
-            return new DerivedRuleValue(literal, null, null);
-        }
-
-        /// <summary>
-        /// A rule value that is a count of checks, which an int output uses
-        /// to expose how much evidence it had.
-        /// </summary>
-        /// <param name="aggregate">Which count to take.</param>
-        /// <param name="group">
-        /// The checks to count, by index, or null for every check.
-        /// </param>
-        /// <returns>The rule value.</returns>
-        public static DerivedRuleValue FromAggregate(
-            DerivedAggregate aggregate,
-            IReadOnlyList<int> group)
-        {
-            return new DerivedRuleValue(null, aggregate, group);
-        }
-
-        /// <summary>
-        /// The literal, where the rule value is a literal.
-        /// </summary>
-        public object Literal { get; }
-
-        /// <summary>
-        /// Which count to take, where the rule value is a count.
-        /// </summary>
-        public DerivedAggregate? Aggregate { get; }
-
-        /// <summary>
-        /// The checks to count, by index, or null for every check.
-        /// </summary>
-        public IReadOnlyList<int> Group { get; }
-
-        /// <summary>
-        /// True where the rule value is a count of checks rather than a
-        /// literal.
-        /// </summary>
-        public bool IsAggregate => Aggregate.HasValue;
     }
 
     /// <summary>

@@ -47,10 +47,9 @@ public class DerivedScriptWriterTests
 
     /// <summary>
     /// A script written to cover the parts of the form that are easy to get
-    /// wrong, being the order of the Output fields, a source property whose
-    /// type is unknown because only Present asks about it, named checks, All,
-    /// Not, an aggregate compared with another aggregate, an aggregate over
-    /// a named group of checks, and an Else.
+    /// wrong, being the order of the Output fields, named checks, All, Not,
+    /// an aggregate compared with another aggregate, an aggregate over a
+    /// named group of checks, and an Else.
     /// </summary>
     private const string ExampleYaml =
         """
@@ -77,17 +76,15 @@ public class DerivedScriptWriterTests
           Values:
             - { Name: High, Description: High confidence. }
             - { Name: Unknown }
-        Optional:
-          - device.IsCrawler
         Checks:
           NotCrawler: { Property: device.IsCrawler, Eq: false }
-          Seen: { Property: device.IsVisible, Present: true }
+          Seen: { Property: device.IsVisible, Eq: true }
           Fresh:
             All:
               - { Property: device.Year, Gt: 0 }
               - { Not: { Property: device.Year, Gt: 3000 } }
         Rules:
-          - When: { Passed: Checks, Ge: { Evaluated: Checks } }
+          - When: { Passed: Checks, Ge: { Failed: Checks } }
             Then: High
           - When: { Passed: [NotCrawler, Fresh], Ge: 1 }
             Then: High
@@ -125,10 +122,9 @@ public class DerivedScriptWriterTests
               { "Name": "Unknown" }
             ]
           },
-          "Optional": ["device.IsCrawler"],
           "Checks": {
             "NotCrawler": { "Property": "device.IsCrawler", "Eq": false },
-            "Seen": { "Property": "device.IsVisible", "Present": true },
+            "Seen": { "Property": "device.IsVisible", "Eq": true },
             "Fresh": {
               "All": [
                 { "Property": "device.Year", "Gt": 0 },
@@ -137,7 +133,7 @@ public class DerivedScriptWriterTests
             }
           },
           "Rules": [
-            { "When": { "Passed": "Checks", "Ge": { "Evaluated": "Checks" } },
+            { "When": { "Passed": "Checks", "Ge": { "Failed": "Checks" } },
               "Then": "High" },
             { "When": { "Passed": ["NotCrawler", "Fresh"], "Ge": 1 },
               "Then": "High" },
@@ -189,21 +185,15 @@ public class DerivedScriptWriterTests
               }
             ]
           },
-          "Optional": [
-            "device.IsCrawler"
-          ],
           "Properties": {
             "device.IsCrawler": {
-              "Type": "bool",
-              "Required": false
+              "Type": "bool"
             },
             "device.IsVisible": {
-              "Type": null,
-              "Required": true
+              "Type": "bool"
             },
             "device.Year": {
-              "Type": "int",
-              "Required": true
+              "Type": "int"
             }
           },
           "Checks": {
@@ -213,7 +203,7 @@ public class DerivedScriptWriterTests
             },
             "Seen": {
               "Property": "device.IsVisible",
-              "Present": true
+              "Eq": true
             },
             "Fresh": {
               "All": [
@@ -235,7 +225,7 @@ public class DerivedScriptWriterTests
               "When": {
                 "Passed": "Checks",
                 "Ge": {
-                  "Evaluated": "Checks"
+                  "Failed": "Checks"
                 }
               },
               "Then": "High"
@@ -258,9 +248,9 @@ public class DerivedScriptWriterTests
         """;
 
     /// <summary>
-    /// An int output, so that a rule can supply the whole number zero and a
-    /// count of checks. Both are places a hand written serialiser can turn a
-    /// value into text without anyone noticing.
+    /// An int output, so that a rule can supply the whole number zero,
+    /// which is a place a hand written serialiser can turn a value into
+    /// text without anyone noticing.
     /// </summary>
     private const string CountYaml =
         """
@@ -269,7 +259,7 @@ public class DerivedScriptWriterTests
         Version: 1.0.0
         Output:
           Name: Count
-          Description: How many checks passed.
+          Description: How suspect the request looks.
           ValueType: int
           IsList: false
         Checks:
@@ -277,7 +267,7 @@ public class DerivedScriptWriterTests
         Rules:
           - When: { Property: device.IsCrawler, Eq: true }
             Then: 0
-          - Else: { Passed: Checks }
+          - Else: 1
         """;
 
     /// <summary>

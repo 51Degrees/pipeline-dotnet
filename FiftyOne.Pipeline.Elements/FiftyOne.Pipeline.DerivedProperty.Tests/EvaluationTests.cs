@@ -223,225 +223,69 @@ public class EvaluationTests
             Values("a.P", "Chrome")));
     }
 
-    /// <summary>
-    /// Present holds both ways round, being true where the property is
-    /// there and readable and false where it is not.
-    /// </summary>
-    [TestMethod]
-    public void Evaluation_PresentBothWays()
-    {
-        Assert.AreEqual("yes", RunCondition(
-            "{ Property: a.P, Present: true }",
-            Values("a.P", "anything")));
-        Assert.AreEqual("no", RunCondition(
-            "{ Property: a.P, Present: true }", Values()));
-        Assert.AreEqual("yes", RunCondition(
-            "{ Property: a.P, Present: false }", Values()));
-        Assert.AreEqual("no", RunCondition(
-            "{ Property: a.P, Present: false }",
-            Values("a.P", "anything")));
-    }
-
-    /// <summary>
-    /// A value that is there but cannot be read as the type the script
-    /// inferred is not present, because a property is only present when it
-    /// can actually be used.
-    /// </summary>
-    [TestMethod]
-    public void Evaluation_PresentIsFalseWhereTheValueCannotBeRead()
-    {
-        // The check compares the property as a bool, so "N/A" is not a
-        // value the property can hold.
-        var checks = "Checks:\n  Bool: { Property: a.P, Eq: true }\n";
-        Assert.AreEqual("no", RunCondition(
-            "{ Property: a.P, Present: true }",
-            Values("a.P", "N/A"),
-            new[] { "a.P" },
-            checks));
-    }
-
     // -----------------------------------------------------------------
-    // The three valued table of DESIGN.md 2.6. Each row is read through
-    // the aggregate probe below, which tells true, false and unknown
-    // apart, rather than through a rule that cannot see the difference
-    // between false and unknown.
+    // The two valued table of DESIGN.md 2.6. Every condition is true or
+    // false, because the rules only run once every source property the
+    // script names has been read.
     // -----------------------------------------------------------------
 
     /// <summary>
-    /// A comparison on a property that is there gives true or false.
+    /// All is true only where every member is true.
     /// </summary>
     [TestMethod]
-    public void Evaluation_ComparisonOnAvailablePropertyIsTrueOrFalse()
-    {
-        Assert.AreEqual("true", StateOf(
-            "{ Property: a.P, Eq: true }", Values("a.P", true)));
-        Assert.AreEqual("false", StateOf(
-            "{ Property: a.P, Eq: true }", Values("a.P", false)));
-    }
-
-    /// <summary>
-    /// A comparison on an absent property is unknown, so a rule holding
-    /// only that comparison never matches and the Else is reached.
-    /// </summary>
-    [TestMethod]
-    public void Evaluation_ComparisonOnAbsentPropertyIsUnknown()
-    {
-        Assert.AreEqual("unknown", StateOf(
-            "{ Property: a.P, Eq: true }", Values()));
-        Assert.AreEqual("no", RunCondition(
-            "{ Property: a.P, Eq: true }", Values()));
-    }
-
-    /// <summary>
-    /// Present is answerable whatever happened, so it is never unknown.
-    /// </summary>
-    [TestMethod]
-    public void Evaluation_PresentIsNeverUnknown()
-    {
-        Assert.AreEqual("true", StateOf(
-            "{ Property: a.P, Present: false }", Values()));
-        Assert.AreEqual("false", StateOf(
-            "{ Property: a.P, Present: true }", Values()));
-    }
-
-    /// <summary>
-    /// All is false as soon as one member is false, even where another
-    /// member could not be answered.
-    /// </summary>
-    [TestMethod]
-    public void Evaluation_AllIsFalseAsSoonAsOneMemberIsFalse()
+    public void Evaluation_AllIsTrueOnlyWhereEveryMemberIsTrue()
     {
         var condition = "{ All: [ { Property: a.P, Eq: true }, " +
             "{ Property: a.Q, Eq: true } ] }";
-        Assert.AreEqual("false", StateOf(
-            condition,
-            Values("a.P", true, "a.Q", false),
-            new[] { "a.P", "a.Q" }));
-        Assert.AreEqual("false", StateOf(
-            condition,
-            Values("a.P", false),
-            new[] { "a.P", "a.Q" }));
+        Assert.AreEqual("yes", RunCondition(
+            condition, Values("a.P", true, "a.Q", true)));
+        Assert.AreEqual("no", RunCondition(
+            condition, Values("a.P", true, "a.Q", false)));
+        Assert.AreEqual("no", RunCondition(
+            condition, Values("a.P", false, "a.Q", true)));
+        Assert.AreEqual("no", RunCondition(
+            condition, Values("a.P", false, "a.Q", false)));
     }
 
     /// <summary>
-    /// All is unknown where one member is unknown and no member is false.
+    /// Any is true where at least one member is true.
     /// </summary>
     [TestMethod]
-    public void Evaluation_AllIsUnknownWhereOneIsUnknownAndNoneFalse()
-    {
-        var condition = "{ All: [ { Property: a.P, Eq: true }, " +
-            "{ Property: a.Q, Eq: true } ] }";
-        Assert.AreEqual("unknown", StateOf(
-            condition,
-            Values("a.P", true),
-            new[] { "a.P", "a.Q" }));
-        Assert.AreEqual("true", StateOf(
-            condition,
-            Values("a.P", true, "a.Q", true),
-            new[] { "a.P", "a.Q" }));
-    }
-
-    /// <summary>
-    /// Any is true as soon as one member is true, even where another
-    /// member could not be answered.
-    /// </summary>
-    [TestMethod]
-    public void Evaluation_AnyIsTrueAsSoonAsOneIsTrue()
+    public void Evaluation_AnyIsTrueWhereAtLeastOneMemberIsTrue()
     {
         var condition = "{ Any: [ { Property: a.P, Eq: true }, " +
             "{ Property: a.Q, Eq: true } ] }";
-        Assert.AreEqual("true", StateOf(
-            condition,
-            Values("a.P", true),
-            new[] { "a.P", "a.Q" }));
         Assert.AreEqual("yes", RunCondition(
-            condition,
-            Values("a.P", true),
-            new[] { "a.P", "a.Q" }));
+            condition, Values("a.P", true, "a.Q", false)));
+        Assert.AreEqual("yes", RunCondition(
+            condition, Values("a.P", false, "a.Q", true)));
+        Assert.AreEqual("no", RunCondition(
+            condition, Values("a.P", false, "a.Q", false)));
     }
 
     /// <summary>
-    /// Any is unknown where one member is unknown and no member is true,
-    /// and false where every member is false.
+    /// Not turns true into false and false into true.
     /// </summary>
     [TestMethod]
-    public void Evaluation_AnyIsUnknownWhereOneIsUnknownAndNoneTrue()
+    public void Evaluation_NotInvertsItsCondition()
     {
-        var condition = "{ Any: [ { Property: a.P, Eq: true }, " +
-            "{ Property: a.Q, Eq: true } ] }";
-        Assert.AreEqual("unknown", StateOf(
-            condition,
-            Values("a.P", false),
-            new[] { "a.P", "a.Q" }));
-        Assert.AreEqual("false", StateOf(
-            condition,
-            Values("a.P", false, "a.Q", false),
-            new[] { "a.P", "a.Q" }));
-    }
-
-    /// <summary>
-    /// Not turns true into false, false into true, and leaves a condition
-    /// that could not be answered unanswered.
-    /// </summary>
-    [TestMethod]
-    public void Evaluation_NotTurnsTrueIntoFalseAndLeavesUnknownAlone()
-    {
-        Assert.AreEqual("false", StateOf(
-            "{ Not: { Property: a.P, Eq: true } }", Values("a.P", true)));
-        Assert.AreEqual("true", StateOf(
-            "{ Not: { Property: a.P, Eq: true } }", Values("a.P", false)));
-        Assert.AreEqual("unknown", StateOf(
-            "{ Not: { Property: a.P, Eq: true } }", Values()));
-        Assert.AreEqual("yes", RunCondition(
-            "{ Not: { Property: a.P, Eq: true } }", Values("a.P", false)));
         Assert.AreEqual("no", RunCondition(
             "{ Not: { Property: a.P, Eq: true } }", Values("a.P", true)));
+        Assert.AreEqual("yes", RunCondition(
+            "{ Not: { Property: a.P, Eq: true } }", Values("a.P", false)));
     }
 
     /// <summary>
-    /// A comparison on a count is always answerable, because a count of
-    /// checks is known even when every check in it is unknown.
-    /// </summary>
-    [TestMethod]
-    public void Evaluation_AggregateComparisonIsNeverUnknown()
-    {
-        var checks = "Checks:\n" +
-            "  One: { Property: a.P, Eq: true }\n" +
-            "  Two: { Property: a.Q, Eq: true }\n";
-        // Neither property is there, so both checks are unknown and every
-        // count is zero, which the comparison still answers.
-        Assert.AreEqual("yes", RunCondition(
-            "{ Evaluated: Checks, Eq: 0 }",
-            Values(),
-            new[] { "a.P", "a.Q" },
-            checks));
-        // Negating the comparison also gives an answer, which it could
-        // not do if the comparison were unknown, because Not leaves an
-        // unanswered condition unanswered.
-        Assert.AreEqual("yes", RunCondition(
-            "{ Not: { Evaluated: Checks, Eq: 1 } }",
-            Values(),
-            new[] { "a.P", "a.Q" },
-            checks));
-    }
-
-    /// <summary>
-    /// A Check reference gives back the answer of the check it names,
-    /// including where that answer is unknown.
+    /// A Check reference gives back the answer of the check it names.
     /// </summary>
     [TestMethod]
     public void Evaluation_CheckReferenceGivesTheReferencedAnswer()
     {
         var checks = "Checks:\n  One: { Property: a.P, Eq: true }\n";
         Assert.AreEqual("yes", RunCondition(
-            "{ Check: One }", Values("a.P", true), new[] { "a.P" }, checks));
+            "{ Check: One }", Values("a.P", true), checks));
         Assert.AreEqual("no", RunCondition(
-            "{ Check: One }", Values("a.P", false), new[] { "a.P" }, checks));
-        Assert.AreEqual("unknown", StateOf(
-            "{ Check: One }",
-            Values(),
-            new[] { "a.P" },
-            "  One: { Property: a.P, Eq: true }\n"));
+            "{ Check: One }", Values("a.P", false), checks));
     }
 
     // -----------------------------------------------------------------
@@ -628,16 +472,21 @@ public class EvaluationTests
 
     /// <summary>
     /// A plain list where the script needs one value is not a value the
-    /// property can hold, so the property is absent.
+    /// property can hold, so the property is absent and the script
+    /// produces no value.
     /// </summary>
     [TestMethod]
     public void Conversion_PlainListWhereOneValueIsNeededIsInvalid()
     {
         var list = new List<string> { "one", "two" };
-        Assert.AreEqual("no", RunCondition(
-            "{ Property: a.P, Present: true }", Values("a.P", list)));
-        Assert.AreEqual("unknown", StateOf(
-            "{ Property: a.P, Eq: \"one\" }", Values("a.P", list)));
+        var value = Run(
+            ConditionScript("{ Property: a.P, Eq: \"one\" }", string.Empty),
+            "Probe",
+            Values("a.P", list));
+        Assert.IsFalse(value.HasValue);
+        Assert.Contains(
+            "'a.P' (held a list where a single value is needed).",
+            value.NoValueMessage);
     }
 
     /// <summary>
@@ -655,7 +504,7 @@ public class EvaluationTests
         var trace = new DerivedTrace();
         Run(
             ConditionScript(
-                "{ Property: a.P, Eq: \"None\" }", new[] { "a.P" }, string.Empty),
+                "{ Property: a.P, Eq: \"None\" }", string.Empty),
             "Probe",
             Values("a.P", absent),
             trace);
@@ -677,26 +526,20 @@ public class EvaluationTests
         "  Two:   { Property: a.Q, Eq: true }\n" +
         "  Three: { Property: a.R, Eq: true }\n";
 
-    private static readonly string[] AggregateProperties =
-        new[] { "a.P", "a.Q", "a.R" };
-
     /// <summary>
-    /// Passed, Failed and Evaluated count only the checks that could be
-    /// answered, so a check that is unknown counts towards nothing.
+    /// Passed and Failed count the checks that were true and the checks
+    /// that were false, and always add up to the size of the group.
     /// </summary>
     [TestMethod]
-    public void Aggregate_PassedFailedAndEvaluatedCountOnlyKnownChecks()
+    public void Aggregate_PassedAndFailedAddUpToTheGroup()
     {
-        var values = Values("a.P", true, "a.Q", false);
+        var values = Values("a.P", true, "a.Q", false, "a.R", false);
         Assert.AreEqual("yes", RunCondition(
-            "{ Passed: Checks, Eq: 1 }",
-            values, AggregateProperties, AggregateChecks));
+            "{ Passed: Checks, Eq: 1 }", values, AggregateChecks));
         Assert.AreEqual("yes", RunCondition(
-            "{ Failed: Checks, Eq: 1 }",
-            values, AggregateProperties, AggregateChecks));
-        Assert.AreEqual("yes", RunCondition(
-            "{ Evaluated: Checks, Eq: 2 }",
-            values, AggregateProperties, AggregateChecks));
+            "{ Failed: Checks, Eq: 2 }", values, AggregateChecks));
+        Assert.AreEqual("no", RunCondition(
+            "{ Passed: Checks, Eq: 2 }", values, AggregateChecks));
     }
 
     /// <summary>
@@ -708,76 +551,41 @@ public class EvaluationTests
     {
         var values = Values("a.P", true, "a.Q", true, "a.R", false);
         Assert.AreEqual("yes", RunCondition(
-            "{ Passed: [One, Two], Eq: 2 }",
-            values, AggregateProperties, AggregateChecks));
+            "{ Passed: [One, Two], Eq: 2 }", values, AggregateChecks));
         Assert.AreEqual("yes", RunCondition(
-            "{ Failed: [One, Two], Eq: 0 }",
-            values, AggregateProperties, AggregateChecks));
+            "{ Failed: [One, Two], Eq: 0 }", values, AggregateChecks));
         Assert.AreEqual("yes", RunCondition(
-            "{ Failed: Checks, Eq: 1 }",
-            values, AggregateProperties, AggregateChecks));
+            "{ Failed: Checks, Eq: 1 }", values, AggregateChecks));
     }
 
     /// <summary>
     /// One aggregate may be compared with another, which is how a script
-    /// asks whether every check that could be answered passed.
+    /// asks whether more checks passed than failed.
     /// </summary>
     [TestMethod]
     public void Aggregate_MayBeComparedWithAnotherAggregate()
     {
         Assert.AreEqual("yes", RunCondition(
-            "{ Passed: Checks, Eq: { Evaluated: Checks } }",
-            Values("a.P", true, "a.Q", true),
-            AggregateProperties, AggregateChecks));
+            "{ Passed: Checks, Gt: { Failed: Checks } }",
+            Values("a.P", true, "a.Q", true, "a.R", false),
+            AggregateChecks));
         Assert.AreEqual("no", RunCondition(
-            "{ Passed: Checks, Eq: { Evaluated: Checks } }",
-            Values("a.P", true, "a.Q", false),
-            AggregateProperties, AggregateChecks));
-    }
-
-    /// <summary>
-    /// An int output returns a count through an Else naming an aggregate,
-    /// which is how a script exposes how much evidence it had.
-    /// </summary>
-    [TestMethod]
-    public void Aggregate_IntOutputReturnsACount()
-    {
-        var text = @"
-Format: 1
-Name: Counter
-Version: 1.0.0
-Output:
-  Name: Counter
-  Description: The number of checks that could be evaluated.
-  ValueType: int
-  IsList: false
-Optional:
-  - a.P
-  - a.Q
-Checks:
-  One: { Property: a.P, Eq: true }
-  Two: { Property: a.Q, Eq: true }
-Rules:
-  - Else: { Evaluated: Checks }
-";
-        Assert.AreEqual(1, IntOf(Run(
-            text, "Counter", Values("a.P", true))));
-        Assert.AreEqual(2, IntOf(Run(
-            text, "Counter", Values("a.P", true, "a.Q", false))));
-        Assert.AreEqual(0, IntOf(Run(text, "Counter", Values())));
+            "{ Passed: Checks, Gt: { Failed: Checks } }",
+            Values("a.P", true, "a.Q", false, "a.R", false),
+            AggregateChecks));
     }
 
     // -----------------------------------------------------------------
-    // Required and optional properties.
+    // Absent source properties.
     // -----------------------------------------------------------------
 
-    private const string RequiredScript = @"
+    private const string StrictScript = @"
 Format: 1
 Name: Strict
 Version: 1.0.0
 Output:
   Name: Strict
-  Description: A property whose sources are all required.
+  Description: A property computed from two source properties.
   ValueType: string
   IsList: false
 Rules:
@@ -790,14 +598,14 @@ Rules:
 ";
 
     /// <summary>
-    /// A required property that is not there makes the output a value with
+    /// A source property that is not there makes the output a value with
     /// no value rather than a guess.
     /// </summary>
     [TestMethod]
-    public void Required_AbsentPropertyGivesAValueWithNoValue()
+    public void Missing_AbsentPropertyGivesAValueWithNoValue()
     {
         var value = Run(
-            RequiredScript,
+            StrictScript,
             "Strict",
             Values("device.WebDriver", "None"));
         Assert.IsFalse(value.HasValue);
@@ -805,19 +613,19 @@ Rules:
     }
 
     /// <summary>
-    /// The message names every absent required property and not only the
-    /// first. The wording is the contract between the languages, so the
-    /// whole sentence is asserted rather than a fragment of it, and the
-    /// closing sentence is taken from the constant every language shares
-    /// so that changing the wording fails here first.
+    /// The message names every absent property and not only the first. The
+    /// wording is the contract between the languages, so the whole
+    /// sentence is asserted rather than a fragment of it, and the closing
+    /// sentence is taken from the constant every language shares so that
+    /// changing the wording fails here first.
     /// </summary>
     [TestMethod]
-    public void Required_MessageNamesEveryAbsentProperty()
+    public void Missing_MessageNamesEveryAbsentProperty()
     {
-        var value = Run(RequiredScript, "Strict", Values());
+        var value = Run(StrictScript, "Strict", Values());
         Assert.IsFalse(value.HasValue);
         var expected =
-            "Derived property 'Strict' has no value because 2 required " +
+            "Derived property 'Strict' has no value because 2 source " +
             "properties were not available. 'device.IsVisible' (element " +
             "'device' has no value for 'IsVisible': property not present " +
             "on this request). 'device.WebDriver' (element 'device' has " +
@@ -830,15 +638,15 @@ Rules:
     /// The message counts in the singular where one property is absent.
     /// </summary>
     [TestMethod]
-    public void Required_MessageIsSingularForOneProperty()
+    public void Missing_MessageIsSingularForOneProperty()
     {
         var value = Run(
-            RequiredScript,
+            StrictScript,
             "Strict",
             Values("device.IsVisible", true));
         Assert.IsFalse(value.HasValue);
         Assert.Contains(
-            "because 1 required property was not available.",
+            "because 1 source property was not available.",
             value.NoValueMessage);
     }
 
@@ -847,10 +655,10 @@ Rules:
     /// the message gives.
     /// </summary>
     [TestMethod]
-    public void Required_MessageCarriesTheSourceNoValueMessage()
+    public void Missing_MessageCarriesTheSourceNoValueMessage()
     {
         var value = Run(
-            RequiredScript,
+            StrictScript,
             "Strict",
             Values(
                 "device.IsVisible", true,
@@ -870,10 +678,10 @@ Rules:
     /// be read as.
     /// </summary>
     [TestMethod]
-    public void Required_MessageSaysWhatAnInvalidValueHeld()
+    public void Missing_MessageSaysWhatAnInvalidValueHeld()
     {
         var value = Run(
-            RequiredScript,
+            StrictScript,
             "Strict",
             Values(
                 "device.IsVisible", "N/A",
@@ -885,20 +693,39 @@ Rules:
     }
 
     /// <summary>
-    /// An optional property that is not there leaves the conditions on it
-    /// unanswered and the script still produces a value.
+    /// Nothing about the rules is read where a source property is absent,
+    /// so the trace holds no checks and names no rule.
     /// </summary>
     [TestMethod]
-    public void Optional_AbsentPropertyLeavesConditionsUnanswered()
+    public void Missing_NoCheckIsEvaluatedAndNoRuleIsReached()
     {
-        Assert.AreEqual("unknown", StateOf(
-            "{ Property: a.P, Eq: true }", Values()));
-        Assert.AreEqual("no", RunCondition(
-            "{ Property: a.P, Eq: true }", Values()));
+        var text = @"
+Format: 1
+Name: Halted
+Version: 1.0.0
+Output:
+  Name: Halted
+  Description: A property whose checks are never reached.
+  ValueType: string
+  IsList: false
+Checks:
+  One: { Property: a.P, Eq: true }
+Rules:
+  - When: { Check: One }
+    Then: High
+  - Else: Low
+";
+        var trace = new DerivedTrace();
+        var value = Run(text, "Halted", Values(), trace);
+
+        Assert.IsFalse(value.HasValue);
+        Assert.IsEmpty(trace.Checks);
+        Assert.IsNull(trace.MatchedRule);
+        Assert.AreEqual(value.NoValueMessage, trace.NoValueMessage);
     }
 
     // -----------------------------------------------------------------
-    // Rule order, Else, DefaultValue and no match.
+    // Rule order and Else.
     // -----------------------------------------------------------------
 
     /// <summary>
@@ -917,8 +744,6 @@ Output:
   Description: Which rule matched.
   ValueType: string
   IsList: false
-Optional:
-  - a.P
 Rules:
   - When: { Property: a.P, Ge: 1 }
     Then: First
@@ -930,15 +755,15 @@ Rules:
             text, "Ordered", Values("a.P", 5))));
         Assert.AreEqual("None", TextOf(Run(
             text, "Ordered", Values("a.P", 0))));
-        Assert.AreEqual("None", TextOf(Run(text, "Ordered", Values())));
     }
 
     /// <summary>
-    /// Where no rule matches and the script gives a DefaultValue, the
-    /// default is the answer.
+    /// Output.DefaultValue is metadata carried through from the script and
+    /// nothing reads it while a request is being processed, because every
+    /// script ends in an Else and so always chooses a value.
     /// </summary>
     [TestMethod]
-    public void Rules_DefaultValueIsUsedWhereNoRuleMatches()
+    public void Rules_DefaultValueIsNotReadWhileProcessing()
     {
         var text = @"
 Format: 1
@@ -946,52 +771,62 @@ Name: Defaulted
 Version: 1.0.0
 Output:
   Name: Defaulted
-  Description: A property with a default and no Else.
+  Description: A property carrying a default that nothing reads.
   ValueType: string
   IsList: false
   DefaultValue: Unknown
-Optional:
-  - a.P
 Rules:
   - When: { Property: a.P, Eq: true }
     Then: High
+  - Else: Low
 ";
-        var trace = new DerivedTrace();
-        var value = Run(text, "Defaulted", Values(), trace);
-        Assert.AreEqual("Unknown", TextOf(value));
-        Assert.IsTrue(trace.UsedDefault);
-        Assert.IsNull(trace.MatchedRule);
+        var result = DerivedScriptValidator.Validate(text, "Defaulted", "code");
+        Assert.IsTrue(result.IsValid,
+            DerivedScriptValidationException.Describe(result.Faults));
+        Assert.AreEqual("Unknown", result.Script.Output.DefaultValue);
+
+        // The Else answers where no earlier rule matched, so the default
+        // never reaches the value the element writes.
+        Assert.AreEqual("Low", TextOf(Run(
+            text, "Defaulted", Values("a.P", false))));
     }
 
     /// <summary>
-    /// Where no rule matches and there is neither an Else nor a
-    /// DefaultValue there is no value, and the message says why. The
-    /// wording is the same in every language.
+    /// A script whose rules do not end in an Else cannot be built by the
+    /// validator, so reaching the evaluator with one says a script was
+    /// built by hand. The evaluator says so rather than answering.
     /// </summary>
     [TestMethod]
-    public void Rules_NoMatchAndNoDefaultGivesNoValue()
+    public void Rules_AModelWithNoElseRaisesRatherThanAnswering()
     {
-        var text = @"
-Format: 1
-Name: Bare
-Version: 1.0.0
-Output:
-  Name: Bare
-  Description: A property with neither an Else nor a default.
-  ValueType: string
-  IsList: false
-Optional:
-  - a.P
-Rules:
-  - When: { Property: a.P, Eq: true }
-    Then: High
-";
-        var value = Run(text, "Bare", Values());
-        Assert.IsFalse(value.HasValue);
-        Assert.AreEqual(
-            "Derived property 'Bare' has no value because no rule matched " +
-            "and the script has no Else or DefaultValue.",
-            value.NoValueMessage);
+        var result = DerivedScriptValidator.Validate(
+            StrictScript, "Strict", "code");
+        Assert.IsTrue(result.IsValid,
+            DerivedScriptValidationException.Describe(result.Faults));
+        var script = result.Script;
+        var withoutElse = new DerivedScript(
+            script.Format,
+            script.Name,
+            script.Version,
+            script.Deprecated,
+            script.DeprecationNote,
+            script.Source,
+            script.Output,
+            script.Properties,
+            script.Checks,
+            script.Rules.Where(r => r.IsElse == false).ToList());
+        var compiled = new CompiledScript(withoutElse);
+        var values = Values(
+            "device.IsVisible", false, "device.WebDriver", "None");
+
+        using (var pipeline = BuildSources(script, values))
+        using (var data = pipeline.CreateFlowData())
+        {
+            data.Process();
+            var exception = Assert.ThrowsExactly<InvalidOperationException>(
+                () => compiled.Evaluate(data, null));
+            Assert.Contains("do not end in an Else", exception.Message);
+        }
     }
 
     // -----------------------------------------------------------------
@@ -1014,9 +849,6 @@ Output:
   Description: A property whose evaluation is traced.
   ValueType: string
   IsList: false
-Optional:
-  - a.P
-  - a.Q
 Checks:
   One: { Property: a.P, Eq: true }
   Two: { Property: a.Q, Eq: true }
@@ -1026,32 +858,28 @@ Rules:
   - Else: Low
 ";
         var trace = new DerivedTrace();
-        var value = Run(text, "Traced", Values("a.P", true), trace);
+        var value = Run(
+            text, "Traced", Values("a.P", true, "a.Q", false), trace);
 
         Assert.AreEqual("High", TextOf(value));
 
         Assert.HasCount(2, trace.Checks);
         Assert.AreEqual("One", trace.Checks[0].Name);
-        Assert.AreEqual(DerivedState.True, trace.Checks[0].State);
+        Assert.IsTrue(trace.Checks[0].State);
         Assert.AreEqual("Two", trace.Checks[1].Name);
-        Assert.AreEqual(DerivedState.Unknown, trace.Checks[1].State);
+        Assert.IsFalse(trace.Checks[1].State);
 
         Assert.AreEqual(0, trace.MatchedRule);
         Assert.IsFalse(trace.MatchedElse);
 
         Assert.HasCount(2, trace.Properties);
         Assert.AreEqual("a.P", trace.Properties[0].Name);
-        Assert.IsFalse(trace.Properties[0].Required);
         Assert.IsTrue(trace.Properties[0].Available);
         Assert.IsTrue((bool)trace.Properties[0].Value);
         Assert.IsNull(trace.Properties[0].Reason);
         Assert.AreEqual("a.Q", trace.Properties[1].Name);
-        Assert.IsFalse(trace.Properties[1].Available);
-        Assert.IsNull(trace.Properties[1].Value);
-        Assert.AreEqual(
-            "element 'a' has no value for 'Q': property not present on " +
-            "this request",
-            trace.Properties[1].Reason);
+        Assert.IsTrue(trace.Properties[1].Available);
+        Assert.IsFalse((bool)trace.Properties[1].Value);
     }
 
     /// <summary>
@@ -1062,10 +890,7 @@ Rules:
     {
         var trace = new DerivedTrace();
         Run(
-            ConditionScript(
-                "{ Property: a.P, Eq: true }",
-                new[] { "a.P" },
-                string.Empty),
+            ConditionScript("{ Property: a.P, Eq: true }", string.Empty),
             "Probe",
             Values("a.P", false),
             trace);
@@ -1096,7 +921,7 @@ Rules:
     public void Evaluation_TheSameScriptGivesTheSameAnswerEveryTime()
     {
         var result = DerivedScriptValidator.Validate(
-            RequiredScript, "Strict", "code");
+            StrictScript, "Strict", "code");
         Assert.IsTrue(result.IsValid,
             DerivedScriptValidationException.Describe(result.Faults));
         var compiled = new CompiledScript(result.Script);
@@ -1125,12 +950,8 @@ Rules:
     /// holds and another when it does not, so one condition can be read on
     /// its own.
     /// </summary>
-    private static string ConditionScript(
-        string condition,
-        IReadOnlyList<string> optional,
-        string checks)
+    private static string ConditionScript(string condition, string checks)
     {
-        var names = optional ?? new[] { "a.P" };
         return
             "Format: 1\n" +
             "Name: Probe\n" +
@@ -1140,8 +961,6 @@ Rules:
             "  Description: Whether the condition was true.\n" +
             "  ValueType: string\n" +
             "  IsList: false\n" +
-            "Optional:\n" +
-            string.Join("", names.Select(n => "  - " + n + "\n")) +
             (checks ?? string.Empty) +
             "Rules:\n" +
             "  - When: " + condition + "\n" +
@@ -1156,11 +975,10 @@ Rules:
     private static string RunCondition(
         string condition,
         IDictionary<string, object> values,
-        IReadOnlyList<string> optional = null,
         string checks = null)
     {
         var value = Run(
-            ConditionScript(condition, optional, checks), "Probe", values);
+            ConditionScript(condition, checks), "Probe", values);
         var text = TextOf(value);
         if (string.Equals(text, "Yes it is", StringComparison.Ordinal))
         {
@@ -1171,54 +989,6 @@ Rules:
             return "no";
         }
         return text;
-    }
-
-    /// <summary>
-    /// Runs one condition as a named check and gives back "true", "false"
-    /// or "unknown". Counting the check apart from reading it is the only
-    /// way to tell a condition that is false from one that could not be
-    /// answered, because neither matches a rule.
-    ///
-    /// Any text passed as otherChecks holds further check entries already
-    /// indented by two spaces, without the Checks heading.
-    /// </summary>
-    private static string StateOf(
-        string condition,
-        IDictionary<string, object> values,
-        IReadOnlyList<string> optional = null,
-        string otherChecks = null)
-    {
-        var names = optional ?? new[] { "a.P" };
-        var text =
-            "Format: 1\n" +
-            "Name: Probe\n" +
-            "Version: 1.0.0\n" +
-            "Output:\n" +
-            "  Name: Probe\n" +
-            "  Description: The state of the condition under test.\n" +
-            "  ValueType: string\n" +
-            "  IsList: false\n" +
-            "Optional:\n" +
-            string.Join("", names.Select(n => "  - " + n + "\n")) +
-            "Checks:\n" +
-            // Any other check comes first, so a check the condition under
-            // test names has already been answered by the time the
-            // condition is read.
-            (otherChecks ?? string.Empty) +
-            "  Subject: " + condition + "\n" +
-            "Rules:\n" +
-            "  - When: { Passed: [Subject], Eq: 1 }\n" +
-            "    Then: IsTrue\n" +
-            "  - When: { Failed: [Subject], Eq: 1 }\n" +
-            "    Then: IsFalse\n" +
-            "  - Else: IsUnknown\n";
-
-        switch (TextOf(Run(text, "Probe", values)))
-        {
-            case "IsTrue": return "true";
-            case "IsFalse": return "false";
-            default: return "unknown";
-        }
     }
 
     /// <summary>
@@ -1315,11 +1085,5 @@ Rules:
     {
         Assert.IsTrue(value.HasValue, value.NoValueMessage);
         return Convert.ToString(value.Value, CultureInfo.InvariantCulture);
-    }
-
-    private static int IntOf(IAspectPropertyValue value)
-    {
-        Assert.IsTrue(value.HasValue, value.NoValueMessage);
-        return (int)value.Value;
     }
 }

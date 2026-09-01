@@ -80,6 +80,18 @@
             <exception cref="T:System.ArgumentNullException">
             Thrown where the flow data is null.
             </exception>
+            <exception cref="T:System.InvalidOperationException">
+            Thrown where the rules do not end in an Else, which the validator
+            does not allow and so can only happen where a script was built by
+            hand rather than read from a file.
+            </exception>
+        </member>
+        <member name="M:FiftyOne.Pipeline.DerivedProperty.Data.CompiledScript.Missing(FiftyOne.Pipeline.DerivedProperty.Data.DerivedEvaluationContext)">
+            <summary>
+            The message saying which source properties were not available and
+            what the element that supplies each one said, or null where every
+            property the script names was read.
+            </summary>
         </member>
         <member name="M:FiftyOne.Pipeline.DerivedProperty.Data.CompiledScript.TryTakeHeaviest(System.Collections.IEnumerable,System.Object@)">
             <summary>
@@ -94,25 +106,6 @@
             reflection happens once for each type ever seen and the request
             path then calls a compiled delegate.
             </summary>
-        </member>
-        <member name="T:FiftyOne.Pipeline.DerivedProperty.Data.DerivedState">
-            <summary>
-            The answer a condition can give. A condition is unknown where a
-            property the condition needs was not available, which is different
-            from the condition being false.
-            </summary>
-        </member>
-        <member name="F:FiftyOne.Pipeline.DerivedProperty.Data.DerivedState.Unknown">
-            <summary>
-            A property the condition needs was not available, so the
-            condition could not be answered.
-            </summary>
-        </member>
-        <member name="F:FiftyOne.Pipeline.DerivedProperty.Data.DerivedState.False">
-            <summary>The condition does not hold.</summary>
-        </member>
-        <member name="F:FiftyOne.Pipeline.DerivedProperty.Data.DerivedState.True">
-            <summary>The condition holds.</summary>
         </member>
         <member name="T:FiftyOne.Pipeline.DerivedProperty.Data.DerivedEvaluationContext">
             <summary>
@@ -151,18 +144,21 @@
             </summary>
         </member>
         <member name="T:FiftyOne.Pipeline.DerivedProperty.Data.DerivedCondition">
-            <summary>
-            A condition in a script, compiled into a small object that answers
-            itself. Every instance is immutable once built, so one compiled
-            script serves every request and every thread with no locking.
-            </summary>
+             <summary>
+             A condition in a script, compiled into a small object that answers
+             itself. Every instance is immutable once built, so one compiled
+             script serves every request and every thread with no locking.
+            
+             Every condition is true or false, because the rules only run once
+             every source property the script names has been read.
+             </summary>
         </member>
         <member name="M:FiftyOne.Pipeline.DerivedProperty.Data.DerivedCondition.Evaluate(FiftyOne.Pipeline.DerivedProperty.Data.DerivedEvaluationContext)">
             <summary>
             Answer the condition for one request.
             </summary>
             <param name="context">The values for this request.</param>
-            <returns>True, false, or unknown.</returns>
+            <returns>True where the condition holds.</returns>
         </member>
         <member name="T:FiftyOne.Pipeline.DerivedProperty.Data.DerivedComparison">
             <summary>
@@ -214,36 +210,6 @@
         <member name="M:FiftyOne.Pipeline.DerivedProperty.Data.DerivedComparison.Evaluate(FiftyOne.Pipeline.DerivedProperty.Data.DerivedEvaluationContext)">
             <inheritdoc/>
         </member>
-        <member name="T:FiftyOne.Pipeline.DerivedProperty.Data.DerivedPresence">
-            <summary>
-            Asks whether a source property was available and valid, which is
-            always answerable and so is never unknown.
-            </summary>
-        </member>
-        <member name="M:FiftyOne.Pipeline.DerivedProperty.Data.DerivedPresence.#ctor(System.Int32,System.Boolean)">
-            <summary>
-            Create a new instance.
-            </summary>
-            <param name="slot">Which source property to read.</param>
-            <param name="expected">
-            True to hold where the property is available, false to hold where
-            the property is absent.
-            </param>
-        </member>
-        <member name="P:FiftyOne.Pipeline.DerivedProperty.Data.DerivedPresence.Slot">
-            <summary>
-            Which source property is read, by index.
-            </summary>
-        </member>
-        <member name="P:FiftyOne.Pipeline.DerivedProperty.Data.DerivedPresence.Expected">
-            <summary>
-            True where the condition holds when the property is available,
-            false where the condition holds when the property is absent.
-            </summary>
-        </member>
-        <member name="M:FiftyOne.Pipeline.DerivedProperty.Data.DerivedPresence.Evaluate(FiftyOne.Pipeline.DerivedProperty.Data.DerivedEvaluationContext)">
-            <inheritdoc/>
-        </member>
         <member name="T:FiftyOne.Pipeline.DerivedProperty.Data.DerivedCheckReference">
             <summary>
             Reuses the answer of a named check.
@@ -265,8 +231,7 @@
         </member>
         <member name="T:FiftyOne.Pipeline.DerivedProperty.Data.DerivedAggregateValue">
             <summary>
-            Counts how many checks in a group passed, failed, or could be
-            evaluated at all.
+            Counts how many checks in a group passed or failed.
             </summary>
         </member>
         <member name="M:FiftyOne.Pipeline.DerivedProperty.Data.DerivedAggregateValue.#ctor(FiftyOne.Pipeline.DerivedProperty.Data.DerivedAggregate,System.Int32[])">
@@ -291,12 +256,12 @@
             Take the count for one request.
             </summary>
             <param name="context">The values for this request.</param>
-            <returns>The count, which is always known.</returns>
+            <returns>The count.</returns>
         </member>
         <member name="T:FiftyOne.Pipeline.DerivedProperty.Data.DerivedAggregateComparison">
             <summary>
             Compares a count of checks against a whole number or against another
-            count. A count is always known, so this condition is never unknown.
+            count.
             </summary>
         </member>
         <member name="M:FiftyOne.Pipeline.DerivedProperty.Data.DerivedAggregateComparison.#ctor(FiftyOne.Pipeline.DerivedProperty.Data.DerivedAggregateValue,FiftyOne.Pipeline.DerivedProperty.Data.DerivedOperator,System.Int32,FiftyOne.Pipeline.DerivedProperty.Data.DerivedAggregateValue)">
@@ -337,8 +302,8 @@
         </member>
         <member name="T:FiftyOne.Pipeline.DerivedProperty.Data.DerivedAll">
             <summary>
-            Holds where every listed condition holds. False as soon as one is
-            false, and unknown where none is false but one could not be answered.
+            Holds where every listed condition holds, and is false as soon as one
+            is false.
             </summary>
         </member>
         <member name="M:FiftyOne.Pipeline.DerivedProperty.Data.DerivedAll.#ctor(FiftyOne.Pipeline.DerivedProperty.Data.DerivedCondition[])">
@@ -355,9 +320,8 @@
         </member>
         <member name="T:FiftyOne.Pipeline.DerivedProperty.Data.DerivedAny">
             <summary>
-            Holds where at least one listed condition holds. True as soon as one
-            is true, and unknown where none is true but one could not be
-            answered.
+            Holds where at least one listed condition holds, and is true as soon
+            as one is true.
             </summary>
         </member>
         <member name="M:FiftyOne.Pipeline.DerivedProperty.Data.DerivedAny.#ctor(FiftyOne.Pipeline.DerivedProperty.Data.DerivedCondition[])">
@@ -374,8 +338,7 @@
         </member>
         <member name="T:FiftyOne.Pipeline.DerivedProperty.Data.DerivedNot">
             <summary>
-            Turns true into false and false into true. A condition that could not
-            be answered stays unanswered.
+            Turns true into false and false into true.
             </summary>
         </member>
         <member name="M:FiftyOne.Pipeline.DerivedProperty.Data.DerivedNot.#ctor(FiftyOne.Pipeline.DerivedProperty.Data.DerivedCondition)">
@@ -476,12 +439,10 @@
         <member name="F:FiftyOne.Pipeline.DerivedProperty.Data.DerivedOperator.Contains">
             <summary>Text holding the text given.</summary>
         </member>
-        <member name="F:FiftyOne.Pipeline.DerivedProperty.Data.DerivedOperator.Present">
-            <summary>Whether the property is available and valid.</summary>
-        </member>
         <member name="T:FiftyOne.Pipeline.DerivedProperty.Data.DerivedAggregate">
             <summary>
-            The counts a rule can take over a group of checks.
+            The counts a rule can take over a group of checks. Every check is
+            true or false, so the two always add up to the size of the group.
             </summary>
         </member>
         <member name="F:FiftyOne.Pipeline.DerivedProperty.Data.DerivedAggregate.Passed">
@@ -489,12 +450,6 @@
         </member>
         <member name="F:FiftyOne.Pipeline.DerivedProperty.Data.DerivedAggregate.Failed">
             <summary>How many checks in the group were false.</summary>
-        </member>
-        <member name="F:FiftyOne.Pipeline.DerivedProperty.Data.DerivedAggregate.Evaluated">
-            <summary>
-            How many checks in the group were either true or false, so how
-            many could be answered at all.
-            </summary>
         </member>
         <member name="T:FiftyOne.Pipeline.DerivedProperty.Data.DerivedValueMetaData">
             <summary>
@@ -538,8 +493,10 @@
             Always false in format 1. List outputs are deferred.
             </param>
             <param name="defaultValue">
-            The string form of the value returned where no rule matches, or
-            null where the script gives none.
+            The string form of the value common-metadata records as the
+            default, or null where the script gives none. It is carried
+            through to the metadata and nothing reads it while a request is
+            being processed.
             </param>
             <param name="values">
             The values the property can return, or null where the script
@@ -574,8 +531,10 @@
         </member>
         <member name="P:FiftyOne.Pipeline.DerivedProperty.Data.DerivedPropertyMetaData.DefaultValue">
             <summary>
-            The string form of the value returned where no rule matches and
-            the script has no Else, or null where the script gives none.
+            The string form of the value common-metadata records as the
+            default, or null where the script gives none. Every script ends
+            in an Else and so always chooses a value, which is why nothing
+            reads this while a request is being processed.
             </summary>
         </member>
         <member name="P:FiftyOne.Pipeline.DerivedProperty.Data.DerivedPropertyMetaData.Values">
@@ -635,7 +594,7 @@
             literals it is compared against.
             </summary>
         </member>
-        <member name="M:FiftyOne.Pipeline.DerivedProperty.Data.DerivedSourceProperty.#ctor(System.String,System.String,System.String,System.Nullable{FiftyOne.Pipeline.DerivedProperty.Data.DerivedValueType},System.Boolean)">
+        <member name="M:FiftyOne.Pipeline.DerivedProperty.Data.DerivedSourceProperty.#ctor(System.String,System.String,System.String,FiftyOne.Pipeline.DerivedProperty.Data.DerivedValueType)">
             <summary>
             Create a new instance.
             </summary>
@@ -648,11 +607,8 @@
             </param>
             <param name="propertyName">The property on that element.</param>
             <param name="valueType">
-            The type the value is read as, or null where the script only ever
-            asks whether the property is present.
-            </param>
-            <param name="required">
-            False where the script lists the property under Optional.
+            The type the value is read as, worked out from the literals the
+            property is compared against.
             </param>
         </member>
         <member name="P:FiftyOne.Pipeline.DerivedProperty.Data.DerivedSourceProperty.Name">
@@ -668,14 +624,8 @@
         </member>
         <member name="P:FiftyOne.Pipeline.DerivedProperty.Data.DerivedSourceProperty.ValueType">
             <summary>
-            The type the value is read as, or null where the script only ever
-            asks whether the property is present.
-            </summary>
-        </member>
-        <member name="P:FiftyOne.Pipeline.DerivedProperty.Data.DerivedSourceProperty.Required">
-            <summary>
-            False where the script lists the property under Optional, meaning
-            the script can produce a value without it.
+            The type the value is read as, worked out from the literals the
+            property is compared against.
             </summary>
         </member>
         <member name="T:FiftyOne.Pipeline.DerivedProperty.Data.DerivedCheck">
@@ -700,10 +650,12 @@
         <member name="T:FiftyOne.Pipeline.DerivedProperty.Data.DerivedRule">
             <summary>
             One rule. Rules are read in order and the first rule whose condition
-            is true supplies the output.
+            is true supplies the output. The last rule of every script is an
+            Else, so a script always chooses a value once its source properties
+            have been read.
             </summary>
         </member>
-        <member name="M:FiftyOne.Pipeline.DerivedProperty.Data.DerivedRule.#ctor(FiftyOne.Pipeline.DerivedProperty.Data.DerivedCondition,FiftyOne.Pipeline.DerivedProperty.Data.DerivedRuleValue)">
+        <member name="M:FiftyOne.Pipeline.DerivedProperty.Data.DerivedRule.#ctor(FiftyOne.Pipeline.DerivedProperty.Data.DerivedCondition,System.Object)">
             <summary>
             Create a new instance.
             </summary>
@@ -711,7 +663,9 @@
             The condition, or null for an Else, which always matches and is
             only allowed on the last rule.
             </param>
-            <param name="value">The value the rule supplies.</param>
+            <param name="value">
+            The literal the rule supplies, of the output's value type.
+            </param>
         </member>
         <member name="P:FiftyOne.Pipeline.DerivedProperty.Data.DerivedRule.Condition">
             <summary>
@@ -719,55 +673,13 @@
             </summary>
         </member>
         <member name="P:FiftyOne.Pipeline.DerivedProperty.Data.DerivedRule.Value">
-            <summary>The value the rule supplies.</summary>
+            <summary>
+            The literal the rule supplies, of the output's value type.
+            </summary>
         </member>
         <member name="P:FiftyOne.Pipeline.DerivedProperty.Data.DerivedRule.IsElse">
             <summary>
             True where the rule is an Else, which always matches.
-            </summary>
-        </member>
-        <member name="T:FiftyOne.Pipeline.DerivedProperty.Data.DerivedRuleValue">
-            <summary>
-            What a rule supplies, being either a literal or a count of checks.
-            </summary>
-        </member>
-        <member name="M:FiftyOne.Pipeline.DerivedProperty.Data.DerivedRuleValue.FromLiteral(System.Object)">
-            <summary>
-            A rule value that is a literal of the output's value type.
-            </summary>
-            <param name="literal">The value.</param>
-            <returns>The rule value.</returns>
-        </member>
-        <member name="M:FiftyOne.Pipeline.DerivedProperty.Data.DerivedRuleValue.FromAggregate(FiftyOne.Pipeline.DerivedProperty.Data.DerivedAggregate,System.Collections.Generic.IReadOnlyList{System.Int32})">
-            <summary>
-            A rule value that is a count of checks, which an int output uses
-            to expose how much evidence it had.
-            </summary>
-            <param name="aggregate">Which count to take.</param>
-            <param name="group">
-            The checks to count, by index, or null for every check.
-            </param>
-            <returns>The rule value.</returns>
-        </member>
-        <member name="P:FiftyOne.Pipeline.DerivedProperty.Data.DerivedRuleValue.Literal">
-            <summary>
-            The literal, where the rule value is a literal.
-            </summary>
-        </member>
-        <member name="P:FiftyOne.Pipeline.DerivedProperty.Data.DerivedRuleValue.Aggregate">
-            <summary>
-            Which count to take, where the rule value is a count.
-            </summary>
-        </member>
-        <member name="P:FiftyOne.Pipeline.DerivedProperty.Data.DerivedRuleValue.Group">
-            <summary>
-            The checks to count, by index, or null for every check.
-            </summary>
-        </member>
-        <member name="P:FiftyOne.Pipeline.DerivedProperty.Data.DerivedRuleValue.IsAggregate">
-            <summary>
-            True where the rule value is a count of checks rather than a
-            literal.
             </summary>
         </member>
         <member name="T:FiftyOne.Pipeline.DerivedProperty.Data.DerivedScript">
@@ -1171,6 +1083,12 @@
             </param>
             <returns>The script, or the faults.</returns>
         </member>
+        <member name="M:FiftyOne.Pipeline.DerivedProperty.Data.DerivedScriptValidator.ReadRuleValue(FiftyOne.Pipeline.DerivedProperty.Data.DerivedScriptValidator.Context,FiftyOne.Pipeline.DerivedProperty.Data.DerivedNode,System.String,FiftyOne.Pipeline.DerivedProperty.Data.DerivedNode,FiftyOne.Pipeline.DerivedProperty.Data.DerivedPropertyMetaData)">
+            <summary>
+            Reads a Then or an Else, which is a literal of Output.ValueType
+            and must be one of Output.Values where that list is given.
+            </summary>
+        </member>
         <member name="M:FiftyOne.Pipeline.DerivedProperty.Data.DerivedScriptValidator.ReadGroup(FiftyOne.Pipeline.DerivedProperty.Data.DerivedScriptValidator.Context,FiftyOne.Pipeline.DerivedProperty.Data.DerivedNode,System.String,FiftyOne.Pipeline.DerivedProperty.Data.DerivedNode)">
             <summary>
             A group is the word Checks, meaning every check, or a list of
@@ -1264,14 +1182,11 @@
             What one source property did on one request.
             </summary>
         </member>
-        <member name="M:FiftyOne.Pipeline.DerivedProperty.Data.DerivedTracedProperty.#ctor(System.String,System.Boolean,System.Boolean,System.Object,System.String)">
+        <member name="M:FiftyOne.Pipeline.DerivedProperty.Data.DerivedTracedProperty.#ctor(System.String,System.Boolean,System.Object,System.String)">
             <summary>
             Create a new instance.
             </summary>
             <param name="name">The property in elementKey.PropertyName form.</param>
-            <param name="required">
-            False where the script lists the property under Optional.
-            </param>
             <param name="available">
             True where the property was there and could be read.
             </param>
@@ -1282,11 +1197,6 @@
         </member>
         <member name="P:FiftyOne.Pipeline.DerivedProperty.Data.DerivedTracedProperty.Name">
             <summary>The property in elementKey.PropertyName form.</summary>
-        </member>
-        <member name="P:FiftyOne.Pipeline.DerivedProperty.Data.DerivedTracedProperty.Required">
-            <summary>
-            False where the script lists the property under Optional.
-            </summary>
         </member>
         <member name="P:FiftyOne.Pipeline.DerivedProperty.Data.DerivedTracedProperty.Available">
             <summary>
@@ -1306,7 +1216,7 @@
             What one check answered on one request.
             </summary>
         </member>
-        <member name="M:FiftyOne.Pipeline.DerivedProperty.Data.DerivedTracedCheck.#ctor(System.String,FiftyOne.Pipeline.DerivedProperty.Data.DerivedState)">
+        <member name="M:FiftyOne.Pipeline.DerivedProperty.Data.DerivedTracedCheck.#ctor(System.String,System.Boolean)">
             <summary>
             Create a new instance.
             </summary>
@@ -1338,25 +1248,19 @@
         </member>
         <member name="P:FiftyOne.Pipeline.DerivedProperty.Data.DerivedTrace.Checks">
             <summary>
-            Every check, in script order. Empty where a required property
-            was missing, because the checks are then never reached.
+            Every check, in script order. Empty where a source property was
+            missing, because the checks are then never reached.
             </summary>
         </member>
         <member name="P:FiftyOne.Pipeline.DerivedProperty.Data.DerivedTrace.MatchedRule">
             <summary>
-            Which rule supplied the answer, by index, or null where no rule
-            matched.
+            Which rule supplied the answer, by index, or null where a source
+            property was missing and no rule was reached.
             </summary>
         </member>
         <member name="P:FiftyOne.Pipeline.DerivedProperty.Data.DerivedTrace.MatchedElse">
             <summary>
             True where the rule that matched was the Else.
-            </summary>
-        </member>
-        <member name="P:FiftyOne.Pipeline.DerivedProperty.Data.DerivedTrace.UsedDefault">
-            <summary>
-            True where no rule matched and the answer came from
-            Output.DefaultValue.
             </summary>
         </member>
         <member name="P:FiftyOne.Pipeline.DerivedProperty.Data.DerivedTrace.NoValueMessage">
@@ -1384,12 +1288,6 @@
             </summary>
             <param name="index">The rule, by index.</param>
             <param name="isElse">True where the rule is the Else.</param>
-        </member>
-        <member name="M:FiftyOne.Pipeline.DerivedProperty.Data.DerivedTrace.SetDefault">
-            <summary>
-            Record that the answer came from Output.DefaultValue because no
-            rule matched. Called by the evaluator.
-            </summary>
         </member>
         <member name="M:FiftyOne.Pipeline.DerivedProperty.Data.DerivedTrace.SetNoValue(System.String)">
             <summary>
@@ -1514,9 +1412,9 @@
             </summary>
             <param name="pipeline">The pipeline being built.</param>
             <exception cref="T:FiftyOne.Pipeline.Core.Exceptions.PipelineConfigurationException">
-            Thrown where a required source property has no supplier earlier
-            in the pipeline, or where another element already writes one of
-            the derived property names this element writes.
+            Thrown where a source property has no supplier earlier in the
+            pipeline, or where another element already writes one of the
+            derived property names this element writes.
             </exception>
         </member>
         <member name="M:FiftyOne.Pipeline.DerivedProperty.FlowElements.DerivedPropertyElement.ProcessInternal(FiftyOne.Pipeline.Core.Data.IFlowData)">

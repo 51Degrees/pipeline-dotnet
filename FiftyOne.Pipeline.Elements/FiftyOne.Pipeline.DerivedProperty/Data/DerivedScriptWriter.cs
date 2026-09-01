@@ -81,19 +81,6 @@ namespace FiftyOne.Pipeline.DerivedProperty.Data
             }
             result.Add("Output", Output(script.Output));
 
-            var optional = new JsonArray();
-            foreach (var property in script.Properties)
-            {
-                if (property.Required == false)
-                {
-                    optional.Add(new JsonLiteral(property.Name));
-                }
-            }
-            if (optional.Items.Count > 0)
-            {
-                result.Add("Optional", optional);
-            }
-
             // The inferred type of every source property, which the script
             // file does not carry because the type is worked out from the
             // literals the property is compared against.
@@ -103,10 +90,7 @@ namespace FiftyOne.Pipeline.DerivedProperty.Data
                 var entry = new JsonObject();
                 entry.AddValue(
                     "Type",
-                    property.ValueType.HasValue
-                        ? DerivedValueConverter.NameOf(property.ValueType.Value)
-                        : null);
-                entry.AddValue("Required", property.Required);
+                    DerivedValueConverter.NameOf(property.ValueType));
                 properties.Add(property.Name, entry);
             }
             result.Add("Properties", properties);
@@ -127,12 +111,12 @@ namespace FiftyOne.Pipeline.DerivedProperty.Data
                 var entry = new JsonObject();
                 if (rule.IsElse)
                 {
-                    entry.Add("Else", Value(rule.Value, script));
+                    entry.AddValue("Else", rule.Value);
                 }
                 else
                 {
                     entry.Add("When", Condition(rule.Condition, script));
-                    entry.Add("Then", Value(rule.Value, script));
+                    entry.AddValue("Then", rule.Value);
                 }
                 rules.Add(entry);
             }
@@ -246,14 +230,6 @@ namespace FiftyOne.Pipeline.DerivedProperty.Data
             {
                 return Comparison(comparison, script);
             }
-            if (condition is DerivedPresence presence)
-            {
-                var result = new JsonObject();
-                result.AddValue(
-                    "Property", script.Properties[presence.Slot].Name);
-                result.AddValue("Present", presence.Expected);
-                return result;
-            }
             if (condition is DerivedCheckReference reference)
             {
                 var result = new JsonObject();
@@ -365,21 +341,6 @@ namespace FiftyOne.Pipeline.DerivedProperty.Data
             return result;
         }
 
-        private static JsonNode Value(
-            DerivedRuleValue value,
-            DerivedScript script)
-        {
-            if (value.IsAggregate)
-            {
-                var result = new JsonObject();
-                result.Add(
-                    NameOf(value.Aggregate.Value),
-                    Group(value.Group, script));
-                return result;
-            }
-            return new JsonLiteral(value.Literal);
-        }
-
         private static string NameOf(DerivedOperator op)
         {
             switch (op)
@@ -394,19 +355,13 @@ namespace FiftyOne.Pipeline.DerivedProperty.Data
                 case DerivedOperator.NotIn: return "NotIn";
                 case DerivedOperator.StartsWith: return "StartsWith";
                 case DerivedOperator.EndsWith: return "EndsWith";
-                case DerivedOperator.Contains: return "Contains";
-                default: return "Present";
+                default: return "Contains";
             }
         }
 
         private static string NameOf(DerivedAggregate aggregate)
         {
-            switch (aggregate)
-            {
-                case DerivedAggregate.Passed: return "Passed";
-                case DerivedAggregate.Failed: return "Failed";
-                default: return "Evaluated";
-            }
+            return aggregate == DerivedAggregate.Passed ? "Passed" : "Failed";
         }
 
         // ---------------------------------------------------------------

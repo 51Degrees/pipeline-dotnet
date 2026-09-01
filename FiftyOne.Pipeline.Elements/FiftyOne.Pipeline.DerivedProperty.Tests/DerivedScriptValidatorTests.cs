@@ -61,8 +61,6 @@ public class DerivedScriptValidatorTests
         "    - { Name: High, Description: High. }",
         "    - { Name: Low, Description: Low. }",
         "    - { Name: Unknown, Description: Unknown. }",
-        "Optional:",
-        "  - device.IsCrawler",
         "Checks:",
         "  NotCrawler: { Property: device.IsCrawler, Eq: false }",
         "Rules:",
@@ -127,92 +125,50 @@ public class DerivedScriptValidatorTests
         Assert.AreEqual("device", property.ElementDataKey);
         Assert.AreEqual("IsCrawler", property.PropertyName);
         Assert.AreEqual(DerivedValueType.Bool, property.ValueType);
-        Assert.IsFalse(property.Required);
     }
 
     /// <summary>
-    /// Each operator infers the type of the literal it is given, and a
-    /// property used only with Present has no inferred type.
+    /// Each operator infers the type of the literal it is given.
     /// </summary>
     [TestMethod]
     public void Validate_TypesAreInferred_FromTheLiteralComparedAgainst()
     {
-        var text = Good
-            .Replace(
-                "Optional:\n  - device.IsCrawler",
-                "Optional:\n  - device.IsCrawler\n  - device.Year\n" +
-                "  - device.Age\n  - device.Name\n  - device.Seen",
-                StringComparison.Ordinal)
-            .Replace(
-                "  NotCrawler: { Property: device.IsCrawler, Eq: false }",
-                "  NotCrawler: { Property: device.IsCrawler, Eq: false }\n" +
-                "  Year:  { Property: device.Year, Gt: 0 }\n" +
-                "  Age:   { Property: device.Age, Lt: 2.5 }\n" +
-                "  Name:  { Property: device.Name, StartsWith: \"Chr\" }\n" +
-                "  Seen:  { Property: device.Seen, Present: true }",
-                StringComparison.Ordinal);
+        var text = Replace(
+            "  NotCrawler: { Property: device.IsCrawler, Eq: false }",
+            "  NotCrawler: { Property: device.IsCrawler, Eq: false }\n" +
+            "  Year:  { Property: device.Year, Gt: 0 }\n" +
+            "  Age:   { Property: device.Age, Lt: 2.5 }\n" +
+            "  Name:  { Property: device.Name, StartsWith: \"Chr\" }");
 
         var result = DerivedScriptValidator.Validate(text, "Example", "test");
 
         AssertNoFaults(result);
         var types = result.Script.Properties.ToDictionary(
             p => p.Name, p => p.ValueType);
-        Assert.HasCount(5, types);
+        Assert.HasCount(4, types);
         Assert.AreEqual(DerivedValueType.Bool, types["device.IsCrawler"]);
         Assert.AreEqual(DerivedValueType.Int, types["device.Year"]);
         Assert.AreEqual(DerivedValueType.Double, types["device.Age"]);
         Assert.AreEqual(DerivedValueType.String, types["device.Name"]);
-        Assert.IsNull(types["device.Seen"]);
-    }
-
-    /// <summary>
-    /// A property only ever asked about with Present needs no type.
-    /// </summary>
-    [TestMethod]
-    public void Validate_APropertyUsedOnlyWithPresent_HasNoInferredType()
-    {
-        var text = Replace(
-            "{ Property: device.IsCrawler, Eq: false }",
-            "{ Property: device.IsCrawler, Present: true }");
-
-        var result = DerivedScriptValidator.Validate(text, "Example", "test");
-
-        AssertNoFaults(result);
-        Assert.IsNull(result.Script.Properties[0].ValueType);
-    }
-
-    /// <summary>
-    /// A property the script does not list under Optional is required, so
-    /// the pipeline check fails the build where nothing supplies it.
-    /// </summary>
-    [TestMethod]
-    public void Validate_APropertyNotListedUnderOptional_IsRequired()
-    {
-        var text = Good.Replace(
-            "Optional:\n  - device.IsCrawler\n",
-            string.Empty,
-            StringComparison.Ordinal);
-
-        var result = DerivedScriptValidator.Validate(text, "Example", "test");
-
-        AssertNoFaults(result);
-        Assert.IsTrue(result.Script.Properties[0].Required);
     }
 
     /// <summary>
     /// Property names are matched without regard to case, as the Pipeline
-    /// matches them elsewhere.
+    /// matches them elsewhere, so two conditions naming one property in
+    /// two letter cases name one source property.
     /// </summary>
     [TestMethod]
     public void Validate_PropertyNames_AreMatchedWithoutRegardToCase()
     {
-        var text = Replace("  - device.IsCrawler", "  - DEVICE.iscrawler");
+        var text = Replace(
+            "  - When: { Check: NotCrawler }",
+            "  - When: { Property: DEVICE.iscrawler, Eq: false }");
 
         var result = DerivedScriptValidator.Validate(text, "Example", "test");
 
         AssertNoFaults(result);
-        Assert.IsFalse(result.Script.Properties[0].Required);
-        // The name kept is the one the check wrote, not the Optional entry.
+        Assert.HasCount(1, result.Script.Properties);
+        // The name kept is the one written first, being the check's.
         Assert.AreEqual("device.IsCrawler", result.Script.Properties[0].Name);
     }
 
@@ -235,43 +191,6 @@ public class DerivedScriptValidatorTests
     }
 
     /// <summary>
-    /// An aggregate is allowed as a rule value where the output is an int,
-    /// which is how a script exposes how much evidence it had.
-    /// </summary>
-    [TestMethod]
-    public void Validate_AnAggregateAsElse_IsAllowedWhereTheTypeIsInt()
-    {
-        var text = string.Join("\n", new[]
-        {
-            "",
-            "Format: 1",
-            "Name: Counter",
-            "Version: 1.0.0",
-            "Output:",
-            "  Name: Counter",
-            "  Description: The number of checks that could be evaluated.",
-            "  ValueType: int",
-            "  IsList: false",
-            "Optional:",
-            "  - device.IsCrawler",
-            "Checks:",
-            "  NotCrawler: { Property: device.IsCrawler, Eq: false }",
-            "Rules:",
-            "  - Else: { Evaluated: Checks }",
-            ""
-        });
-
-        var result = DerivedScriptValidator.Validate(text, "Counter", "test");
-
-        AssertNoFaults(result);
-        var value = result.Script.Rules[0].Value;
-        Assert.IsTrue(value.IsAggregate);
-        Assert.AreEqual(DerivedAggregate.Evaluated, value.Aggregate);
-        // A null group stands for every check.
-        Assert.IsNull(value.Group);
-    }
-
-    /// <summary>
     /// A JSON script and the YAML mirroring it build an equal model.
     /// </summary>
     [TestMethod]
@@ -286,7 +205,6 @@ public class DerivedScriptValidatorTests
             "{\"Name\":\"High\",\"Description\":\"High.\"}," +
             "{\"Name\":\"Low\",\"Description\":\"Low.\"}," +
             "{\"Name\":\"Unknown\",\"Description\":\"Unknown.\"}]}," +
-            "\"Optional\":[\"device.IsCrawler\"]," +
             "\"Checks\":{\"NotCrawler\":" +
             "{\"Property\":\"device.IsCrawler\",\"Eq\":false}}," +
             "\"Rules\":[{\"When\":{\"Check\":\"NotCrawler\"}," +
@@ -435,12 +353,8 @@ public class DerivedScriptValidatorTests
     public void Fault_AnOperatorNotAllowedOnTheInferredType()
     {
         var faults = FaultsOf(Replace(
-                "{ Property: device.IsCrawler, Eq: false }",
-                "{ Property: device.BrowserName, Gt: \"A\" }")
-            .Replace(
-                "  - device.IsCrawler",
-                "  - device.BrowserName",
-                StringComparison.Ordinal));
+            "{ Property: device.IsCrawler, Eq: false }",
+            "{ Property: device.BrowserName, Gt: \"A\" }"));
 
         AssertFault(
             faults,
@@ -554,31 +468,33 @@ public class DerivedScriptValidatorTests
         AssertFault(faults, "Rules[1]", "has both When and Else");
     }
 
-    /// <summary>An aggregate where the output is not a count.</summary>
+    /// <summary>
+    /// A Then that is a mapping rather than a literal. Then and Else are
+    /// literals of Output.ValueType and nothing else.
+    /// </summary>
     [TestMethod]
-    public void Fault_AnAggregateAsThenWhereTheValueTypeIsNotInt()
+    public void Fault_AThenThatIsNotALiteral()
     {
         var faults = FaultsOf(Replace(
-            "    Then: High", "    Then: { Evaluated: Checks }"));
+            "    Then: High", "    Then: { Passed: Checks }"));
 
         AssertFault(
             faults,
             "Rules[0].Then",
-            "an aggregate is only allowed where ValueType is int");
+            "a rule value is a literal of the output value type");
     }
 
-    /// <summary>An Optional entry that nothing in the script names.</summary>
+    /// <summary>
+    /// A Rules list whose last entry is not an Else. Every script ends in
+    /// an Else, so that a script always chooses a value once its source
+    /// properties have been read.
+    /// </summary>
     [TestMethod]
-    public void Fault_AnOptionalEntryNoConditionNames()
+    public void Fault_TheLastRuleIsNotAnElse()
     {
-        var faults = FaultsOf(Replace(
-            "  - device.IsCrawler",
-            "  - device.IsCrawler\n  - device.NeverUsed"));
+        var faults = FaultsOf(Replace("  - Else: Low\n", string.Empty));
 
-        AssertFault(
-            faults,
-            "Optional[1]",
-            "no check or rule names 'device.NeverUsed'");
+        AssertFault(faults, "Rules", "the last rule must be an Else");
     }
 
     /// <summary>Rules missing.</summary>
@@ -633,12 +549,8 @@ public class DerivedScriptValidatorTests
     public void Fault_AMixedTypeListLiteral()
     {
         var faults = FaultsOf(Replace(
-                "{ Property: device.IsCrawler, Eq: false }",
-                "{ Property: device.BrowserName, In: [\"Chrome\", 7] }")
-            .Replace(
-                "  - device.IsCrawler",
-                "  - device.BrowserName",
-                StringComparison.Ordinal));
+            "{ Property: device.IsCrawler, Eq: false }",
+            "{ Property: device.BrowserName, In: [\"Chrome\", 7] }"));
 
         AssertFault(faults, "Checks.NotCrawler.In", "every member of a list");
     }
@@ -911,8 +823,6 @@ public class DerivedScriptValidatorTests
             Assert.AreEqual(left.Properties[i].Name, right.Properties[i].Name);
             Assert.AreEqual(
                 left.Properties[i].ValueType, right.Properties[i].ValueType);
-            Assert.AreEqual(
-                left.Properties[i].Required, right.Properties[i].Required);
         }
 
         Assert.HasCount(left.Checks.Count, right.Checks);
@@ -928,11 +838,7 @@ public class DerivedScriptValidatorTests
         for (var i = 0; i < left.Rules.Count; i++)
         {
             Assert.AreEqual(left.Rules[i].IsElse, right.Rules[i].IsElse);
-            Assert.AreEqual(
-                left.Rules[i].Value.Literal, right.Rules[i].Value.Literal);
-            Assert.AreEqual(
-                left.Rules[i].Value.IsAggregate,
-                right.Rules[i].Value.IsAggregate);
+            Assert.AreEqual(left.Rules[i].Value, right.Rules[i].Value);
             Assert.AreEqual(
                 left.Rules[i].Condition == null,
                 right.Rules[i].Condition == null);

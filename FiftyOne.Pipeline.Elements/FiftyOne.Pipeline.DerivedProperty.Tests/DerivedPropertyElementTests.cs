@@ -261,7 +261,7 @@ public class DerivedPropertyElementTests
     public void Builder_BuildFromConfiguration()
     {
         var path = WriteScript(
-            "Configured", Script("Configured", "Configured"));
+            "Configured", SelfContainedScript("Configured", "Configured"));
 
         var elementOptions = new ElementOptions()
         {
@@ -321,8 +321,6 @@ public class DerivedPropertyElementTests
             "  Description: A script written with several faults.\n" +
             "  ValueType: string\n" +
             "  IsList: false\n" +
-            "Optional:\n" +
-            "  - a.P\n" +
             "Rules:\n" +
             "  - When: { Property: a.P, Nope: 1 }\n" +
             "    Then: High\n";
@@ -375,10 +373,10 @@ public class DerivedPropertyElementTests
     public void Element_KeyFilterAndSharedElementData()
     {
         using (var first = new DerivedPropertyElementBuilder(_loggerFactory)
-            .AddScript("First", Script("First", "FirstOutput"))
+            .AddScript("First", SelfContainedScript("First", "FirstOutput"))
             .Build())
         using (var second = new DerivedPropertyElementBuilder(_loggerFactory)
-            .AddScript("Second", Script("Second", "SecondOutput"))
+            .AddScript("Second", SelfContainedScript("Second", "SecondOutput"))
             .Build())
         {
             Assert.AreEqual("derived", first.ElementDataKey);
@@ -495,11 +493,10 @@ public class DerivedPropertyElementTests
             "      Description: The high value.\n" +
             "    - Name: Unknown\n" +
             "      Description: The unknown value.\n" +
-            "Optional:\n" +
-            "  - a.P\n" +
             "Rules:\n" +
             "  - When: { Property: a.P, Eq: true }\n" +
-            "    Then: High\n";
+            "    Then: High\n" +
+            "  - Else: Unknown\n";
 
         using (var element = new DerivedPropertyElementBuilder(_loggerFactory)
             .AddScript("Everything", text)
@@ -547,14 +544,16 @@ public class DerivedPropertyElementTests
     // -----------------------------------------------------------------
 
     /// <summary>
-    /// A required source property that nothing in the pipeline supplies
-    /// fails the pipeline build, naming the property.
+    /// A source property that nothing in the pipeline supplies fails the
+    /// pipeline build, naming the property. Every property a script names
+    /// is needed, so a pipeline that cannot supply one would produce no
+    /// value on every request.
     /// </summary>
     [TestMethod]
-    public void PipelineCheck_RequiredPropertyWithNoSupplierFails()
+    public void PipelineCheck_PropertyWithNoSupplierFails()
     {
         var element = new DerivedPropertyElementBuilder(_loggerFactory)
-            .AddScript("Strict", RequiredScript)
+            .AddScript("Strict", StrictScript)
             .Build();
         var builder = new PipelineBuilder(_loggerFactory)
             .AddFlowElement(element);
@@ -576,7 +575,7 @@ public class DerivedPropertyElementTests
     public void PipelineCheck_SupplierAfterTheElementIsNamed()
     {
         var element = new DerivedPropertyElementBuilder(_loggerFactory)
-            .AddScript("Strict", RequiredScript)
+            .AddScript("Strict", StrictScript)
             .Build();
         var builder = new PipelineBuilder(_loggerFactory)
             .AddFlowElement(element)
@@ -592,36 +591,36 @@ public class DerivedPropertyElementTests
     }
 
     /// <summary>
-    /// An optional source property that nothing supplies builds, says so
-    /// at information level, and is absent on every request.
+    /// A source property whose supplier is in the pipeline but which has
+    /// no value on a request leaves the derived property with no value,
+    /// and the message names the property. The pipeline builds, because
+    /// the element that supplies the property is there.
     /// </summary>
     [TestMethod]
-    public void PipelineCheck_OptionalPropertyWithNoSupplierIsLogged()
+    public void PipelineCheck_ASupplierWithNoValueLeavesNoValue()
     {
+        var declaringNothing = new StubSourceElement(
+            _loggerFactory.CreateLogger<
+                FlowElementBase<StubSourceData, ElementPropertyMetaData>>(),
+            "a",
+            new Dictionary<string, object>(),
+            new[] { "P" });
+
         using (var element = new DerivedPropertyElementBuilder(_loggerFactory)
             .AddScript("Loose", Script("Loose", "Loose"))
             .Build())
         using (var pipeline = new PipelineBuilder(_loggerFactory)
+            .AddFlowElement(declaringNothing)
             .AddFlowElement(element)
             .Build())
+        using (var data = pipeline.CreateFlowData())
         {
-            var lines = _loggerFactory.Loggers
-                .SelectMany(l => l.InfoEntries)
-                .Where(e => e.Contains("names the optional property"))
-                .ToList();
-            Assert.HasCount(1, lines);
-            Assert.Contains("'a.P'", lines[0]);
-
-            // Absent on every request, so the rule that needs it never
-            // matches and the Else supplies the answer.
-            for (var i = 0; i < 3; i++)
-            {
-                using (var data = pipeline.CreateFlowData())
-                {
-                    data.Process();
-                    Assert.AreEqual("Low", TextOf(data, "Loose"));
-                }
-            }
+            data.Process();
+            var derived = data.Get(
+                DerivedPropertyElement.DerivedElementDataKey);
+            var value = (IAspectPropertyValue)derived["Loose"];
+            Assert.IsFalse(value.HasValue);
+            Assert.Contains("'a.P'", value.NoValueMessage);
         }
     }
 
@@ -633,10 +632,10 @@ public class DerivedPropertyElementTests
     public void PipelineCheck_TwoElementsWritingTheSamePropertyFail()
     {
         var first = new DerivedPropertyElementBuilder(_loggerFactory)
-            .AddScript("First", Script("First", "Same"))
+            .AddScript("First", SelfContainedScript("First", "Same"))
             .Build();
         var second = new DerivedPropertyElementBuilder(_loggerFactory)
-            .AddScript("Second", Script("Second", "Same"))
+            .AddScript("Second", SelfContainedScript("Second", "Same"))
             .Build();
         var builder = new PipelineBuilder(_loggerFactory)
             .AddFlowElement(first)
@@ -740,8 +739,6 @@ public class DerivedPropertyElementTests
             "  Description: A script that should no longer be used.\n" +
             "  ValueType: string\n" +
             "  IsList: false\n" +
-            "Optional:\n" +
-            "  - a.P\n" +
             "Rules:\n" +
             "  - When: { Property: a.P, Eq: true }\n" +
             "    Then: High\n" +
@@ -792,8 +789,8 @@ public class DerivedPropertyElementTests
     // -----------------------------------------------------------------
 
     /// <summary>
-    /// A script whose only source property is optional, so an element
-    /// built from it can go into a pipeline on its own.
+    /// A script reading one source property, a.P, which a pipeline holding
+    /// an element built from it therefore has to supply.
     /// </summary>
     private static string Script(
         string name,
@@ -815,8 +812,6 @@ public class DerivedPropertyElementTests
             (category == null
                 ? string.Empty
                 : "  Category: " + category + "\n") +
-            "Optional:\n" +
-            "  - a.P\n" +
             "Rules:\n" +
             "  - When: { Property: a.P, Eq: true }\n" +
             "    Then: " + thenValue + "\n" +
@@ -824,16 +819,38 @@ public class DerivedPropertyElementTests
     }
 
     /// <summary>
-    /// A script whose source properties are all required, used by the
-    /// pipeline check tests.
+    /// A script naming no source property at all, so an element built from
+    /// it goes into a pipeline on its own. The single rule is an Else,
+    /// which every script ends in, so the answer is always the same.
     /// </summary>
-    private const string RequiredScript =
+    private static string SelfContainedScript(
+        string name,
+        string outputName)
+    {
+        return
+            "Format: 1\n" +
+            "Name: " + name + "\n" +
+            "Version: 1.0.0\n" +
+            "Output:\n" +
+            "  Name: " + outputName + "\n" +
+            "  Description: A property that reads no source property.\n" +
+            "  ValueType: string\n" +
+            "  IsList: false\n" +
+            "Rules:\n" +
+            "  - Else: Low\n";
+    }
+
+    /// <summary>
+    /// A script naming a source property the pipeline check tests leave
+    /// unsupplied.
+    /// </summary>
+    private const string StrictScript =
         "Format: 1\n" +
         "Name: Strict\n" +
         "Version: 1.0.0\n" +
         "Output:\n" +
         "  Name: Strict\n" +
-        "  Description: A property whose sources are all required.\n" +
+        "  Description: A property computed from a device property.\n" +
         "  ValueType: string\n" +
         "  IsList: false\n" +
         "Rules:\n" +

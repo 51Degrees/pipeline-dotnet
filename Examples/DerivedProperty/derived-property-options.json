@@ -22,7 +22,7 @@
           // this example does not depend on the content of another
           // repository.
           //
-          // "Scripts": "HumanConfidence,HumanConfidenceEvaluated",
+          // "Scripts": "HumanConfidence",
 
           // ScriptFiles names scripts in your own environment. A path
           // may hold a wildcard, so "scripts/*.yaml" adds every script

@@ -33,9 +33,6 @@ namespace FiftyOne.Pipeline.DerivedProperty.Data
         /// Create a new instance.
         /// </summary>
         /// <param name="name">The property in elementKey.PropertyName form.</param>
-        /// <param name="required">
-        /// False where the script lists the property under Optional.
-        /// </param>
         /// <param name="available">
         /// True where the property was there and could be read.
         /// </param>
@@ -45,13 +42,11 @@ namespace FiftyOne.Pipeline.DerivedProperty.Data
         /// </param>
         public DerivedTracedProperty(
             string name,
-            bool required,
             bool available,
             object value,
             string reason)
         {
             Name = name;
-            Required = required;
             Available = available;
             Value = value;
             Reason = reason;
@@ -59,11 +54,6 @@ namespace FiftyOne.Pipeline.DerivedProperty.Data
 
         /// <summary>The property in elementKey.PropertyName form.</summary>
         public string Name { get; }
-
-        /// <summary>
-        /// False where the script lists the property under Optional.
-        /// </summary>
-        public bool Required { get; }
 
         /// <summary>
         /// True where the property was there and could be read.
@@ -89,7 +79,7 @@ namespace FiftyOne.Pipeline.DerivedProperty.Data
         /// </summary>
         /// <param name="name">The name the script gave the check.</param>
         /// <param name="state">What the check answered.</param>
-        public DerivedTracedCheck(string name, DerivedState state)
+        public DerivedTracedCheck(string name, bool state)
         {
             Name = name;
             State = state;
@@ -99,7 +89,7 @@ namespace FiftyOne.Pipeline.DerivedProperty.Data
         public string Name { get; }
 
         /// <summary>What the check answered.</summary>
-        public DerivedState State { get; }
+        public bool State { get; }
     }
 
     /// <summary>
@@ -125,14 +115,14 @@ namespace FiftyOne.Pipeline.DerivedProperty.Data
         public IReadOnlyList<DerivedTracedProperty> Properties => _properties;
 
         /// <summary>
-        /// Every check, in script order. Empty where a required property
-        /// was missing, because the checks are then never reached.
+        /// Every check, in script order. Empty where a source property was
+        /// missing, because the checks are then never reached.
         /// </summary>
         public IReadOnlyList<DerivedTracedCheck> Checks => _checks;
 
         /// <summary>
-        /// Which rule supplied the answer, by index, or null where no rule
-        /// matched.
+        /// Which rule supplied the answer, by index, or null where a source
+        /// property was missing and no rule was reached.
         /// </summary>
         public int? MatchedRule { get; private set; }
 
@@ -140,12 +130,6 @@ namespace FiftyOne.Pipeline.DerivedProperty.Data
         /// True where the rule that matched was the Else.
         /// </summary>
         public bool MatchedElse { get; private set; }
-
-        /// <summary>
-        /// True where no rule matched and the answer came from
-        /// Output.DefaultValue.
-        /// </summary>
-        public bool UsedDefault { get; private set; }
 
         /// <summary>
         /// The message saying why there is no value, where there is none.
@@ -170,7 +154,6 @@ namespace FiftyOne.Pipeline.DerivedProperty.Data
             {
                 _properties.Add(new DerivedTracedProperty(
                     script.Properties[i].Name,
-                    script.Properties[i].Required,
                     context.Available[i],
                     context.Available[i] ? context.Values[i] : null,
                     context.Reasons[i]));
@@ -207,15 +190,6 @@ namespace FiftyOne.Pipeline.DerivedProperty.Data
         {
             MatchedRule = index;
             MatchedElse = isElse;
-        }
-
-        /// <summary>
-        /// Record that the answer came from Output.DefaultValue because no
-        /// rule matched. Called by the evaluator.
-        /// </summary>
-        public void SetDefault()
-        {
-            UsedDefault = true;
         }
 
         /// <summary>

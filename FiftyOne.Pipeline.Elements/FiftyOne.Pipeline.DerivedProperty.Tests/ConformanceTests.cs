@@ -430,13 +430,13 @@ public class ConformanceTests
         if (expect.Has("Missing"))
         {
             // The element hands back one value that has no value, and the
-            // message names every required property that was not available,
+            // message names every source property that was not available,
             // so the names are looked for in the message.
             if (produced.HasValue)
             {
                 report.ValueFailures.Add(string.Format(
                     CultureInfo.InvariantCulture,
-                    "{0}expected no value because a required property was " +
+                    "{0}expected no value because a source property was " +
                     "not available, but got '{1}'",
                     prefix,
                     Convert.ToString(
@@ -469,22 +469,8 @@ public class ConformanceTests
             return;
         }
 
-        if (expect.Has("NoMatch"))
-        {
-            if (produced.HasValue)
-            {
-                report.ValueFailures.Add(string.Format(
-                    CultureInfo.InvariantCulture,
-                    "{0}expected no rule to match but got '{1}'",
-                    prefix,
-                    Convert.ToString(
-                        produced.Value, CultureInfo.InvariantCulture)));
-            }
-            return;
-        }
-
         report.ValueFailures.Add(
-            prefix + "has an Expect that is not Value, Missing or NoMatch");
+            prefix + "has an Expect that is not Value or Missing");
     }
 
     // -------------------------------------------------------------------
@@ -540,10 +526,17 @@ public class ConformanceTests
     }
 
     /// <summary>
-    /// One source element per element data key the case names. Each element
-    /// declares every property of the script that comes from that key, even
-    /// where the case gives no value for the property, so the pipeline sees
-    /// the property as supplied and only the value is absent.
+    /// One source element per element data key the script names, whether or
+    /// not the case gives any value for that key. Each element declares
+    /// every property of the script that comes from its key and publishes
+    /// only the values the case gives, so the pipeline sees every property
+    /// as supplied and a case that leaves one out exercises the value being
+    /// absent on the request.
+    ///
+    /// A property with no supplier anywhere in the pipeline is a pipeline
+    /// build failure rather than an absent value, which is a rule about
+    /// assembling a pipeline rather than about evaluating a script, so the
+    /// shared cases do not cover it and DerivedPropertyElementTests does.
     /// </summary>
     private static List<IFlowElement> BuildSources(
         DerivedScript script,
@@ -551,6 +544,16 @@ public class ConformanceTests
     {
         var byKey = new Dictionary<string, Dictionary<string, object>>(
             StringComparer.OrdinalIgnoreCase);
+        foreach (var property in script.Properties)
+        {
+            if (byKey.ContainsKey(property.ElementDataKey) == false)
+            {
+                byKey.Add(
+                    property.ElementDataKey,
+                    new Dictionary<string, object>(
+                        StringComparer.OrdinalIgnoreCase));
+            }
+        }
         foreach (var property in properties)
         {
             var dot = property.Key.IndexOf('.');

@@ -27,26 +27,6 @@ using System.Globalization;
 namespace FiftyOne.Pipeline.DerivedProperty.Data
 {
     /// <summary>
-    /// The answer a condition can give. A condition is unknown where a
-    /// property the condition needs was not available, which is different
-    /// from the condition being false.
-    /// </summary>
-    public enum DerivedState
-    {
-        /// <summary>
-        /// A property the condition needs was not available, so the
-        /// condition could not be answered.
-        /// </summary>
-        Unknown = 0,
-
-        /// <summary>The condition does not hold.</summary>
-        False = 1,
-
-        /// <summary>The condition holds.</summary>
-        True = 2
-    }
-
-    /// <summary>
     /// What one request supplies to a condition, being the converted value
     /// of every source property and the answer of every check evaluated so
     /// far. One instance belongs to one request on one thread, and nothing
@@ -64,7 +44,7 @@ namespace FiftyOne.Pipeline.DerivedProperty.Data
             Available = new bool[slotCount];
             Values = new object[slotCount];
             Reasons = new string[slotCount];
-            Checks = new DerivedState[checkCount];
+            Checks = new bool[checkCount];
         }
 
         /// <summary>
@@ -86,13 +66,16 @@ namespace FiftyOne.Pipeline.DerivedProperty.Data
         /// <summary>
         /// The answer of each check, filled in before the rules are read.
         /// </summary>
-        public DerivedState[] Checks { get; }
+        public bool[] Checks { get; }
     }
 
     /// <summary>
     /// A condition in a script, compiled into a small object that answers
     /// itself. Every instance is immutable once built, so one compiled
     /// script serves every request and every thread with no locking.
+    ///
+    /// Every condition is true or false, because the rules only run once
+    /// every source property the script names has been read.
     /// </summary>
     public abstract class DerivedCondition
     {
@@ -100,9 +83,8 @@ namespace FiftyOne.Pipeline.DerivedProperty.Data
         /// Answer the condition for one request.
         /// </summary>
         /// <param name="context">The values for this request.</param>
-        /// <returns>True, false, or unknown.</returns>
-        public abstract DerivedState Evaluate(
-            DerivedEvaluationContext context);
+        /// <returns>True where the condition holds.</returns>
+        public abstract bool Evaluate(DerivedEvaluationContext context);
     }
 
     /// <summary>
@@ -171,16 +153,9 @@ namespace FiftyOne.Pipeline.DerivedProperty.Data
         public DerivedValueType ValueType => _valueType;
 
         /// <inheritdoc/>
-        public override DerivedState Evaluate(
-            DerivedEvaluationContext context)
+        public override bool Evaluate(DerivedEvaluationContext context)
         {
-            if (context.Available[_slot] == false)
-            {
-                return DerivedState.Unknown;
-            }
-            return Compare(context.Values[_slot])
-                ? DerivedState.True
-                : DerivedState.False;
+            return Compare(context.Values[_slot]);
         }
 
         private bool Compare(object value)
@@ -272,50 +247,6 @@ namespace FiftyOne.Pipeline.DerivedProperty.Data
     }
 
     /// <summary>
-    /// Asks whether a source property was available and valid, which is
-    /// always answerable and so is never unknown.
-    /// </summary>
-    public sealed class DerivedPresence : DerivedCondition
-    {
-        private readonly int _slot;
-        private readonly bool _expected;
-
-        /// <summary>
-        /// Create a new instance.
-        /// </summary>
-        /// <param name="slot">Which source property to read.</param>
-        /// <param name="expected">
-        /// True to hold where the property is available, false to hold where
-        /// the property is absent.
-        /// </param>
-        public DerivedPresence(int slot, bool expected)
-        {
-            _slot = slot;
-            _expected = expected;
-        }
-
-        /// <summary>
-        /// Which source property is read, by index.
-        /// </summary>
-        public int Slot => _slot;
-
-        /// <summary>
-        /// True where the condition holds when the property is available,
-        /// false where the condition holds when the property is absent.
-        /// </summary>
-        public bool Expected => _expected;
-
-        /// <inheritdoc/>
-        public override DerivedState Evaluate(
-            DerivedEvaluationContext context)
-        {
-            return context.Available[_slot] == _expected
-                ? DerivedState.True
-                : DerivedState.False;
-        }
-    }
-
-    /// <summary>
     /// Reuses the answer of a named check.
     /// </summary>
     public sealed class DerivedCheckReference : DerivedCondition
@@ -337,16 +268,14 @@ namespace FiftyOne.Pipeline.DerivedProperty.Data
         public int Index => _index;
 
         /// <inheritdoc/>
-        public override DerivedState Evaluate(
-            DerivedEvaluationContext context)
+        public override bool Evaluate(DerivedEvaluationContext context)
         {
             return context.Checks[_index];
         }
     }
 
     /// <summary>
-    /// Counts how many checks in a group passed, failed, or could be
-    /// evaluated at all.
+    /// Counts how many checks in a group passed or failed.
     /// </summary>
     public sealed class DerivedAggregateValue
     {
@@ -380,7 +309,7 @@ namespace FiftyOne.Pipeline.DerivedProperty.Data
         /// Take the count for one request.
         /// </summary>
         /// <param name="context">The values for this request.</param>
-        /// <returns>The count, which is always known.</returns>
+        /// <returns>The count.</returns>
         public int Count(DerivedEvaluationContext context)
         {
             var count = 0;
@@ -405,28 +334,15 @@ namespace FiftyOne.Pipeline.DerivedProperty.Data
             return count;
         }
 
-        private bool Counts(DerivedState state)
+        private bool Counts(bool state)
         {
-            // A check that could not be answered counts towards nothing.
-            if (state == DerivedState.Unknown)
-            {
-                return false;
-            }
-            switch (_aggregate)
-            {
-                case DerivedAggregate.Passed:
-                    return state == DerivedState.True;
-                case DerivedAggregate.Failed:
-                    return state == DerivedState.False;
-                default:
-                    return true;
-            }
+            return _aggregate == DerivedAggregate.Passed ? state : !state;
         }
     }
 
     /// <summary>
     /// Compares a count of checks against a whole number or against another
-    /// count. A count is always known, so this condition is never unknown.
+    /// count.
     /// </summary>
     public sealed class DerivedAggregateComparison : DerivedCondition
     {
@@ -479,16 +395,13 @@ namespace FiftyOne.Pipeline.DerivedProperty.Data
         public DerivedAggregateValue Right => _right;
 
         /// <inheritdoc/>
-        public override DerivedState Evaluate(
-            DerivedEvaluationContext context)
+        public override bool Evaluate(DerivedEvaluationContext context)
         {
             var left = _left.Count(context);
             var right = _right == null
                 ? _operand
                 : _right.Count(context);
-            return Holds(left, right)
-                ? DerivedState.True
-                : DerivedState.False;
+            return Holds(left, right);
         }
 
         private bool Holds(int left, int right)
@@ -512,8 +425,8 @@ namespace FiftyOne.Pipeline.DerivedProperty.Data
     }
 
     /// <summary>
-    /// Holds where every listed condition holds. False as soon as one is
-    /// false, and unknown where none is false but one could not be answered.
+    /// Holds where every listed condition holds, and is false as soon as one
+    /// is false.
     /// </summary>
     public sealed class DerivedAll : DerivedCondition
     {
@@ -532,30 +445,22 @@ namespace FiftyOne.Pipeline.DerivedProperty.Data
         public IReadOnlyList<DerivedCondition> Items => _items;
 
         /// <inheritdoc/>
-        public override DerivedState Evaluate(
-            DerivedEvaluationContext context)
+        public override bool Evaluate(DerivedEvaluationContext context)
         {
-            var unknown = false;
             for (var i = 0; i < _items.Length; i++)
             {
-                var state = _items[i].Evaluate(context);
-                if (state == DerivedState.False)
+                if (_items[i].Evaluate(context) == false)
                 {
-                    return DerivedState.False;
-                }
-                if (state == DerivedState.Unknown)
-                {
-                    unknown = true;
+                    return false;
                 }
             }
-            return unknown ? DerivedState.Unknown : DerivedState.True;
+            return true;
         }
     }
 
     /// <summary>
-    /// Holds where at least one listed condition holds. True as soon as one
-    /// is true, and unknown where none is true but one could not be
-    /// answered.
+    /// Holds where at least one listed condition holds, and is true as soon
+    /// as one is true.
     /// </summary>
     public sealed class DerivedAny : DerivedCondition
     {
@@ -574,29 +479,21 @@ namespace FiftyOne.Pipeline.DerivedProperty.Data
         public IReadOnlyList<DerivedCondition> Items => _items;
 
         /// <inheritdoc/>
-        public override DerivedState Evaluate(
-            DerivedEvaluationContext context)
+        public override bool Evaluate(DerivedEvaluationContext context)
         {
-            var unknown = false;
             for (var i = 0; i < _items.Length; i++)
             {
-                var state = _items[i].Evaluate(context);
-                if (state == DerivedState.True)
+                if (_items[i].Evaluate(context))
                 {
-                    return DerivedState.True;
-                }
-                if (state == DerivedState.Unknown)
-                {
-                    unknown = true;
+                    return true;
                 }
             }
-            return unknown ? DerivedState.Unknown : DerivedState.False;
+            return false;
         }
     }
 
     /// <summary>
-    /// Turns true into false and false into true. A condition that could not
-    /// be answered stays unanswered.
+    /// Turns true into false and false into true.
     /// </summary>
     public sealed class DerivedNot : DerivedCondition
     {
@@ -615,16 +512,9 @@ namespace FiftyOne.Pipeline.DerivedProperty.Data
         public DerivedCondition Item => _item;
 
         /// <inheritdoc/>
-        public override DerivedState Evaluate(
-            DerivedEvaluationContext context)
+        public override bool Evaluate(DerivedEvaluationContext context)
         {
-            var state = _item.Evaluate(context);
-            switch (state)
-            {
-                case DerivedState.True: return DerivedState.False;
-                case DerivedState.False: return DerivedState.True;
-                default: return DerivedState.Unknown;
-            }
+            return _item.Evaluate(context) == false;
         }
     }
 }

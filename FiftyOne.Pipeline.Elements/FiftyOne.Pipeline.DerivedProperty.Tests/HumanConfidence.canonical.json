@@ -15,9 +15,6 @@
     "ExportValues": true,
     "Dependencies": [
       "device.IsCrawler",
-      "device.IsHeadless",
-      "device.WebDriver",
-      "device.IsVisible",
       "device.BrowserReleaseYear",
       "device.BrowserReleaseAge",
       "ip.HumanProbability"
@@ -41,61 +38,24 @@
       }
     ]
   },
-  "Optional": [
-    "device.IsCrawler",
-    "device.IsHeadless",
-    "device.WebDriver",
-    "device.IsVisible",
-    "device.BrowserReleaseYear",
-    "device.BrowserReleaseAge",
-    "ip.HumanProbability"
-  ],
   "Properties": {
     "device.IsCrawler": {
-      "Type": "bool",
-      "Required": false
-    },
-    "device.IsHeadless": {
-      "Type": "bool",
-      "Required": false
-    },
-    "device.WebDriver": {
-      "Type": "string",
-      "Required": false
-    },
-    "device.IsVisible": {
-      "Type": "bool",
-      "Required": false
+      "Type": "bool"
     },
     "device.BrowserReleaseYear": {
-      "Type": "int",
-      "Required": false
+      "Type": "int"
     },
     "device.BrowserReleaseAge": {
-      "Type": "int",
-      "Required": false
+      "Type": "int"
     },
     "ip.HumanProbability": {
-      "Type": "int",
-      "Required": false
+      "Type": "int"
     }
   },
   "Checks": {
     "NotCrawler": {
       "Property": "device.IsCrawler",
       "Eq": false
-    },
-    "NotHeadless": {
-      "Property": "device.IsHeadless",
-      "Eq": false
-    },
-    "NoWebDriver": {
-      "Property": "device.WebDriver",
-      "Eq": "None"
-    },
-    "Visible": {
-      "Property": "device.IsVisible",
-      "Eq": true
     },
     "Current": {
       "All": [
@@ -124,30 +84,8 @@
     },
     {
       "When": {
-        "Property": "device.IsHeadless",
-        "Eq": true
-      },
-      "Then": "Low"
-    },
-    {
-      "When": {
-        "Evaluated": "Checks",
+        "Failed": "Checks",
         "Eq": 0
-      },
-      "Then": "Unknown"
-    },
-    {
-      "When": {
-        "All": [
-          {
-            "Failed": "Checks",
-            "Eq": 0
-          },
-          {
-            "Evaluated": "Checks",
-            "Ge": 4
-          }
-        ]
       },
       "Then": "High"
     },

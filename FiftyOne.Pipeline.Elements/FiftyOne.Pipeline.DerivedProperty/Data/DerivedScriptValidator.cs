@@ -88,7 +88,7 @@ namespace FiftyOne.Pipeline.DerivedProperty.Data
         private static readonly string[] _topLevelKeys =
         {
             "Format", "Name", "Version", "Deprecated", "DeprecationNote",
-            "Output", "Optional", "Checks", "Rules"
+            "Output", "Checks", "Rules"
         };
 
         private static readonly string[] _outputKeys =
@@ -188,9 +188,8 @@ namespace FiftyOne.Pipeline.DerivedProperty.Data
         private sealed class PropertyUse
         {
             public string Name { get; set; }
-            public DerivedValueType? ValueType { get; set; }
+            public DerivedValueType ValueType { get; set; }
             public string TypePath { get; set; }
-            public bool Required { get; set; } = true;
             public int Slot { get; set; }
         }
 
@@ -216,14 +215,10 @@ namespace FiftyOne.Pipeline.DerivedProperty.Data
                 out var deprecated, out var deprecationNote);
             var output = ReadOutput(context, document);
 
-            // Checks are read before rules so a rule can name one, and the
-            // Optional list is applied last so that every source property a
-            // condition names has already been seen.
-            var optional = ReadOptional(context, document);
+            // Checks are read before rules so that a rule can name one.
             ReadCheckNames(context, document);
-            var checks = ReadChecks(context, document, output);
+            var checks = ReadChecks(context, document);
             var rules = ReadRules(context, document, output);
-            ApplyOptional(context, optional);
 
             var properties = context.Order
                 .Select(p => MakeSourceProperty(p))
@@ -256,8 +251,7 @@ namespace FiftyOne.Pipeline.DerivedProperty.Data
                 use.Name,
                 use.Name.Substring(0, dot),
                 use.Name.Substring(dot + 1),
-                use.ValueType,
-                use.Required);
+                use.ValueType);
         }
 
         private static DerivedPropertyMetaData WithDependencies(
@@ -890,79 +884,8 @@ namespace FiftyOne.Pipeline.DerivedProperty.Data
         }
 
         // ---------------------------------------------------------------
-        // Optional, checks and rules.
+        // Checks and rules.
         // ---------------------------------------------------------------
-
-        private sealed class OptionalEntry
-        {
-            public string Path { get; set; }
-            public string Name { get; set; }
-            public DerivedNode Node { get; set; }
-        }
-
-        private static List<OptionalEntry> ReadOptional(
-            Context context,
-            DerivedMapping document)
-        {
-            var entries = new List<OptionalEntry>();
-            var node = document.Get("Optional");
-            if (node == null)
-            {
-                return entries;
-            }
-            if (!(node is DerivedSequence sequence))
-            {
-                context.Fault("Optional", node, string.Format(
-                    CultureInfo.InvariantCulture,
-                    "Optional expected a list of source properties, found {0}",
-                    Describe(node)));
-                return entries;
-            }
-            for (var i = 0; i < sequence.Items.Count; i++)
-            {
-                var path = string.Format(
-                    CultureInfo.InvariantCulture, "Optional[{0}]", i);
-                var item = sequence.Items[i];
-                if (!(item is DerivedScalar scalar) ||
-                    !(scalar.Value is string value))
-                {
-                    context.Fault(path, item, string.Format(
-                        CultureInfo.InvariantCulture,
-                        "Optional expected a source property name, found {0}",
-                        Describe(item)));
-                    continue;
-                }
-                if (_sourceProperty.IsMatch(value) == false)
-                {
-                    context.Fault(path, item, string.Format(
-                        CultureInfo.InvariantCulture,
-                        "'{0}' is not a source property. Write it as " +
-                        "elementKey.PropertyName, for example " +
-                        "device.IsCrawler",
-                        value));
-                    continue;
-                }
-                entries.Add(new OptionalEntry
-                {
-                    Path = path,
-                    Name = value,
-                    Node = item
-                });
-            }
-
-            var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-            foreach (var entry in entries)
-            {
-                if (seen.Add(entry.Name) == false)
-                {
-                    context.Fault(entry.Path, entry.Node, string.Format(
-                        CultureInfo.InvariantCulture,
-                        "'{0}' is listed more than once under Optional",
-                        entry.Name));
-                }
-            }
-            return entries;
-        }
 
         private static void ReadCheckNames(
             Context context,
@@ -998,8 +921,7 @@ namespace FiftyOne.Pipeline.DerivedProperty.Data
 
         private static IReadOnlyList<DerivedCheck> ReadChecks(
             Context context,
-            DerivedMapping document,
-            DerivedPropertyMetaData output)
+            DerivedMapping document)
         {
             var result = new List<DerivedCheck>();
             var node = document.Get("Checks") as DerivedMapping;
@@ -1041,6 +963,18 @@ namespace FiftyOne.Pipeline.DerivedProperty.Data
                 context.Fault("Rules", node,
                     "Rules must hold at least one rule");
                 return result;
+            }
+
+            // Every script ends in an Else, so a script always chooses a
+            // value once its source properties have been read and there is
+            // no runtime path for no rule having matched.
+            var last = sequence.Items[sequence.Items.Count - 1];
+            if (!(last is DerivedMapping lastEntry) ||
+                lastEntry.Has("Else") == false)
+            {
+                context.Fault("Rules", node,
+                    "the last rule must be an Else, which is what a script " +
+                    "falls back to when no earlier rule matched");
             }
 
             for (var i = 0; i < sequence.Items.Count; i++)
@@ -1113,43 +1047,39 @@ namespace FiftyOne.Pipeline.DerivedProperty.Data
             return result;
         }
 
-        private static DerivedRuleValue ReadRuleValue(
+        /// <summary>
+        /// Reads a Then or an Else, which is a literal of Output.ValueType
+        /// and must be one of Output.Values where that list is given.
+        /// </summary>
+        private static object ReadRuleValue(
             Context context,
             DerivedNode node,
             string path,
             DerivedNode parent,
             DerivedPropertyMetaData output)
         {
-            if (node is DerivedMapping mapping)
+            if (node is DerivedScalar scalar == false)
             {
-                var aggregate = ReadAggregateValue(context, mapping, path);
-                if (aggregate == null)
+                if (node == null)
                 {
-                    context.Fault(path, node, string.Format(
-                        CultureInfo.InvariantCulture,
-                        "expected a {0} to match Output.ValueType, found {1}",
-                        DerivedValueConverter.NameOf(output.ValueType),
-                        Describe(node)));
-                    return DerivedRuleValue.FromLiteral(null);
+                    context.Fault(path, parent,
+                        "a rule value is a null literal, which format 1 does " +
+                        "not allow");
+                    return null;
                 }
-                if (output.ValueType != DerivedValueType.Int)
-                {
-                    context.Fault(path, node, string.Format(
-                        CultureInfo.InvariantCulture,
-                        "an aggregate is only allowed where ValueType is " +
-                        "int, not {0}",
-                        DerivedValueConverter.NameOf(output.ValueType)));
-                    return DerivedRuleValue.FromLiteral(null);
-                }
-                return aggregate;
+                context.Fault(path, node, string.Format(
+                    CultureInfo.InvariantCulture,
+                    "a rule value is a literal of the output value type, " +
+                    "found {0}",
+                    Describe(node)));
+                return null;
             }
-
-            if (!(node is DerivedScalar scalar) || scalar.Value == null)
+            if (scalar.Value == null)
             {
-                context.Fault(path, node ?? parent,
+                context.Fault(path, node,
                     "a rule value is a null literal, which format 1 does " +
                     "not allow");
-                return DerivedRuleValue.FromLiteral(null);
+                return null;
             }
 
             var literalType = InferType(scalar.Value);
@@ -1160,7 +1090,7 @@ namespace FiftyOne.Pipeline.DerivedProperty.Data
                     "expected a {0} to match Output.ValueType, found {1}",
                     DerivedValueConverter.NameOf(output.ValueType),
                     Describe(node)));
-                return DerivedRuleValue.FromLiteral(null);
+                return null;
             }
 
             var text = Convert.ToString(
@@ -1175,7 +1105,7 @@ namespace FiftyOne.Pipeline.DerivedProperty.Data
                     "Output.Values ({1})",
                     text,
                     string.Join(", ", output.Values.Select(v => v.Name))));
-                return DerivedRuleValue.FromLiteral(null);
+                return null;
             }
 
             // A whole number written for a double output stands for the
@@ -1183,61 +1113,9 @@ namespace FiftyOne.Pipeline.DerivedProperty.Data
             if (output.ValueType == DerivedValueType.Double &&
                 scalar.Value is int wholeNumber)
             {
-                return DerivedRuleValue.FromLiteral((double)wholeNumber);
+                return (double)wholeNumber;
             }
-            return DerivedRuleValue.FromLiteral(scalar.Value);
-        }
-
-        private static DerivedRuleValue ReadAggregateValue(
-            Context context,
-            DerivedMapping mapping,
-            string path)
-        {
-            var aggregateKeys = mapping.Names
-                .Where(n => _aggregateNames.Any(
-                    a => string.Equals(
-                        a, n, StringComparison.OrdinalIgnoreCase)))
-                .ToList();
-            if (aggregateKeys.Count == 0)
-            {
-                return null;
-            }
-            if (mapping.Names.Count != 1)
-            {
-                context.Fault(path, mapping, string.Format(
-                    CultureInfo.InvariantCulture,
-                    "an aggregate value expects exactly one key, found {0}",
-                    string.Join(", ", mapping.Names)));
-                return DerivedRuleValue.FromAggregate(
-                    DerivedAggregate.Evaluated, null);
-            }
-            var aggregate = ParseAggregate(aggregateKeys[0]);
-            var group = ReadGroup(
-                context,
-                mapping.Get(aggregateKeys[0]),
-                path + "." + aggregate,
-                mapping);
-            return DerivedRuleValue.FromAggregate(aggregate, group);
-        }
-
-        private static void ApplyOptional(
-            Context context,
-            List<OptionalEntry> optional)
-        {
-            foreach (var entry in optional)
-            {
-                if (context.Properties.TryGetValue(
-                    entry.Name, out var property) == false)
-                {
-                    context.Fault(entry.Path, entry.Node, string.Format(
-                        CultureInfo.InvariantCulture,
-                        "no check or rule names '{0}', so listing it under " +
-                        "Optional has no effect",
-                        entry.Name));
-                    continue;
-                }
-                property.Required = false;
-            }
+            return scalar.Value;
         }
 
         // ---------------------------------------------------------------
@@ -1413,23 +1291,6 @@ namespace FiftyOne.Pipeline.DerivedProperty.Data
             var op = ParseOperator(known[0]);
             var operandNode = mapping.Get(known[0]);
 
-            if (op == DerivedOperator.Present)
-            {
-                if (!(operandNode is DerivedScalar presentScalar) ||
-                    !(presentScalar.Value is bool expected))
-                {
-                    context.Fault(path + ".Present", operandNode ?? mapping,
-                        string.Format(
-                            CultureInfo.InvariantCulture,
-                            "Present expects true or false, found {0}",
-                            Describe(operandNode)));
-                    return _unreadable;
-                }
-                var presentSlot = UseProperty(
-                    context, property, null, path, mapping);
-                return new DerivedPresence(presentSlot, expected);
-            }
-
             if (op == DerivedOperator.In || op == DerivedOperator.NotIn)
             {
                 return ReadMembership(
@@ -1467,7 +1328,8 @@ namespace FiftyOne.Pipeline.DerivedProperty.Data
                 return _unreadable;
             }
 
-            var slot = UseProperty(context, property, type, path, mapping);
+            var slot = UseProperty(
+                context, property, type.Value, path, mapping);
             return new DerivedComparison(
                 slot, op, operandScalar.Value, null, type.Value);
         }
@@ -1658,8 +1520,7 @@ namespace FiftyOne.Pipeline.DerivedProperty.Data
             }
             var op = ParseOperator(operatorKeys[0]);
             if (IsAllowed(op, DerivedValueType.Int) == false ||
-                op == DerivedOperator.In || op == DerivedOperator.NotIn ||
-                op == DerivedOperator.Present)
+                op == DerivedOperator.In || op == DerivedOperator.NotIn)
             {
                 context.Fault(path, mapping, string.Format(
                     CultureInfo.InvariantCulture,
@@ -1682,7 +1543,7 @@ namespace FiftyOne.Pipeline.DerivedProperty.Data
                     context.Fault(path + "." + op, nested, string.Format(
                         CultureInfo.InvariantCulture,
                         "an aggregate is compared with an integer or " +
-                        "another aggregate such as {{ Evaluated: Checks }}, " +
+                        "another aggregate such as {{ Failed: Checks }}, " +
                         "found {0}",
                         string.Join(", ", nested.Names)));
                     return _unreadable;
@@ -1790,7 +1651,7 @@ namespace FiftyOne.Pipeline.DerivedProperty.Data
         private static int UseProperty(
             Context context,
             string name,
-            DerivedValueType? type,
+            DerivedValueType type,
             string path,
             DerivedNode node)
         {
@@ -1800,33 +1661,24 @@ namespace FiftyOne.Pipeline.DerivedProperty.Data
                 {
                     Name = name,
                     ValueType = type,
-                    TypePath = type.HasValue ? path : null,
-                    Required = true,
+                    TypePath = path,
                     Slot = context.Order.Count
                 };
                 context.Properties.Add(name, use);
                 context.Order.Add(use);
                 return use.Slot;
             }
-            if (type.HasValue)
+            if (use.ValueType != type)
             {
-                if (use.ValueType.HasValue == false)
-                {
-                    use.ValueType = type;
-                    use.TypePath = path;
-                }
-                else if (use.ValueType.Value != type.Value)
-                {
-                    context.Fault(path, node, string.Format(
-                        CultureInfo.InvariantCulture,
-                        "'{0}' is inferred as {1} here but was already " +
-                        "inferred as {2} at {3}. Every use of a property " +
-                        "must infer the same type",
-                        name,
-                        DerivedValueConverter.NameOf(type.Value),
-                        DerivedValueConverter.NameOf(use.ValueType.Value),
-                        use.TypePath));
-                }
+                context.Fault(path, node, string.Format(
+                    CultureInfo.InvariantCulture,
+                    "'{0}' is inferred as {1} here but was already " +
+                    "inferred as {2} at {3}. Every use of a property " +
+                    "must infer the same type",
+                    name,
+                    DerivedValueConverter.NameOf(type),
+                    DerivedValueConverter.NameOf(use.ValueType),
+                    use.TypePath));
             }
             return use.Slot;
         }

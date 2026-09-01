@@ -83,34 +83,35 @@ namespace Examples.DerivedProperty
         /// <summary>
         /// The property the script held below writes.
         /// </summary>
-        private const string EvidenceProperty = "ReaderEngagementEvidence";
+        private const string EveryTestProperty = "ReaderEngagementIsHigh";
 
         /// <summary>
         /// A second script, held as text rather than in a file, to show
         /// that a script can come straight from your own code. The text is
         /// YAML here, and JSON is read just as well.
         ///
-        /// The script publishes how many of the tests could be answered on
-        /// the request, which is what the word Evaluated counts.
+        /// The script reads the same three source properties and publishes
+        /// whether every one of the tests passed, so an element can run
+        /// more than one script over one set of source properties.
         /// </summary>
-        private const string EvidenceScript = @"
+        private const string EveryTestScript = @"
 Format: 1
-Name: ReaderEngagementEvidence
+Name: ReaderEngagementIsHigh
 Version: ""1.0.0""
 Output:
-  Name: ReaderEngagementEvidence
-  Description: How many of the ReaderEngagement tests could be answered on this request.
-  ValueType: int
+  Name: ReaderEngagementIsHigh
+  Description: Whether every one of the ReaderEngagement tests passed on this request.
+  ValueType: bool
   IsList: false
   Category: Example
-Optional:
-  - session.PointerMoved
 Checks:
   SeveralPages: { Property: session.PagesViewed, Ge: 3 }
   LongEnough:   { Property: session.SecondsSincePageLoad, Ge: 30 }
   PointerMoved: { Property: session.PointerMoved, Eq: true }
 Rules:
-  - Else: { Evaluated: Checks }
+  - When: { Failed: Checks, Eq: 0 }
+    Then: true
+  - Else: false
 ";
 
         public static void Main(string[] args)
@@ -191,18 +192,23 @@ Rules:
 
                 Process(
                     pipeline,
-                    "Request 2, the optional source property absent.",
+                    "Request 2, one source property absent.",
                     5,
                     120,
                     null,
                     properties);
 
                 Console.WriteLine(
-                    "The answer falls from High to Medium because one of " +
-                    "the three tests");
+                    "The second request has no value at all, because a " +
+                    "property the script");
                 Console.WriteLine(
-                    "could not be answered, so the script had less " +
-                    "evidence to work from.");
+                    "names was not there. The message says which property " +
+                    "was missing and");
+                Console.WriteLine(
+                    "what the element that supplies it said, which is more " +
+                    "use than a");
+                Console.WriteLine(
+                    "confidence band resting on part of the evidence.");
                 Console.WriteLine();
 
                 PrintDefinitions(
@@ -231,7 +237,7 @@ Rules:
                 .AddScriptFile(ScriptFile)
                 // A script held as text in your own code. The name given
                 // here must equal the Name the script itself carries.
-                .AddScript(EvidenceProperty, EvidenceScript)
+                .AddScript(EveryTestProperty, EveryTestScript)
                 // AddScript(BuiltInScript.Something) adds a script that
                 // ships inside the package. The scripts 51Degrees ships
                 // come from the derived-properties repository, and this
@@ -249,7 +255,7 @@ Rules:
                 var properties = new List<string>()
                 {
                     EngagementProperty,
-                    EvidenceProperty
+                    EveryTestProperty
                 };
 
                 Process(
@@ -262,18 +268,20 @@ Rules:
 
                 Process(
                     pipeline,
-                    "Request 2, the optional source property absent.",
+                    "Request 2, one source property absent.",
                     5,
                     120,
                     null,
                     properties);
 
                 Console.WriteLine(
-                    "ReaderEngagementEvidence counts the tests that could " +
-                    "be answered, which");
+                    "One element runs both scripts, so both properties are " +
+                    "written under");
                 Console.WriteLine(
-                    "puts a number on what the drop from High to Medium " +
-                    "rests on.");
+                    "the key derived, and both say the same thing about " +
+                    "the second request");
+                Console.WriteLine(
+                    "because they read the same source properties.");
                 Console.WriteLine();
             }
         }

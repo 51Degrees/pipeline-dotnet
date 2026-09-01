@@ -50,10 +50,13 @@ public class ConcurrencyAndPerformanceTests
     public TestContext TestContext { get; set; }
 
     /// <summary>
-    /// The script the concurrency test and the fallback benchmark run. It
-    /// is the shape of HumanConfidence, being several named checks, an
-    /// aggregate over them and a run of rules, so the test exercises every
-    /// part of the evaluator rather than one comparison.
+    /// The script both tests run. It reads several source properties from
+    /// two elements, holds named checks, an aggregate over them and a run
+    /// of rules, so the tests exercise every part of the evaluator rather
+    /// than one comparison.
+    ///
+    /// Nothing here reads the derived-properties submodule, because a test
+    /// in this repository must not depend on the content of another one.
     /// </summary>
     private const string ScriptText =
         "Format: 1\n" +
@@ -63,7 +66,7 @@ public class ConcurrencyAndPerformanceTests
         "  Name: Confidence\n" +
         "  Description: The confidence that a human is viewing the page.\n" +
         "  ValueType: string\n" +
-        "  DefaultValue: Unknown\n" +
+        "  DefaultValue: Low\n" +
         "  IsList: false\n" +
         "  Category: General\n" +
         "  Values:\n" +
@@ -73,19 +76,8 @@ public class ConcurrencyAndPerformanceTests
         "      Description: Mixed evidence.\n" +
         "    - Name: Low\n" +
         "      Description: Almost certainly no human.\n" +
-        "    - Name: Unknown\n" +
-        "      Description: Not enough evidence.\n" +
-        "Optional:\n" +
-        "  - device.IsCrawler\n" +
-        "  - device.IsHeadless\n" +
-        "  - device.WebDriver\n" +
-        "  - device.IsVisible\n" +
-        "  - device.BrowserReleaseYear\n" +
-        "  - device.BrowserReleaseAge\n" +
-        "  - ip.HumanProbability\n" +
         "Checks:\n" +
         "  NotCrawler:  { Property: device.IsCrawler,  Eq: false }\n" +
-        "  NotHeadless: { Property: device.IsHeadless, Eq: false }\n" +
         "  NoWebDriver: { Property: device.WebDriver,  Eq: \"None\" }\n" +
         "  Visible:     { Property: device.IsVisible,  Eq: true }\n" +
         "  Current:\n" +
@@ -96,14 +88,7 @@ public class ConcurrencyAndPerformanceTests
         "Rules:\n" +
         "  - When: { Property: device.IsCrawler,  Eq: true }\n" +
         "    Then: Low\n" +
-        "  - When: { Property: device.IsHeadless, Eq: true }\n" +
-        "    Then: Low\n" +
-        "  - When: { Evaluated: Checks, Eq: 0 }\n" +
-        "    Then: Unknown\n" +
-        "  - When:\n" +
-        "      All:\n" +
-        "        - { Failed: Checks, Eq: 0 }\n" +
-        "        - { Evaluated: Checks, Ge: 4 }\n" +
+        "  - When: { Failed: Checks, Eq: 0 }\n" +
         "    Then: High\n" +
         "  - When: { Failed: Checks, Le: 1 }\n" +
         "    Then: Medium\n" +
@@ -199,18 +184,11 @@ public class ConcurrencyAndPerformanceTests
         const int warmUp = 20000;
         const int iterations = 200000;
 
-        var path = FindHumanConfidenceScript();
-        var text = path == null ? ScriptText : File.ReadAllText(path);
-        var name = path == null
-            ? "Confidence"
-            : Path.GetFileNameWithoutExtension(path);
-        var source = path ?? "the inline script of the same shape";
-
         // As above, a logger that records nothing, so the timing is of
         // the element rather than of the log.
         var loggerFactory = NullLoggerFactory.Instance;
         using (var element = new DerivedPropertyElementBuilder(loggerFactory)
-            .AddScript(name, text)
+            .AddScript("Confidence", ScriptText)
             .Build())
         using (var pipeline = BuildPipeline(loggerFactory, element))
         using (var data = pipeline.CreateFlowData())
@@ -239,8 +217,6 @@ public class ConcurrencyAndPerformanceTests
                 "Derived property element benchmark");
             TestContext.WriteLine(
                 "  Script            {0}", element.Scripts[0].Name);
-            TestContext.WriteLine(
-                "  Script source     {0}", source);
             TestContext.WriteLine(
                 "  Warm up           {0} requests",
                 warmUp.ToString("N0", CultureInfo.InvariantCulture));
@@ -300,7 +276,7 @@ public class ConcurrencyAndPerformanceTests
                     { "IsCrawler", false },
                     { "WebDriver", "None" },
                     { "IsVisible", true },
-                    { "BrowserReleaseYear", 2025 },
+                    { "BrowserReleaseYear", 2026 },
                     { "BrowserReleaseAge", 1 }
                 }))
             .AddFlowElement(Source(loggerFactory, "ip",
@@ -338,31 +314,5 @@ public class ConcurrencyAndPerformanceTests
             var value = (IAspectPropertyValue)derived["Confidence"];
             return value.HasValue ? (string)value.Value : null;
         }
-    }
-
-    /// <summary>
-    /// The HumanConfidence script in the derived-properties submodule,
-    /// found by walking up from the test assembly, or null where the
-    /// submodule is not checked out on this machine.
-    /// </summary>
-    private static string FindHumanConfidenceScript()
-    {
-        var relative = Path.Combine(
-            "FiftyOne.Pipeline.Elements",
-            "FiftyOne.Pipeline.DerivedProperty",
-            "Scripts",
-            "scripts",
-            "HumanConfidence.yaml");
-        var folder = new DirectoryInfo(AppContext.BaseDirectory);
-        while (folder != null)
-        {
-            var candidate = Path.Combine(folder.FullName, relative);
-            if (File.Exists(candidate))
-            {
-                return candidate;
-            }
-            folder = folder.Parent;
-        }
-        return null;
     }
 }
