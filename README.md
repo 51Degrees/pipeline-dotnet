@@ -10,6 +10,7 @@
 | [![NuGet](https://img.shields.io/nuget/v/FiftyOne.Pipeline.Engines.svg)](https://www.nuget.org/packages/FiftyOne.Pipeline.Engines) | Engines | [![NuGet](https://img.shields.io/nuget/v/FiftyOne.Pipeline.JsonBuilder.svg)](https://www.nuget.org/packages/FiftyOne.Pipeline.JsonBuilder) | JsonBuilder |
 | [![NuGet](https://img.shields.io/nuget/v/FiftyOne.Pipeline.Engines.FiftyOne.svg)](https://www.nuget.org/packages/FiftyOne.Pipeline.Engines.FiftyOne) | Engines.FiftyOne | [![NuGet](https://img.shields.io/nuget/v/FiftyOne.Pipeline.Web.svg)](https://www.nuget.org/packages/FiftyOne.Pipeline.Web) | Web |
 | [![NuGet](https://img.shields.io/nuget/v/FiftyOne.Pipeline.Engines.TestHelpers.svg)](https://www.nuget.org/packages/FiftyOne.Pipeline.Engines.TestHelpers) | Engines.TestHelpers | [![NuGet](https://img.shields.io/nuget/v/FiftyOne.Pipeline.Web.Shared.svg)](https://www.nuget.org/packages/FiftyOne.Pipeline.Web.Shared) | Web.Shared |
+| [![NuGet](https://img.shields.io/nuget/v/FiftyOne.Pipeline.AgentSignature.svg)](https://www.nuget.org/packages/FiftyOne.Pipeline.AgentSignature) | AgentSignature | | |
 
 ## Introduction
 
