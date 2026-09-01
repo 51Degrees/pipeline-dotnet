@@ -100,4 +100,19 @@
   <data name="LogSharedSecretAlgorithm" xml:space="preserve">
     <value>A request was signed with the shared secret algorithm '{0}' using key id '{1}'. The Web Bot Auth protocol forbids shared secrets, so the signature was not verified. This points at a misconfigured agent and is worth an operator's attention.</value>
   </data>
+  <data name="NoValueDetailUnbound" xml:space="preserve">
+    <value>The signature covered nothing that ties it to this request, so it was not checked.</value>
+  </data>
+  <data name="NoValueDetailInlineDirectory" xml:space="preserve">
+    <value>The agent sent its key with the request rather than publishing it, which this element does not accept.</value>
+  </data>
+  <data name="ExceptionPeriodOutOfRange" xml:space="preserve">
+    <value>The period must not be negative and must not be longer than {0}.</value>
+  </data>
+  <data name="ExceptionCacheSizeTooSmall" xml:space="preserve">
+    <value>The cache must be allowed to hold at least one key directory.</value>
+  </data>
+  <data name="ExceptionMaxResponseBytesTooSmall" xml:space="preserve">
+    <value>The response limit must allow at least one byte to be read.</value>
+  </data>
 </root>

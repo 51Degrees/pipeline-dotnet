@@ -56,9 +56,9 @@ namespace FiftyOne.Pipeline.AgentSignature.Keys
     /// keeps running, so that the next request from the same agent finds the
     /// result. This follows the cloud ConfigurationElement, which does the
     /// same thing with a LoadingDictionary from the FiftyOne.Caching
-    /// package. That class has no bound on its size, which is why this
-    /// element wraps a least recently used cache around the same
-    /// single-start trick rather than using it directly.
+    /// package. LoadingDictionary has no bound on its size, so this element
+    /// wraps a least recently used cache around the same way of starting
+    /// one fetch rather than using LoadingDictionary itself.
     /// </remarks>
     internal sealed class DirectoryCache : IDisposable
     {
@@ -75,7 +75,7 @@ namespace FiftyOne.Pipeline.AgentSignature.Keys
         /// The number of fetches that have been started. The tests read this
         /// to check that one agent causes one fetch.
         /// </summary>
-        public int FetchCount => _fetchCount;
+        public int FetchCount => Volatile.Read(ref _fetchCount);
 
         private int _fetchCount;
 
@@ -268,17 +268,18 @@ namespace FiftyOne.Pipeline.AgentSignature.Keys
                 var task = current.Value;
                 if (task.IsCompleted == false)
                 {
-                    return Wait(current, waitBudget, stopToken);
+                    return Wait(
+                        current, clock, lifetime, waitBudget, stopToken);
                 }
 
-                var entry = task.Result;
+                var entry = ReadResult(task);
                 Remember(entry);
                 var limit = entry.Success
                     ? Shorter(lifetime, entry.MaxAge)
                     : negativeLifetime;
                 if (clock() - entry.FetchedAt < limit)
                 {
-                    return Answer(entry);
+                    return Answer(entry, clock, lifetime);
                 }
 
                 StartRefresh(current);
@@ -291,16 +292,22 @@ namespace FiftyOne.Pipeline.AgentSignature.Keys
                     return entry;
                 }
                 var known = Volatile.Read(ref _lastSuccess);
-                if (known != null)
+                if (StillUsable(known, clock, lifetime))
                 {
                     return known;
                 }
                 return Wait(
-                    Volatile.Read(ref _current), waitBudget, stopToken);
+                    Volatile.Read(ref _current),
+                    clock,
+                    lifetime,
+                    waitBudget,
+                    stopToken);
             }
 
             private DirectoryEntry Wait(
                 Lazy<Task<DirectoryEntry>> lazy,
+                Func<DateTimeOffset> clock,
+                TimeSpan lifetime,
                 TimeSpan waitBudget,
                 CancellationToken stopToken)
             {
@@ -309,7 +316,10 @@ namespace FiftyOne.Pipeline.AgentSignature.Keys
                 try
                 {
                     completed = task.Wait(
-                        (int)waitBudget.TotalMilliseconds, stopToken);
+                        (int)Math.Min(
+                            waitBudget.TotalMilliseconds,
+                            int.MaxValue),
+                        stopToken);
                 }
                 catch (OperationCanceledException)
                 {
@@ -321,9 +331,63 @@ namespace FiftyOne.Pipeline.AgentSignature.Keys
                     // from this agent finds the result.
                     return null;
                 }
-                var entry = task.Result;
+                var entry = ReadResult(task);
                 Remember(entry);
-                return Answer(entry);
+                return Answer(entry, clock, lifetime);
+            }
+
+            /// <summary>
+            /// Read the result of a fetch that has finished.
+            /// </summary>
+            /// <remarks>
+            /// The loader turns every failure it can see into an entry, so
+            /// a task that faulted means something threw where nothing was
+            /// expected to, such as the clock or the logger inside the
+            /// loader's own catch. Reading such a task through Result
+            /// would throw an AggregateException into the pipeline, and
+            /// the pipeline passes that on to the caller unless the host
+            /// has turned that off, so the request would fail because of a
+            /// header. Answering with a failure entry keeps the promise
+            /// that whatever an agent sends, the request still completes.
+            /// </remarks>
+            /// <param name="task">The finished fetch.</param>
+            /// <returns>The entry it produced, or a failure entry.</returns>
+            private static DirectoryEntry ReadResult(
+                Task<DirectoryEntry> task)
+            {
+                try
+                {
+                    return task.Result;
+                }
+#pragma warning disable CA1031 // Do not catch general exception types
+                catch (Exception)
+#pragma warning restore CA1031
+                {
+                    // The time is deliberately the earliest one there is,
+                    // so the entry counts as old at once and the next
+                    // request for this agent starts a fresh fetch rather
+                    // than being held to the negative cache lifetime.
+                    return DirectoryEntry.Failed(
+                        DateTimeOffset.MinValue,
+                        "the fetch did not complete");
+                }
+            }
+
+            /// <summary>
+            /// Whether a set of keys obtained earlier may still answer a
+            /// request. Keys held on to whilst a refresh keeps failing are
+            /// given one further lifetime and no more. Taking a directory
+            /// offline is how an agent withdraws a key that has been
+            /// stolen, so keys that answer for ever after the directory
+            /// stops responding would make that impossible.
+            /// </summary>
+            private static bool StillUsable(
+                DirectoryEntry known,
+                Func<DateTimeOffset> clock,
+                TimeSpan lifetime)
+            {
+                return known != null &&
+                    clock() - known.FetchedAt < lifetime + lifetime;
             }
 
             /// <summary>
@@ -343,13 +407,17 @@ namespace FiftyOne.Pipeline.AgentSignature.Keys
             /// last set of keys that was obtained when the entry is a
             /// failure.
             /// </summary>
-            private DirectoryEntry Answer(DirectoryEntry entry)
+            private DirectoryEntry Answer(
+                DirectoryEntry entry,
+                Func<DateTimeOffset> clock,
+                TimeSpan lifetime)
             {
                 if (entry.Success)
                 {
                     return entry;
                 }
-                return Volatile.Read(ref _lastSuccess) ?? entry;
+                var known = Volatile.Read(ref _lastSuccess);
+                return StillUsable(known, clock, lifetime) ? known : entry;
             }
 
             private void StartRefresh(Lazy<Task<DirectoryEntry>> observed)

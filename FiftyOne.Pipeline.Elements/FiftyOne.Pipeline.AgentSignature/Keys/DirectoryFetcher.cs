@@ -26,8 +26,10 @@ using Microsoft.Extensions.Logging;
 using System;
 using System.Collections.Generic;
 using System.Globalization;
+using System.IO;
 using System.Net;
 using System.Net.Http;
+using System.Net.Sockets;
 using System.Reflection;
 using System.Security.Cryptography;
 using System.Text;
@@ -46,6 +48,7 @@ namespace FiftyOne.Pipeline.AgentSignature.Keys
         private readonly ILogger _logger;
         private readonly Func<DateTimeOffset> _clock;
         private readonly string _userAgent;
+        private readonly int _maxResponseBytes;
 
         /// <summary>
         /// Construct a fetcher.
@@ -57,14 +60,19 @@ namespace FiftyOne.Pipeline.AgentSignature.Keys
         /// <param name="clock">
         /// The source of the current time, which the tests replace.
         /// </param>
+        /// <param name="maxResponseBytes">
+        /// The number of bytes read from a response before it is abandoned.
+        /// </param>
         public DirectoryFetcher(
             HttpClient httpClient,
             ILogger logger,
-            Func<DateTimeOffset> clock)
+            Func<DateTimeOffset> clock,
+            int maxResponseBytes)
         {
             _httpClient = httpClient;
             _logger = logger;
             _clock = clock;
+            _maxResponseBytes = maxResponseBytes;
             var version = typeof(DirectoryFetcher)
                 .GetTypeInfo().Assembly.GetName().Version;
             _userAgent = string.Format(
@@ -88,7 +96,11 @@ namespace FiftyOne.Pipeline.AgentSignature.Keys
         /// </param>
         /// <returns>
         /// The keys, or an entry describing why they could not be obtained.
-        /// This method does not throw.
+        /// Every failure this method expects, being a network failure, a
+        /// timeout or a document it cannot read, comes back as an entry
+        /// rather than as an exception. The caller in
+        /// <see cref="DirectoryCache"/> catches anything else, so that
+        /// nothing an agent sends can throw into the pipeline.
         /// </returns>
         public async Task<DirectoryEntry> FetchAsync(
             string url,
@@ -97,6 +109,10 @@ namespace FiftyOne.Pipeline.AgentSignature.Keys
         {
             try
             {
+                if (IsSafeUrl(url) == false)
+                {
+                    return Failed(url, "the address may not be fetched");
+                }
                 if (string.Equals(
                     type, Constants.AGENT_TYPE_CIMD,
                     StringComparison.Ordinal))
@@ -172,18 +188,20 @@ namespace FiftyOne.Pipeline.AgentSignature.Keys
                     // The registry draft says a card is returned directly
                     // with a 200, so a card reached through a redirect is
                     // not the card that was asked for.
-                    var finalUri = response.RequestMessage?.RequestUri;
-                    if (finalUri != null &&
-                        string.Equals(
-                            finalUri.AbsoluteUri,
-                            url,
-                            StringComparison.Ordinal) == false)
+                    if (WasRedirected(response, url))
                     {
                         LogCardFailure(url, "the request was redirected");
                         return null;
                     }
-                    var body = await response.Content.ReadAsStringAsync()
+                    var bytes = await ReadBodyAsync(response, token)
                         .ConfigureAwait(false);
+                    if (bytes == null)
+                    {
+                        LogCardFailure(
+                            url, "the card was too long to read");
+                        return null;
+                    }
+                    var body = Encoding.UTF8.GetString(bytes);
                     if (AgentCard.TryParse(body, url, out var card) == false)
                     {
                         LogCardFailure(url, "the card could not be read");
@@ -230,9 +248,15 @@ namespace FiftyOne.Pipeline.AgentSignature.Keys
                                 (int)response.StatusCode));
                         return new List<string>();
                     }
-                    var body = await response.Content.ReadAsStringAsync()
+                    var bytes = await ReadBodyAsync(response, token)
                         .ConfigureAwait(false);
-                    return ParseRegistry(body);
+                    if (bytes == null)
+                    {
+                        LogRegistryFailure(
+                            url, "the registry was too long to read");
+                        return new List<string>();
+                    }
+                    return ParseRegistry(Encoding.UTF8.GetString(bytes));
                 }
             }
             catch (Exception exception) when (IsNetworkFailure(exception))
@@ -300,6 +324,16 @@ namespace FiftyOne.Pipeline.AgentSignature.Keys
             {
                 return Failed(url, "the agent card names no keys");
             }
+            // The card was fetched because of a header the sender wrote,
+            // so the address it names is checked in the same way as the
+            // header's own, rather than trusted because it arrived in a
+            // document rather than in a header.
+            if (IsSafeUrl(card.JwksUri) == false)
+            {
+                return Failed(
+                    url, "the agent card names an address that may not " +
+                    "be fetched");
+            }
             return await FetchDirectoryAsync(
                 card.JwksUri, Constants.AGENT_TYPE_JWKS_URI, card, token)
                 .ConfigureAwait(false);
@@ -325,6 +359,15 @@ namespace FiftyOne.Pipeline.AgentSignature.Keys
                             (int)response.StatusCode));
                 }
 
+                // The well known path is what ties a key set to a domain,
+                // so a response that arrived somewhere else is not the
+                // document that was asked for. The protocol draft says a
+                // verifier must not follow a redirect here.
+                if (WasRedirected(response, url))
+                {
+                    return Failed(url, "the request was redirected");
+                }
+
                 var mediaType = response.Content.Headers.ContentType?.MediaType;
                 if (IsAcceptableMediaType(mediaType, type) == false)
                 {
@@ -336,8 +379,12 @@ namespace FiftyOne.Pipeline.AgentSignature.Keys
                             mediaType ?? "absent"));
                 }
 
-                var body = await response.Content.ReadAsByteArrayAsync()
+                var body = await ReadBodyAsync(response, token)
                     .ConfigureAwait(false);
+                if (body == null)
+                {
+                    return Failed(url, "the document was too long to read");
+                }
                 var json = Encoding.UTF8.GetString(body);
                 if (KeyDirectory.TryParse(json, out var directory) == false)
                 {
@@ -391,6 +438,177 @@ namespace FiftyOne.Pipeline.AgentSignature.Keys
             request.Headers.TryAddWithoutValidation("Accept", accept);
             request.Headers.TryAddWithoutValidation("User-Agent", _userAgent);
             return _httpClient.SendAsync(request, token);
+        }
+
+        /// <summary>
+        /// Whether the response came from somewhere other than the address
+        /// that was asked for.
+        /// </summary>
+        /// <remarks>
+        /// The two addresses are compared as URIs rather than as text.
+        /// Comparing the text would report a redirect for an address that
+        /// merely spells the host in capitals or writes the default port
+        /// out in full, because those are the differences the framework
+        /// takes out when it makes the request.
+        /// </remarks>
+        /// <param name="response">The response.</param>
+        /// <param name="url">The address that was asked for.</param>
+        /// <returns>True when the response came from somewhere else.</returns>
+        private static bool WasRedirected(
+            HttpResponseMessage response,
+            string url)
+        {
+            var finalUri = response.RequestMessage?.RequestUri;
+            if (finalUri == null)
+            {
+                return false;
+            }
+            return Uri.TryCreate(url, UriKind.Absolute, out var asked)
+                ? finalUri.Equals(asked) == false
+                : true;
+        }
+
+        /// <summary>
+        /// Read a response body, giving up once more bytes have arrived
+        /// than the limit allows. The address fetched is chosen by whoever
+        /// sent the request, so the body cannot be read into memory whole
+        /// on the promise that a well behaved server sends a small one.
+        /// </summary>
+        /// <param name="response">The response.</param>
+        /// <param name="token">A token that cancels the read.</param>
+        /// <returns>
+        /// The bytes, or null when the body is longer than the limit.
+        /// </returns>
+        private async Task<byte[]> ReadBodyAsync(
+            HttpResponseMessage response,
+            CancellationToken token)
+        {
+            // A declared length over the limit is refused before anything
+            // is read, and the read below still counts the bytes, because
+            // a response may declare no length at all or declare one it
+            // then exceeds.
+            if (response.Content.Headers.ContentLength.HasValue &&
+                response.Content.Headers.ContentLength.Value >
+                    _maxResponseBytes)
+            {
+                return null;
+            }
+            using (var stream = await response.Content
+                .ReadAsStreamAsync().ConfigureAwait(false))
+            using (var held = new MemoryStream())
+            {
+                var buffer = new byte[8192];
+                var total = 0;
+                while (true)
+                {
+                    var read = await stream
+                        .ReadAsync(buffer, 0, buffer.Length, token)
+                        .ConfigureAwait(false);
+                    if (read == 0)
+                    {
+                        break;
+                    }
+                    total += read;
+                    if (total > _maxResponseBytes)
+                    {
+                        return null;
+                    }
+                    held.Write(buffer, 0, read);
+                }
+                return held.ToArray();
+            }
+        }
+
+        /// <summary>
+        /// Whether a URL is one this element is willing to fetch. The
+        /// address comes from a header the sender wrote, or from a
+        /// document fetched because of one, so it is checked before a
+        /// request is made rather than trusted.
+        /// </summary>
+        /// <remarks>
+        /// The check refuses anything that is not HTTPS, and refuses an
+        /// address written as an IP address in a range that only appears
+        /// inside a network, which is what an attacker reaches for when
+        /// trying to make a server fetch its own internal services. It
+        /// cannot refuse a name that resolves to such an address, because
+        /// the name is resolved later when the connection is made. Where
+        /// the element faces the public internet, point it at an outbound
+        /// proxy that enforces an allow list as well.
+        /// </remarks>
+        /// <param name="url">The URL.</param>
+        /// <returns>True when the URL may be fetched.</returns>
+        public static bool IsSafeUrl(string url)
+        {
+            if (Uri.TryCreate(url, UriKind.Absolute, out var uri) == false ||
+                string.Equals(
+                    uri.Scheme,
+                    Uri.UriSchemeHttps,
+                    StringComparison.OrdinalIgnoreCase) == false)
+            {
+                return false;
+            }
+            // Anything before an '@' in the authority names a user rather
+            // than a host, and is a well worn way of writing a URL that
+            // reads as one host and connects to another.
+            if (string.IsNullOrEmpty(uri.UserInfo) == false)
+            {
+                return false;
+            }
+            if (IPAddress.TryParse(uri.Host.Trim('[', ']'), out var address))
+            {
+                return IsPrivateAddress(address) == false;
+            }
+            return true;
+        }
+
+        /// <summary>
+        /// Whether an address is one that only appears inside a network,
+        /// covering loopback, link local (which carries the address cloud
+        /// providers answer machine credentials on), the private ranges
+        /// and the unspecified address.
+        /// </summary>
+        /// <param name="address">The address.</param>
+        /// <returns>True when the address is not a public one.</returns>
+        private static bool IsPrivateAddress(IPAddress address)
+        {
+            if (IPAddress.IsLoopback(address) ||
+                address.Equals(IPAddress.Any) ||
+                address.Equals(IPAddress.IPv6Any))
+            {
+                return true;
+            }
+            if (address.AddressFamily == AddressFamily.InterNetwork)
+            {
+                var octets = address.GetAddressBytes();
+                return octets[0] == 10 ||
+                    octets[0] == 127 ||
+                    (octets[0] == 172 &&
+                        octets[1] >= 16 && octets[1] <= 31) ||
+                    (octets[0] == 192 && octets[1] == 168) ||
+                    (octets[0] == 169 && octets[1] == 254) ||
+                    (octets[0] == 100 &&
+                        octets[1] >= 64 && octets[1] <= 127);
+            }
+            if (address.AddressFamily == AddressFamily.InterNetworkV6)
+            {
+                if (address.IsIPv6LinkLocal || address.IsIPv6SiteLocal)
+                {
+                    return true;
+                }
+                var bytes = address.GetAddressBytes();
+                // fc00::/7 is the range held back for use inside one
+                // network, and an IPv4 address mapped into IPv6 is checked
+                // as the IPv4 address it carries.
+                if ((bytes[0] & 0xFE) == 0xFC)
+                {
+                    return true;
+                }
+                if (address.IsIPv4MappedToIPv6)
+                {
+                    return IsPrivateAddress(address.MapToIPv4());
+                }
+            }
+            return false;
         }
 
         /// <summary>

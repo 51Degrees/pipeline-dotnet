@@ -111,10 +111,16 @@ namespace FiftyOne.Pipeline.AgentSignature.FlowElement
     /// <remarks>
     /// These instances are shared by every request. A request with no
     /// signature, which is nearly every request, is answered entirely from
-    /// them, so that the element allocates nothing beyond the element data
-    /// itself. Nothing writes to them, and
-    /// <see cref="AspectPropertyValue{T}"/> only becomes mutable through its
-    /// Value setter, which is never called on these.
+    /// them, so that answering it costs no property values at all and the
+    /// element does no parsing and makes no request.
+    /// <para>
+    /// Nothing in this element writes to them. They are handed out through
+    /// <see cref="IAspectPropertyValue{T}"/>, whose Value setter is public,
+    /// so an element or a caller further along the pipeline that wrote to
+    /// one would change what every later request with no signature reports.
+    /// Nothing in this repository does that, and the pipeline gives no
+    /// element a reason to write to another element's values.
+    /// </para>
     /// </remarks>
     internal static class SharedValues
     {

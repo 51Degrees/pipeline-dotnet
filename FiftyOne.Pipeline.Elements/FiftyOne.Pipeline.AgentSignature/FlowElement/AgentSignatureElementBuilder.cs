@@ -21,10 +21,12 @@
  * ********************************************************************* */
 
 using FiftyOne.Pipeline.AgentSignature.Data;
+using FiftyOne.Pipeline.Core.Attributes;
 using FiftyOne.Pipeline.Core.Data;
 using FiftyOne.Pipeline.Core.FlowElements;
 using Microsoft.Extensions.Logging;
 using System;
+using System.Globalization;
 using System.Net.Http;
 
 namespace FiftyOne.Pipeline.AgentSignature.FlowElement
@@ -33,9 +35,12 @@ namespace FiftyOne.Pipeline.AgentSignature.FlowElement
     /// Builder for the <see cref="AgentSignatureElement"/>.
     /// </summary>
     /// <remarks>
-    /// Every option can also be set from a pipeline configuration file, by
+    /// Most options can also be set from a pipeline configuration file, by
     /// naming the method without its 'Set' prefix as a build parameter, in
-    /// the same way as the other elements in this repository.
+    /// the same way as the other elements in this repository. The client
+    /// is the exception, because a configuration file holds text and there
+    /// is no way to write an <see cref="HttpClient"/> as text, so
+    /// <see cref="SetHttpClient(HttpClient)"/> is marked as code only.
     /// </remarks>
     public class AgentSignatureElementBuilder
     {
@@ -66,6 +71,35 @@ namespace FiftyOne.Pipeline.AgentSignature.FlowElement
         }
 
         /// <summary>
+        /// Check that a period setting is one the element can work with.
+        /// A negative period, or one longer than a year, would otherwise
+        /// reach the request path and throw there, where the request that
+        /// happened to arrive first would carry the blame for a setting
+        /// made at start up.
+        /// </summary>
+        /// <param name="value">The period given.</param>
+        /// <param name="name">The parameter name to report.</param>
+        /// <returns>The period.</returns>
+        /// <exception cref="ArgumentOutOfRangeException">
+        /// Thrown when the period is negative or longer than a year.
+        /// </exception>
+        private static TimeSpan CheckPeriod(TimeSpan value, string name)
+        {
+            if (value < TimeSpan.Zero ||
+                value > Constants.MAXIMUM_PERIOD)
+            {
+                throw new ArgumentOutOfRangeException(
+                    name,
+                    value,
+                    string.Format(
+                        CultureInfo.InvariantCulture,
+                        Messages.ExceptionPeriodOutOfRange,
+                        Constants.MAXIMUM_PERIOD));
+            }
+            return value;
+        }
+
+        /// <summary>
         /// Set the client the element fetches key directories and agent
         /// cards with. By default the element makes a client of its own and
         /// disposes it with itself. A client set here is not disposed by the
@@ -73,6 +107,7 @@ namespace FiftyOne.Pipeline.AgentSignature.FlowElement
         /// </summary>
         /// <param name="httpClient">The client.</param>
         /// <returns>This builder.</returns>
+        [CodeConfigOnly]
         public AgentSignatureElementBuilder SetHttpClient(
             HttpClient httpClient)
         {
@@ -85,8 +120,17 @@ namespace FiftyOne.Pipeline.AgentSignature.FlowElement
         /// </summary>
         /// <param name="size">The number of directories.</param>
         /// <returns>This builder.</returns>
+        /// <exception cref="ArgumentOutOfRangeException">
+        /// Thrown when the size is less than one.
+        /// </exception>
+        [DefaultValue(Constants.DEFAULT_CACHE_SIZE)]
         public AgentSignatureElementBuilder SetCacheSize(int size)
         {
+            if (size < 1)
+            {
+                throw new ArgumentOutOfRangeException(
+                    nameof(size), size, Messages.ExceptionCacheSizeTooSmall);
+            }
             Configuration.CacheSize = size;
             return this;
         }
@@ -99,10 +143,12 @@ namespace FiftyOne.Pipeline.AgentSignature.FlowElement
         /// </summary>
         /// <param name="lifetime">The period.</param>
         /// <returns>This builder.</returns>
+        [DefaultValue("1.00:00:00")]
         public AgentSignatureElementBuilder SetCacheLifetime(
             TimeSpan lifetime)
         {
-            Configuration.CacheLifetime = lifetime;
+            Configuration.CacheLifetime =
+                CheckPeriod(lifetime, nameof(lifetime));
             return this;
         }
 
@@ -112,10 +158,12 @@ namespace FiftyOne.Pipeline.AgentSignature.FlowElement
         /// </summary>
         /// <param name="lifetime">The period.</param>
         /// <returns>This builder.</returns>
+        [DefaultValue("00:05:00")]
         public AgentSignatureElementBuilder SetNegativeCacheLifetime(
             TimeSpan lifetime)
         {
-            Configuration.NegativeCacheLifetime = lifetime;
+            Configuration.NegativeCacheLifetime =
+                CheckPeriod(lifetime, nameof(lifetime));
             return this;
         }
 
@@ -127,10 +175,12 @@ namespace FiftyOne.Pipeline.AgentSignature.FlowElement
         /// </summary>
         /// <param name="waitBudget">The period.</param>
         /// <returns>This builder.</returns>
+        [DefaultValue("00:00:00.350")]
         public AgentSignatureElementBuilder SetWaitBudget(
             TimeSpan waitBudget)
         {
-            Configuration.WaitBudget = waitBudget;
+            Configuration.WaitBudget =
+                CheckPeriod(waitBudget, nameof(waitBudget));
             return this;
         }
 
@@ -139,10 +189,12 @@ namespace FiftyOne.Pipeline.AgentSignature.FlowElement
         /// </summary>
         /// <param name="fetchTimeout">The period.</param>
         /// <returns>This builder.</returns>
+        [DefaultValue("00:00:05")]
         public AgentSignatureElementBuilder SetFetchTimeout(
             TimeSpan fetchTimeout)
         {
-            Configuration.FetchTimeout = fetchTimeout;
+            Configuration.FetchTimeout =
+                CheckPeriod(fetchTimeout, nameof(fetchTimeout));
             return this;
         }
 
@@ -152,9 +204,11 @@ namespace FiftyOne.Pipeline.AgentSignature.FlowElement
         /// </summary>
         /// <param name="clockSkew">The tolerance.</param>
         /// <returns>This builder.</returns>
+        [DefaultValue("00:01:00")]
         public AgentSignatureElementBuilder SetClockSkew(TimeSpan clockSkew)
         {
-            Configuration.ClockSkew = clockSkew;
+            Configuration.ClockSkew =
+                CheckPeriod(clockSkew, nameof(clockSkew));
             return this;
         }
 
@@ -166,10 +220,12 @@ namespace FiftyOne.Pipeline.AgentSignature.FlowElement
         /// </summary>
         /// <param name="maxLifetime">The limit, or zero for no limit.</param>
         /// <returns>This builder.</returns>
+        [DefaultValue("00:00:00")]
         public AgentSignatureElementBuilder SetMaxLifetime(
             TimeSpan maxLifetime)
         {
-            Configuration.MaxLifetime = maxLifetime;
+            Configuration.MaxLifetime =
+                CheckPeriod(maxLifetime, nameof(maxLifetime));
             return this;
         }
 
@@ -195,10 +251,56 @@ namespace FiftyOne.Pipeline.AgentSignature.FlowElement
         /// </summary>
         /// <param name="allow">True to accept it.</param>
         /// <returns>This builder.</returns>
+        [DefaultValue(Constants.DEFAULT_ALLOW_LEGACY_SIGNATURE_AGENT)]
         public AgentSignatureElementBuilder SetAllowLegacySignatureAgent(
             bool allow)
         {
             Configuration.AllowLegacySignatureAgent = allow;
+            return this;
+        }
+
+        /// <summary>
+        /// Set whether a key set carried inline in a 'data:' URI is
+        /// accepted. This is off by default and should stay off wherever
+        /// requests arrive from the public internet. A key set sent in the
+        /// header is chosen by whoever sent the request, so a signature
+        /// that checks out against it shows only that the sender holds the
+        /// matching private key and says nothing about which agent sent
+        /// the request. Turn it on only where every caller is already
+        /// trusted, such as a test harness.
+        /// </summary>
+        /// <param name="allow">True to accept an inline key set.</param>
+        /// <returns>This builder.</returns>
+        [DefaultValue(Constants.DEFAULT_ALLOW_INLINE_DIRECTORY)]
+        public AgentSignatureElementBuilder SetAllowInlineDirectory(
+            bool allow)
+        {
+            Configuration.AllowInlineDirectory = allow;
+            return this;
+        }
+
+        /// <summary>
+        /// Set how many bytes are read from a key directory, an agent card
+        /// or a registry before the fetch is abandoned. The address fetched
+        /// is chosen by whoever sent the request, so the limit stops one
+        /// request asking the element to read an endless document.
+        /// </summary>
+        /// <param name="bytes">The limit.</param>
+        /// <returns>This builder.</returns>
+        /// <exception cref="ArgumentOutOfRangeException">
+        /// Thrown when the limit is less than one.
+        /// </exception>
+        [DefaultValue(Constants.DEFAULT_MAX_RESPONSE_BYTES)]
+        public AgentSignatureElementBuilder SetMaxResponseBytes(int bytes)
+        {
+            if (bytes < 1)
+            {
+                throw new ArgumentOutOfRangeException(
+                    nameof(bytes),
+                    bytes,
+                    Messages.ExceptionMaxResponseBytesTooSmall);
+            }
+            Configuration.MaxResponseBytes = bytes;
             return this;
         }
 

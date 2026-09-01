@@ -92,6 +92,22 @@ namespace FiftyOne.Pipeline.AgentSignature.FlowElement
             Constants.DEFAULT_ALLOW_LEGACY_SIGNATURE_AGENT;
 
         /// <summary>
+        /// True when a key set carried inline in a 'data:' URI is accepted.
+        /// This is off by default, because such a key set is chosen by
+        /// whoever sent the request rather than published at an address the
+        /// agent controls.
+        /// </summary>
+        public bool AllowInlineDirectory { get; set; } =
+            Constants.DEFAULT_ALLOW_INLINE_DIRECTORY;
+
+        /// <summary>
+        /// The number of bytes read from a fetched document before the
+        /// fetch is abandoned.
+        /// </summary>
+        public int MaxResponseBytes { get; set; } =
+            Constants.DEFAULT_MAX_RESPONSE_BYTES;
+
+        /// <summary>
         /// The registries of agent cards to read, each being a text
         /// document listing agent card URLs.
         /// </summary>

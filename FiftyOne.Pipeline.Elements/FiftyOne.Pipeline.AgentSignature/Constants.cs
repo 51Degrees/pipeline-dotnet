@@ -87,7 +87,7 @@ namespace FiftyOne.Pipeline.AgentSignature
 
         /// <summary>
         /// The name of the property holding the signature status, which is
-        /// one of the five values in the AGENT_SIGNATURE_ constants.
+        /// one of the five values in the STATUS_ constants.
         /// </summary>
         public const string PROPERTY_STATUS = "agentsignature";
 
@@ -278,6 +278,23 @@ namespace FiftyOne.Pipeline.AgentSignature
         public const string REASON_SIGNATURE_MISMATCH = "SignatureMismatch";
 
         /// <summary>
+        /// The signature covers nothing that ties it to the request it
+        /// arrived on, so the same signature would check out against any
+        /// request sent to this site. The protocol draft requires an agent
+        /// to cover either '@authority' or '@target-uri'.
+        /// </summary>
+        public const string REASON_UNBOUND_SIGNATURE = "UnboundSignature";
+
+        /// <summary>
+        /// The agent carried its key set in the header itself rather than
+        /// publishing it at an address it controls, and the element is not
+        /// set to accept that. A key sent alongside the signature proves
+        /// only that the sender holds the matching private key, and says
+        /// nothing about which agent sent the request.
+        /// </summary>
+        public const string REASON_INLINE_DIRECTORY = "InlineDirectory";
+
+        /// <summary>
         /// The signature checked against a key the agent publishes.
         /// </summary>
         public const string REASON_VERIFIED = "Verified";
@@ -415,6 +432,31 @@ namespace FiftyOne.Pipeline.AgentSignature
         /// 'Signature-Agent' header is accepted.
         /// </summary>
         public const bool DEFAULT_ALLOW_LEGACY_SIGNATURE_AGENT = true;
+
+        /// <summary>
+        /// The default for whether a key set carried inline in a 'data:'
+        /// URI is accepted. This is off, because such a key set is chosen
+        /// by whoever sent the request rather than published at an address
+        /// the agent controls, so a signature that checks out against it
+        /// says nothing about which agent sent the request.
+        /// </summary>
+        public const bool DEFAULT_ALLOW_INLINE_DIRECTORY = false;
+
+        /// <summary>
+        /// The default number of bytes read from a key directory, an agent
+        /// card or a registry before the fetch is abandoned. The documents
+        /// are small, and the address they are read from is chosen by
+        /// whoever sent the request, so the size has to be held down.
+        /// </summary>
+        public const int DEFAULT_MAX_RESPONSE_BYTES = 256 * 1024;
+
+        /// <summary>
+        /// The longest period any of the builder's period settings may be
+        /// given. The bound keeps the wait arithmetic inside what the
+        /// framework can hold, and no sensible setting comes near it.
+        /// </summary>
+        public static readonly TimeSpan MAXIMUM_PERIOD =
+            TimeSpan.FromDays(365);
 
         #endregion
     }

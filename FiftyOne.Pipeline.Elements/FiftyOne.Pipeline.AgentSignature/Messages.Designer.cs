@@ -185,5 +185,50 @@ namespace FiftyOne.Pipeline.AgentSignature {
                 return ResourceManager.GetString("LogSharedSecretAlgorithm", resourceCulture);
             }
         }
+
+        /// <summary>
+        ///   Looks up a localized string similar to The signature covered nothing that ties it to this request, so it was not checked.
+        /// </summary>
+        internal static string NoValueDetailUnbound {
+            get {
+                return ResourceManager.GetString("NoValueDetailUnbound", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Looks up a localized string similar to The agent sent its key with the request rather than publishing it, which this element does not accept.
+        /// </summary>
+        internal static string NoValueDetailInlineDirectory {
+            get {
+                return ResourceManager.GetString("NoValueDetailInlineDirectory", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Looks up a localized string similar to The period must not be negative and must not be longer than {0}.
+        /// </summary>
+        internal static string ExceptionPeriodOutOfRange {
+            get {
+                return ResourceManager.GetString("ExceptionPeriodOutOfRange", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Looks up a localized string similar to The cache must be allowed to hold at least one key directory.
+        /// </summary>
+        internal static string ExceptionCacheSizeTooSmall {
+            get {
+                return ResourceManager.GetString("ExceptionCacheSizeTooSmall", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Looks up a localized string similar to The response limit must allow at least one byte to be read.
+        /// </summary>
+        internal static string ExceptionMaxResponseBytesTooSmall {
+            get {
+                return ResourceManager.GetString("ExceptionMaxResponseBytesTooSmall", resourceCulture);
+            }
+        }
     }
 }

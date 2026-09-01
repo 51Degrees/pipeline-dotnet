@@ -53,7 +53,7 @@ namespace FiftyOne.Pipeline.AgentSignature.FlowElement
     public class AgentSignatureElement :
         FlowElementBase<IAgentSignatureData, IElementPropertyMetaData>
     {
-        private readonly EvidenceKeyFilterWhitelist _evidenceKeyFilter;
+        private readonly IEvidenceKeyFilter _evidenceKeyFilter;
         private readonly IList<IElementPropertyMetaData> _properties;
         private readonly AgentSignatureConfiguration _configuration;
         private readonly HttpClient _httpClient;
@@ -65,6 +65,13 @@ namespace FiftyOne.Pipeline.AgentSignature.FlowElement
         private readonly ConcurrentDictionary<string, bool>
             _sharedSecretKeysLogged =
                 new ConcurrentDictionary<string, bool>(StringComparer.Ordinal);
+
+        /// <summary>
+        /// The number of key ids remembered for the once per key warning
+        /// about shared secrets, after which no more are remembered and no
+        /// more warnings are written.
+        /// </summary>
+        private const int MAXIMUM_LOGGED_KEYS = 1000;
 
         /// <summary>
         /// Construct an element.
@@ -93,15 +100,7 @@ namespace FiftyOne.Pipeline.AgentSignature.FlowElement
             }
             _configuration = configuration;
 
-            _evidenceKeyFilter = new EvidenceKeyFilterWhitelist(
-                new List<string>()
-                {
-                    Constants.EVIDENCE_SIGNATURE_KEY,
-                    Constants.EVIDENCE_SIGNATURE_INPUT_KEY,
-                    Constants.EVIDENCE_SIGNATURE_AGENT_KEY,
-                    Constants.EVIDENCE_HOST_KEY,
-                    Core.Constants.EVIDENCE_PROTOCOL,
-                });
+            _evidenceKeyFilter = new AgentSignatureEvidenceKeyFilter();
 
             _properties = new List<IElementPropertyMetaData>()
             {
@@ -120,9 +119,22 @@ namespace FiftyOne.Pipeline.AgentSignature.FlowElement
             };
 
             _ownsHttpClient = configuration.HttpClient == null;
-            _httpClient = configuration.HttpClient ?? new HttpClient();
+            // A client the element makes for itself does not follow
+            // redirects. The address fetched is chosen by whoever sent the
+            // request, and a redirect would move the fetch somewhere the
+            // checks made before the request never saw. A client supplied
+            // through the builder is used as it was given, so whoever
+            // supplies one decides that for themselves.
+            _httpClient = configuration.HttpClient ??
+                new HttpClient(new HttpClientHandler()
+                {
+                    AllowAutoRedirect = false,
+                });
             _fetcher = new DirectoryFetcher(
-                _httpClient, logger, configuration.Clock);
+                _httpClient,
+                logger,
+                configuration.Clock,
+                configuration.MaxResponseBytes);
             _cache = new DirectoryCache(
                 _fetcher,
                 configuration.Clock,
@@ -277,13 +289,37 @@ namespace FiftyOne.Pipeline.AgentSignature.FlowElement
             outcome.KeyId = candidate.KeyId;
             outcome.Nonce = candidate.Nonce;
             outcome.Algorithm = candidate.Algorithm;
+            // A 'created' or 'expires' outside the range of times the
+            // framework can hold is not a time at all, so the signature
+            // parameters cannot be read. Carrying such a value forward as
+            // the earliest time there is would make a signature claiming a
+            // created far in the future read as one made long ago, and it
+            // would then pass the check below rather than failing it.
             if (candidate.Created.HasValue)
             {
-                outcome.Created = FromUnixSeconds(candidate.Created.Value);
+                if (TryFromUnixSeconds(
+                    candidate.Created.Value, out var created) == false)
+                {
+                    return Fail(
+                        outcome,
+                        Constants.STATUS_INVALID,
+                        Constants.REASON_MALFORMED,
+                        Messages.NoValueDetailMalformed);
+                }
+                outcome.Created = created;
             }
             if (candidate.Expires.HasValue)
             {
-                outcome.Expires = FromUnixSeconds(candidate.Expires.Value);
+                if (TryFromUnixSeconds(
+                    candidate.Expires.Value, out var expires) == false)
+                {
+                    return Fail(
+                        outcome,
+                        Constants.STATUS_INVALID,
+                        Constants.REASON_MALFORMED,
+                        Messages.NoValueDetailMalformed);
+                }
+                outcome.Expires = expires;
             }
 
             if (candidate.Created.HasValue == false ||
@@ -317,6 +353,35 @@ namespace FiftyOne.Pipeline.AgentSignature.FlowElement
                     Messages.NoValueDetailNoAgent);
             }
             outcome.Agent = agent.Value;
+
+            // A key set carried in the header is chosen by whoever sent
+            // the request, so a signature that checks out against it shows
+            // only that the sender holds the matching private key. That is
+            // not what this element reports, so the key set is refused
+            // unless the caller has said their traffic is already trusted.
+            if (agent.InlineDirectory != null &&
+                _configuration.AllowInlineDirectory == false)
+            {
+                return Fail(
+                    outcome,
+                    Constants.STATUS_UNVERIFIED,
+                    Constants.REASON_INLINE_DIRECTORY,
+                    Messages.NoValueDetailInlineDirectory);
+            }
+
+            // The protocol draft has an agent cover '@authority' or
+            // '@target-uri', so that the signature says something about
+            // the request it arrived on. A signature covering neither
+            // would check out just as well against a request to any other
+            // site, so one captured anywhere could be replayed here.
+            if (CoversTheRequest(candidate) == false)
+            {
+                return Fail(
+                    outcome,
+                    Constants.STATUS_INVALID,
+                    Constants.REASON_UNBOUND_SIGNATURE,
+                    Messages.NoValueDetailUnbound);
+            }
 
             var resolver = new FlowDataComponentResolver(data);
             if (SignatureBase.TryBuild(
@@ -354,7 +419,7 @@ namespace FiftyOne.Pipeline.AgentSignature.FlowElement
 
             outcome.DirectoryWasRead = true;
             outcome.Purpose = entry.Directory.Purpose;
-            ApplyCard(outcome, entry, agent);
+            ApplyCard(outcome, entry, agent, data.GetStopToken());
 
             var key = entry.Directory.FindKey(candidate.KeyId);
             if (key == null)
@@ -407,23 +472,57 @@ namespace FiftyOne.Pipeline.AgentSignature.FlowElement
 
         private string CheckTimes(AgentSignatureOutcome outcome)
         {
-            var now = _configuration.Clock();
-            var skew = _configuration.ClockSkew;
-            if (outcome.Created.Value - skew > now)
+            // The comparisons are made on ticks rather than on whole
+            // DateTimeOffset values. A signature may claim a 'created' or
+            // an 'expires' far outside the range the framework can hold,
+            // which arrives here as the smallest or largest value it can
+            // hold, and adding or subtracting the skew from either of
+            // those throws. The builder holds the skew and the maximum
+            // lifetime to a range that keeps the arithmetic below inside
+            // what a long can carry.
+            var now = _configuration.Clock().UtcTicks;
+            var skew = _configuration.ClockSkew.Ticks;
+            var created = outcome.Created.Value.UtcTicks;
+            var expires = outcome.Expires.Value.UtcTicks;
+            if (created - skew > now)
             {
                 return Constants.REASON_NOT_YET_VALID;
             }
-            if (outcome.Expires.Value + skew < now)
+            if (expires + skew < now)
             {
                 return Constants.REASON_EXPIRED;
             }
             if (_configuration.MaxLifetime > TimeSpan.Zero &&
-                outcome.Expires.Value - outcome.Created.Value >
-                    _configuration.MaxLifetime)
+                expires - created > _configuration.MaxLifetime.Ticks)
             {
                 return Constants.REASON_EXPIRED;
             }
             return null;
+        }
+
+        /// <summary>
+        /// Whether the signature covers something that ties it to the
+        /// request it arrived on. The protocol draft has an agent cover
+        /// '@authority' or '@target-uri', and a signature covering neither
+        /// would check out against a request sent to any other site, so
+        /// one captured elsewhere could be replayed here.
+        /// </summary>
+        /// <param name="candidate">The signature being read.</param>
+        /// <returns>True when the signature is tied to the request.</returns>
+        private static bool CoversTheRequest(SignatureCandidate candidate)
+        {
+            foreach (var component in candidate.CoveredComponents)
+            {
+                if (component.Value is string name &&
+                    (string.Equals(
+                        name, "@authority", StringComparison.Ordinal) ||
+                    string.Equals(
+                        name, "@target-uri", StringComparison.Ordinal)))
+                {
+                    return true;
+                }
+            }
+            return false;
         }
 
         /// <summary>
@@ -473,9 +572,11 @@ namespace FiftyOne.Pipeline.AgentSignature.FlowElement
         private void ApplyCard(
             AgentSignatureOutcome outcome,
             DirectoryEntry entry,
-            SignatureAgentEntry agent)
+            SignatureAgentEntry agent,
+            CancellationToken stopToken)
         {
-            var card = entry.Card ?? FindCardInRegistries(agent.KeyUrl);
+            var card = entry.Card ??
+                FindCardInRegistries(agent.KeyUrl, stopToken);
             if (card == null)
             {
                 return;
@@ -489,24 +590,45 @@ namespace FiftyOne.Pipeline.AgentSignature.FlowElement
             }
         }
 
-        private AgentCard FindCardInRegistries(string keyUrl)
+        private AgentCard FindCardInRegistries(
+            string keyUrl,
+            CancellationToken stopToken)
         {
             if (_configuration.Registries.Count == 0 || keyUrl == null)
             {
                 return null;
             }
-            var task = _cardsByKeyUrl.Value;
-            // The registries are read once, in the background. A request
-            // that arrives before that finishes simply gets no agent card,
-            // because a card never changes whether a signature is valid.
-            if (task.Wait((int)_configuration.WaitBudget.TotalMilliseconds)
-                == false)
+            try
             {
+                var task = _cardsByKeyUrl.Value;
+                // The registries are read once, in the background. A
+                // request that arrives before that finishes simply gets no
+                // agent card, because a card never changes whether a
+                // signature is valid. The stop token is honoured here as
+                // it is on the directory wait, so a request whose caller
+                // has already gone does not sit out the budget.
+                if (task.Wait(
+                    (int)Math.Min(
+                        _configuration.WaitBudget.TotalMilliseconds,
+                        int.MaxValue),
+                    stopToken) == false)
+                {
+                    return null;
+                }
+                return task.Result.TryGetValue(keyUrl, out var card)
+                    ? card
+                    : null;
+            }
+#pragma warning disable CA1031 // Do not catch general exception types
+            catch (Exception)
+#pragma warning restore CA1031
+            {
+                // An agent card only adds description to a result that is
+                // already decided, so nothing here is worth failing a
+                // request for, whether the wait was cancelled or the load
+                // threw where it was not expected to.
                 return null;
             }
-            return task.Result.TryGetValue(keyUrl, out var card)
-                ? card
-                : null;
         }
 
         private async Task<IDictionary<string, AgentCard>> LoadCards()
@@ -518,13 +640,27 @@ namespace FiftyOne.Pipeline.AgentSignature.FlowElement
                 using (var source = new CancellationTokenSource(
                     _configuration.FetchTimeout))
                 {
+                    // The whole load shares one time limit, and the cards
+                    // are fetched one after another, so both loops stop
+                    // once it runs out. Without the checks every card left
+                    // in a long registry would still be asked for with a
+                    // token that has already fired, throwing and being
+                    // logged once each for no result.
                     foreach (var registry in _configuration.Registries)
                     {
+                        if (source.Token.IsCancellationRequested)
+                        {
+                            break;
+                        }
                         var cardUrls = await _fetcher
                             .FetchRegistryAsync(registry, source.Token)
                             .ConfigureAwait(false);
                         foreach (var cardUrl in cardUrls)
                         {
+                            if (source.Token.IsCancellationRequested)
+                            {
+                                break;
+                            }
                             var card = await _fetcher
                                 .FetchCardAsync(cardUrl, source.Token)
                                 .ConfigureAwait(false);
@@ -567,29 +703,50 @@ namespace FiftyOne.Pipeline.AgentSignature.FlowElement
             return outcome;
         }
 
-        private static DateTimeOffset FromUnixSeconds(long seconds)
+        /// <summary>
+        /// Read a signature time, given as a count of seconds since the
+        /// start of 1970.
+        /// </summary>
+        /// <param name="seconds">The count of seconds.</param>
+        /// <param name="value">The time.</param>
+        /// <returns>
+        /// False when the count names a time outside the range the
+        /// framework can hold, which the caller reports as a signature it
+        /// could not read.
+        /// </returns>
+        private static bool TryFromUnixSeconds(
+            long seconds,
+            out DateTimeOffset value)
         {
             try
             {
-                return DateTimeOffset.FromUnixTimeSeconds(seconds);
+                value = DateTimeOffset.FromUnixTimeSeconds(seconds);
+                return true;
             }
             catch (ArgumentOutOfRangeException)
             {
-                // A time outside the range the framework can hold is not a
-                // time this element can act on, so treat it as the far past,
-                // which reads as expired.
-                return DateTimeOffset.MinValue;
+                value = default;
+                return false;
             }
         }
 
         private void ReportUnsupportedAlgorithm(string algorithm, string keyId)
         {
+            // The checks are made in this order on purpose. Logging is
+            // asked about first, so that a key id is not marked as already
+            // logged when nothing would have been written and the line is
+            // then lost if logging is turned up later. The count is checked
+            // next, because the key id is chosen by whoever holds the
+            // directory, so without a bound the set of remembered key ids
+            // would grow for as long as the process runs. Once the bound is
+            // reached the fault has been reported plenty of times already.
             if (string.Equals(
                     algorithm,
                     Constants.ALGORITHM_HMAC_SHA256,
                     StringComparison.Ordinal) &&
-                _sharedSecretKeysLogged.TryAdd(keyId ?? string.Empty, true) &&
-                Logger.IsEnabled(LogLevel.Warning))
+                Logger.IsEnabled(LogLevel.Warning) &&
+                _sharedSecretKeysLogged.Count < MAXIMUM_LOGGED_KEYS &&
+                _sharedSecretKeysLogged.TryAdd(keyId ?? string.Empty, true))
             {
                 // A shared secret arriving from an agent points at a
                 // misconfigured agent, which is worth an operator's eye, but
@@ -705,12 +862,12 @@ namespace FiftyOne.Pipeline.AgentSignature.FlowElement
         /// evidence the pipeline holds.
         /// </summary>
         /// <remarks>
-        /// The web integration puts every request header into evidence, so
-        /// header components are all available. Of the derived components it
-        /// puts in enough for '@authority' and '@scheme' only, so a
-        /// signature that covers '@target-uri', '@method', '@path' or
-        /// '@query' cannot be rebuilt and reads Unverified with the
-        /// ComponentUnavailable reason.
+        /// A signature may cover any request header, so the element asks
+        /// for every header rather than a fixed list. Of the derived
+        /// components the web integration puts in enough for '@authority'
+        /// and '@scheme' only, so a signature that covers '@target-uri',
+        /// '@method', '@path' or '@query' cannot be rebuilt and reads
+        /// Unverified with the ComponentUnavailable reason.
         /// </remarks>
         private sealed class FlowDataComponentResolver : IComponentResolver
         {
@@ -841,6 +998,46 @@ namespace FiftyOne.Pipeline.AgentSignature.FlowElement
                 }
                 value = raw.ToString();
                 return true;
+            }
+        }
+
+        /// <summary>
+        /// The evidence this element asks for.
+        /// </summary>
+        /// <remarks>
+        /// A signature names the parts of the request it covers, and it may
+        /// name any request header, so the element cannot write down the
+        /// list in advance. It asks for every header instead, together with
+        /// the protocol, which '@authority' and '@scheme' are built from.
+        /// A fixed list would leave a signature covering any other header
+        /// unable to be rebuilt, because the web integration only puts
+        /// evidence into the request that some element has asked for.
+        /// </remarks>
+        private sealed class AgentSignatureEvidenceKeyFilter
+            : IEvidenceKeyFilter
+        {
+            private readonly string _headerPrefix =
+                Core.Constants.EVIDENCE_HTTPHEADER_PREFIX +
+                Core.Constants.EVIDENCE_SEPERATOR;
+
+            /// <inheritdoc/>
+            /// <remarks>
+            /// The protocol, which '@scheme' and the port in '@authority'
+            /// are built from, is itself written as 'header.protocol', so
+            /// the one test on the prefix covers it as well.
+            /// </remarks>
+            public bool Include(string key)
+            {
+                return key != null &&
+                    key.StartsWith(
+                        _headerPrefix,
+                        StringComparison.OrdinalIgnoreCase);
+            }
+
+            /// <inheritdoc/>
+            public int? Order(string key)
+            {
+                return Include(key) ? 100 : (int?)null;
             }
         }
     }

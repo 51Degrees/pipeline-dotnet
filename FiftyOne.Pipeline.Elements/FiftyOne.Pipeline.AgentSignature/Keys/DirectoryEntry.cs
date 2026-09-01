@@ -56,15 +56,20 @@ namespace FiftyOne.Pipeline.AgentSignature.Keys
         public DateTimeOffset FetchedAt { get; }
 
         /// <summary>
-        /// A short description of what went wrong, for the log. Null when
-        /// the attempt worked.
+        /// A short description of what went wrong, or null when the attempt
+        /// worked. The fetcher writes the same description to the log as it
+        /// builds the entry, so this carries it for the tests to read. It
+        /// is deliberately never put into a property, because it is built
+        /// partly from what a remote server sent.
         /// </summary>
         public string FailureReason { get; }
 
         /// <summary>
         /// The 'max-age' the response asked for, or null when it asked for
-        /// none. The cache never keeps an entry longer than the configured
-        /// lifetime, whatever the response asks for.
+        /// none. A response asking for longer than the configured lifetime
+        /// does not get it, because the cache takes whichever of the two is
+        /// shorter. A set of keys already held may still answer for one
+        /// further lifetime beyond that whilst refreshing it keeps failing.
         /// </summary>
         public TimeSpan? MaxAge { get; }
 

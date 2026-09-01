@@ -211,7 +211,20 @@ namespace FiftyOne.Pipeline.AgentSignature.Parsing
                 type, Constants.AGENT_TYPE_DIRECTORY,
                 StringComparison.Ordinal))
             {
-                keyUrl = value.TrimEnd('/') + Constants.DIRECTORY_PATH;
+                // The draft has this member carry an origin and nothing
+                // else, because the well known path is what ties a key set
+                // to a domain. The check matters because the path is added
+                // by joining text, so a member ending in '#' or '?' would
+                // turn the well known path into a fragment or a query and
+                // let the sender choose the whole address fetched.
+                if (uri.PathAndQuery != "/" ||
+                    string.IsNullOrEmpty(uri.Fragment) == false ||
+                    string.IsNullOrEmpty(uri.UserInfo) == false)
+                {
+                    return false;
+                }
+                keyUrl = uri.GetLeftPart(UriPartial.Authority) +
+                    Constants.DIRECTORY_PATH;
             }
             else
             {

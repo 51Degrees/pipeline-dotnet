@@ -332,7 +332,30 @@ namespace FiftyOne.Pipeline.AgentSignature.Parsing
                         return false;
                     }
                 }
-                list.Add(new SfParameter(name, value));
+                // RFC 8941 section 4.2.3.2 step 7 says a repeated
+                // parameter key overwrites the value already read and
+                // keeps its original position, so the last one written
+                // wins. Adding both would leave this element reading a
+                // different tag, expiry or agent from every other
+                // verifier, because callers take the first match.
+                var existing = -1;
+                for (var i = 0; i < list.Count; i++)
+                {
+                    if (string.Equals(
+                        list[i].Name, name, StringComparison.Ordinal))
+                    {
+                        existing = i;
+                        break;
+                    }
+                }
+                if (existing >= 0)
+                {
+                    list[existing] = new SfParameter(name, value);
+                }
+                else
+                {
+                    list.Add(new SfParameter(name, value));
+                }
             }
             return true;
         }
@@ -485,6 +508,25 @@ namespace FiftyOne.Pipeline.AgentSignature.Parsing
             var encoded = input.Substring(start, position - start);
             // Skip the closing colon.
             position++;
+            // RFC 8941 section 4.2.7 step 7 says to add the padding back if
+            // it is needed, and the note says a parser should not fail when
+            // the '=' padding is absent. Convert.FromBase64String does fail
+            // on it, so the padding is put back here. A length that leaves
+            // one character over cannot be base64 at all, so that is still
+            // refused.
+            switch (encoded.Length % 4)
+            {
+                case 1:
+                    return false;
+                case 2:
+                    encoded += "==";
+                    break;
+                case 3:
+                    encoded += "=";
+                    break;
+                default:
+                    break;
+            }
             try
             {
                 value = Convert.FromBase64String(encoded);
