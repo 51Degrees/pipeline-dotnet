@@ -35,6 +35,7 @@ using System.Net;
 using System.Net.Http;
 using System.Text;
 using System.Threading;
+using System.Threading.Tasks;
 
 namespace FiftyOne.Pipeline.AgentSignature.Tests
 {
@@ -868,6 +869,251 @@ namespace FiftyOne.Pipeline.AgentSignature.Tests
                 SignatureAgent = label + "=" + member,
                 SignatureBase = signatureBase,
             };
+        }
+
+        /// <summary>
+        /// A failure cached for a URL under one member type does not answer
+        /// a request naming the same URL under another type. The sender
+        /// writes both the URL and the type, so without the type in the
+        /// cache key anyone could name a real agent's key URL under the
+        /// wrong type, cache the failure that follows, and hold the real
+        /// agent's requests to that failure for the negative cache
+        /// lifetime.
+        /// </summary>
+        [TestMethod]
+        public void FailureUnderOneTypeDoesNotAnswerAnotherType()
+        {
+            var now = DateTimeOffset.FromUnixTimeSeconds(1735689700);
+            var keysUrl = OriginAlpha + "/keys";
+            using (var handler = new FakeHttpHandler())
+            using (var httpClient = new HttpClient(handler, false))
+            {
+                // The URL serves a plain JWKS, which is a valid answer for
+                // the jwks_uri type and an unreadable one for the cimd
+                // type, because an agent card is a different document.
+                handler.Add(keysUrl, new FakeResponse
+                {
+                    Body = "{\"keys\":[" + RequestSigner.PublicPart(
+                        Fixtures.Ed25519Key()) + "]}",
+                    MediaType = "application/json",
+                });
+                var fetcher = new DirectoryFetcher(
+                    httpClient,
+                    NullLogger.Instance,
+                    () => now,
+                    Constants.DEFAULT_MAX_RESPONSE_BYTES);
+                using (var cache = new DirectoryCache(
+                    fetcher,
+                    () => now,
+                    Constants.DEFAULT_CACHE_SIZE,
+                    TimeSpan.FromMinutes(10),
+                    TimeSpan.FromMinutes(5),
+                    TimeSpan.FromSeconds(10),
+                    TimeSpan.FromSeconds(10),
+                    1))
+                {
+                    var poisoner = AgentFor(keysUrl, "cimd");
+                    var lookup = cache.Lookup(
+                        poisoner, CancellationToken.None, out var poisoned);
+                    Assert.AreEqual(
+                        DirectoryLookupOutcome.Resolved,
+                        lookup,
+                        "The cimd lookup was expected to finish.");
+                    Assert.IsFalse(
+                        poisoned.Success,
+                        "A JWKS read as an agent card was expected to " +
+                        "fail, and the failure is what the test then " +
+                        "checks is not shared.");
+
+                    var real = AgentFor(keysUrl, "jwks_uri");
+                    lookup = cache.Lookup(
+                        real, CancellationToken.None, out var entry);
+                    Assert.AreEqual(
+                        DirectoryLookupOutcome.Resolved,
+                        lookup,
+                        "The jwks_uri lookup was expected to finish.");
+                    Assert.IsTrue(
+                        entry.Success,
+                        "The keys were expected to be read for the " +
+                        "jwks_uri type even though a failure was cached " +
+                        "for the same URL under the cimd type, but the " +
+                        "lookup failed because " + entry.FailureReason +
+                        ".");
+                    Assert.AreEqual(
+                        2,
+                        cache.FetchCount,
+                        "The two types were expected to cause a fetch " +
+                        "each, but " + Text(cache.FetchCount) +
+                        " were started.");
+                }
+            }
+        }
+
+        /// <summary>
+        /// Whilst a stale directory is being refreshed, a request that did
+        /// not trigger the refresh is answered from the copy already held
+        /// rather than waiting out the budget and reporting Timeout. The
+        /// refresh is held open so the test knows the answer came from the
+        /// copy and not from the fetch finishing quickly.
+        /// </summary>
+        [TestMethod]
+        public void RequestDuringARefreshIsAnsweredFromTheCopyHeld()
+        {
+            var now = DateTimeOffset.FromUnixTimeSeconds(1735689700);
+            var url = OriginAlpha + Constants.DIRECTORY_PATH;
+            using (var handler = new FakeHttpHandler())
+            using (var httpClient = new HttpClient(handler, false))
+            {
+                handler.AddDirectory(
+                    url, RequestSigner.PublicPart(Fixtures.Ed25519Key()));
+                var fetcher = new DirectoryFetcher(
+                    httpClient,
+                    NullLogger.Instance,
+                    () => now,
+                    Constants.DEFAULT_MAX_RESPONSE_BYTES);
+                using (var cache = new DirectoryCache(
+                    fetcher,
+                    () => now,
+                    Constants.DEFAULT_CACHE_SIZE,
+                    TimeSpan.FromMinutes(10),
+                    TimeSpan.FromMinutes(5),
+                    TimeSpan.FromSeconds(10),
+                    TimeSpan.FromSeconds(10),
+                    1))
+                {
+                    var agent = AgentFor(OriginAlpha);
+                    Resolve(cache, agent, OriginAlpha);
+
+                    // The copy is now stale, and the next fetch will not
+                    // finish until the handler is released.
+                    now = now.AddMinutes(11);
+                    handler.Hold();
+                    try
+                    {
+                        // The first request starts the refresh and is
+                        // answered from the copy held.
+                        Resolve(cache, agent, OriginAlpha);
+                        // A second request arriving whilst the refresh is
+                        // still running is the case this test exists for.
+                        // Before the fix the second request waited the
+                        // whole budget and reported Pending with a usable
+                        // directory to hand, so a slow origin turned every
+                        // request in the window into a Timeout.
+                        var watch = Stopwatch.StartNew();
+                        Resolve(cache, agent, OriginAlpha);
+                        watch.Stop();
+                        Assert.IsTrue(
+                            watch.ElapsedMilliseconds < 5000,
+                            "The request during the refresh was expected " +
+                            "to be answered from the copy held rather " +
+                            "than waiting, and " +
+                            Text(watch.ElapsedMilliseconds) +
+                            "ms is most of the ten second budget.");
+                    }
+                    finally
+                    {
+                        handler.Release();
+                    }
+                }
+            }
+        }
+
+        /// <summary>
+        /// A fetch task that faulted answers as a failure rather than
+        /// throwing. The loader turns everything the fetcher can throw
+        /// into an entry, so faulting takes something throwing inside the
+        /// loader's own catch, which the test arranges by making the clock
+        /// throw exactly once. Waiting on a faulted task throws what the
+        /// task holds, so without the guard the exception would leave the
+        /// cache and fail the request.
+        /// </summary>
+        [TestMethod]
+        public void FetchTaskThatFaultedAnswersAsAFailure()
+        {
+            var now = DateTimeOffset.FromUnixTimeSeconds(1735689700);
+            var throwOnce = true;
+            Func<DateTimeOffset> clock = () =>
+            {
+                if (throwOnce)
+                {
+                    throwOnce = false;
+                    throw new InvalidOperationException(
+                        "The test's clock throwing stands for anything " +
+                        "unexpected thrown inside the loader's catch.");
+                }
+                return now;
+            };
+            using (var handler = new ThrowingHandler())
+            using (var httpClient = new HttpClient(handler, false))
+            {
+                var fetcher = new DirectoryFetcher(
+                    httpClient,
+                    NullLogger.Instance,
+                    clock,
+                    Constants.DEFAULT_MAX_RESPONSE_BYTES);
+                using (var cache = new DirectoryCache(
+                    fetcher,
+                    clock,
+                    Constants.DEFAULT_CACHE_SIZE,
+                    TimeSpan.FromMinutes(10),
+                    TimeSpan.FromMinutes(5),
+                    TimeSpan.FromSeconds(10),
+                    TimeSpan.FromSeconds(10),
+                    1))
+                {
+                    var agent = AgentFor(OriginAlpha);
+                    var lookup = cache.Lookup(
+                        agent, CancellationToken.None, out var entry);
+                    Assert.AreEqual(
+                        DirectoryLookupOutcome.Resolved,
+                        lookup,
+                        "The lookup was expected to finish with an " +
+                        "answer rather than waiting or throwing.");
+                    Assert.IsFalse(
+                        entry.Success,
+                        "A faulted fetch was expected to answer as a " +
+                        "failure.");
+                }
+            }
+        }
+
+        /// <summary>
+        /// A handler that throws a type the fetcher's own filtered catch
+        /// does not name, so the exception reaches the loader's catch in
+        /// the cache.
+        /// </summary>
+        private sealed class ThrowingHandler : HttpMessageHandler
+        {
+            protected override Task<HttpResponseMessage> SendAsync(
+                HttpRequestMessage request,
+                CancellationToken cancellationToken)
+            {
+                throw new InvalidOperationException(
+                    "The test's handler always throws.");
+            }
+        }
+
+        /// <summary>
+        /// Build the parsed 'Signature-Agent' member for an origin that
+        /// publishes a key directory, or for a key URL under the given
+        /// member type.
+        /// </summary>
+        /// <param name="origin">The origin or key URL.</param>
+        /// <param name="type">The member type, or null for a directory.</param>
+        /// <returns>The member.</returns>
+        private static SignatureAgentEntry AgentFor(
+            string origin,
+            string type)
+        {
+            Assert.IsTrue(
+                SignatureAgentEntry.TryParse(
+                    "agent1=\"" + origin + "\";type=" + type,
+                    true,
+                    out var agents),
+                "The test's own 'Signature-Agent' header naming '" +
+                origin + "' with type '" + type + "' was expected to " +
+                "parse.");
+            return agents[0];
         }
 
         /// <summary>

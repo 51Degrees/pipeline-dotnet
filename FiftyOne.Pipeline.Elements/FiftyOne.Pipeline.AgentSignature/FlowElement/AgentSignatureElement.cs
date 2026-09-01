@@ -65,6 +65,9 @@ namespace FiftyOne.Pipeline.AgentSignature.FlowElement
         private readonly ConcurrentDictionary<string, bool>
             _sharedSecretKeysLogged =
                 new ConcurrentDictionary<string, bool>(StringComparer.Ordinal);
+        private readonly ConcurrentDictionary<string, bool>
+            _pendingDirectoriesLogged =
+                new ConcurrentDictionary<string, bool>(StringComparer.Ordinal);
 
         /// <summary>
         /// The number of key ids remembered for the once per key warning
@@ -770,6 +773,26 @@ namespace FiftyOne.Pipeline.AgentSignature.FlowElement
 
         private void LogDirectoryPending(string keyUrl)
         {
+            // The first Timeout for each directory is written at Warning,
+            // so that a struggling or unreachable agent directory shows in
+            // production logs the way the cloud service surfaces its
+            // entitlement lookups timing out. Every occurrence after that
+            // is Debug, because one line per request would drown the log
+            // the moment a popular agent's directory slowed down. The set
+            // of directories remembered shares the bound used for the
+            // shared secret warning.
+            if (Logger.IsEnabled(LogLevel.Warning) &&
+                _pendingDirectoriesLogged.Count < MAXIMUM_LOGGED_KEYS &&
+                _pendingDirectoriesLogged.TryAdd(
+                    keyUrl ?? string.Empty, true))
+            {
+                Logger.LogWarning(string.Format(
+                    CultureInfo.InvariantCulture,
+                    Messages.LogDirectoryPending,
+                    keyUrl,
+                    _configuration.WaitBudget.TotalMilliseconds));
+                return;
+            }
             if (Logger.IsEnabled(LogLevel.Debug))
             {
                 Logger.LogDebug(string.Format(

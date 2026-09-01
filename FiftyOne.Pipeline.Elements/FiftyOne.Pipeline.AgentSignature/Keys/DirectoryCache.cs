@@ -54,11 +54,14 @@ namespace FiftyOne.Pipeline.AgentSignature.Keys
     /// A request waits for a fetch only for the wait budget. When the budget
     /// runs out the request reports the Timeout status whilst the fetch
     /// keeps running, so that the next request from the same agent finds the
-    /// result. This follows the cloud ConfigurationElement, which does the
-    /// same thing with a LoadingDictionary from the FiftyOne.Caching
-    /// package. LoadingDictionary has no bound on its size, so this element
-    /// wraps a least recently used cache around the same way of starting
-    /// one fetch rather than using LoadingDictionary itself.
+    /// result. The cloud ConfigurationElement resolves resource key
+    /// entitlements with the same shape, a dictionary of lazily started
+    /// tasks from the FiftyOne.Caching package, and describes the same
+    /// intent, although the LoadingDictionary the cloud uses discards a
+    /// load when its own time limit fires where this cache keeps the fetch
+    /// running. LoadingDictionary also has no bound on its size, so this
+    /// element wraps a least recently used cache around the same way of
+    /// starting one fetch rather than using LoadingDictionary itself.
     /// </remarks>
     internal sealed class DirectoryCache : IDisposable
     {
@@ -174,6 +177,13 @@ namespace FiftyOne.Pipeline.AgentSignature.Keys
 
         private DirectorySlot GetSlot(string url, string type)
         {
+            // The cache key carries the member type as well as the URL,
+            // because what a fetch does with the URL depends on the type,
+            // and the sender writes both. Keyed on the URL alone, a
+            // request naming another agent's key URL under the wrong type
+            // would cache a failure under that URL and hold the real
+            // agent's requests to the failure for the negative lifetime.
+            var key = type + " " + url;
             // The cache is built not to replace an entry that is already
             // there, so every thread that races here reads back the same
             // slot and only that slot's fetch is started. The entry put in
@@ -184,13 +194,13 @@ namespace FiftyOne.Pipeline.AgentSignature.Keys
             // own fetch whose result nothing else could share.
             for (var attempt = 0; attempt < 3; attempt++)
             {
-                var slot = _cache[url];
+                var slot = _cache[key];
                 if (slot != null)
                 {
                     return slot;
                 }
-                _cache.Put(url, new DirectorySlot(() => Load(url, type)));
-                slot = _cache[url];
+                _cache.Put(key, new DirectorySlot(() => Load(url, type)));
+                slot = _cache[key];
                 if (slot != null)
                 {
                     return slot;
@@ -327,6 +337,18 @@ namespace FiftyOne.Pipeline.AgentSignature.Keys
                 TimeSpan waitBudget,
                 CancellationToken stopToken)
             {
+                // A set of keys already held answers at once, without
+                // waiting at all. This is what serves every request that
+                // arrives whilst a refresh of a stale directory is still
+                // running. Only the request that started the refresh would
+                // otherwise see the copy held, and everyone else would sit
+                // out the budget and report Timeout with a usable
+                // directory to hand.
+                var known = Volatile.Read(ref _lastSuccess);
+                if (StillUsable(known, clock, lifetime))
+                {
+                    return known;
+                }
                 var task = lazy.Value;
                 bool completed;
                 try
@@ -340,6 +362,15 @@ namespace FiftyOne.Pipeline.AgentSignature.Keys
                 catch (OperationCanceledException)
                 {
                     completed = false;
+                }
+                catch (AggregateException)
+                {
+                    // Wait throws what a faulted task holds, before the
+                    // result is ever read. The task is finished, so fall
+                    // through and let ReadResult turn the fault into a
+                    // failure entry rather than letting an exception out
+                    // of a header decide a request.
+                    completed = true;
                 }
                 if (completed == false)
                 {
