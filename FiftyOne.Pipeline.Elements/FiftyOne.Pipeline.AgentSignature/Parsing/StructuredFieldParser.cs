@@ -465,6 +465,16 @@ namespace FiftyOne.Pipeline.AgentSignature.Parsing
             var start = position;
             while (position < input.Length && input[position] != ':')
             {
+                // RFC 8941 section 4.2.7 allows only the base64 alphabet
+                // between the two colons. The check matters because
+                // Convert.FromBase64String quietly ignores whitespace, so
+                // without it a byte sequence written with a space inside it
+                // would be read as a value rather than reported as
+                // unreadable.
+                if (IsBase64Character(input[position]) == false)
+                {
+                    return false;
+                }
                 position++;
             }
             if (position >= input.Length)
@@ -526,28 +536,65 @@ namespace FiftyOne.Pipeline.AgentSignature.Parsing
             {
                 position++;
             }
-            var digits = 0;
+            if (position >= input.Length || IsDigit(input[position]) == false)
+            {
+                // A number needs at least one digit, so a lone minus sign is
+                // not a number.
+                return false;
+            }
+            // RFC 8941 section 4.2.4 puts limits on how long a number may
+            // be, and a number over the limit is not a number that has been
+            // rounded, it is a field that cannot be read. Without these
+            // checks a value too large for the standard would be accepted
+            // and reported as though the agent had sent something valid.
+            var integerDigits = 0;
+            var fractionDigits = 0;
             var isDecimal = false;
+            var length = 0;
             while (position < input.Length)
             {
                 var current = input[position];
                 if (IsDigit(current))
                 {
-                    digits++;
+                    if (isDecimal)
+                    {
+                        fractionDigits++;
+                    }
+                    else
+                    {
+                        integerDigits++;
+                    }
+                    length++;
                     position++;
                 }
-                else if (current == '.' && isDecimal == false && digits > 0)
+                else if (current == '.' && isDecimal == false)
                 {
+                    // The part before the decimal point holds at most
+                    // twelve digits.
+                    if (integerDigits > 12)
+                    {
+                        return false;
+                    }
                     isDecimal = true;
+                    length++;
                     position++;
                 }
                 else
                 {
                     break;
                 }
+                // A whole number holds at most fifteen digits, and a
+                // fractional number at most sixteen characters counting the
+                // decimal point itself.
+                if (length > (isDecimal ? 16 : 15))
+                {
+                    return false;
+                }
             }
-            if (digits == 0)
+            if (isDecimal && (fractionDigits < 1 || fractionDigits > 3))
             {
+                // A fractional number has between one and three digits
+                // after the decimal point.
                 return false;
             }
             var text = input.Substring(start, position - start);
@@ -642,6 +689,15 @@ namespace FiftyOne.Pipeline.AgentSignature.Parsing
             {
                 position++;
             }
+        }
+
+        private static bool IsBase64Character(char value)
+        {
+            return IsAlpha(value) ||
+                IsDigit(value) ||
+                value == '+' ||
+                value == '/' ||
+                value == '=';
         }
 
         private static bool IsLowerAlpha(char value) =>
