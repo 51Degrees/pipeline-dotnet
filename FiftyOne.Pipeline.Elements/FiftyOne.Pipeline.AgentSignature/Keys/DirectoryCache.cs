@@ -174,17 +174,33 @@ namespace FiftyOne.Pipeline.AgentSignature.Keys
 
         private DirectorySlot GetSlot(string url, string type)
         {
-            var slot = _cache[url];
-            if (slot == null)
+            // The cache is built not to replace an entry that is already
+            // there, so every thread that races here reads back the same
+            // slot and only that slot's fetch is started. The entry put in
+            // can also be evicted before the read back when more origins
+            // are hot than the cache holds, which is why the read back is
+            // checked and tried again rather than assumed. Without the
+            // retry, every requester in that window would quietly run its
+            // own fetch whose result nothing else could share.
+            for (var attempt = 0; attempt < 3; attempt++)
             {
-                var created = new DirectorySlot(() => Load(url, type));
-                // The cache is built not to replace an entry that is
-                // already there, so every thread that races here reads back
-                // the same slot and only that slot's fetch is started.
-                _cache.Put(url, created);
-                slot = _cache[url] ?? created;
+                var slot = _cache[url];
+                if (slot != null)
+                {
+                    return slot;
+                }
+                _cache.Put(url, new DirectorySlot(() => Load(url, type)));
+                slot = _cache[url];
+                if (slot != null)
+                {
+                    return slot;
+                }
             }
-            return slot;
+            // Under this much pressure the entry cannot be kept in the
+            // cache at all, so this request gets a slot of its own. The
+            // fetch it starts serves only this request, which is the cost
+            // of answering rather than a fault.
+            return new DirectorySlot(() => Load(url, type));
         }
 
         private async Task<DirectoryEntry> Load(string url, string type)

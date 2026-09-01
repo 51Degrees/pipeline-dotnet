@@ -74,6 +74,14 @@ namespace FiftyOne.Pipeline.AgentSignature.FlowElement
         private const int MAXIMUM_LOGGED_KEYS = 1000;
 
         /// <summary>
+        /// The factory handed to the flow data's GetOrAdd. Writing
+        /// the method name at the call site would build a fresh delegate on
+        /// every request, spending an allocation before the no signature
+        /// early return, so the one delegate is made here and reused.
+        /// </summary>
+        private readonly Func<IPipeline, IAgentSignatureData> _createData;
+
+        /// <summary>
         /// Construct an element.
         /// </summary>
         /// <param name="logger">The logger.</param>
@@ -146,6 +154,7 @@ namespace FiftyOne.Pipeline.AgentSignature.FlowElement
                 configuration.Concurrency);
             _cardsByKeyUrl =
                 new Lazy<Task<IDictionary<string, AgentCard>>>(LoadCards);
+            _createData = CreateElementData;
         }
 
         /// <inheritdoc/>
@@ -175,7 +184,7 @@ namespace FiftyOne.Pipeline.AgentSignature.FlowElement
                 throw new ArgumentNullException(nameof(data));
             }
             var elementData = data.GetOrAdd(
-                ElementDataKeyTyped, CreateElementData) as AgentSignatureData;
+                ElementDataKeyTyped, _createData) as AgentSignatureData;
             if (elementData == null)
             {
                 return;
