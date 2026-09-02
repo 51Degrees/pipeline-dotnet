@@ -275,7 +275,8 @@ namespace FiftyOne.Pipeline.DerivedProperty.Data
                 output.PropertyId,
                 output.StoredValueType,
                 output.VendorIds,
-                dependencies);
+                dependencies,
+                output.ElementDataKey);
         }
 
         private static IEnumerable<string> UnknownKeys(
@@ -469,7 +470,7 @@ namespace FiftyOne.Pipeline.DerivedProperty.Data
                     key));
             }
 
-            var name = ReadOutputName(context, mapping);
+            var name = ReadOutputName(context, mapping, out var elementDataKey);
             var description = ReadOutputDescription(context, mapping);
             var valueType = ReadValueType(context, mapping, out var readType);
             var isList = ReadIsList(context, mapping);
@@ -494,7 +495,8 @@ namespace FiftyOne.Pipeline.DerivedProperty.Data
                 ReadOptionalInt(context, mapping, "PropertyId"),
                 ReadOptionalString(context, mapping, "StoredValueType"),
                 ReadOptionalStringList(context, mapping, "VendorIds"),
-                ReadOptionalStringList(context, mapping, "Dependencies"));
+                ReadOptionalStringList(context, mapping, "Dependencies"),
+                elementDataKey);
         }
 
         private static DerivedPropertyMetaData Fallback(Context context)
@@ -506,10 +508,19 @@ namespace FiftyOne.Pipeline.DerivedProperty.Data
                 false);
         }
 
+        /// <summary>
+        /// Reads Output.Name, which may carry an element data key as a
+        /// prefix. A bare name such as `HumanConfidence` creates a property
+        /// in this element's own data. A prefixed name such as
+        /// `device.IsCrawler` names a property another element already
+        /// produces, and the script replaces its value.
+        /// </summary>
         private static string ReadOutputName(
             Context context,
-            DerivedMapping mapping)
+            DerivedMapping mapping,
+            out string elementDataKey)
         {
+            elementDataKey = null;
             var node = mapping.Get("Name");
             if (node == null)
             {
@@ -518,15 +529,27 @@ namespace FiftyOne.Pipeline.DerivedProperty.Data
                 return context.Script ?? "unknown";
             }
             if (node is DerivedScalar scalar &&
-                scalar.Value is string value &&
-                _identifier.IsMatch(value))
+                scalar.Value is string value)
             {
-                return value;
+                if (_identifier.IsMatch(value))
+                {
+                    return value;
+                }
+                if (_sourceProperty.IsMatch(value))
+                {
+                    var stop = value.IndexOf('.');
+                    elementDataKey = value.Substring(0, stop);
+                    return value.Substring(stop + 1);
+                }
             }
             context.Fault("Output.Name", node, string.Format(
                 CultureInfo.InvariantCulture,
-                "Output.Name {0} does not match the pattern {1}",
-                Describe(node), _identifier.ToString()));
+                "Output.Name {0} is neither a property name matching {1} " +
+                "nor a property in another element written as " +
+                "elementDataKey.PropertyName, matching {2}",
+                Describe(node),
+                _identifier.ToString(),
+                _sourceProperty.ToString()));
             return context.Script ?? "unknown";
         }
 

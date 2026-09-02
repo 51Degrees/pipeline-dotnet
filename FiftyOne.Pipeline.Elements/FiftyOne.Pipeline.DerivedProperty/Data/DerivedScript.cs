@@ -163,6 +163,13 @@ namespace FiftyOne.Pipeline.DerivedProperty.Data
         /// Every source property the checks and rules name, computed by the
         /// validator where the script does not give the list.
         /// </param>
+        /// <param name="elementDataKey">
+        /// The element data the property is written into. Null or the
+        /// default means this element's own key, so the script creates a
+        /// property. Any other key names a property another element already
+        /// produces, and the script replaces its value instead. See
+        /// <see cref="IsOverride"/>.
+        /// </param>
         public DerivedPropertyMetaData(
             string name,
             string description,
@@ -180,8 +187,12 @@ namespace FiftyOne.Pipeline.DerivedProperty.Data
             int? propertyId = null,
             string storedValueType = null,
             IReadOnlyList<string> vendorIds = null,
-            IReadOnlyList<string> dependencies = null)
+            IReadOnlyList<string> dependencies = null,
+            string elementDataKey = null)
         {
+            ElementDataKey = string.IsNullOrEmpty(elementDataKey)
+                ? DefaultElementDataKey
+                : elementDataKey;
             Name = name;
             Description = description;
             ValueType = valueType;
@@ -201,8 +212,41 @@ namespace FiftyOne.Pipeline.DerivedProperty.Data
             Dependencies = dependencies;
         }
 
-        /// <summary>The property name.</summary>
+        /// <summary>
+        /// The element data key a script writes into when its
+        /// <c>Output.Name</c> carries no prefix, which is this element's
+        /// own key.
+        /// </summary>
+        public const string DefaultElementDataKey = "derived";
+
+        /// <summary>The property name, without any element data key.</summary>
         public string Name { get; }
+
+        /// <summary>
+        /// The element data the property is written into, taken from the
+        /// prefix of <c>Output.Name</c>. Where the script writes
+        /// <c>HumanConfidence</c> this is <c>derived</c>, and where it
+        /// writes <c>device.IsCrawler</c> this is <c>device</c>.
+        /// </summary>
+        public string ElementDataKey { get; }
+
+        /// <summary>
+        /// True where the script replaces the value of a property another
+        /// element already produces, rather than creating one of its own.
+        /// An override that cannot read every source property it names
+        /// leaves the existing value untouched rather than writing a value
+        /// that has no value.
+        /// </summary>
+        public bool IsOverride => string.Equals(
+            ElementDataKey,
+            DefaultElementDataKey,
+            StringComparison.OrdinalIgnoreCase) == false;
+
+        /// <summary>
+        /// The property written as <c>elementDataKey.PropertyName</c>,
+        /// which is how a script names it and how messages name it.
+        /// </summary>
+        public string QualifiedName => ElementDataKey + "." + Name;
 
         /// <summary>What the property asserts.</summary>
         public string Description { get; }

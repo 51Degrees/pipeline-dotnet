@@ -83,6 +83,10 @@ namespace FiftyOne.Pipeline.DerivedProperty.Data
         private readonly string[] _slotPropertyName;
         private readonly DerivedValueType[] _slotValueType;
 
+        // The element data a script replaces a property in, or null where
+        // the script creates a property of its own.
+        private readonly ITypedKey<IElementData> _targetKey;
+
         private readonly Func<object, IAspectPropertyValue> _valueFactory;
         private readonly Func<string, IAspectPropertyValue> _noValueFactory;
 
@@ -127,6 +131,13 @@ namespace FiftyOne.Pipeline.DerivedProperty.Data
                     new TypedKey<IElementData>(k))
                 .ToArray();
 
+            // Only a script that replaces a property in another element
+            // needs a key for that element. A script that creates one is
+            // handed the element data to write into.
+            _targetKey = script.Output.IsOverride
+                ? new TypedKey<IElementData>(script.Output.ElementDataKey)
+                : null;
+
             _valueFactory = MakeValueFactory(script.Output.ValueType);
             _noValueFactory = MakeNoValueFactory(script.Output.ValueType);
         }
@@ -156,7 +167,29 @@ namespace FiftyOne.Pipeline.DerivedProperty.Data
             {
                 throw new ArgumentNullException(nameof(output));
             }
-            output[_script.Output.Name] = Evaluate(data, null);
+
+            if (_targetKey == null)
+            {
+                output[_script.Output.Name] = Evaluate(data, null);
+                return;
+            }
+
+            // A script that replaces a property in another element writes
+            // nothing at all where it cannot read every source property it
+            // names, so the value that element produced survives untouched.
+            // Nothing is missing from the caller's point of view, so no
+            // message is produced either.
+            if (data.TryGetValue(_targetKey, out var target) == false ||
+                target == null)
+            {
+                return;
+            }
+            var value = Evaluate(data, null);
+            if (value.HasValue == false)
+            {
+                return;
+            }
+            target[_script.Output.Name] = value;
         }
 
         /// <summary>

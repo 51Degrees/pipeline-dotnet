@@ -97,6 +97,48 @@ public class StubSourceElement
         string elementDataKey,
         IReadOnlyDictionary<string, object> values,
         IReadOnlyCollection<string> propertyNamesDeclaredWithoutValues)
+        : this(
+            logger,
+            elementDataKey,
+            values,
+            propertyNamesDeclaredWithoutValues,
+            null)
+    {
+    }
+
+    /// <summary>
+    /// Constructor that also says what type each property is declared as.
+    /// A real element declares the type callers read a property back as,
+    /// and anything checking one element's property against another's has
+    /// to read that type, so a test needs to be able to set it. A name
+    /// with no entry in <paramref name="declaredTypes"/> is declared as
+    /// object, which is what the other constructors give every name.
+    /// </summary>
+    /// <param name="logger">
+    /// The logger for the new instance to use.
+    /// </param>
+    /// <param name="elementDataKey">
+    /// The element data key the values are published under.
+    /// </param>
+    /// <param name="values">
+    /// The property values to publish, keyed by property name.
+    /// </param>
+    /// <param name="propertyNamesDeclaredWithoutValues">
+    /// Property names to declare in <see cref="Properties"/> without
+    /// publishing a value for them. Pass null or an empty collection where
+    /// no such names are wanted.
+    /// </param>
+    /// <param name="declaredTypes">
+    /// The type to declare each property as, keyed by property name. Pass
+    /// null where every property is to be declared as object.
+    /// </param>
+    public StubSourceElement(
+        ILogger<FlowElementBase<StubSourceData, ElementPropertyMetaData>>
+            logger,
+        string elementDataKey,
+        IReadOnlyDictionary<string, object> values,
+        IReadOnlyCollection<string> propertyNamesDeclaredWithoutValues,
+        IReadOnlyDictionary<string, Type> declaredTypes)
         : base(logger)
     {
         _elementDataKey = elementDataKey ??
@@ -110,17 +152,29 @@ public class StubSourceElement
         foreach (var name in _values.Keys)
         {
             properties.Add(new ElementPropertyMetaData(
-                this, name, typeof(object), true));
+                this, name, TypeOf(declaredTypes, name), true));
         }
         if (propertyNamesDeclaredWithoutValues != null)
         {
             foreach (var name in propertyNamesDeclaredWithoutValues)
             {
                 properties.Add(new ElementPropertyMetaData(
-                    this, name, typeof(object), true));
+                    this, name, TypeOf(declaredTypes, name), true));
             }
         }
         _properties = properties;
+    }
+
+    private static Type TypeOf(
+        IReadOnlyDictionary<string, Type> declaredTypes,
+        string name)
+    {
+        if (declaredTypes != null &&
+            declaredTypes.TryGetValue(name, out var type))
+        {
+            return type;
+        }
+        return typeof(object);
     }
 
     /// <summary>

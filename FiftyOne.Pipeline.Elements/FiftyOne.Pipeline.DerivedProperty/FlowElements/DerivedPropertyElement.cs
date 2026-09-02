@@ -24,6 +24,7 @@ using FiftyOne.Pipeline.Core.Data;
 using FiftyOne.Pipeline.Core.Exceptions;
 using FiftyOne.Pipeline.Core.FlowElements;
 using FiftyOne.Pipeline.DerivedProperty.Data;
+using FiftyOne.Pipeline.Engines.Data;
 using Microsoft.Extensions.Logging;
 using System;
 using System.Collections.Generic;
@@ -94,7 +95,13 @@ namespace FiftyOne.Pipeline.DerivedProperty.FlowElements
             CheckOutputNamesAreUnique(_scripts);
             _compiled = _scripts.Select(s => new CompiledScript(s)).ToArray();
 
+            // Only a script that creates a property contributes one here.
+            // A script that replaces the value of a property another
+            // element owns defines nothing, because that element already
+            // published the definition, so advertising it here would be a
+            // second definition of the same property.
             _properties = _scripts
+                .Where(s => s.Output.IsOverride == false)
                 .Select(s => (IElementPropertyMetaData)
                     new ElementPropertyMetaData(
                         this,
@@ -133,8 +140,10 @@ namespace FiftyOne.Pipeline.DerivedProperty.FlowElements
         /// <param name="pipeline">The pipeline being built.</param>
         /// <exception cref="PipelineConfigurationException">
         /// Thrown where a source property has no supplier earlier in the
-        /// pipeline, or where another element already writes one of the
-        /// derived property names this element writes.
+        /// pipeline, where another element already writes one of the
+        /// derived property names this element writes, or where a script
+        /// replaces a property no earlier element produces or produces a
+        /// value of a type that property is not declared as.
         /// </exception>
         public override void AddPipeline(IPipeline pipeline)
         {
@@ -179,7 +188,11 @@ namespace FiftyOne.Pipeline.DerivedProperty.FlowElements
             var faults = new List<DerivedScriptFault>();
             foreach (var script in scripts)
             {
-                if (seen.TryGetValue(script.Output.Name, out var first))
+                // Compared on the qualified name, so a script creating
+                // derived.IsCrawler and one replacing device.IsCrawler are
+                // two different properties rather than a collision.
+                if (seen.TryGetValue(
+                    script.Output.QualifiedName, out var first))
                 {
                     faults.Add(new DerivedScriptFault(
                         script.Name,
@@ -191,12 +204,17 @@ namespace FiftyOne.Pipeline.DerivedProperty.FlowElements
                             "two scripts in the same element write the " +
                             "property '{0}', being '{1}' and '{2}'. One " +
                             "element writes each property once",
-                            script.Output.Name,
+                            // Named the way the script named it and the way
+                            // the canonical form prints it, so a reader can
+                            // find the line to change.
+                            script.Output.IsOverride
+                                ? script.Output.QualifiedName
+                                : script.Output.Name,
                             first,
                             script.Name)));
                     continue;
                 }
-                seen.Add(script.Output.Name, script.Name);
+                seen.Add(script.Output.QualifiedName, script.Name);
             }
             if (faults.Count > 0)
             {
@@ -272,6 +290,7 @@ namespace FiftyOne.Pipeline.DerivedProperty.FlowElements
 
             CheckForCollisions(elements, faults);
             CheckSourceProperties(elements, position, faults);
+            CheckOverrideTargets(elements, position, faults);
 
             if (faults.Count > 0)
             {
@@ -315,6 +334,14 @@ namespace FiftyOne.Pipeline.DerivedProperty.FlowElements
         {
             foreach (var script in _scripts)
             {
+                // A script that replaces a property another element owns
+                // writes nothing under the derived key, so it cannot
+                // collide with what another derived property element
+                // writes there.
+                if (script.Output.IsOverride)
+                {
+                    continue;
+                }
                 for (var i = 0; i < elements.Count; i++)
                 {
                     var element = elements[i];
@@ -413,12 +440,166 @@ namespace FiftyOne.Pipeline.DerivedProperty.FlowElements
         }
 
         /// <summary>
+        /// A script that replaces the value of a property another element
+        /// owns needs that element to be in the pipeline, to be placed
+        /// before this one, and to declare the property as the type the
+        /// script produces. None of the three can be known before the
+        /// pipeline is built.
+        ///
+        /// An override that finds nothing to replace writes nothing on
+        /// every request, and would do so silently, because leaving the
+        /// owning element's value alone is exactly what an override does
+        /// when it has nothing to say. Failing the build is therefore the
+        /// only point at which the mistake can be seen.
+        /// </summary>
+        private void CheckOverrideTargets(
+            IReadOnlyList<IFlowElement> elements,
+            int position,
+            List<string> faults)
+        {
+            foreach (var script in _scripts)
+            {
+                if (script.Output.IsOverride == false)
+                {
+                    continue;
+                }
+
+                IElementPropertyMetaData target = null;
+                var later = new List<string>();
+
+                for (var i = 0; i < elements.Count; i++)
+                {
+                    var element = elements[i];
+                    if (ReferenceEquals(element, this))
+                    {
+                        continue;
+                    }
+                    if (string.Equals(
+                        element.ElementDataKey,
+                        script.Output.ElementDataKey,
+                        StringComparison.OrdinalIgnoreCase) == false)
+                    {
+                        continue;
+                    }
+                    var supplied = Supplied(element, script.Output.Name);
+                    if (supplied == null)
+                    {
+                        continue;
+                    }
+                    if (i < position)
+                    {
+                        target = supplied;
+                        break;
+                    }
+                    later.Add(element.GetType().Name);
+                }
+
+                if (target == null)
+                {
+                    faults.Add(later.Count > 0
+                        ? string.Format(
+                            CultureInfo.InvariantCulture,
+                            "The script '{0}' replaces the value of the " +
+                            "property '{1}' in the element data '{2}', " +
+                            "which is produced by {3}, placed after the " +
+                            "derived property element rather than before " +
+                            "it. Move the derived property element after " +
+                            "{3}.",
+                            script.Name,
+                            script.Output.Name,
+                            script.Output.ElementDataKey,
+                            string.Join(", ", later))
+                        : string.Format(
+                            CultureInfo.InvariantCulture,
+                            "The script '{0}' replaces the value of the " +
+                            "property '{1}' in the element data '{2}', and " +
+                            "no element in the pipeline produces '{3}'. " +
+                            "Either add the element that produces it, or " +
+                            "change Output.Name to '{1}' so that the " +
+                            "script creates a property of its own.",
+                            script.Name,
+                            script.Output.Name,
+                            script.Output.ElementDataKey,
+                            script.Output.QualifiedName));
+                    continue;
+                }
+
+                CheckOverrideType(script, target, faults);
+            }
+        }
+
+        /// <summary>
+        /// The type the owning element declares is the type every caller
+        /// reads the property as, so a script that produces anything else
+        /// would break those callers on the requests where it happened to
+        /// have an answer. An element that declares no type has said
+        /// nothing that can be checked, and nothing is checked.
+        /// </summary>
+        private static void CheckOverrideType(
+            DerivedScript script,
+            IElementPropertyMetaData target,
+            List<string> faults)
+        {
+            var declared = UnwrapAspectPropertyValue(target.Type);
+            if (declared == null)
+            {
+                return;
+            }
+            var produced = script.Output.GetClrType();
+            if (declared == produced)
+            {
+                return;
+            }
+            faults.Add(string.Format(
+                CultureInfo.InvariantCulture,
+                "The script '{0}' replaces the value of the property " +
+                "'{1}', which {2} declares as {3}, and the script produces " +
+                "{4}. A script can only replace a property with a value of " +
+                "the type the element that owns the property declares.",
+                script.Name,
+                script.Output.QualifiedName,
+                target.Element == null
+                    ? "the element that owns it"
+                    : target.Element.GetType().Name,
+                declared.Name,
+                produced.Name));
+        }
+
+        /// <summary>
+        /// The type a caller reads a property as. An element that hands
+        /// back values able to say they have no value declares the wrapper,
+        /// and the type a script has to match is the one inside it.
+        /// </summary>
+        private static Type UnwrapAspectPropertyValue(Type type)
+        {
+            if (type != null &&
+                type.IsGenericType &&
+                type.GetGenericTypeDefinition() ==
+                    typeof(IAspectPropertyValue<>))
+            {
+                return type.GetGenericArguments()[0];
+            }
+            return type;
+        }
+
+        /// <summary>
         /// Whether an element says it produces a property, read from the
-        /// element's own metadata. An element that cannot answer yet is
-        /// treated as not supplying the property, so a build never fails
-        /// because a cloud engine had not finished starting.
+        /// element's own metadata.
         /// </summary>
         private static bool Supplies(IFlowElement element, string propertyName)
+        {
+            return Supplied(element, propertyName) != null;
+        }
+
+        /// <summary>
+        /// The metadata an element publishes for a property, or null where
+        /// the element does not produce one of that name. An element that
+        /// cannot answer yet is read as producing nothing, which is all
+        /// that can be made of an element which has not finished starting.
+        /// </summary>
+        private static IElementPropertyMetaData Supplied(
+            IFlowElement element,
+            string propertyName)
         {
             IList<IElementPropertyMetaData> properties;
             try
@@ -429,11 +610,11 @@ namespace FiftyOne.Pipeline.DerivedProperty.FlowElements
                 when (exception is PropertiesNotYetLoadedException ||
                     exception is PipelineTemporarilyUnavailableException)
             {
-                return false;
+                return null;
             }
             if (properties == null)
             {
-                return false;
+                return null;
             }
             for (var i = 0; i < properties.Count; i++)
             {
@@ -442,10 +623,10 @@ namespace FiftyOne.Pipeline.DerivedProperty.FlowElements
                     propertyName,
                     StringComparison.OrdinalIgnoreCase))
                 {
-                    return true;
+                    return properties[i];
                 }
             }
-            return false;
+            return null;
         }
     }
 }

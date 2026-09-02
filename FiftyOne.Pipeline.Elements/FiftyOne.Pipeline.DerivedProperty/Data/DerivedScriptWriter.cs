@@ -132,7 +132,14 @@ namespace FiftyOne.Pipeline.DerivedProperty.Data
         private static JsonObject Output(DerivedPropertyMetaData output)
         {
             var result = new JsonObject();
-            AddText(result, "Name", output.Name);
+            // A script that creates a property prints the bare name it was
+            // written with, and one that replaces a property in another
+            // element prints the prefixed form, so the canonical output is
+            // the name the script gave either way.
+            AddText(
+                result,
+                "Name",
+                output.IsOverride ? output.QualifiedName : output.Name);
             AddText(result, "Description", output.Description);
             result.AddValue(
                 "ValueType", DerivedValueConverter.NameOf(output.ValueType));
