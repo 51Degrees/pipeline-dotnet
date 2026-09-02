@@ -306,6 +306,35 @@ namespace FiftyOne.Pipeline.AgentSignature.Tests
         }
 
         /// <summary>
+        /// A registry line naming an address this element refuses to fetch,
+        /// such as one inside the network or one carrying user information,
+        /// is dropped when the registry is read. The registry's own address
+        /// is configured by the operator, but the lines are whatever the
+        /// registry served, so a registry that has been tampered with must
+        /// not be able to point this element at an internal service.
+        /// </summary>
+        [TestMethod]
+        public void RegistryLinesNamingUnsafeAddressesAreDropped()
+        {
+            var actual = DirectoryFetcher.ParseRegistry(
+                "https://192.168.0.1/card.json\n" +
+                "https://[::1]/card.json\n" +
+                "https://169.254.169.254/card.json\n" +
+                "https://user@example.com/card.json\n" +
+                "http://example.com/card.json\n" +
+                "https://example.com/card.json\n");
+            Assert.AreEqual(
+                1,
+                actual.Count,
+                "Expected only the public HTTPS address to survive, and " +
+                "the list held '" + string.Join("', '", actual) + "'.");
+            Assert.AreEqual(
+                "https://example.com/card.json",
+                actual[0],
+                "Expected the public HTTPS address to be the one kept.");
+        }
+
+        /// <summary>
         /// A card found through a configured registry, whose key URL is the
         /// one the signature's agent resolves to, puts the name, the product
         /// token, the purpose and the card URL on a Verified result even

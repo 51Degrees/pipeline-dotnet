@@ -269,7 +269,11 @@ namespace FiftyOne.Pipeline.AgentSignature.Keys
         /// <summary>
         /// Read the text of a registry into the card URLs it lists. Blank
         /// lines are skipped and everything after a '#' on a line is a
-        /// comment.
+        /// comment. Each URL is checked the same way as an address from a
+        /// header, because although the registry's own address is configured
+        /// by the operator, the lines are whatever the registry served, so a
+        /// registry that has been tampered with must not be able to point
+        /// this element at an address inside the network.
         /// </summary>
         /// <param name="text">The registry text.</param>
         /// <returns>The card URLs.</returns>
@@ -293,11 +297,7 @@ namespace FiftyOne.Pipeline.AgentSignature.Keys
                 {
                     continue;
                 }
-                if (Uri.TryCreate(line, UriKind.Absolute, out var uri) &&
-                    string.Equals(
-                        uri.Scheme,
-                        Uri.UriSchemeHttps,
-                        StringComparison.OrdinalIgnoreCase))
+                if (IsSafeUrl(line))
                 {
                     result.Add(line);
                 }
