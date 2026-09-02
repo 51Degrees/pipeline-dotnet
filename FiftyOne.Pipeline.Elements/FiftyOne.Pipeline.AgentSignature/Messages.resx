@@ -1,0 +1,118 @@
+<?xml version="1.0" encoding="utf-8"?>
+<root>
+  <xsd:schema id="root" xmlns="" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:msdata="urn:schemas-microsoft-com:xml-msdata">
+    <xsd:import namespace="http://www.w3.org/XML/1998/namespace" />
+    <xsd:element name="root" msdata:IsDataSet="true">
+      <xsd:complexType>
+        <xsd:choice maxOccurs="unbounded">
+          <xsd:element name="metadata">
+            <xsd:complexType>
+              <xsd:sequence>
+                <xsd:element name="value" type="xsd:string" minOccurs="0" />
+              </xsd:sequence>
+              <xsd:attribute name="name" use="required" type="xsd:string" />
+              <xsd:attribute name="type" type="xsd:string" />
+              <xsd:attribute name="mimetype" type="xsd:string" />
+              <xsd:attribute ref="xml:space" />
+            </xsd:complexType>
+          </xsd:element>
+          <xsd:element name="assembly">
+            <xsd:complexType>
+              <xsd:attribute name="alias" type="xsd:string" />
+              <xsd:attribute name="name" type="xsd:string" />
+            </xsd:complexType>
+          </xsd:element>
+          <xsd:element name="data">
+            <xsd:complexType>
+              <xsd:sequence>
+                <xsd:element name="value" type="xsd:string" minOccurs="0" msdata:Ordinal="1" />
+                <xsd:element name="comment" type="xsd:string" minOccurs="0" msdata:Ordinal="2" />
+              </xsd:sequence>
+              <xsd:attribute name="name" type="xsd:string" use="required" msdata:Ordinal="1" />
+              <xsd:attribute name="type" type="xsd:string" msdata:Ordinal="3" />
+              <xsd:attribute name="mimetype" type="xsd:string" msdata:Ordinal="4" />
+              <xsd:attribute ref="xml:space" />
+            </xsd:complexType>
+          </xsd:element>
+          <xsd:element name="resheader">
+            <xsd:complexType>
+              <xsd:sequence>
+                <xsd:element name="value" type="xsd:string" minOccurs="0" msdata:Ordinal="1" />
+              </xsd:sequence>
+              <xsd:attribute name="name" type="xsd:string" use="required" />
+            </xsd:complexType>
+          </xsd:element>
+        </xsd:choice>
+      </xsd:complexType>
+    </xsd:element>
+  </xsd:schema>
+  <resheader name="resmimetype">
+    <value>text/microsoft-resx</value>
+  </resheader>
+  <resheader name="version">
+    <value>2.0</value>
+  </resheader>
+  <resheader name="reader">
+    <value>System.Resources.ResXResourceReader, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </resheader>
+  <resheader name="writer">
+    <value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </resheader>
+  <data name="NoValueDetailAbsent" xml:space="preserve">
+    <value>No signature headers were present in the request</value>
+  </data>
+  <data name="NoValueDetailNotSent" xml:space="preserve">
+    <value>The signature did not carry this information</value>
+  </data>
+  <data name="NoValueDetailMalformed" xml:space="preserve">
+    <value>The signature headers could not be read</value>
+  </data>
+  <data name="NoValueDetailWrongTag" xml:space="preserve">
+    <value>No signature in the request was made for automated agent traffic</value>
+  </data>
+  <data name="NoValueDetailNoAgent" xml:space="preserve">
+    <value>The signature named no agent, so there was nowhere to fetch a key from</value>
+  </data>
+  <data name="NoValuePurposeNotRead" xml:space="preserve">
+    <value>The signature was not verified so the directory was not read</value>
+  </data>
+  <data name="NoValuePurposeNotStated" xml:space="preserve">
+    <value>The agent does not say what its keys are for</value>
+  </data>
+  <data name="NoValueNoCard" xml:space="preserve">
+    <value>No agent card available</value>
+  </data>
+  <data name="LogDirectoryFetchFailed" xml:space="preserve">
+    <value>The key directory at '{0}' could not be read because {1}. The request reports the Unverified status, which is not evidence against the agent.</value>
+  </data>
+  <data name="LogCardFetchFailed" xml:space="preserve">
+    <value>The agent card at '{0}' could not be read because {1}. The signature status is unaffected.</value>
+  </data>
+  <data name="LogRegistryFetchFailed" xml:space="preserve">
+    <value>The agent card registry at '{0}' could not be read because {1}. The signature status is unaffected.</value>
+  </data>
+  <data name="LogMillisecondKeyTimes" xml:space="preserve">
+    <value>The key directory at '{0}' carried key times in milliseconds where the standard uses seconds, so the times were divided by 1,000.</value>
+  </data>
+  <data name="LogDirectoryPending" xml:space="preserve">
+    <value>The key directory at '{0}' had not been fetched after {1}ms, so this request reports the Timeout status. The fetch keeps running, so a later request from this agent finds the result.</value>
+  </data>
+  <data name="LogSharedSecretAlgorithm" xml:space="preserve">
+    <value>A request was signed with the shared secret algorithm '{0}' using key id '{1}'. The Web Bot Auth protocol forbids shared secrets, so the signature was not verified. This points at a misconfigured agent and is worth an operator's attention.</value>
+  </data>
+  <data name="NoValueDetailUnbound" xml:space="preserve">
+    <value>The signature covered nothing that ties it to this request, so it was not checked.</value>
+  </data>
+  <data name="NoValueDetailInlineDirectory" xml:space="preserve">
+    <value>The agent sent its key with the request rather than publishing it, which this element does not accept.</value>
+  </data>
+  <data name="ExceptionPeriodOutOfRange" xml:space="preserve">
+    <value>The period must not be negative and must not be longer than {0}.</value>
+  </data>
+  <data name="ExceptionCacheSizeTooSmall" xml:space="preserve">
+    <value>The cache must be allowed to hold at least one key directory.</value>
+  </data>
+  <data name="ExceptionMaxResponseBytesTooSmall" xml:space="preserve">
+    <value>The response limit must allow at least one byte to be read.</value>
+  </data>
+</root>
