@@ -67,7 +67,7 @@ namespace FiftyOne.Did.Tests
 
         /// <summary>The canonical 32-byte match key, bytes 0x20..0x3F.</summary>
         public static readonly byte[] CanonicalHash = Enumerable
-            .Range(0, FodId.HashLength)
+            .Range(0, FodId.MatchKeyLength)
             .Select(i => (byte)(0x20 + i))
             .ToArray();
 
@@ -106,7 +106,7 @@ namespace FiftyOne.Did.Tests
             var payload = new byte[FodId.PayloadLength];
             payload[FodId.FlagsOffset] = CanonicalFlags;
             WriteCanonicalLicenseId(payload);
-            Array.Copy(CanonicalHash, 0, payload, FodId.HashOffset, FodId.HashLength);
+            Array.Copy(CanonicalHash, 0, payload, FodId.MatchKeyOffset, FodId.MatchKeyLength);
             return payload;
         }
 
@@ -122,7 +122,7 @@ namespace FiftyOne.Did.Tests
             WriteCanonicalLicenseId(payload);
             for (int i = 0; i < FodId.GuidLength; i++)
             {
-                payload[FodId.HashOffset + i] = (byte)(0x40 + i);
+                payload[FodId.MatchKeyOffset + i] = (byte)(0x40 + i);
             }
             return payload;
         }

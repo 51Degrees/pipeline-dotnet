@@ -80,7 +80,7 @@ namespace FiftyOne.Did.Examples.Tests
         {
             var payload = new byte[FodId.PayloadLength];
             payload[FodId.FlagsOffset] = 0b0000_0101;
-            for (var i = FodId.HashOffset; i < payload.Length; i++)
+            for (var i = FodId.MatchKeyOffset; i < payload.Length; i++)
             {
                 payload[i] = (byte)i;
             }

@@ -101,18 +101,34 @@ namespace FiftyOne.Did.Model
         /// <summary>
         /// Byte offset of the match key field within the payload.
         /// </summary>
-        public const int HashOffset = 5;
+        public const int MatchKeyOffset = 5;
 
         /// <summary>
         /// Byte length of the match key field (SHA-256).
         /// </summary>
-        public const int HashLength = 32;
+        public const int MatchKeyLength = 32;
+
+        /// <summary>
+        /// Obsolete alias for <see cref="MatchKeyOffset"/>. The stable,
+        /// comparable part of a 51Did is now called the match key,
+        /// mirroring the Model Terms for Marketing vocabulary.
+        /// </summary>
+        [Obsolete("Renamed to MatchKeyOffset. This alias will be removed in a future release.")]
+        public const int HashOffset = MatchKeyOffset;
+
+        /// <summary>
+        /// Obsolete alias for <see cref="MatchKeyLength"/>. The stable,
+        /// comparable part of a 51Did is now called the match key,
+        /// mirroring the Model Terms for Marketing vocabulary.
+        /// </summary>
+        [Obsolete("Renamed to MatchKeyLength. This alias will be removed in a future release.")]
+        public const int HashLength = MatchKeyLength;
 
         /// <summary>
         /// Byte length of the payload header (Flags + LicenseId) that is
         /// common to every identifier type.
         /// </summary>
-        public const int HeaderLength = HashOffset;
+        public const int HeaderLength = MatchKeyOffset;
 
         /// <summary>
         /// Byte length of the GUID match key carried by Random identifiers.
@@ -139,7 +155,7 @@ namespace FiftyOne.Did.Model
         /// <c>Payload.Length</c>, or the inherited property through an
         /// <see cref="global::Owid.Client.Model.Owid"/> reference.
         /// </remarks>
-        public new const int PayloadLength = HashOffset + HashLength;
+        public new const int PayloadLength = MatchKeyOffset + MatchKeyLength;
 
         /// <summary>
         /// The 1-byte usage flags bit-mask from the payload.
@@ -550,7 +566,7 @@ namespace FiftyOne.Did.Model
             {
                 IdType.Random => GuidLength,
                 IdType.Reserved => payload.Length - HeaderLength,
-                _ => HashLength,
+                _ => MatchKeyLength,
             };
             if (payload.Length < HeaderLength + valueLength)
             {
@@ -562,7 +578,7 @@ namespace FiftyOne.Did.Model
                 | (payload[LicenseIdOffset + 2] << 16)
                 | (payload[LicenseIdOffset + 3] << 24));
             var matchKey = new byte[valueLength];
-            Array.Copy(payload, HashOffset, matchKey, 0, valueLength);
+            Array.Copy(payload, MatchKeyOffset, matchKey, 0, valueLength);
             unpacked = new Unpacked(owid, flags, licenseId, matchKey);
             return FodIdParseStatus.Parsed;
         }
