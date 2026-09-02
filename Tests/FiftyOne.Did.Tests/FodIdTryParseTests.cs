@@ -493,8 +493,8 @@ namespace FiftyOne.Did.Tests
         public void TryParse_AlteredPayload_ParsesThenSignatureInvalid()
         {
             var bytes = _factory.SignedBytes(CanonicalPayload(), DateTime.UtcNow);
-            var hashOffset = bytes.Length - SignatureLength - FodId.HashLength;
-            bytes[hashOffset] ^= 0xFF;
+            var matchKeyOffset = bytes.Length - SignatureLength - FodId.MatchKeyLength;
+            bytes[matchKeyOffset] ^= 0xFF;
 
             var ok = FodId.TryParse(bytes, out var fodId, out var status);
 

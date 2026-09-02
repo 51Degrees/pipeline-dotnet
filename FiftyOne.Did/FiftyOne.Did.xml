@@ -689,14 +689,28 @@
             Byte length of the License Id field.
             </summary>
         </member>
-        <member name="F:FiftyOne.Did.Model.FodId.HashOffset">
+        <member name="F:FiftyOne.Did.Model.FodId.MatchKeyOffset">
             <summary>
             Byte offset of the match key field within the payload.
             </summary>
         </member>
-        <member name="F:FiftyOne.Did.Model.FodId.HashLength">
+        <member name="F:FiftyOne.Did.Model.FodId.MatchKeyLength">
             <summary>
             Byte length of the match key field (SHA-256).
+            </summary>
+        </member>
+        <member name="F:FiftyOne.Did.Model.FodId.HashOffset">
+            <summary>
+            Obsolete alias for <see cref="F:FiftyOne.Did.Model.FodId.MatchKeyOffset"/>. The stable,
+            comparable part of a 51Did is now called the match key,
+            mirroring the Model Terms for Marketing vocabulary.
+            </summary>
+        </member>
+        <member name="F:FiftyOne.Did.Model.FodId.HashLength">
+            <summary>
+            Obsolete alias for <see cref="F:FiftyOne.Did.Model.FodId.MatchKeyLength"/>. The stable,
+            comparable part of a 51Did is now called the match key,
+            mirroring the Model Terms for Marketing vocabulary.
             </summary>
         </member>
         <member name="F:FiftyOne.Did.Model.FodId.HeaderLength">

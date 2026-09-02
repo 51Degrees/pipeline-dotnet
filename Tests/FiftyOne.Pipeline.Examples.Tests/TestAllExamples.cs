@@ -67,6 +67,16 @@ namespace FiftyOne.Pipeline.Examples.Tests
         }
 
         /// <summary>
+        /// Test that the agent signature example runs successfully.
+        /// </summary>
+        [TestMethod]
+        public void TestAgentSignatureExample()
+        {
+            var example = new Ex.AgentSignature.Program();
+            example.RunExample();
+        }
+
+        /// <summary>
         /// Test that the derived property example runs successfully.
         /// </summary>
         [TestMethod]

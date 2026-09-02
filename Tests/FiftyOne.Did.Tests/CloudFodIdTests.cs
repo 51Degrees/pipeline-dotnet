@@ -249,9 +249,9 @@ namespace FiftyOne.Did.Tests
             var fodId = new FodId(base64);
 
             // A 51Did wraps a payload of at least PayloadLength bytes carrying
-            // a HashLength byte probabilistic match key, inside a domain
+            // a MatchKeyLength byte probabilistic match key, inside a domain
             // bearing envelope.
-            Assert.AreEqual(FodId.HashLength, fodId.MatchKey.Length,
+            Assert.AreEqual(FodId.MatchKeyLength, fodId.MatchKey.Length,
                 $"{label}: match key length");
             Assert.IsTrue(fodId.Payload.Length >= FodId.PayloadLength,
                 $"{label}: payload length {fodId.Payload.Length} is below " +

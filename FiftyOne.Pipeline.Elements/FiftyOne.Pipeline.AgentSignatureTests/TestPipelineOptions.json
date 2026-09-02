@@ -1,0 +1,13 @@
+{
+  "PipelineOptions": {
+    "Elements": [
+      {
+        "BuilderName": "AgentSignatureElement",
+        "BuildParameters": {
+          "CacheLifetime": "01:00:00",
+          "CacheSize": 25
+        }
+      }
+    ]
+  }
+}

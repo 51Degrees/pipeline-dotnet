@@ -728,7 +728,7 @@ namespace FiftyOne.Did.Client
         private static int BaseLength(FodId fodId)
             => FodId.HeaderLength + (fodId.Type == IdType.Random
                 ? FodId.GuidLength
-                : FodId.HashLength);
+                : FodId.MatchKeyLength);
 
         /// <summary>
         /// Refuses a string that cannot be a 51Did before any key is

@@ -54,11 +54,11 @@ namespace FiftyOne.Did.Tests
             // as constant-folded so flags them, so the warning is suppressed locally.
 #pragma warning disable MSTEST0032
             Assert.AreEqual(
-                FodId.HashOffset + FodId.HashLength,
+                FodId.MatchKeyOffset + FodId.MatchKeyLength,
                 FodId.PayloadLength);
             Assert.AreEqual(
                 FodId.LicenseIdOffset + FodId.LicenseIdLength,
-                FodId.HashOffset);
+                FodId.MatchKeyOffset);
 #pragma warning restore MSTEST0032
         }
 
@@ -205,13 +205,13 @@ namespace FiftyOne.Did.Tests
             var fodId = new FodId(_factory.SignedOwidBase64(CanonicalPayload()));
 
             fodId.MatchKey[0] = 0x00;
-            fodId.MatchKey[FodId.HashLength - 1] = 0x00;
+            fodId.MatchKey[FodId.MatchKeyLength - 1] = 0x00;
 
             // The inherited Payload bytes must not have been mutated.
-            Assert.AreEqual(CanonicalHash[0], fodId.Payload[FodId.HashOffset]);
+            Assert.AreEqual(CanonicalHash[0], fodId.Payload[FodId.MatchKeyOffset]);
             Assert.AreEqual(
-                CanonicalHash[FodId.HashLength - 1],
-                fodId.Payload[FodId.HashOffset + FodId.HashLength - 1]);
+                CanonicalHash[FodId.MatchKeyLength - 1],
+                fodId.Payload[FodId.MatchKeyOffset + FodId.MatchKeyLength - 1]);
         }
 
         [TestMethod]
@@ -303,7 +303,7 @@ namespace FiftyOne.Did.Tests
             Assert.AreEqual(CanonicalFlags, fodId.Flags);
             Assert.AreEqual(CanonicalLicenseId, fodId.LicenseId);
             CollectionAssert.AreEqual(CanonicalHash, fodId.MatchKey);
-            Assert.AreEqual(FodId.HashLength, fodId.MatchKey.Length);
+            Assert.AreEqual(FodId.MatchKeyLength, fodId.MatchKey.Length);
         }
 
         [TestMethod]
@@ -332,7 +332,7 @@ namespace FiftyOne.Did.Tests
             // A context section of a version this reader does not implement
             // is accepted at any length, so an older reader keeps working
             // when a newer version ships.
-            var payload = new byte[FodId.HashOffset + 500];
+            var payload = new byte[FodId.MatchKeyOffset + 500];
             payload[FodId.FlagsOffset] = 0b1100_0000;
 
             var fodId = new FodId(_factory.SignedOwidBase64(payload));
@@ -440,7 +440,7 @@ namespace FiftyOne.Did.Tests
         [TestMethod]
         public void Constructor_ReservedHeaderOnly_Parses()
         {
-            var payload = new byte[FodId.HashOffset];
+            var payload = new byte[FodId.MatchKeyOffset];
             payload[FodId.FlagsOffset] = 0b1100_0000;
 
             var fodId = new FodId(_factory.SignedOwidBase64(payload));
@@ -454,7 +454,7 @@ namespace FiftyOne.Did.Tests
         {
 #pragma warning disable MSTEST0032
             Assert.AreEqual(
-                FodId.HashOffset + FodId.GuidLength,
+                FodId.MatchKeyOffset + FodId.GuidLength,
                 FodId.RandomPayloadLength);
 #pragma warning restore MSTEST0032
         }
