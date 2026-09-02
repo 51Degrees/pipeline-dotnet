@@ -57,44 +57,22 @@ namespace FiftyOne.Pipeline.Engines.FiftyOne.Tests.Data
         }
 
         /// <summary>
-        /// The request path and the whole query string are never shared,
-        /// even where everything is shared, because a site puts what it
-        /// likes in either so both can carry personal data, and neither
-        /// says anything about the device. They sit under the 'server'
-        /// prefix, which is otherwise shared, so without the rule they
-        /// would leave the server as soon as an element asked for them.
+        /// The request line values are shared like the other values under
+        /// the 'server' prefix. 51Degrees and the customer are joint
+        /// controllers of shared usage data under the terms of service,
+        /// and the contract prevents the data being used for anything
+        /// else, so a path or a query string that carries personal data is
+        /// covered by that agreement rather than by a filter here.
         /// </summary>
         [TestMethod]
-        public void ShareAll_ExcludesTheRequestPathAndQuery()
+        public void ShareAll_IncludesTheRequestLine()
         {
             var filter = new EvidenceKeyFilterShareUsage();
 
-            Assert.IsFalse(filter.Include("server.request-path"));
-            Assert.IsFalse(filter.Include("server.request-query"));
-            Assert.IsFalse(filter.Include("SERVER.REQUEST-QUERY"));
-            // A method is a verb and identifies nobody, so it is shared
-            // like the other server values.
             Assert.IsTrue(filter.Include("server.request-method"));
+            Assert.IsTrue(filter.Include("server.request-path"));
+            Assert.IsTrue(filter.Include("server.request-query"));
             Assert.IsTrue(filter.Include("server.client-ip"));
-        }
-
-        /// <summary>
-        /// The same two keys are excluded under the configured filter as
-        /// well, which is the mode a customer's share usage element
-        /// actually runs in.
-        /// </summary>
-        [TestMethod]
-        public void Configured_ExcludesTheRequestPathAndQuery()
-        {
-            var filter = new EvidenceKeyFilterShareUsage(
-                new List<string>(),
-                null,
-                false,
-                "asp.net_sessionid");
-
-            Assert.IsFalse(filter.Include("server.request-path"));
-            Assert.IsFalse(filter.Include("server.request-query"));
-            Assert.IsTrue(filter.Include("server.request-method"));
         }
 
         [TestMethod]
