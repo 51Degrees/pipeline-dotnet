@@ -68,6 +68,8 @@ using CoreConstants = FiftyOne.Pipeline.Core.Constants;
 ///
 /// This repository ships no data file, so the example uses the agent
 /// signature element on its own and adds no device detection dependency.
+/// The engine lives at
+/// [device-detection-dotnet](https://github.com/51Degrees/device-detection-dotnet).
 ///
 /// The example shows how to:
 ///
@@ -320,6 +322,42 @@ namespace Examples.AgentSignature
                 "device detection data file. This repository ships no data " +
                 "file, so this example uses the agent signature element on " +
                 "its own.");
+            WriteFindOutMore();
+        }
+
+        /// <summary>
+        /// Print where to find out more, so that anyone this example is
+        /// shown to can follow up from the output itself.
+        /// </summary>
+        private static void WriteFindOutMore()
+        {
+            Console.WriteLine(Separator);
+            Console.WriteLine("Find out more");
+            Console.WriteLine(
+                "  The device detection engine, which adds IsCrawler, " +
+                "CrawlerName and IsArtificialIntelligence:");
+            Console.WriteLine(
+                "    https://github.com/51Degrees/device-detection-dotnet");
+            Console.WriteLine(
+                "  This repository, where the agent signature element " +
+                "lives:");
+            Console.WriteLine(
+                "    https://github.com/51Degrees/pipeline-dotnet");
+            Console.WriteLine("  The 51Degrees documentation:");
+            Console.WriteLine(
+                "    https://51degrees.com/documentation" +
+                "?utm_source=code&utm_medium=example" +
+                "&utm_campaign=pipeline-dotnet" +
+                "&utm_content=examples-agentsignature-program.cs" +
+                "&utm_term=find-out-more");
+            Console.WriteLine(
+                "  More about 51Degrees and how to get in touch:");
+            Console.WriteLine(
+                "    https://51degrees.com" +
+                "?utm_source=code&utm_medium=example" +
+                "&utm_campaign=pipeline-dotnet" +
+                "&utm_content=examples-agentsignature-program.cs" +
+                "&utm_term=about-51degrees");
         }
 
         /// <summary>
