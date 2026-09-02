@@ -77,6 +77,15 @@ namespace FiftyOne.Pipeline.AgentSignature.FlowElement
         private const int MAXIMUM_LOGGED_KEYS = 1000;
 
         /// <summary>
+        /// The number of signatures carrying the Web Bot Auth tag that one
+        /// request has checked. The protocol draft's reverse proxy case
+        /// sends two, so three leaves room for a longer chain whilst
+        /// holding the worst case cost, which is one directory wait per
+        /// signature, to a few wait budgets.
+        /// </summary>
+        private const int MAXIMUM_SIGNATURES_CHECKED = 3;
+
+        /// <summary>
         /// The factory handed to the flow data's GetOrAdd. Writing
         /// the method name at the call site would build a fresh delegate on
         /// every request, spending an allocation before the no signature
@@ -275,29 +284,81 @@ namespace FiftyOne.Pipeline.AgentSignature.FlowElement
                 }
             }
 
-            // The protocol draft says to work with the first signature that
-            // carries the Web Bot Auth tag and to discard the others.
-            SignatureCandidate candidate = null;
+            // Every signature carrying the Web Bot Auth tag is checked,
+            // because the protocol draft has a verifier validate each one
+            // independently and its reverse proxy case sends two, the
+            // agent's own and the proxy's. The first that verifies answers
+            // the request, and where none does the first tagged
+            // signature's outcome is reported, so a request carrying one
+            // signature reads exactly as before. The number checked is
+            // bounded, because each one can cost a directory wait and the
+            // header is written by the sender, so an unbounded loop would
+            // hand the sender a way to hold a request thread through one
+            // long header.
+            AgentSignatureOutcome firstTagged = null;
+            var checked_ = 0;
             foreach (var possible in candidates)
             {
                 if (string.Equals(
                     possible.Tag,
                     Constants.TAG_WEB_BOT_AUTH,
-                    StringComparison.Ordinal))
+                    StringComparison.Ordinal) == false)
                 {
-                    candidate = possible;
+                    continue;
+                }
+                if (checked_ >= MAXIMUM_SIGNATURES_CHECKED)
+                {
                     break;
                 }
+                checked_++;
+                var attempt = new AgentSignatureOutcome
+                {
+                    MissingDetailMessage = Messages.NoValueDetailNotSent,
+                    Agent = outcome.Agent,
+                };
+                var result = EvaluateCandidate(data, possible, agents, attempt);
+                if (string.Equals(
+                    result.Status,
+                    Constants.STATUS_VERIFIED,
+                    StringComparison.Ordinal))
+                {
+                    return result;
+                }
+                if (firstTagged == null)
+                {
+                    firstTagged = result;
+                }
             }
-            if (candidate == null)
+            if (firstTagged != null)
             {
-                return Fail(
-                    outcome,
-                    Constants.STATUS_INVALID,
-                    Constants.REASON_TAG_MISMATCH,
-                    Messages.NoValueDetailWrongTag);
+                return firstTagged;
             }
+            return Fail(
+                outcome,
+                Constants.STATUS_INVALID,
+                Constants.REASON_TAG_MISMATCH,
+                Messages.NoValueDetailWrongTag);
+        }
 
+        /// <summary>
+        /// Take one signature through the checks of the decision table,
+        /// from its parameters to the check against the key the agent
+        /// publishes.
+        /// </summary>
+        /// <param name="data">The flow data the evidence is read from.</param>
+        /// <param name="candidate">The signature being checked.</param>
+        /// <param name="agents">
+        /// The 'Signature-Agent' members the request carried, or null when
+        /// the header was not sent.
+        /// </param>
+        /// <param name="outcome">The outcome being filled in.</param>
+        /// <returns>The outcome.</returns>
+        private AgentSignatureOutcome EvaluateCandidate(
+            IFlowData data,
+            SignatureCandidate candidate,
+            IList<SignatureAgentEntry> agents,
+            AgentSignatureOutcome outcome)
+        {
             outcome.KeyId = candidate.KeyId;
             outcome.Nonce = candidate.Nonce;
             outcome.Algorithm = candidate.Algorithm;
