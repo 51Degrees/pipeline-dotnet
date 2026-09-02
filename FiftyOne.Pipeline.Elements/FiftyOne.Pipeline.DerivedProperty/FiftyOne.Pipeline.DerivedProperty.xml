@@ -36,11 +36,17 @@
             reference evaluator and every other language.
             </summary>
         </member>
-        <member name="M:FiftyOne.Pipeline.DerivedProperty.Data.CompiledScript.#ctor(FiftyOne.Pipeline.DerivedProperty.Data.DerivedScript)">
+        <member name="M:FiftyOne.Pipeline.DerivedProperty.Data.CompiledScript.#ctor(FiftyOne.Pipeline.DerivedProperty.Data.DerivedScript,Microsoft.Extensions.Logging.ILogger)">
             <summary>
             Compile a validated script.
             </summary>
             <param name="script">The script.</param>
+            <param name="logger">
+            Used to report an element data that the pipeline said would be
+            there and that no request carries, which is the one mistake the
+            pipeline build cannot catch. Optional, and where it is null
+            nothing is reported.
+            </param>
             <exception cref="T:System.ArgumentNullException">
             Thrown where the script is null.
             </exception>
@@ -85,6 +91,30 @@
             does not allow and so can only happen where a script was built by
             hand rather than read from a file.
             </exception>
+        </member>
+        <member name="M:FiftyOne.Pipeline.DerivedProperty.Data.CompiledScript.ReportMissingElementData(System.String,System.String)">
+             <summary>
+             Reports, once only, that a request carried no element data at all
+             under a key the pipeline said some element writes.
+            
+             The pipeline build refuses a source property that no element in
+             the pipeline supplies, so reaching here means an element does
+             supply it and did not run before this one. That is the mistake
+             the build deliberately does not try to catch, because a pipeline
+             reports elements that run in parallel in an order that does not
+             say what ran before what, and judging that order failed
+             pipelines that were correct.
+            
+             It is reported once rather than on every request, because a
+             pipeline built the wrong way round is built the wrong way round
+             for the life of the process and would otherwise write the same
+             line for every request it serves.
+            
+             A property that is simply not there on a request, such as one
+             the 51Degrees JavaScript has not populated yet, does not come
+             through here at all. That is an ordinary thing to happen and is
+             reported in the value's own message rather than in the log.
+             </summary>
         </member>
         <member name="M:FiftyOne.Pipeline.DerivedProperty.Data.CompiledScript.Missing(FiftyOne.Pipeline.DerivedProperty.Data.DerivedEvaluationContext)">
             <summary>

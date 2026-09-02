@@ -93,7 +93,9 @@ namespace FiftyOne.Pipeline.DerivedProperty.FlowElements
 
             _scripts = scripts.ToArray();
             CheckOutputNamesAreUnique(_scripts);
-            _compiled = _scripts.Select(s => new CompiledScript(s)).ToArray();
+            _compiled = _scripts
+                .Select(s => new CompiledScript(s, logger))
+                .ToArray();
 
             // Only a script that creates a property contributes one here.
             // A script that replaces the value of a property another

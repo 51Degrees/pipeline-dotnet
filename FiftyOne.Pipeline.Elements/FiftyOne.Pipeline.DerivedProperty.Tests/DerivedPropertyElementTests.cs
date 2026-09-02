@@ -669,14 +669,33 @@ public class DerivedPropertyElementTests
             .AddFlowElement(element)
             .AddFlowElement(Source("device", "IsVisible", true))
             .Build())
-        using (var data = pipeline.CreateFlowData())
         {
-            data.Process();
-            var derived = data.Get(
-                DerivedPropertyElement.DerivedElementDataKey);
-            var value = (IAspectPropertyValue)derived["Strict"];
-            Assert.IsFalse(value.HasValue);
-            Assert.Contains("'device.IsVisible'", value.NoValueMessage);
+            for (var request = 0; request < 3; request++)
+            {
+                using (var data = pipeline.CreateFlowData())
+                {
+                    data.Process();
+                    var derived = data.Get(
+                        DerivedPropertyElement.DerivedElementDataKey);
+                    var value = (IAspectPropertyValue)derived["Strict"];
+                    Assert.IsFalse(value.HasValue);
+                    Assert.Contains(
+                        "'device.IsVisible'", value.NoValueMessage);
+                }
+            }
+
+            // The mistake is reported once and not on every request, since
+            // a pipeline built the wrong way round stays that way for the
+            // life of the process and would otherwise write the same line
+            // for every request it served.
+            var errors = _loggerFactory.Loggers
+                .SelectMany(l => l.ExtendedEntries)
+                .Where(e => e.LogLevel == LogLevel.Error)
+                .ToList();
+            Assert.HasCount(1, errors);
+            Assert.Contains("'Strict'", errors[0].Message);
+            Assert.Contains("device", errors[0].Message);
+            Assert.Contains("running after this one", errors[0].Message);
         }
     }
 

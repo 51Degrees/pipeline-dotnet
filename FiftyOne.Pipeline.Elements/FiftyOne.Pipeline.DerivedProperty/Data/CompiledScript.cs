@@ -24,6 +24,7 @@ using FiftyOne.Pipeline.Core.Data;
 using FiftyOne.Pipeline.Core.TypedMap;
 using FiftyOne.Pipeline.Engines;
 using FiftyOne.Pipeline.Engines.Data;
+using Microsoft.Extensions.Logging;
 using System;
 using System.Collections;
 using System.Collections.Concurrent;
@@ -68,7 +69,8 @@ namespace FiftyOne.Pipeline.DerivedProperty.Data
         /// </summary>
         public const string UsualCauses =
             "Usual causes are the element that supplies the property not " +
-            "being in the pipeline, the property being excluded in the " +
+            "being in the pipeline, or being added after this element " +
+            "rather than before it, the property being excluded in the " +
             "engine configuration, the property not being included in the " +
             "resource key, or JavaScript that populates the property not " +
             "having run yet.";
@@ -91,16 +93,31 @@ namespace FiftyOne.Pipeline.DerivedProperty.Data
         private readonly Func<object, IAspectPropertyValue> _valueFactory;
         private readonly Func<string, IAspectPropertyValue> _noValueFactory;
 
+        private readonly ILogger _logger;
+
+        // Zero until an element data the pipeline said would be there has
+        // been reported missing, then one. Read and set through Interlocked
+        // because requests run on many threads at once, so without it the
+        // first few requests would each report the same thing.
+        private int _reported;
+
         /// <summary>
         /// Compile a validated script.
         /// </summary>
         /// <param name="script">The script.</param>
+        /// <param name="logger">
+        /// Used to report an element data that the pipeline said would be
+        /// there and that no request carries, which is the one mistake the
+        /// pipeline build cannot catch. Optional, and where it is null
+        /// nothing is reported.
+        /// </param>
         /// <exception cref="ArgumentNullException">
         /// Thrown where the script is null.
         /// </exception>
-        public CompiledScript(DerivedScript script)
+        public CompiledScript(DerivedScript script, ILogger logger = null)
         {
             _script = script ?? throw new ArgumentNullException(nameof(script));
+            _logger = logger;
 
             var keys = new List<string>();
             var count = script.Properties.Count;
@@ -278,6 +295,51 @@ namespace FiftyOne.Pipeline.DerivedProperty.Data
         // Reading one source property.
         // ---------------------------------------------------------------
 
+        /// <summary>
+        /// Reports, once only, that a request carried no element data at all
+        /// under a key the pipeline said some element writes.
+        ///
+        /// The pipeline build refuses a source property that no element in
+        /// the pipeline supplies, so reaching here means an element does
+        /// supply it and did not run before this one. That is the mistake
+        /// the build deliberately does not try to catch, because a pipeline
+        /// reports elements that run in parallel in an order that does not
+        /// say what ran before what, and judging that order failed
+        /// pipelines that were correct.
+        ///
+        /// It is reported once rather than on every request, because a
+        /// pipeline built the wrong way round is built the wrong way round
+        /// for the life of the process and would otherwise write the same
+        /// line for every request it serves.
+        ///
+        /// A property that is simply not there on a request, such as one
+        /// the 51Degrees JavaScript has not populated yet, does not come
+        /// through here at all. That is an ordinary thing to happen and is
+        /// reported in the value's own message rather than in the log.
+        /// </summary>
+        private void ReportMissingElementData(
+            string elementKey, string propertyName)
+        {
+            if (_logger == null ||
+                System.Threading.Interlocked.CompareExchange(
+                    ref _reported, 1, 0) != 0)
+            {
+                return;
+            }
+            _logger.LogError(
+                "The script '{Script}' reads '{Property}', and the request " +
+                "carried no element data '{Element}' at all. An element in " +
+                "the pipeline does supply it, because the pipeline build " +
+                "refuses a source property nothing supplies, so that " +
+                "element is running after this one rather than before it. " +
+                "Add the derived property element after it. Until then " +
+                "every request leaves the script with no value. This is " +
+                "reported once.",
+                _script.Name,
+                elementKey + "." + propertyName,
+                elementKey);
+        }
+
         private void ReadSlot(
             int slot,
             IElementData[] elements,
@@ -294,6 +356,7 @@ namespace FiftyOne.Pipeline.DerivedProperty.Data
                     elementKey,
                     propertyName,
                     "property not present on this request");
+                ReportMissingElementData(elementKey, propertyName);
                 return;
             }
 
