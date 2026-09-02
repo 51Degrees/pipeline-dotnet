@@ -468,40 +468,37 @@ namespace FiftyOne.Pipeline.Web.Framework
             /// </remarks>
             public void AddRequestLineToEvidence(HttpRequest request)
             {
-                var wantsMethod = _evidenceKeyFilter.Include(
-                    Core.Constants.EVIDENCE_REQUEST_METHOD_KEY);
-                var wantsPath = _evidenceKeyFilter.Include(
-                    Core.Constants.EVIDENCE_REQUEST_PATH_KEY);
-                var wantsQuery = _evidenceKeyFilter.Include(
-                    Core.Constants.EVIDENCE_REQUEST_QUERY_KEY);
-                if (wantsMethod == false &&
-                    wantsPath == false &&
-                    wantsQuery == false)
-                {
-                    return;
-                }
-
-                if (wantsMethod)
+                if (_evidenceKeyFilter.Include(
+                    Core.Constants.EVIDENCE_REQUEST_METHOD_KEY))
                 {
                     CheckAndAdd(
                         Core.Constants.EVIDENCE_REQUEST_METHOD_KEY,
                         request.HttpMethod ?? string.Empty);
                 }
-                if (wantsPath == false && wantsQuery == false)
-                {
-                    return;
-                }
 
-                SplitRequestTarget(request, out var path, out var query);
-                if (wantsPath)
+                // The path and the query are split out of the request
+                // target together, so the one reading serves both and is
+                // only done where at least one of them is wanted.
+                if (_evidenceKeyFilter.Include(
+                        Core.Constants.EVIDENCE_REQUEST_PATH_KEY) ||
+                    _evidenceKeyFilter.Include(
+                        Core.Constants.EVIDENCE_REQUEST_QUERY_KEY))
                 {
-                    CheckAndAdd(
-                        Core.Constants.EVIDENCE_REQUEST_PATH_KEY, path);
-                }
-                if (wantsQuery)
-                {
-                    CheckAndAdd(
-                        Core.Constants.EVIDENCE_REQUEST_QUERY_KEY, query);
+                    SplitRequestTarget(request, out var path, out var query);
+
+                    if (_evidenceKeyFilter.Include(
+                        Core.Constants.EVIDENCE_REQUEST_PATH_KEY))
+                    {
+                        CheckAndAdd(
+                            Core.Constants.EVIDENCE_REQUEST_PATH_KEY, path);
+                    }
+
+                    if (_evidenceKeyFilter.Include(
+                        Core.Constants.EVIDENCE_REQUEST_QUERY_KEY))
+                    {
+                        CheckAndAdd(
+                            Core.Constants.EVIDENCE_REQUEST_QUERY_KEY, query);
+                    }
                 }
             }
 

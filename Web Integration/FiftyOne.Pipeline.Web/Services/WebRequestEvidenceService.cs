@@ -292,40 +292,33 @@ namespace FiftyOne.Pipeline.Web.Services
             HttpRequest httpRequest)
         {
             var filter = flowData.EvidenceKeyFilter;
-            var wantsMethod = filter.Include(
-                Core.Constants.EVIDENCE_REQUEST_METHOD_KEY);
-            var wantsPath = filter.Include(
-                Core.Constants.EVIDENCE_REQUEST_PATH_KEY);
-            var wantsQuery = filter.Include(
-                Core.Constants.EVIDENCE_REQUEST_QUERY_KEY);
-            if (wantsMethod == false &&
-                wantsPath == false &&
-                wantsQuery == false)
-            {
-                return;
-            }
 
-            if (wantsMethod)
+            if (filter.Include(Core.Constants.EVIDENCE_REQUEST_METHOD_KEY))
             {
                 flowData.AddEvidence(
                     Core.Constants.EVIDENCE_REQUEST_METHOD_KEY,
                     httpRequest.Method ?? string.Empty);
             }
-            if (wantsPath == false && wantsQuery == false)
-            {
-                return;
-            }
 
-            SplitRequestTarget(httpRequest, out var path, out var query);
-            if (wantsPath)
+            // The path and the query are split out of the request target
+            // together, so the one reading serves both and is only done
+            // where at least one of them is wanted.
+            if (filter.Include(Core.Constants.EVIDENCE_REQUEST_PATH_KEY) ||
+                filter.Include(Core.Constants.EVIDENCE_REQUEST_QUERY_KEY))
             {
-                flowData.AddEvidence(
-                    Core.Constants.EVIDENCE_REQUEST_PATH_KEY, path);
-            }
-            if (wantsQuery)
-            {
-                flowData.AddEvidence(
-                    Core.Constants.EVIDENCE_REQUEST_QUERY_KEY, query);
+                SplitRequestTarget(httpRequest, out var path, out var query);
+
+                if (filter.Include(Core.Constants.EVIDENCE_REQUEST_PATH_KEY))
+                {
+                    flowData.AddEvidence(
+                        Core.Constants.EVIDENCE_REQUEST_PATH_KEY, path);
+                }
+
+                if (filter.Include(Core.Constants.EVIDENCE_REQUEST_QUERY_KEY))
+                {
+                    flowData.AddEvidence(
+                        Core.Constants.EVIDENCE_REQUEST_QUERY_KEY, query);
+                }
             }
         }
 
