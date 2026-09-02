@@ -103,10 +103,24 @@
        empty, which is valid C#, so a build never depends on the content of
        the submodule and a machine without the submodule checked out still
        builds. -->
+  <!-- The target deliberately has no Inputs and Outputs, so it runs on
+       every build rather than only when a file it names is newer.
+
+       Moving the submodule to another commit does not always change the
+       timestamp of anything this target could name, because the scripts
+       themselves may be identical between two commits of the shared
+       repository. With an incremental gate the generated file was then
+       reused and the package went out carrying the commit of a previous
+       pin, which was found by reading SubmoduleCommit out of a packed
+       assembly and seeing the wrong value. That matters because the
+       element writes the value to the log as the answer to which scripts
+       ran.
+
+       Running every time costs one git rev-parse and one read of the
+       template, and WriteOnlyWhenDifferent below means an unchanged file
+       is not touched, so nothing downstream rebuilds. -->
   <Target Name="GenerateBuiltInScripts"
-          BeforeTargets="BeforeCompile;CoreCompile"
-          Inputs="@(EmbeddedResource);$(MSBuildThisFileDirectory)BuiltInScript.cs.template;$(MSBuildThisFileDirectory)Scripts\.git;$(MSBuildThisFileFullPath)"
-          Outputs="$(IntermediateOutputPath)BuiltInScript.g.cs">
+          BeforeTargets="BeforeCompile;CoreCompile">
 
     <!-- The submodule commit. A machine without the submodule, or without
          git on the path, gets the word unknown rather than a failed build. -->
