@@ -92,6 +92,22 @@ namespace FiftyOne.Pipeline.AgentSignature.FlowElement
             Constants.DEFAULT_ALLOW_LEGACY_SIGNATURE_AGENT;
 
         /// <summary>
+        /// The address of a key directory to fetch once at start up, so
+        /// that the log says whether this deployment can reach the keys
+        /// agents publish at all. Null, the default, means no check is
+        /// made.
+        /// </summary>
+        /// <remarks>
+        /// A deployment with no outbound access answers every signed
+        /// request Unverified, one request at a time, which reads as
+        /// agents behaving oddly rather than as a deployment that cannot
+        /// do the work. The check is made in the background, changes
+        /// nothing about how requests are answered and never stops the
+        /// element being built.
+        /// </remarks>
+        public string ReachabilityCheckUrl { get; set; }
+
+        /// <summary>
         /// True when a key set carried inline in a 'data:' URI is accepted.
         /// This is off by default, because such a key set is chosen by
         /// whoever sent the request rather than published at an address the

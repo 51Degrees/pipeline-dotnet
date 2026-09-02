@@ -341,6 +341,63 @@ namespace FiftyOne.Pipeline.AgentSignature.Tests
         }
 
         /// <summary>
+        /// A forwarded request whose caller sent the signature but not the
+        /// request line reports that a component was unavailable, not that
+        /// the signature did not match. The difference matters, because a
+        /// mismatch says the agent was lying whilst an unavailable
+        /// component says only that the check could not be made. Without
+        /// the rule that every part comes from the same place, the check
+        /// would fall back to this server's own request line, which
+        /// belongs to the call the caller made rather than to the request
+        /// the agent signed, and a well behaved agent would be reported as
+        /// a bad one.
+        /// </summary>
+        [TestMethod]
+        public void PartlyForwardedRequestIsNotBlamedOnTheAgent()
+        {
+            var signed = RequestSigner.Sign(Options(
+                new KeyValuePair<string, string>("\"@path\"", Path)));
+
+            using (var harness = ElementHarness.CreateWithTestKey())
+            {
+                var forwarded = new Dictionary<string, string>()
+                {
+                    { "query.signature", signed.Signature },
+                    { "query.signature-input", signed.SignatureInput },
+                    { "query.signature-agent", signed.SignatureAgent },
+                    { "query.host", Host },
+                    { "query.protocol", "https" },
+                    // The caller sent no request line, which is what an
+                    // older integration does.
+                };
+                var result = harness.ProcessSigned(
+                    new SignedRequest
+                    {
+                        Signature = "sig1=:AAAA:",
+                        SignatureInput = "sig1=();created=1",
+                        SignatureAgent = null,
+                    },
+                    forwarded,
+                    "cloud.51degrees.com",
+                    "https");
+
+                Assert.AreEqual(
+                    Constants.STATUS_UNVERIFIED,
+                    result.AgentSignature.Value,
+                    "Expected Unverified where the caller forwarded no " +
+                    "request line, and the status was '" +
+                    result.AgentSignature.Value + "' with reason '" +
+                    result.AgentSignatureReason.Value + "'.");
+                Assert.AreEqual(
+                    Constants.REASON_COMPONENT_UNAVAILABLE,
+                    result.AgentSignatureReason.Value,
+                    "Expected the ComponentUnavailable reason rather than " +
+                    "a mismatch, because this server's own request line " +
+                    "belongs to a different request.");
+            }
+        }
+
+        /// <summary>
         /// The element asks for the keys a forwarded request carries by
         /// name, not only through the rule that accepts any header. The
         /// cloud service builds the list of evidence it accepts from the

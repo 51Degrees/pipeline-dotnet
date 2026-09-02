@@ -85,6 +85,12 @@
   <data name="LogDirectoryFetchFailed" xml:space="preserve">
     <value>The key directory at '{0}' could not be read because {1}. The request reports the Unverified status, which is not evidence against the agent.</value>
   </data>
+  <data name="LogReachabilityGood" xml:space="preserve">
+    <value>Agent signature verification reached the key directory at '{0}' at start up, so this deployment can fetch the keys agents publish.</value>
+  </data>
+  <data name="LogReachabilityBad" xml:space="preserve">
+    <value>Agent signature verification could NOT reach the key directory at '{0}' at start up because {1}. Unless outbound HTTPS is opened for this deployment, every signed request will report the Unverified status with the DirectoryUnavailable reason, because no agent's keys can be fetched. Signature checking is effectively switched off until this is fixed.</value>
+  </data>
   <data name="LogCardFetchFailed" xml:space="preserve">
     <value>The agent card at '{0}' could not be read because {1}. The signature status is unaffected.</value>
   </data>

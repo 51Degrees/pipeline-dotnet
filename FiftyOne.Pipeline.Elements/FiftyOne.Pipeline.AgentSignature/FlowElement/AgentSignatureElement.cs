@@ -167,6 +167,79 @@ namespace FiftyOne.Pipeline.AgentSignature.FlowElement
             _cardsByKeyUrl =
                 new Lazy<Task<IDictionary<string, AgentCard>>>(LoadCards);
             _createData = CreateElementData;
+            StartReachabilityCheck();
+        }
+
+        /// <summary>
+        /// Where an address to check has been configured, fetch it once in
+        /// the background and say plainly in the log whether this
+        /// deployment can reach an agent's keys at all.
+        /// </summary>
+        /// <remarks>
+        /// A deployment with no outbound access answers every signed
+        /// request Unverified, one request at a time, which looks like
+        /// agents behaving oddly rather than like a deployment that cannot
+        /// work. One line at start up says which it is.
+        /// <para>
+        /// The check runs in the background and its outcome changes
+        /// nothing. Nothing is awaited, nothing is thrown and no request
+        /// waits for it, because an element that reached the network
+        /// whilst being built would stop a site starting at all when the
+        /// network was down, which is the fault this repository already
+        /// fixed once in issues 44 and 312.
+        /// </para>
+        /// </remarks>
+        private void StartReachabilityCheck()
+        {
+            if (string.IsNullOrEmpty(_configuration.ReachabilityCheckUrl))
+            {
+                return;
+            }
+            var url = _configuration.ReachabilityCheckUrl;
+            _ = Task.Run(async () =>
+            {
+                try
+                {
+                    using (var source = new CancellationTokenSource(
+                        _configuration.FetchTimeout))
+                    {
+                        var entry = await _fetcher.FetchAsync(
+                            url,
+                            Constants.AGENT_TYPE_DIRECTORY,
+                            source.Token).ConfigureAwait(false);
+                        if (entry.Success)
+                        {
+                            Logger.LogInformation(string.Format(
+                                CultureInfo.InvariantCulture,
+                                Messages.LogReachabilityGood,
+                                url));
+                        }
+                        else
+                        {
+                            Logger.LogError(string.Format(
+                                CultureInfo.InvariantCulture,
+                                Messages.LogReachabilityBad,
+                                url,
+                                entry.FailureReason ??
+                                    "no reason was given"));
+                        }
+                    }
+                }
+#pragma warning disable CA1031 // Do not catch general exception types
+                catch (Exception exception)
+#pragma warning restore CA1031
+                {
+                    // The catch is deliberately broad. This runs on a
+                    // thread nobody is waiting on, so anything escaping it
+                    // would be an unobserved failure rather than a message
+                    // to whoever is reading the log.
+                    Logger.LogError(string.Format(
+                        CultureInfo.InvariantCulture,
+                        Messages.LogReachabilityBad,
+                        url,
+                        exception.Message));
+                }
+            });
         }
 
         /// <inheritdoc/>
@@ -204,12 +277,26 @@ namespace FiftyOne.Pipeline.AgentSignature.FlowElement
 
             // Nearly every request has no signature at all, so answer that
             // case before anything is parsed or allocated.
-            var hasSignature = TryGetForwardedOrOwn(
+            //
+            // Where the signature came from decides where everything else
+            // comes from. A caller's own Pipeline forwards its evidence
+            // with the prefix taken off, so a forwarded signature sits
+            // under 'query' whilst 'header' holds the call to this server,
+            // and mixing the two would check part of one request against
+            // part of another. Reading only the prefix the signature came
+            // from means a forwarded request whose caller sent no host or
+            // no request line reports that a component was unavailable,
+            // which says the check could not be made, rather than
+            // reporting a mismatch, which would say the agent was lying.
+            var source = FindSource(data);
+            var hasSignature = TryGetBySource(
                 data,
+                source,
                 Constants.EVIDENCE_SIGNATURE_NAME,
                 out var signatureValue);
-            var hasInput = TryGetForwardedOrOwn(
+            var hasInput = TryGetBySource(
                 data,
+                source,
                 Constants.EVIDENCE_SIGNATURE_INPUT_NAME,
                 out var inputValue);
             if (hasSignature == false && hasInput == false)
@@ -218,49 +305,62 @@ namespace FiftyOne.Pipeline.AgentSignature.FlowElement
                 return;
             }
 
-            var outcome = Evaluate(data, signatureValue, inputValue);
+            var outcome = Evaluate(data, source, signatureValue, inputValue);
             Apply(outcome, elementData);
         }
 
         /// <summary>
-        /// Read a header by name, taking a copy forwarded by a caller's
-        /// own Pipeline ahead of the one this server received.
+        /// Decide which prefix this request's signature arrived under, so
+        /// that every part of the request is read from the same place.
         /// </summary>
         /// <remarks>
-        /// A caller's Pipeline sends its evidence to the cloud service
-        /// with the prefix taken off, so the caller's own
-        /// 'header.signature' arrives as 'query.signature' whilst
-        /// 'header.signature' holds whatever the call to the cloud itself
-        /// carried. The forwarded copy describes the request the agent
-        /// signed, so it is the one to read, and the specification gives
-        /// the query prefix the higher precedence for the same reason.
+        /// A signature under the query prefix was forwarded by a caller's
+        /// own Pipeline, which takes the prefix off every key it sends on,
+        /// and describes the request that reached the caller. Anything
+        /// under the header prefix describes the call this server
+        /// received. The two are different requests, so a base built from
+        /// both would be a base no agent ever signed.
         /// </remarks>
         /// <param name="data">The flow data.</param>
-        /// <param name="name">The header name, with no prefix.</param>
+        /// <returns>The prefix to read this request from.</returns>
+        private static string FindSource(IFlowData data)
+        {
+            var query = Core.Constants.EVIDENCE_QUERY_PREFIX;
+            if (data.TryGetEvidence<object>(
+                    query + Core.Constants.EVIDENCE_SEPERATOR +
+                        Constants.EVIDENCE_SIGNATURE_NAME,
+                    out _) ||
+                data.TryGetEvidence<object>(
+                    query + Core.Constants.EVIDENCE_SEPERATOR +
+                        Constants.EVIDENCE_SIGNATURE_INPUT_NAME,
+                    out _))
+            {
+                return query;
+            }
+            return Core.Constants.EVIDENCE_HTTPHEADER_PREFIX;
+        }
+
+        /// <summary>
+        /// Read a value by name from the prefix the signature came from.
+        /// </summary>
+        /// <param name="data">The flow data.</param>
+        /// <param name="source">The prefix to read from.</param>
+        /// <param name="name">The name, with no prefix.</param>
         /// <param name="value">The value found.</param>
-        /// <returns>True where either prefix carried the header.</returns>
-        private static bool TryGetForwardedOrOwn(
+        /// <returns>True where that prefix carried the name.</returns>
+        private static bool TryGetBySource(
             IFlowData data,
+            string source,
             string name,
             out string value)
         {
             value = null;
             if (data.TryGetEvidence(
-                    Core.Constants.EVIDENCE_QUERY_PREFIX +
-                        Core.Constants.EVIDENCE_SEPERATOR + name,
-                    out object forwarded) &&
-                forwarded != null)
+                    source + Core.Constants.EVIDENCE_SEPERATOR + name,
+                    out object raw) &&
+                raw != null)
             {
-                value = forwarded.ToString();
-                return true;
-            }
-            if (data.TryGetEvidence(
-                    Core.Constants.EVIDENCE_HTTPHEADER_PREFIX +
-                        Core.Constants.EVIDENCE_SEPERATOR + name,
-                    out object own) &&
-                own != null)
-            {
-                value = own.ToString();
+                value = raw.ToString();
                 return true;
             }
             return false;
@@ -283,6 +383,7 @@ namespace FiftyOne.Pipeline.AgentSignature.FlowElement
 
         private AgentSignatureOutcome Evaluate(
             IFlowData data,
+            string source,
             string signatureHeader,
             string inputHeader)
         {
@@ -308,8 +409,9 @@ namespace FiftyOne.Pipeline.AgentSignature.FlowElement
             }
 
             IList<SignatureAgentEntry> agents = null;
-            if (TryGetForwardedOrOwn(
+            if (TryGetBySource(
                 data,
+                source,
                 Constants.EVIDENCE_SIGNATURE_AGENT_NAME,
                 out var agentValue))
             {
@@ -362,7 +464,8 @@ namespace FiftyOne.Pipeline.AgentSignature.FlowElement
                     MissingDetailMessage = Messages.NoValueDetailNotSent,
                     Agent = outcome.Agent,
                 };
-                var result = EvaluateCandidate(data, possible, agents, attempt);
+                var result = EvaluateCandidate(
+                    data, source, possible, agents, attempt);
                 if (string.Equals(
                     result.Status,
                     Constants.STATUS_VERIFIED,
@@ -392,6 +495,10 @@ namespace FiftyOne.Pipeline.AgentSignature.FlowElement
         /// publishes.
         /// </summary>
         /// <param name="data">The flow data the evidence is read from.</param>
+        /// <param name="source">
+        /// The evidence prefix this request's signature arrived under,
+        /// which every other part of the request is read from too.
+        /// </param>
         /// <param name="candidate">The signature being checked.</param>
         /// <param name="agents">
         /// The 'Signature-Agent' members the request carried, or null when
@@ -401,6 +508,7 @@ namespace FiftyOne.Pipeline.AgentSignature.FlowElement
         /// <returns>The outcome.</returns>
         private AgentSignatureOutcome EvaluateCandidate(
             IFlowData data,
+            string source,
             SignatureCandidate candidate,
             IList<SignatureAgentEntry> agents,
             AgentSignatureOutcome outcome)
@@ -502,7 +610,7 @@ namespace FiftyOne.Pipeline.AgentSignature.FlowElement
                     Messages.NoValueDetailUnbound);
             }
 
-            var resolver = new FlowDataComponentResolver(data);
+            var resolver = new FlowDataComponentResolver(data, source);
             if (SignatureBase.TryBuild(
                 candidate.CoveredComponents,
                 candidate.SignatureParams,
@@ -1013,9 +1121,12 @@ namespace FiftyOne.Pipeline.AgentSignature.FlowElement
         {
             private readonly IFlowData _data;
 
-            public FlowDataComponentResolver(IFlowData data)
+            private readonly string _source;
+
+            public FlowDataComponentResolver(IFlowData data, string source)
             {
                 _data = data;
+                _source = source;
             }
 
             public bool TryResolve(
@@ -1197,47 +1308,50 @@ namespace FiftyOne.Pipeline.AgentSignature.FlowElement
             }
 
             /// <summary>
-            /// Read a header by name, taking the forwarded copy ahead of
-            /// the one this server received.
+            /// Read a header by name from the prefix the signature came
+            /// from, and from no other.
             /// </summary>
             /// <remarks>
-            /// A caller's own Pipeline sends its evidence on to the cloud
-            /// service with the prefix taken off, so a request signed for
-            /// the caller's own site arrives at the cloud with the
-            /// caller's headers under 'query' and the cloud's own headers
-            /// under 'header'. Checking 'query' first is what makes the
-            /// signature check run against the request the agent actually
-            /// signed rather than against the call the caller made to the
-            /// cloud, and it is the order the specification gives for the
-            /// two prefixes.
+            /// A forwarded signature describes the request that reached
+            /// the caller, and the headers under the header prefix
+            /// describe the call the caller then made to this server.
+            /// They are two different requests, so taking one part from
+            /// each would build a base no agent ever signed, and the
+            /// signature would read as a mismatch, which says the agent
+            /// was lying. Reading only the one source means a forwarded
+            /// request whose caller sent no host reports instead that a
+            /// component was unavailable, which says only that the check
+            /// could not be made.
             /// </remarks>
             private bool GetHeader(string name, out string value)
             {
                 return GetEvidence(
-                        Core.Constants.EVIDENCE_QUERY_PREFIX +
-                            Core.Constants.EVIDENCE_SEPERATOR + name,
-                        out value) ||
-                    GetEvidence(
-                        Core.Constants.EVIDENCE_HTTPHEADER_PREFIX +
-                            Core.Constants.EVIDENCE_SEPERATOR + name,
-                        out value);
+                    _source + Core.Constants.EVIDENCE_SEPERATOR + name,
+                    out value);
             }
 
             /// <summary>
-            /// Read one of the request line values, taking the forwarded
-            /// copy ahead of the one this server received, for the same
-            /// reason as a header.
+            /// Read one of the request line values from the prefix the
+            /// signature came from, for the same reason as a header. A
+            /// request that arrived here directly carries them under the
+            /// server prefix, and a forwarded one under the query prefix
+            /// with the server prefix taken off.
             /// </summary>
             private bool GetRequestLineValue(string key, out string value)
             {
+                if (string.Equals(
+                    _source,
+                    Core.Constants.EVIDENCE_HTTPHEADER_PREFIX,
+                    StringComparison.Ordinal))
+                {
+                    return GetEvidence(key, out value);
+                }
                 var name = key.Substring(key.IndexOf(
                     Core.Constants.EVIDENCE_SEPERATOR,
                     StringComparison.Ordinal) + 1);
                 return GetEvidence(
-                        Core.Constants.EVIDENCE_QUERY_PREFIX +
-                            Core.Constants.EVIDENCE_SEPERATOR + name,
-                        out value) ||
-                    GetEvidence(key, out value);
+                    _source + Core.Constants.EVIDENCE_SEPERATOR + name,
+                    out value);
             }
 
             private bool GetEvidence(string key, out string value)

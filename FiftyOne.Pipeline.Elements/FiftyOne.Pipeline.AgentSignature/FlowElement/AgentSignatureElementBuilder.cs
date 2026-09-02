@@ -260,6 +260,31 @@ namespace FiftyOne.Pipeline.AgentSignature.FlowElement
         }
 
         /// <summary>
+        /// Set the address of a key directory to fetch once at start up,
+        /// so that the log says whether this deployment can reach the keys
+        /// agents publish at all. No check is made by default.
+        /// </summary>
+        /// <remarks>
+        /// A deployment with no outbound access answers every signed
+        /// request Unverified, one request at a time, which reads as
+        /// agents behaving oddly rather than as a deployment that cannot
+        /// do the work. Point this at a directory that is expected to be
+        /// reachable, and one line at start up says which it is. The check
+        /// is made in the background, changes nothing about how requests
+        /// are answered, and never stops the element being built, because
+        /// an element that reached the network whilst being built would
+        /// stop a site starting at all when the network was down.
+        /// </remarks>
+        /// <param name="url">The address, or null for no check.</param>
+        /// <returns>This builder.</returns>
+        public AgentSignatureElementBuilder SetReachabilityCheckUrl(
+            string url)
+        {
+            Configuration.ReachabilityCheckUrl = url;
+            return this;
+        }
+
+        /// <summary>
         /// Set whether the bare quoted string form of the 'Signature-Agent'
         /// header, which the earlier drafts used, is accepted.
         /// </summary>

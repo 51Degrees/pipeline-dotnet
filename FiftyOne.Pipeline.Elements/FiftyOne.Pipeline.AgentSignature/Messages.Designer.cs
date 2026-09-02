@@ -142,6 +142,24 @@ namespace FiftyOne.Pipeline.AgentSignature {
         }
 
         /// <summary>
+        ///   Looks up a localized string similar to Agent signature verification reached the key directory at &apos;{0}&apos; at start up.
+        /// </summary>
+        internal static string LogReachabilityGood {
+            get {
+                return ResourceManager.GetString("LogReachabilityGood", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Looks up a localized string similar to Agent signature verification could NOT reach the key directory at &apos;{0}&apos; at start up because {1}.
+        /// </summary>
+        internal static string LogReachabilityBad {
+            get {
+                return ResourceManager.GetString("LogReachabilityBad", resourceCulture);
+            }
+        }
+
+        /// <summary>
         ///   Looks up a localized string similar to The agent card at &apos;{0}&apos; could not be read because {1}.
         /// </summary>
         internal static string LogCardFetchFailed {
