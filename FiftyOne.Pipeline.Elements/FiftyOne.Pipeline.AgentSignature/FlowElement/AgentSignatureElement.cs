@@ -204,21 +204,66 @@ namespace FiftyOne.Pipeline.AgentSignature.FlowElement
 
             // Nearly every request has no signature at all, so answer that
             // case before anything is parsed or allocated.
-            var hasSignature = data.TryGetEvidence(
-                Constants.EVIDENCE_SIGNATURE_KEY, out object signatureValue);
-            var hasInput = data.TryGetEvidence(
-                Constants.EVIDENCE_SIGNATURE_INPUT_KEY, out object inputValue);
+            var hasSignature = TryGetForwardedOrOwn(
+                data,
+                Constants.EVIDENCE_SIGNATURE_NAME,
+                out var signatureValue);
+            var hasInput = TryGetForwardedOrOwn(
+                data,
+                Constants.EVIDENCE_SIGNATURE_INPUT_NAME,
+                out var inputValue);
             if (hasSignature == false && hasInput == false)
             {
                 ApplyAbsent(elementData);
                 return;
             }
 
-            var outcome = Evaluate(
-                data,
-                hasSignature ? signatureValue?.ToString() : null,
-                hasInput ? inputValue?.ToString() : null);
+            var outcome = Evaluate(data, signatureValue, inputValue);
             Apply(outcome, elementData);
+        }
+
+        /// <summary>
+        /// Read a header by name, taking a copy forwarded by a caller's
+        /// own Pipeline ahead of the one this server received.
+        /// </summary>
+        /// <remarks>
+        /// A caller's Pipeline sends its evidence to the cloud service
+        /// with the prefix taken off, so the caller's own
+        /// 'header.signature' arrives as 'query.signature' whilst
+        /// 'header.signature' holds whatever the call to the cloud itself
+        /// carried. The forwarded copy describes the request the agent
+        /// signed, so it is the one to read, and the specification gives
+        /// the query prefix the higher precedence for the same reason.
+        /// </remarks>
+        /// <param name="data">The flow data.</param>
+        /// <param name="name">The header name, with no prefix.</param>
+        /// <param name="value">The value found.</param>
+        /// <returns>True where either prefix carried the header.</returns>
+        private static bool TryGetForwardedOrOwn(
+            IFlowData data,
+            string name,
+            out string value)
+        {
+            value = null;
+            if (data.TryGetEvidence(
+                    Core.Constants.EVIDENCE_QUERY_PREFIX +
+                        Core.Constants.EVIDENCE_SEPERATOR + name,
+                    out object forwarded) &&
+                forwarded != null)
+            {
+                value = forwarded.ToString();
+                return true;
+            }
+            if (data.TryGetEvidence(
+                    Core.Constants.EVIDENCE_HTTPHEADER_PREFIX +
+                        Core.Constants.EVIDENCE_SEPERATOR + name,
+                    out object own) &&
+                own != null)
+            {
+                value = own.ToString();
+                return true;
+            }
+            return false;
         }
 
         /// <inheritdoc/>
@@ -263,12 +308,13 @@ namespace FiftyOne.Pipeline.AgentSignature.FlowElement
             }
 
             IList<SignatureAgentEntry> agents = null;
-            if (data.TryGetEvidence(
-                Constants.EVIDENCE_SIGNATURE_AGENT_KEY,
-                out object agentValue))
+            if (TryGetForwardedOrOwn(
+                data,
+                Constants.EVIDENCE_SIGNATURE_AGENT_NAME,
+                out var agentValue))
             {
                 if (SignatureAgentEntry.TryParse(
-                    agentValue?.ToString(),
+                    agentValue,
                     _configuration.AllowLegacySignatureAgent,
                     out agents) == false)
                 {
@@ -1031,15 +1077,15 @@ namespace FiftyOne.Pipeline.AgentSignature.FlowElement
                         {
                             return false;
                         }
-                        GetHeaderByKey(
-                            Core.Constants.EVIDENCE_PROTOCOL,
+                        GetHeader(
+                            "protocol",
                             out var scheme);
                         value = SignatureBase.BuildAuthority(
                             host, scheme?.Trim().ToLowerInvariant());
                         return value != null;
                     case "@scheme":
-                        if (GetHeaderByKey(
-                            Core.Constants.EVIDENCE_PROTOCOL,
+                        if (GetHeader(
+                            "protocol",
                             out var protocol) == false)
                         {
                             return false;
@@ -1049,7 +1095,7 @@ namespace FiftyOne.Pipeline.AgentSignature.FlowElement
                     case "@method":
                         // RFC 9421 section 2.2.1. The method is upper case
                         // in the base whatever case the request used.
-                        if (GetHeaderByKey(
+                        if (GetRequestLineValue(
                             Core.Constants.EVIDENCE_REQUEST_METHOD_KEY,
                             out var method) == false)
                         {
@@ -1060,7 +1106,7 @@ namespace FiftyOne.Pipeline.AgentSignature.FlowElement
                     case "@path":
                         // RFC 9421 section 2.2.6. An empty path is the
                         // single slash.
-                        if (GetHeaderByKey(
+                        if (GetRequestLineValue(
                             Core.Constants.EVIDENCE_REQUEST_PATH_KEY,
                             out var path) == false)
                         {
@@ -1073,7 +1119,7 @@ namespace FiftyOne.Pipeline.AgentSignature.FlowElement
                         // leading question mark, and a request with no
                         // query at all still has the question mark on its
                         // own, so the two cases cannot be confused.
-                        if (GetHeaderByKey(
+                        if (GetRequestLineValue(
                             Core.Constants.EVIDENCE_REQUEST_QUERY_KEY,
                             out var query) == false)
                         {
@@ -1100,14 +1146,14 @@ namespace FiftyOne.Pipeline.AgentSignature.FlowElement
             private bool TryResolveTargetUri(out string value)
             {
                 value = null;
-                if (GetHeaderByKey(
-                        Core.Constants.EVIDENCE_PROTOCOL,
+                if (GetHeader(
+                        "protocol",
                         out var scheme) == false ||
                     GetHeader("host", out var host) == false ||
-                    GetHeaderByKey(
+                    GetRequestLineValue(
                         Core.Constants.EVIDENCE_REQUEST_PATH_KEY,
                         out var path) == false ||
-                    GetHeaderByKey(
+                    GetRequestLineValue(
                         Core.Constants.EVIDENCE_REQUEST_QUERY_KEY,
                         out var query) == false)
                 {
@@ -1150,16 +1196,51 @@ namespace FiftyOne.Pipeline.AgentSignature.FlowElement
                 return true;
             }
 
+            /// <summary>
+            /// Read a header by name, taking the forwarded copy ahead of
+            /// the one this server received.
+            /// </summary>
+            /// <remarks>
+            /// A caller's own Pipeline sends its evidence on to the cloud
+            /// service with the prefix taken off, so a request signed for
+            /// the caller's own site arrives at the cloud with the
+            /// caller's headers under 'query' and the cloud's own headers
+            /// under 'header'. Checking 'query' first is what makes the
+            /// signature check run against the request the agent actually
+            /// signed rather than against the call the caller made to the
+            /// cloud, and it is the order the specification gives for the
+            /// two prefixes.
+            /// </remarks>
             private bool GetHeader(string name, out string value)
             {
-                return GetHeaderByKey(
-                    Core.Constants.EVIDENCE_HTTPHEADER_PREFIX +
-                        Core.Constants.EVIDENCE_SEPERATOR +
-                        name,
-                    out value);
+                return GetEvidence(
+                        Core.Constants.EVIDENCE_QUERY_PREFIX +
+                            Core.Constants.EVIDENCE_SEPERATOR + name,
+                        out value) ||
+                    GetEvidence(
+                        Core.Constants.EVIDENCE_HTTPHEADER_PREFIX +
+                            Core.Constants.EVIDENCE_SEPERATOR + name,
+                        out value);
             }
 
-            private bool GetHeaderByKey(string key, out string value)
+            /// <summary>
+            /// Read one of the request line values, taking the forwarded
+            /// copy ahead of the one this server received, for the same
+            /// reason as a header.
+            /// </summary>
+            private bool GetRequestLineValue(string key, out string value)
+            {
+                var name = key.Substring(key.IndexOf(
+                    Core.Constants.EVIDENCE_SEPERATOR,
+                    StringComparison.Ordinal) + 1);
+                return GetEvidence(
+                        Core.Constants.EVIDENCE_QUERY_PREFIX +
+                            Core.Constants.EVIDENCE_SEPERATOR + name,
+                        out value) ||
+                    GetEvidence(key, out value);
+            }
+
+            private bool GetEvidence(string key, out string value)
             {
                 value = null;
                 if (_data.TryGetEvidence(key, out object raw) == false ||
@@ -1177,65 +1258,119 @@ namespace FiftyOne.Pipeline.AgentSignature.FlowElement
         /// </summary>
         /// <remarks>
         /// A signature names the parts of the request it covers, and it may
-        /// name any request header, so the element cannot write down the
-        /// list in advance. It asks for every header instead, together with
+        /// name any request header, so the element cannot write the list
+        /// down in advance. It accepts every header instead, together with
         /// the protocol, which '@authority' and '@scheme' are built from,
         /// and the three request line values, which '@method', '@path',
         /// '@query' and '@target-uri' are built from. A fixed list of
         /// headers would leave a signature covering any other header unable
-        /// to be rebuilt, because the web integration only puts evidence
-        /// into the request that some element has asked for. That same rule
-        /// is why the request line values are named here, and why a
-        /// pipeline holding no element that asks for them carries none of
-        /// them.
+        /// to be rebuilt, because a web integration only puts evidence into
+        /// the request that some element has asked for.
+        /// <para>
+        /// The 'query' prefix is accepted as well as 'header', because a
+        /// caller's own Pipeline sends its evidence on to the cloud service
+        /// with the prefix taken off, so a header that started as
+        /// 'header.signature' reaches the cloud as 'query.signature'.
+        /// Accepting both is what lets one element serve a request that
+        /// arrived directly and one that was forwarded.
+        /// </para>
+        /// <para>
+        /// The class derives from the whitelist filter, holding the keys
+        /// this element cannot work without, so that anything reading the
+        /// whitelist can say what to send. The cloud service builds the
+        /// list of evidence it accepts that way, and a prefix rule alone
+        /// cannot be written down in such a list, so a signature forwarded
+        /// to the cloud would carry none of its headers.
+        /// </para>
         /// </remarks>
         private sealed class AgentSignatureEvidenceKeyFilter
-            : IEvidenceKeyFilter
+            : EvidenceKeyFilterWhitelist
         {
-            private readonly string _headerPrefix =
+            private static readonly string _headerPrefix =
                 Core.Constants.EVIDENCE_HTTPHEADER_PREFIX +
                 Core.Constants.EVIDENCE_SEPERATOR;
 
-            private static readonly string[] _requestLineKeys = new[]
+            private static readonly string _queryPrefix =
+                Core.Constants.EVIDENCE_QUERY_PREFIX +
+                Core.Constants.EVIDENCE_SEPERATOR;
+
+            /// <summary>
+            /// The keys carrying the request line, which '@method',
+            /// '@path', '@query' and '@target-uri' are built from.
+            /// </summary>
+            private static readonly string[] RequestLineKeys = new[]
             {
                 Core.Constants.EVIDENCE_REQUEST_METHOD_KEY,
                 Core.Constants.EVIDENCE_REQUEST_PATH_KEY,
                 Core.Constants.EVIDENCE_REQUEST_QUERY_KEY,
             };
 
+            public AgentSignatureEvidenceKeyFilter()
+                : base(NamedKeys())
+            {
+            }
+
+            /// <summary>
+            /// The keys this element cannot do without, under both the
+            /// prefix a request carries directly and the prefix a
+            /// forwarded request carries. Anything reading the whitelist,
+            /// such as the cloud service's list of accepted evidence,
+            /// sees these.
+            /// </summary>
+            private static List<string> NamedKeys()
+            {
+                var names = new[]
+                {
+                    Constants.EVIDENCE_SIGNATURE_NAME,
+                    Constants.EVIDENCE_SIGNATURE_INPUT_NAME,
+                    Constants.EVIDENCE_SIGNATURE_AGENT_NAME,
+                    "host",
+                    "protocol",
+                };
+                var keys = new List<string>();
+                foreach (var name in names)
+                {
+                    keys.Add(_headerPrefix + name);
+                    keys.Add(_queryPrefix + name);
+                }
+                foreach (var key in RequestLineKeys)
+                {
+                    keys.Add(key);
+                    // The request line keys reach the cloud with the
+                    // 'server' prefix taken off, in the same way as the
+                    // headers.
+                    keys.Add(
+                        _queryPrefix +
+                        key.Substring(key.IndexOf(
+                            Core.Constants.EVIDENCE_SEPERATOR,
+                            StringComparison.Ordinal) + 1));
+                }
+                return keys;
+            }
+
             /// <inheritdoc/>
             /// <remarks>
-            /// The protocol, which '@scheme' and the port in '@authority'
-            /// are built from, is itself written as 'header.protocol', so
-            /// the one test on the prefix covers it as well.
+            /// Any header at all is accepted beyond the named keys,
+            /// because a signature may cover one this element cannot know
+            /// in advance. The protocol, which '@scheme' and the port in
+            /// '@authority' are built from, is itself written as
+            /// 'header.protocol', so the test on the prefix covers it too.
             /// </remarks>
-            public bool Include(string key)
+            public override bool Include(string key)
             {
                 if (key == null)
                 {
                     return false;
                 }
-                if (key.StartsWith(
-                    _headerPrefix,
-                    StringComparison.OrdinalIgnoreCase))
-                {
-                    return true;
-                }
-                foreach (var requestLineKey in _requestLineKeys)
-                {
-                    if (string.Equals(
-                        key,
-                        requestLineKey,
-                        StringComparison.OrdinalIgnoreCase))
-                    {
-                        return true;
-                    }
-                }
-                return false;
+                return key.StartsWith(
+                        _headerPrefix, StringComparison.OrdinalIgnoreCase) ||
+                    key.StartsWith(
+                        _queryPrefix, StringComparison.OrdinalIgnoreCase) ||
+                    base.Include(key);
             }
 
             /// <inheritdoc/>
-            public int? Order(string key)
+            public override int? Order(string key)
             {
                 return Include(key) ? 100 : (int?)null;
             }

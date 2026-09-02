@@ -21,6 +21,7 @@
  * ********************************************************************* */
 
 using FiftyOne.Pipeline.AgentSignature.Tests.Helpers;
+using FiftyOne.Pipeline.Core.Data;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using System.Collections.Generic;
 
@@ -278,6 +279,110 @@ namespace FiftyOne.Pipeline.AgentSignature.Tests
                     "Expected the element not to ask for evidence it " +
                     "cannot use, because asking for more than is needed " +
                     "makes other elements' work reach this element too.");
+            }
+        }
+
+        /// <summary>
+        /// A request forwarded to the cloud service verifies. A caller's
+        /// own Pipeline sends its evidence on with the prefix taken off,
+        /// so the signature headers and the request line arrive under the
+        /// query prefix, whilst the headers of the call to the cloud
+        /// itself arrive under the header prefix and name the cloud as the
+        /// host. The forwarded copy has to win, or the check would run
+        /// against the call the caller made rather than the request the
+        /// agent signed.
+        /// </summary>
+        [TestMethod]
+        public void ForwardedRequestVerifiesAgainstTheCallersOwnHost()
+        {
+            var signed = RequestSigner.Sign(Options(
+                new KeyValuePair<string, string>("\"@method\"", "GET"),
+                new KeyValuePair<string, string>("\"@path\"", Path)));
+
+            using (var harness = ElementHarness.CreateWithTestKey())
+            {
+                var forwarded = new Dictionary<string, string>()
+                {
+                    // What the caller's Pipeline sent on.
+                    { "query.signature", signed.Signature },
+                    { "query.signature-input", signed.SignatureInput },
+                    { "query.signature-agent", signed.SignatureAgent },
+                    { "query.host", Host },
+                    { "query.protocol", "https" },
+                    { "query.request-method", "GET" },
+                    { "query.request-path", Path },
+                    { "query.request-query", string.Empty },
+                };
+                var result = harness.ProcessSigned(
+                    // The call to the cloud carries none of the agent's
+                    // own signature, and names the cloud as its host.
+                    new SignedRequest
+                    {
+                        Signature = "sig1=:AAAA:",
+                        SignatureInput = "sig1=();created=1",
+                        SignatureAgent = null,
+                    },
+                    forwarded,
+                    "cloud.51degrees.com");
+
+                Assert.AreEqual(
+                    Constants.STATUS_VERIFIED,
+                    result.AgentSignature.Value,
+                    "Expected a forwarded request to verify against the " +
+                    "caller's own host rather than the cloud's, and the " +
+                    "status was '" + result.AgentSignature.Value +
+                    "' with reason '" + result.AgentSignatureReason.Value +
+                    "'.");
+                Assert.AreEqual(
+                    Fixtures.SignatureAgentOrigin,
+                    result.AgentSignatureAgent.Value,
+                    "Expected the agent from the forwarded headers.");
+            }
+        }
+
+        /// <summary>
+        /// The element asks for the keys a forwarded request carries by
+        /// name, not only through the rule that accepts any header. The
+        /// cloud service builds the list of evidence it accepts from the
+        /// named keys, and a rule about a prefix cannot be written into
+        /// such a list, so without these a forwarded signature would
+        /// arrive carrying nothing.
+        /// </summary>
+        [TestMethod]
+        public void NamedKeysCoverWhatAForwardedRequestNeeds()
+        {
+            using (var harness = ElementHarness.CreateWithTestKey())
+            {
+                var whitelist =
+                    ((EvidenceKeyFilterWhitelist)harness.Element
+                        .EvidenceKeyFilter).Whitelist;
+                foreach (var key in new[]
+                {
+                    "query.signature",
+                    "query.signature-input",
+                    "query.signature-agent",
+                    "query.host",
+                    "query.protocol",
+                    "query.request-method",
+                    "query.request-path",
+                    "query.request-query",
+                    "header.signature",
+                    "header.signature-input",
+                    "header.signature-agent",
+                    "header.host",
+                    "header.protocol",
+                    Core.Constants.EVIDENCE_REQUEST_METHOD_KEY,
+                    Core.Constants.EVIDENCE_REQUEST_PATH_KEY,
+                    Core.Constants.EVIDENCE_REQUEST_QUERY_KEY,
+                })
+                {
+                    Assert.IsTrue(
+                        whitelist.ContainsKey(key),
+                        "Expected '" + key + "' to be named in the " +
+                        "whitelist, because a service that reads the " +
+                        "whitelist to decide what to forward cannot see " +
+                        "a rule about a prefix.");
+                }
             }
         }
 

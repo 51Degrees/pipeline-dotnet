@@ -37,13 +37,33 @@ namespace FiftyOne.Pipeline.AgentSignature
         #region Evidence keys
 
         /// <summary>
+        /// The name of the 'Signature' HTTP header, without a prefix. A
+        /// request that arrives here directly carries it under the
+        /// 'header' prefix, and one forwarded by a caller's own Pipeline
+        /// carries it under 'query', so the name is held on its own.
+        /// </summary>
+        public const string EVIDENCE_SIGNATURE_NAME = "signature";
+
+        /// <summary>
+        /// The name of the 'Signature-Input' HTTP header, without a
+        /// prefix.
+        /// </summary>
+        public const string EVIDENCE_SIGNATURE_INPUT_NAME = "signature-input";
+
+        /// <summary>
+        /// The name of the 'Signature-Agent' HTTP header, without a
+        /// prefix.
+        /// </summary>
+        public const string EVIDENCE_SIGNATURE_AGENT_NAME = "signature-agent";
+
+        /// <summary>
         /// The complete key used when the 'Signature' HTTP header is
         /// passed as evidence.
         /// </summary>
         public const string EVIDENCE_SIGNATURE_KEY =
             Core.Constants.EVIDENCE_HTTPHEADER_PREFIX +
             Core.Constants.EVIDENCE_SEPERATOR +
-            "signature";
+            EVIDENCE_SIGNATURE_NAME;
 
         /// <summary>
         /// The complete key used when the 'Signature-Input' HTTP header is
@@ -52,7 +72,7 @@ namespace FiftyOne.Pipeline.AgentSignature
         public const string EVIDENCE_SIGNATURE_INPUT_KEY =
             Core.Constants.EVIDENCE_HTTPHEADER_PREFIX +
             Core.Constants.EVIDENCE_SEPERATOR +
-            "signature-input";
+            EVIDENCE_SIGNATURE_INPUT_NAME;
 
         /// <summary>
         /// The complete key used when the 'Signature-Agent' HTTP header is
@@ -61,7 +81,7 @@ namespace FiftyOne.Pipeline.AgentSignature
         public const string EVIDENCE_SIGNATURE_AGENT_KEY =
             Core.Constants.EVIDENCE_HTTPHEADER_PREFIX +
             Core.Constants.EVIDENCE_SEPERATOR +
-            "signature-agent";
+            EVIDENCE_SIGNATURE_AGENT_NAME;
 
         /// <summary>
         /// The complete key used when the 'Host' HTTP header is passed as
