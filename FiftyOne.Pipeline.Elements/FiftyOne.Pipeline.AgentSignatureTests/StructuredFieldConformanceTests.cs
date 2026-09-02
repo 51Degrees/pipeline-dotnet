@@ -198,6 +198,14 @@ namespace FiftyOne.Pipeline.AgentSignature.Tests
             public object Expected { get; set; }
 
             /// <summary>
+            /// The strict serialisation the suite expects, being the lines
+            /// of 'canonical' joined the way <see cref="Raw"/> is joined.
+            /// When the suite gives no 'canonical' the input is already in
+            /// its strict form, so this is <see cref="Raw"/>.
+            /// </summary>
+            public string Canonical { get; set; }
+
+            /// <summary>
             /// The rule this case is judged by.
             /// </summary>
             public CaseBucket Bucket { get; set; }
@@ -725,6 +733,14 @@ namespace FiftyOne.Pipeline.AgentSignature.Tests
                     element.GetProperty("header_type").GetString(),
                 Raw = string.Join(", ", lines),
             };
+
+            testCase.Canonical = element.TryGetProperty(
+                "canonical", out var canonical)
+                ? string.Join(
+                    ", ",
+                    canonical.EnumerateArray()
+                        .Select(line => line.GetString()))
+                : testCase.Raw;
 
             var mustFail =
                 element.TryGetProperty("must_fail", out var mustFailValue) &&

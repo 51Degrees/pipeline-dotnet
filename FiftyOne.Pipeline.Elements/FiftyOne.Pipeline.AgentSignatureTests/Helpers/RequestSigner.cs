@@ -145,6 +145,24 @@ namespace FiftyOne.Pipeline.AgentSignature.Tests.Helpers
         public bool OmitKeyId { get; set; }
 
         /// <summary>
+        /// Parameters appended to the 'Signature-Agent' member in the
+        /// header, written exactly as given, for example '; type=directory'.
+        /// Null appends nothing. A test pairs this with
+        /// <see cref="SignatureAgentSignedParameters"/> to spell the header
+        /// with legal spacing whilst the signature base carries the strict
+        /// form, the way RFC 8941 lets a signer write a header one legal
+        /// way and RFC 9421 has the verifier rebuild the strict form.
+        /// </summary>
+        public string SignatureAgentHeaderParameters { get; set; }
+
+        /// <summary>
+        /// Parameters appended to the 'Signature-Agent' member value on its
+        /// line of the signature base, written exactly as given, for
+        /// example ';type=directory'. Null appends nothing.
+        /// </summary>
+        public string SignatureAgentSignedParameters { get; set; }
+
+        /// <summary>
         /// Covered components to add beyond '@authority' and the signature
         /// agent, given as a component identifier and the value that
         /// belongs on its line of the signature base. For example
@@ -179,20 +197,26 @@ namespace FiftyOne.Pipeline.AgentSignature.Tests.Helpers
             if (options.SignatureAgent != null)
             {
                 var quoted = "\"" + options.SignatureAgent + "\"";
+                var signed = quoted +
+                    (options.SignatureAgentSignedParameters ?? string.Empty);
                 if (options.SignatureAgentLabel == null)
                 {
-                    signatureAgentHeader = quoted;
+                    signatureAgentHeader = quoted +
+                        (options.SignatureAgentHeaderParameters ??
+                            string.Empty);
                     components.Add(new KeyValuePair<string, string>(
-                        "\"signature-agent\"", quoted));
+                        "\"signature-agent\"", signed));
                 }
                 else
                 {
                     signatureAgentHeader =
-                        options.SignatureAgentLabel + "=" + quoted;
+                        options.SignatureAgentLabel + "=" + quoted +
+                        (options.SignatureAgentHeaderParameters ??
+                            string.Empty);
                     components.Add(new KeyValuePair<string, string>(
                         "\"signature-agent\";key=\"" +
                             options.SignatureAgentLabel + "\"",
-                        quoted));
+                        signed));
                 }
             }
             foreach (var extra in options.ExtraComponents)

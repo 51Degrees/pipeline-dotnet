@@ -357,10 +357,13 @@ namespace FiftyOne.Pipeline.AgentSignature.Tests
         }
 
         /// <summary>
-        /// The signature parameters are kept as the exact text that follows
-        /// the label in the 'Signature-Input' header. The last line of the
-        /// signature base is that text, so a single character of difference
-        /// makes every signature fail.
+        /// The signature parameters are the strict serialisation of the
+        /// member value of the 'Signature-Input' header. The architecture
+        /// vectors were written by a compliant signer in the strict form
+        /// already, so the serialisation must equal the text after the
+        /// label character for character. The last line of the signature
+        /// base is that text, so a single character of difference makes
+        /// every signature fail.
         /// </summary>
         /// <param name="caseName">The name of the case.</param>
         /// <param name="setName">The fixture the vector came from.</param>

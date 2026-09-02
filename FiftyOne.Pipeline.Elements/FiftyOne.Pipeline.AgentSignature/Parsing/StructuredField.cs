@@ -99,9 +99,9 @@ namespace FiftyOne.Pipeline.AgentSignature.Parsing
 
         /// <summary>
         /// The text of this item, including its parameters, exactly as it
-        /// appeared in the header. The signature base is built from this
-        /// text rather than from a fresh serialisation, so that a signer
-        /// whose serialisation differs in some detail still verifies.
+        /// appeared in the header. The signature base is built from the
+        /// strict serialisation instead, as RFC 9421 section 2.5 requires,
+        /// so this text is kept only as a record of what was read.
         /// </summary>
         public string Raw { get; }
 
@@ -177,8 +177,10 @@ namespace FiftyOne.Pipeline.AgentSignature.Parsing
 
         /// <summary>
         /// The text of the whole member value, including its parameters,
-        /// exactly as it appeared in the header. RFC 9421 section 2.5 puts
-        /// this text on the '@signature-params' line of the signature base.
+        /// exactly as it appeared in the header. The '@signature-params'
+        /// line of the signature base carries the strict serialisation
+        /// instead, as RFC 9421 section 2.3 requires, so this text is kept
+        /// only as a record of what was read.
         /// </summary>
         public string Raw { get; }
 

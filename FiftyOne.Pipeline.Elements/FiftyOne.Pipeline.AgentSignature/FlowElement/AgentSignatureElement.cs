@@ -1007,7 +1007,12 @@ namespace FiftyOne.Pipeline.AgentSignature.FlowElement
                 {
                     return false;
                 }
-                value = member.Raw;
+                // RFC 9421 section 2.1.2 puts the strict serialisation of
+                // the member value on the signature base line, not the
+                // text as the sender wrote it, so a member written
+                // without a value goes out as '?1' and legal spacing
+                // differences disappear.
+                value = StructuredFieldSerializer.Serialize(member);
                 return true;
             }
 

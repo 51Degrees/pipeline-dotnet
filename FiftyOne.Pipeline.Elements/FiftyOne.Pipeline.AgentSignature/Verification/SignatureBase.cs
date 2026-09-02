@@ -73,8 +73,8 @@ namespace FiftyOne.Pipeline.AgentSignature.Verification
         /// The covered components in the order the signer listed them.
         /// </param>
         /// <param name="signatureParams">
-        /// The text of the signature parameters, being the member value of
-        /// the 'Signature-Input' header exactly as the signer wrote it.
+        /// The signature parameters, being the strict serialisation of the
+        /// member value of the 'Signature-Input' header.
         /// </param>
         /// <param name="resolver">
         /// The source of the component values.
@@ -100,9 +100,17 @@ namespace FiftyOne.Pipeline.AgentSignature.Verification
                     // identifier to be a string.
                     return false;
                 }
+                // RFC 9421 section 2.5 writes each component identifier
+                // in its strict serialisation, so the line starts the way
+                // a compliant signer wrote it whatever legal spelling the
+                // header used.
+                var identifier =
+                    StructuredFieldSerializer.Serialize(component);
                 // A component listed twice makes the base ambiguous, which
-                // RFC 9421 section 2.5 forbids.
-                if (seen.Add(component.Raw) == false)
+                // RFC 9421 section 2.5 forbids. Comparing the serialised
+                // identifiers catches two spellings of one identifier as
+                // well as two identical ones.
+                if (seen.Add(identifier) == false)
                 {
                     return false;
                 }
@@ -111,7 +119,7 @@ namespace FiftyOne.Pipeline.AgentSignature.Verification
                 {
                     return false;
                 }
-                builder.Append(component.Raw);
+                builder.Append(identifier);
                 builder.Append(": ");
                 builder.Append(value);
                 builder.Append("\n");

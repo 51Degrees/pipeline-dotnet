@@ -43,9 +43,13 @@ namespace FiftyOne.Pipeline.AgentSignature.Parsing
         public IList<SfItem> CoveredComponents { get; }
 
         /// <summary>
-        /// The text of the 'Signature-Input' member value exactly as the
-        /// agent sent it. RFC 9421 section 2.5 puts this text on the last
-        /// line of the signature base.
+        /// The strict serialisation of the 'Signature-Input' member value,
+        /// being the inner list of covered components with its parameters
+        /// written the one way RFC 8941 section 4.1 allows. RFC 9421
+        /// section 2.3 has the signer build the last line of the signature
+        /// base from this form, so the verifier rebuilds from the same
+        /// form rather than from the text as the agent happened to write
+        /// it.
         /// </summary>
         public string SignatureParams { get; }
 
@@ -103,7 +107,7 @@ namespace FiftyOne.Pipeline.AgentSignature.Parsing
         {
             Label = label;
             CoveredComponents = input.InnerList;
-            SignatureParams = input.Raw;
+            SignatureParams = StructuredFieldSerializer.Serialize(input);
             Signature = signature;
             Created = input.TryGetLongParameter("created", out var created)
                 ? created
