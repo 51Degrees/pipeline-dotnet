@@ -21,6 +21,11 @@
 
   <ItemGroup>
     <ProjectReference Include="..\FiftyOne.Pipeline.DerivedProperty\FiftyOne.Pipeline.DerivedProperty.csproj" />
+    <!-- Referenced by JsonBuilderIntegrationTests only. The cloud serves a
+         derived property by putting the JSON builder after this element, so
+         the two working together is a contract worth pinning here rather
+         than being found later in the cloud. -->
+    <ProjectReference Include="..\FiftyOne.Pipeline.JsonBuilderElement\FiftyOne.Pipeline.JsonBuilder.csproj" />
   </ItemGroup>
 
   <ItemGroup>

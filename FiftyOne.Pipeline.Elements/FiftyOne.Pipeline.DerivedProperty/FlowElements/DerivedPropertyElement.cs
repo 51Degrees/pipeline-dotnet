@@ -270,7 +270,7 @@ namespace FiftyOne.Pipeline.DerivedProperty.FlowElements
             var position = IndexOfSelf(elements);
             var faults = new List<string>();
 
-            CheckForCollisions(elements, position, faults);
+            CheckForCollisions(elements, faults);
             CheckSourceProperties(elements, position, faults);
 
             if (faults.Count > 0)
@@ -303,9 +303,14 @@ namespace FiftyOne.Pipeline.DerivedProperty.FlowElements
             return elements.Count;
         }
 
+        /// <summary>
+        /// Two elements writing the same derived property collide wherever
+        /// they sit, because both write the one element data held under the
+        /// derived key, so where the other element sits does not matter and
+        /// no position is taken.
+        /// </summary>
         private void CheckForCollisions(
             IReadOnlyList<IFlowElement> elements,
-            int position,
             List<string> faults)
         {
             foreach (var script in _scripts)

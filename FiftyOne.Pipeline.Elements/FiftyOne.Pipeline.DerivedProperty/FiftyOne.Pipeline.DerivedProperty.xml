@@ -1419,6 +1419,14 @@
             simply reported missing on every request.
             </summary>
         </member>
+        <member name="M:FiftyOne.Pipeline.DerivedProperty.FlowElements.DerivedPropertyElement.CheckForCollisions(System.Collections.Generic.IReadOnlyList{FiftyOne.Pipeline.Core.FlowElements.IFlowElement},System.Collections.Generic.List{System.String})">
+            <summary>
+            Two elements writing the same derived property collide wherever
+            they sit, because both write the one element data held under the
+            derived key, so where the other element sits does not matter and
+            no position is taken.
+            </summary>
+        </member>
         <member name="M:FiftyOne.Pipeline.DerivedProperty.FlowElements.DerivedPropertyElement.Supplies(FiftyOne.Pipeline.Core.FlowElements.IFlowElement,System.String)">
             <summary>
             Whether an element says it produces a property, read from the
