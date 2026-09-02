@@ -59,6 +59,7 @@ namespace FiftyOne.Pipeline.AgentSignature.FlowElement
         private readonly HttpClient _httpClient;
         private readonly bool _ownsHttpClient;
         private readonly DirectoryCache _cache;
+        private bool _disposing;
         private readonly DirectoryFetcher _fetcher;
         private readonly Lazy<Task<IDictionary<string, AgentCard>>>
             _cardsByKeyUrl;
@@ -120,7 +121,8 @@ namespace FiftyOne.Pipeline.AgentSignature.FlowElement
             }
             _configuration = configuration;
 
-            _evidenceKeyFilter = new AgentSignatureEvidenceKeyFilter();
+            _evidenceKeyFilter = new AgentSignatureEvidenceKeyFilter(
+                configuration.TrustForwardedEvidence);
 
             _properties = new List<IElementPropertyMetaData>()
             {
@@ -233,6 +235,16 @@ namespace FiftyOne.Pipeline.AgentSignature.FlowElement
                     // thread nobody is waiting on, so anything escaping it
                     // would be an unobserved failure rather than a message
                     // to whoever is reading the log.
+                    //
+                    // An element disposed whilst the check was still
+                    // running takes the client with it, and that is an
+                    // ordinary shutdown rather than a deployment that
+                    // cannot reach the keys, so it must not raise the
+                    // alarm that says signature checking is switched off.
+                    if (Volatile.Read(ref _disposing))
+                    {
+                        return;
+                    }
                     Logger.LogError(string.Format(
                         CultureInfo.InvariantCulture,
                         Messages.LogReachabilityBad,
@@ -323,22 +335,44 @@ namespace FiftyOne.Pipeline.AgentSignature.FlowElement
         /// </remarks>
         /// <param name="data">The flow data.</param>
         /// <returns>The prefix to read this request from.</returns>
-        private static string FindSource(IFlowData data)
+        private string FindSource(IFlowData data)
         {
-            var query = Core.Constants.EVIDENCE_QUERY_PREFIX;
-            if (data.TryGetEvidence<object>(
-                    query + Core.Constants.EVIDENCE_SEPERATOR +
-                        Constants.EVIDENCE_SIGNATURE_NAME,
-                    out _) ||
-                data.TryGetEvidence<object>(
-                    query + Core.Constants.EVIDENCE_SEPERATOR +
-                        Constants.EVIDENCE_SIGNATURE_INPUT_NAME,
-                    out _))
+            // Without this, a visitor could put a signature, a host and a
+            // path in the address bar of an ordinary page, have the web
+            // integration turn them into evidence under the query prefix,
+            // and have those checked in place of the request that
+            // actually arrived. A signature captured from a genuine agent
+            // anywhere could then be replayed here and reported as
+            // Verified, which is what covering the authority and the path
+            // exists to prevent. Only a service that knows it receives
+            // forwarded evidence may turn this on, because forwarded
+            // evidence and a typed query string cannot be told apart once
+            // they have arrived.
+            if (_configuration.TrustForwardedEvidence &&
+                (data.TryGetEvidence<object>(
+                        QuerySignatureKey, out _) ||
+                    data.TryGetEvidence<object>(
+                        QuerySignatureInputKey, out _)))
             {
-                return query;
+                return Core.Constants.EVIDENCE_QUERY_PREFIX;
             }
             return Core.Constants.EVIDENCE_HTTPHEADER_PREFIX;
         }
+
+        /// <summary>
+        /// The two keys that say a request's evidence was forwarded,
+        /// built once rather than on every request, because this runs
+        /// whether or not a request carries a signature at all.
+        /// </summary>
+        private static readonly string QuerySignatureKey =
+            Core.Constants.EVIDENCE_QUERY_PREFIX +
+            Core.Constants.EVIDENCE_SEPERATOR +
+            Constants.EVIDENCE_SIGNATURE_NAME;
+
+        private static readonly string QuerySignatureInputKey =
+            Core.Constants.EVIDENCE_QUERY_PREFIX +
+            Core.Constants.EVIDENCE_SEPERATOR +
+            Constants.EVIDENCE_SIGNATURE_INPUT_NAME;
 
         /// <summary>
         /// Read a value by name from the prefix the signature came from.
@@ -369,6 +403,10 @@ namespace FiftyOne.Pipeline.AgentSignature.FlowElement
         /// <inheritdoc/>
         protected override void ManagedResourcesCleanup()
         {
+            // Read by the start up check, which runs on a thread nobody
+            // waits for and would otherwise report an ordinary shutdown
+            // as a deployment that cannot reach the keys.
+            Volatile.Write(ref _disposing, true);
             _cache.Dispose();
             if (_ownsHttpClient)
             {
@@ -1204,15 +1242,20 @@ namespace FiftyOne.Pipeline.AgentSignature.FlowElement
                         value = protocol.Trim().ToLowerInvariant();
                         return true;
                     case "@method":
-                        // RFC 9421 section 2.2.1. The method is upper case
-                        // in the base whatever case the request used.
+                        // RFC 9421 section 2.2.1 takes the method as the
+                        // request carried it. The published text is
+                        // explicit that "no transformation to the input
+                        // method value's case is performed", where an
+                        // earlier draft had said to upper case it, so a
+                        // request whose method arrived in lower case is
+                        // signed and checked in lower case.
                         if (GetRequestLineValue(
                             Core.Constants.EVIDENCE_REQUEST_METHOD_KEY,
                             out var method) == false)
                         {
                             return false;
                         }
-                        value = method.ToUpperInvariant();
+                        value = method;
                         return value.Length > 0;
                     case "@path":
                         // RFC 9421 section 2.2.6. An empty path is the
@@ -1419,9 +1462,12 @@ namespace FiftyOne.Pipeline.AgentSignature.FlowElement
                 Core.Constants.EVIDENCE_REQUEST_QUERY_KEY,
             };
 
-            public AgentSignatureEvidenceKeyFilter()
-                : base(NamedKeys())
+            private readonly bool _trustForwarded;
+
+            public AgentSignatureEvidenceKeyFilter(bool trustForwarded)
+                : base(NamedKeys(trustForwarded))
             {
+                _trustForwarded = trustForwarded;
             }
 
             /// <summary>
@@ -1431,7 +1477,7 @@ namespace FiftyOne.Pipeline.AgentSignature.FlowElement
             /// such as the cloud service's list of accepted evidence,
             /// sees these.
             /// </summary>
-            private static List<string> NamedKeys()
+            private static List<string> NamedKeys(bool trustForwarded)
             {
                 var names = new[]
                 {
@@ -1445,19 +1491,26 @@ namespace FiftyOne.Pipeline.AgentSignature.FlowElement
                 foreach (var name in names)
                 {
                     keys.Add(_headerPrefix + name);
-                    keys.Add(_queryPrefix + name);
+                    if (trustForwarded)
+                    {
+                        keys.Add(_queryPrefix + name);
+                    }
                 }
                 foreach (var key in RequestLineKeys)
                 {
                     keys.Add(key);
-                    // The request line keys reach the cloud with the
-                    // 'server' prefix taken off, in the same way as the
-                    // headers.
-                    keys.Add(
-                        _queryPrefix +
-                        key.Substring(key.IndexOf(
-                            Core.Constants.EVIDENCE_SEPERATOR,
-                            StringComparison.Ordinal) + 1));
+                    if (trustForwarded)
+                    {
+                        // The request line keys reach a service that
+                        // receives forwarded evidence with the 'server'
+                        // prefix taken off, in the same way as the
+                        // headers.
+                        keys.Add(
+                            _queryPrefix +
+                            key.Substring(key.IndexOf(
+                                Core.Constants.EVIDENCE_SEPERATOR,
+                                StringComparison.Ordinal) + 1));
+                    }
                 }
                 return keys;
             }
@@ -1478,8 +1531,10 @@ namespace FiftyOne.Pipeline.AgentSignature.FlowElement
                 }
                 return key.StartsWith(
                         _headerPrefix, StringComparison.OrdinalIgnoreCase) ||
-                    key.StartsWith(
-                        _queryPrefix, StringComparison.OrdinalIgnoreCase) ||
+                    (_trustForwarded &&
+                        key.StartsWith(
+                            _queryPrefix,
+                            StringComparison.OrdinalIgnoreCase)) ||
                     base.Include(key);
             }
 

@@ -472,6 +472,16 @@ namespace FiftyOne.Pipeline.AgentSignature
         public const bool DEFAULT_ALLOW_INLINE_DIRECTORY = false;
 
         /// <summary>
+        /// The default for whether evidence under the 'query' prefix is
+        /// trusted to describe the request that was signed. This is off,
+        /// because a web integration turns query string parameters into
+        /// evidence under that prefix, so a visitor could otherwise put a
+        /// signature, a host and a path in the address bar and have those
+        /// checked instead of the request that actually arrived.
+        /// </summary>
+        public const bool DEFAULT_TRUST_FORWARDED_EVIDENCE = false;
+
+        /// <summary>
         /// The default number of bytes read from a key directory, an agent
         /// card or a registry before the fetch is abandoned. The documents
         /// are small, and the address they are read from is chosen by

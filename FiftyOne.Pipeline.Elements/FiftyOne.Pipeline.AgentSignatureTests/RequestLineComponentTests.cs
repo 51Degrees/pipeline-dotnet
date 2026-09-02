@@ -134,14 +134,18 @@ namespace FiftyOne.Pipeline.AgentSignature.Tests
         }
 
         /// <summary>
-        /// The method goes on the signature base in upper case whatever
-        /// case the request used, as RFC 9421 section 2.2.1 requires.
+        /// The method goes on the signature base exactly as the request
+        /// carried it. RFC 9421 section 2.2.1 says plainly that "no
+        /// transformation to the input method value's case is
+        /// performed", where an earlier draft had said to upper case it,
+        /// so a request whose method arrived in lower case must be
+        /// checked in lower case.
         /// </summary>
         [TestMethod]
-        public void MethodIsUpperCasedOnTheSignatureBase()
+        public void MethodKeepsTheCaseTheRequestCarried()
         {
             var signed = RequestSigner.Sign(Options(
-                new KeyValuePair<string, string>("\"@method\"", "POST")));
+                new KeyValuePair<string, string>("\"@method\"", "post")));
 
             using (var harness = ElementHarness.CreateWithTestKey())
             {
@@ -152,8 +156,8 @@ namespace FiftyOne.Pipeline.AgentSignature.Tests
                     Constants.STATUS_VERIFIED,
                     result.AgentSignature.Value,
                     "Expected a request whose method arrived in lower " +
-                    "case to verify against a signature made over the " +
-                    "upper case form, and the status was '" +
+                    "case to verify against a signature made over that " +
+                    "same lower case form, and the status was '" +
                     result.AgentSignature.Value + "' with reason '" +
                     result.AgentSignatureReason.Value + "'.");
             }
@@ -299,7 +303,8 @@ namespace FiftyOne.Pipeline.AgentSignature.Tests
                 new KeyValuePair<string, string>("\"@method\"", "GET"),
                 new KeyValuePair<string, string>("\"@path\"", Path)));
 
-            using (var harness = ElementHarness.CreateWithTestKey())
+            using (var harness = ElementHarness.CreateWithTestKey(
+                builder => builder.SetTrustForwardedEvidence(true)))
             {
                 var forwarded = new Dictionary<string, string>()
                 {
@@ -358,7 +363,8 @@ namespace FiftyOne.Pipeline.AgentSignature.Tests
             var signed = RequestSigner.Sign(Options(
                 new KeyValuePair<string, string>("\"@path\"", Path)));
 
-            using (var harness = ElementHarness.CreateWithTestKey())
+            using (var harness = ElementHarness.CreateWithTestKey(
+                builder => builder.SetTrustForwardedEvidence(true)))
             {
                 var forwarded = new Dictionary<string, string>()
                 {
@@ -408,7 +414,8 @@ namespace FiftyOne.Pipeline.AgentSignature.Tests
         [TestMethod]
         public void NamedKeysCoverWhatAForwardedRequestNeeds()
         {
-            using (var harness = ElementHarness.CreateWithTestKey())
+            using (var harness = ElementHarness.CreateWithTestKey(
+                builder => builder.SetTrustForwardedEvidence(true)))
             {
                 var whitelist =
                     ((EvidenceKeyFilterWhitelist)harness.Element
@@ -440,6 +447,98 @@ namespace FiftyOne.Pipeline.AgentSignature.Tests
                         "whitelist to decide what to forward cannot see " +
                         "a rule about a prefix.");
                 }
+            }
+        }
+
+        /// <summary>
+        /// A visitor cannot forge a verified agent by putting a signature
+        /// in the address bar. A web integration turns query string
+        /// parameters into evidence under the query prefix, so without
+        /// the rule that such evidence is only read where a service has
+        /// said it receives forwarded evidence, anyone could take a
+        /// signature a genuine agent sent to any site, put it and a host
+        /// of their choosing in a URL, and be reported as that agent.
+        /// Covering the authority is meant to stop exactly that replay.
+        /// </summary>
+        [TestMethod]
+        public void QueryStringCannotForgeAVerifiedAgent()
+        {
+            // Signed for somewhere else entirely.
+            var signed = RequestSigner.Sign(new SigningOptions
+            {
+                Host = "attacker-owned.example",
+            });
+
+            using (var harness = ElementHarness.CreateWithTestKey())
+            {
+                // The request itself carries no signature headers at all,
+                // only what a visitor typed into the address bar.
+                var result = harness.Process(
+                    new Dictionary<string, string>()
+                    {
+                        { "header.host", "victim.example.com" },
+                        { "header.protocol", "https" },
+                        { "query.signature", signed.Signature },
+                        { "query.signature-input", signed.SignatureInput },
+                        { "query.signature-agent", signed.SignatureAgent },
+                        { "query.host", "attacker-owned.example" },
+                        { "query.protocol", "https" },
+                    });
+
+                Assert.AreNotEqual(
+                    Constants.STATUS_VERIFIED,
+                    result.AgentSignature.Value,
+                    "A signature put in the query string must never " +
+                    "report a verified agent, and the status was '" +
+                    result.AgentSignature.Value + "'.");
+                Assert.IsFalse(
+                    result.AgentSignatureAgent.HasValue,
+                    "No agent should be named at all, and '" +
+                    (result.AgentSignatureAgent.HasValue
+                        ? result.AgentSignatureAgent.Value
+                        : string.Empty) + "' was.");
+                Assert.AreEqual(
+                    Constants.STATUS_ABSENT,
+                    result.AgentSignature.Value,
+                    "A request whose only signature is in the query " +
+                    "string carries no signature at all as far as this " +
+                    "element is concerned.");
+            }
+        }
+
+        /// <summary>
+        /// A query string parameter that happens to be called 'signature'
+        /// does not stop a genuine signed request verifying. Signed URLs,
+        /// content delivery tokens and webhook callbacks all use a
+        /// parameter of that name, and reading it in place of the header
+        /// would report a well behaved agent as Invalid, which says the
+        /// agent was lying.
+        /// </summary>
+        [TestMethod]
+        public void UnrelatedQueryParameterDoesNotBreakAGenuineSignature()
+        {
+            var signed = RequestSigner.Sign(new SigningOptions
+            {
+                Host = Host,
+            });
+
+            using (var harness = ElementHarness.CreateWithTestKey())
+            {
+                var noise = new Dictionary<string, string>()
+                {
+                    { "query.signature", "not-a-signature-at-all" },
+                    { "query.signature-input", "nor-is-this" },
+                };
+                var result = harness.ProcessSigned(signed, noise, Host);
+
+                Assert.AreEqual(
+                    Constants.STATUS_VERIFIED,
+                    result.AgentSignature.Value,
+                    "A genuine signed request must still verify with an " +
+                    "unrelated query parameter called 'signature' beside " +
+                    "it, and the status was '" +
+                    result.AgentSignature.Value + "' with reason '" +
+                    result.AgentSignatureReason.Value + "'.");
             }
         }
 

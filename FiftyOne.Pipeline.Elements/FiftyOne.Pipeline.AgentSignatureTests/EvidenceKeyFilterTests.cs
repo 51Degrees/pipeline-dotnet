@@ -92,16 +92,14 @@ namespace FiftyOne.Pipeline.AgentSignature.Tests
             "an evidence key is matched whatever its case")]
         [DataRow(
             "query.signature",
-            true,
-            "a caller's own Pipeline forwards its evidence with the " +
-            "prefix taken off, so a signature header reaches the cloud " +
-            "service under the query prefix")]
+            false,
+            "a query string value is written by whoever sent the " +
+            "request, so it is only read where a service has said it " +
+            "receives forwarded evidence")]
         [DataRow(
             "query.foo",
-            true,
-            "a signature may cover any request header, and a forwarded " +
-            "header cannot be told apart from any other query value once " +
-            "the prefix has been taken off")]
+            false,
+            "a query string value is not a request header")]
         [DataRow(
             "cookie.bar",
             false,

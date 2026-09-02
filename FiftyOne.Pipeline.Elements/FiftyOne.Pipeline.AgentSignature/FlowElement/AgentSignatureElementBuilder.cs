@@ -260,6 +260,41 @@ namespace FiftyOne.Pipeline.AgentSignature.FlowElement
         }
 
         /// <summary>
+        /// Set whether evidence under the 'query' prefix is trusted to
+        /// describe the request that was signed. This is off by default
+        /// and MUST stay off anywhere a request can reach this Pipeline
+        /// from a browser.
+        /// </summary>
+        /// <remarks>
+        /// A web integration turns query string parameters into evidence
+        /// under the 'query' prefix, so with this on, a visitor could put
+        /// a signature, a host and a path in the address bar and have the
+        /// element check those instead of the request that actually
+        /// arrived. A signature captured from a genuine agent on any site
+        /// could then be replayed and reported as Verified, which is
+        /// exactly what covering the authority and the path is meant to
+        /// prevent.
+        /// <para>
+        /// The only place this belongs is a service that receives
+        /// evidence a caller's own Pipeline collected and forwarded, with
+        /// the prefix taken off every key on the way, being the 51Degrees
+        /// cloud service. Such a service knows it is in that position.
+        /// The element cannot work it out for itself, because forwarded
+        /// evidence and a typed query string look the same once they have
+        /// arrived.
+        /// </para>
+        /// </remarks>
+        /// <param name="trust">True to trust forwarded evidence.</param>
+        /// <returns>This builder.</returns>
+        [DefaultValue(Constants.DEFAULT_TRUST_FORWARDED_EVIDENCE)]
+        public AgentSignatureElementBuilder SetTrustForwardedEvidence(
+            bool trust)
+        {
+            Configuration.TrustForwardedEvidence = trust;
+            return this;
+        }
+
+        /// <summary>
         /// Set the address of a key directory to fetch once at start up,
         /// so that the log says whether this deployment can reach the keys
         /// agents publish at all. No check is made by default.
