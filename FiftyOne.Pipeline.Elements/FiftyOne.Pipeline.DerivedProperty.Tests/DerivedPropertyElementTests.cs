@@ -27,7 +27,9 @@ using FiftyOne.Pipeline.Core.Exceptions;
 using FiftyOne.Pipeline.Core.FlowElements;
 using FiftyOne.Pipeline.DerivedProperty.Data;
 using FiftyOne.Pipeline.DerivedProperty.FlowElements;
+using FiftyOne.Pipeline.Engines.Configuration;
 using FiftyOne.Pipeline.Engines.Data;
+using FiftyOne.Pipeline.Engines.FlowElements;
 using Microsoft.Extensions.Logging;
 using System;
 using System.Collections.Generic;
@@ -567,6 +569,48 @@ public class DerivedPropertyElementTests
     }
 
     /// <summary>
+    /// A source engine configured for lazy loading still gives the derived
+    /// property its value.
+    ///
+    /// An engine with lazy loading adds its aspect data to the flow data
+    /// straight away and fills it on another thread, so a reader that takes
+    /// the dictionary as it stands sees nothing. The engine here takes 300
+    /// milliseconds, which is far longer than the element needs to run, so
+    /// a reader that does not wait reads an empty element data every time
+    /// and this test fails.
+    /// </summary>
+    [TestMethod]
+    public void Element_WaitsForALazilyLoadedSourceProperty()
+    {
+        using (var source = new SlowSourceEngine(
+            _loggerFactory.CreateLogger<AspectEngineBase<
+                SlowSourceData, IAspectPropertyMetaData>>(),
+            (pipeline, engine) => new SlowSourceData(
+                _loggerFactory.CreateLogger<AspectDataBase>(),
+                pipeline,
+                (IAspectEngine)engine),
+            TimeSpan.FromMilliseconds(300)))
+        using (var element = new DerivedPropertyElementBuilder(_loggerFactory)
+            .AddScript("Lazy", LazyScript)
+            .Build())
+        {
+            source.SetLazyLoading(new LazyLoadingConfiguration(10000));
+            using (var pipeline = new PipelineBuilder(_loggerFactory)
+                .AddFlowElement(source)
+                .AddFlowElement(element)
+                .Build())
+            using (var data = pipeline.CreateFlowData())
+            {
+                data.Process();
+                var derived = data.Get(element.ElementDataKey);
+                var value = (IAspectPropertyValue)derived["Lazy"];
+                Assert.IsTrue(value.HasValue, value.NoValueMessage);
+                Assert.AreEqual("Verified", value.Value);
+            }
+        }
+    }
+
+    /// <summary>
     /// A supplier placed after the derived property element is named, so
     /// an ordering mistake says what to move rather than reading as a
     /// missing element.
@@ -844,6 +888,20 @@ public class DerivedPropertyElementTests
     /// A script naming a source property the pipeline check tests leave
     /// unsupplied.
     /// </summary>
+    private const string LazyScript =
+        "Format: 1\n" +
+        "Name: Lazy\n" +
+        "Version: 1.0.0\n" +
+        "Output:\n" +
+        "  Name: Lazy\n" +
+        "  Description: A property computed from a lazily loaded one.\n" +
+        "  ValueType: string\n" +
+        "  IsList: false\n" +
+        "Rules:\n" +
+        "  - When: { Property: signature.Verified, Eq: true }\n" +
+        "    Then: Verified\n" +
+        "  - Else: Unverified\n";
+
     private const string StrictScript =
         "Format: 1\n" +
         "Name: Strict\n" +

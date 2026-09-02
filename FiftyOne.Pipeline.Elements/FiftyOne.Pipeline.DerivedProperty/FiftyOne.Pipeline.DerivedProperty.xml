@@ -1475,6 +1475,13 @@
             no position is taken.
             </summary>
         </member>
+        <member name="M:FiftyOne.Pipeline.DerivedProperty.FlowElements.DerivedPropertyElement.CheckOverrideCollisions(System.Collections.Generic.IReadOnlyList{FiftyOne.Pipeline.Core.FlowElements.IFlowElement},FiftyOne.Pipeline.DerivedProperty.Data.DerivedScript,System.Collections.Generic.List{System.String})">
+            <summary>
+            Two derived property elements replacing the same property of the
+            same element collide, because both write that one element data
+            and whichever runs last silently wins.
+            </summary>
+        </member>
         <member name="M:FiftyOne.Pipeline.DerivedProperty.FlowElements.DerivedPropertyElement.CheckOverrideTargets(System.Collections.Generic.IReadOnlyList{FiftyOne.Pipeline.Core.FlowElements.IFlowElement},System.Int32,System.Collections.Generic.List{System.String})">
              <summary>
              A script that replaces the value of a property another element

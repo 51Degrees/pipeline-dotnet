@@ -224,6 +224,19 @@ namespace FiftyOne.Pipeline.DerivedProperty.FlowElements
 
         private void LogScripts()
         {
+            // Where the scripts in this package came from, logged once per
+            // element rather than once per script, so anyone holding the
+            // log can find the exact scripts that ran. A script added from
+            // a file or from code says so in its own line below.
+            if (_scripts.Any(s => s.Source != null &&
+                s.Source.StartsWith("built in", StringComparison.Ordinal)))
+            {
+                Logger.LogInformation(
+                    "Built in derived property scripts came from " +
+                    "derived-properties commit {Commit}.",
+                    BuiltInScripts.SubmoduleCommit);
+            }
+
             foreach (var script in _scripts)
             {
                 Logger.LogInformation(
@@ -336,10 +349,14 @@ namespace FiftyOne.Pipeline.DerivedProperty.FlowElements
             {
                 // A script that replaces a property another element owns
                 // writes nothing under the derived key, so it cannot
-                // collide with what another derived property element
-                // writes there.
+                // collide there. It can still collide with another
+                // derived property element replacing the same property,
+                // and that collision is invisible to the check below
+                // because an override is not advertised, so it is looked
+                // for by asking the other elements what they replace.
                 if (script.Output.IsOverride)
                 {
+                    CheckOverrideCollisions(elements, script, faults);
                     continue;
                 }
                 for (var i = 0; i < elements.Count; i++)
@@ -364,6 +381,48 @@ namespace FiftyOne.Pipeline.DerivedProperty.FlowElements
                             script.Name,
                             script.Output.Name));
                     }
+                }
+            }
+        }
+
+        /// <summary>
+        /// Two derived property elements replacing the same property of the
+        /// same element collide, because both write that one element data
+        /// and whichever runs last silently wins.
+        /// </summary>
+        private void CheckOverrideCollisions(
+            IReadOnlyList<IFlowElement> elements,
+            DerivedScript script,
+            List<string> faults)
+        {
+            for (var i = 0; i < elements.Count; i++)
+            {
+                if (ReferenceEquals(elements[i], this) ||
+                    (elements[i] is DerivedPropertyElement other) == false)
+                {
+                    continue;
+                }
+                foreach (var theirs in other.Scripts)
+                {
+                    if (theirs.Output.IsOverride == false ||
+                        string.Equals(
+                            theirs.Output.QualifiedName,
+                            script.Output.QualifiedName,
+                            StringComparison.OrdinalIgnoreCase) == false)
+                    {
+                        continue;
+                    }
+                    faults.Add(string.Format(
+                        CultureInfo.InvariantCulture,
+                        "The script '{0}' replaces the property '{1}', and " +
+                        "the script '{2}' in another derived property " +
+                        "element in this pipeline replaces the same " +
+                        "property. One pipeline replaces each property " +
+                        "once, because whichever element ran last would " +
+                        "otherwise decide the value.",
+                        script.Name,
+                        script.Output.QualifiedName,
+                        theirs.Name));
                 }
             }
         }

@@ -145,6 +145,53 @@ Rules:
 
             RunFromConfiguration();
             RunFromCode();
+            WriteFindOutMore();
+        }
+
+        /// <summary>
+        /// Print where to find out more, so that anyone this example is
+        /// shown to can follow up from the output itself.
+        /// </summary>
+        private static void WriteFindOutMore()
+        {
+            Console.WriteLine("==========================================");
+            Console.WriteLine("Find out more");
+            Console.WriteLine(
+                "  The scripts, the format reference and a page that runs " +
+                "a script in your browser:");
+            Console.WriteLine(
+                "    https://github.com/51Degrees/derived-properties");
+            Console.WriteLine(
+                "    https://51degrees.github.io/derived-properties/");
+            Console.WriteLine(
+                "  This repository, where the derived property element " +
+                "lives:");
+            Console.WriteLine(
+                "    https://github.com/51Degrees/pipeline-dotnet");
+            Console.WriteLine(
+                "  The device detection engine, which supplies most of " +
+                "the properties a script reads:");
+            Console.WriteLine(
+                "    https://github.com/51Degrees/device-detection-dotnet");
+            Console.WriteLine(
+                "  The IP intelligence engine, which supplies the rest:");
+            Console.WriteLine(
+                "    https://github.com/51Degrees/ip-intelligence-dotnet");
+            Console.WriteLine("  The 51Degrees documentation:");
+            Console.WriteLine(
+                "    https://51degrees.com/documentation" +
+                "?utm_source=code&utm_medium=example" +
+                "&utm_campaign=pipeline-dotnet" +
+                "&utm_content=examples-derivedproperty-program.cs" +
+                "&utm_term=find-out-more");
+            Console.WriteLine(
+                "  More about 51Degrees and how to get in touch:");
+            Console.WriteLine(
+                "    https://51degrees.com" +
+                "?utm_source=code&utm_medium=example" +
+                "&utm_campaign=pipeline-dotnet" +
+                "&utm_content=examples-derivedproperty-program.cs" +
+                "&utm_term=about-51degrees");
         }
 
         /// <summary>

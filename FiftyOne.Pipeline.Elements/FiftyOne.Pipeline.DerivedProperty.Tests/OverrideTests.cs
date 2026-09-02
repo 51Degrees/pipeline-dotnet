@@ -335,6 +335,41 @@ public class OverrideTests
         }
     }
 
+    /// <summary>
+    /// Two elements replacing the same property fail the pipeline build.
+    /// Both write the one element data the owning element holds, so
+    /// whichever ran last would decide the value and the other script
+    /// would have no effect that anybody could see. An override is not
+    /// advertised in the element's properties, so this collision is
+    /// invisible to the check that catches two elements creating the same
+    /// derived property and has to be looked for separately.
+    /// </summary>
+    [TestMethod]
+    public void PipelineCheck_TwoElementsReplacingOnePropertyFails()
+    {
+        var first = new DerivedPropertyElementBuilder(_loggerFactory)
+            .AddScript("CrawlerProof", OverrideScript)
+            .Build();
+        var second = new DerivedPropertyElementBuilder(_loggerFactory)
+            .AddScript("CrawlerProofAgain", SecondOverrideScript)
+            .Build();
+        var builder = new PipelineBuilder(_loggerFactory)
+            .AddFlowElement(Source("signature", Values("Verified", true)))
+            .AddFlowElement(Device(new AspectPropertyValue<bool>(true)))
+            .AddFlowElement(first)
+            .AddFlowElement(second);
+
+        var exception = Assert.ThrowsExactly<PipelineConfigurationException>(
+            () => builder.Build());
+        Assert.Contains("'device.IsCrawler'", exception.Message);
+        Assert.Contains("CrawlerProof", exception.Message);
+        Assert.Contains("CrawlerProofAgain", exception.Message);
+        Assert.Contains(
+            "One pipeline replaces each property once", exception.Message);
+        first.Dispose();
+        second.Dispose();
+    }
+
     // -----------------------------------------------------------------
     // The canonical form.
     // -----------------------------------------------------------------
@@ -404,6 +439,25 @@ public class OverrideTests
         "  - When: { Property: signature.Verified, Eq: true }\n" +
         "    Then: false\n" +
         "  - Else: true\n";
+
+    /// <summary>
+    /// A second script replacing the same property as
+    /// <see cref="OverrideScript"/>, so that two elements holding one each
+    /// collide on the property they both write.
+    /// </summary>
+    private const string SecondOverrideScript =
+        "Format: 1\n" +
+        "Name: CrawlerProofAgain\n" +
+        "Version: 1.0.0\n" +
+        "Output:\n" +
+        "  Name: device.IsCrawler\n" +
+        "  Description: What the signature proves about the requester.\n" +
+        "  ValueType: bool\n" +
+        "  IsList: false\n" +
+        "Rules:\n" +
+        "  - When: { Property: signature.Verified, Eq: true }\n" +
+        "    Then: true\n" +
+        "  - Else: false\n";
 
     /// <summary>
     /// The same target property written as text rather than as a boolean,

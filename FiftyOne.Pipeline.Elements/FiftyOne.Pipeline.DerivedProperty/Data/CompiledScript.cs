@@ -22,6 +22,7 @@
 
 using FiftyOne.Pipeline.Core.Data;
 using FiftyOne.Pipeline.Core.TypedMap;
+using FiftyOne.Pipeline.Engines;
 using FiftyOne.Pipeline.Engines.Data;
 using System;
 using System.Collections;
@@ -296,19 +297,51 @@ namespace FiftyOne.Pipeline.DerivedProperty.Data
                 return;
             }
 
+            // Read through the indexer rather than TryGet, because TryGet
+            // reads the dictionary as it stands and deliberately does not
+            // wait for lazy loading, so a source engine configured with
+            // SetLazyLoading would still be filling its data and every
+            // request would lose its derived value in a race. The indexer
+            // waits, which is what the translation engine does with its own
+            // source values. It also gives a real reason for a property the
+            // engine does not have, rather than the fixed wording below.
             object raw;
             try
             {
-                if (elementData.TryGet(propertyName, out raw) == false)
-                {
-                    raw = null;
-                }
+                raw = elementData[propertyName];
+            }
+            catch (PropertyMissingException missing)
+            {
+                context.Available[slot] = false;
+                context.Reasons[slot] = NotAvailable(
+                    elementKey,
+                    propertyName,
+                    string.IsNullOrEmpty(missing.Message)
+                        ? "property not present on this request"
+                        : missing.Message);
+                return;
             }
             catch (Exception exception)
                 when (exception is KeyNotFoundException ||
                     exception is InvalidCastException)
             {
                 raw = null;
+            }
+            catch (Exception exception)
+                when (exception is TimeoutException ||
+                    exception is OperationCanceledException ||
+                    exception is AggregateException)
+            {
+                // Lazy loading did not finish. The property is not readable
+                // on this request, which is a state the format already has,
+                // so it is reported as one rather than thrown out of an
+                // element that is only reading.
+                context.Available[slot] = false;
+                context.Reasons[slot] = NotAvailable(
+                    elementKey,
+                    propertyName,
+                    exception.Message);
+                return;
             }
 
             if (raw == null)
