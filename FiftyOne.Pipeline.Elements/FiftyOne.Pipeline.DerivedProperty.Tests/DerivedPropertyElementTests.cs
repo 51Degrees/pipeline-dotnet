@@ -611,27 +611,73 @@ public class DerivedPropertyElementTests
     }
 
     /// <summary>
-    /// A supplier placed after the derived property element is named, so
-    /// an ordering mistake says what to move rather than reading as a
-    /// missing element.
+    /// The shape the 51Degrees cloud pipeline is built in. The elements
+    /// that supply the source properties run in parallel with each other,
+    /// and the derived property element is added after that group.
+    ///
+    /// A pipeline reports parallel elements flattened, with the members of
+    /// a group after every element at the top level, so the derived
+    /// property element appears in that list before the elements that in
+    /// truth run long before it. Judging position failed this pipeline at
+    /// build with advice nobody could follow, being to move the element
+    /// after elements it was already after.
     /// </summary>
     [TestMethod]
-    public void PipelineCheck_SupplierAfterTheElementIsNamed()
+    public void PipelineCheck_SuppliersInAParallelGroupBuildAndRun()
     {
-        var element = new DerivedPropertyElementBuilder(_loggerFactory)
+        using (var element = new DerivedPropertyElementBuilder(_loggerFactory)
             .AddScript("Strict", StrictScript)
-            .Build();
-        var builder = new PipelineBuilder(_loggerFactory)
+            .Build())
+        using (var pipeline = new PipelineBuilder(_loggerFactory)
+            .AddFlowElementsParallel(
+                Source("device", "IsVisible", true),
+                Source("ip", "HumanProbability", 9))
             .AddFlowElement(element)
-            .AddFlowElement(Source("device", "IsVisible", true));
+            .Build())
+        using (var data = pipeline.CreateFlowData())
+        {
+            data.Process();
+            var derived = data.Get(
+                DerivedPropertyElement.DerivedElementDataKey);
+            var value = (IAspectPropertyValue)derived["Strict"];
+            Assert.IsTrue(value.HasValue, value.NoValueMessage);
+            Assert.AreEqual("High", value.Value);
+        }
+    }
 
-        var exception = Assert.ThrowsExactly<PipelineConfigurationException>(
-            () => builder.Build());
-        Assert.Contains("StubSourceElement", exception.Message);
-        Assert.Contains(
-            "placed after the derived property element",
-            exception.Message);
-        element.Dispose();
+    /// <summary>
+    /// A supplier placed after the derived property element builds, and
+    /// the derived property has no value with the message naming the
+    /// property that could not be read.
+    ///
+    /// Where an element sits is deliberately not judged at build. A
+    /// pipeline holding elements that run in parallel reports them
+    /// flattened, with the members of a group after every element at the
+    /// top level, so a position in that list does not say what ran before
+    /// what, and judging it failed pipelines that were correct. A property
+    /// that has not been written when this element runs is a property that
+    /// cannot be read, which is a state the format already has an answer
+    /// for, and that answer is what this test asserts.
+    /// </summary>
+    [TestMethod]
+    public void PipelineCheck_SupplierAfterTheElementLeavesNoValue()
+    {
+        using (var element = new DerivedPropertyElementBuilder(_loggerFactory)
+            .AddScript("Strict", StrictScript)
+            .Build())
+        using (var pipeline = new PipelineBuilder(_loggerFactory)
+            .AddFlowElement(element)
+            .AddFlowElement(Source("device", "IsVisible", true))
+            .Build())
+        using (var data = pipeline.CreateFlowData())
+        {
+            data.Process();
+            var derived = data.Get(
+                DerivedPropertyElement.DerivedElementDataKey);
+            var value = (IAspectPropertyValue)derived["Strict"];
+            Assert.IsFalse(value.HasValue);
+            Assert.Contains("'device.IsVisible'", value.NoValueMessage);
+        }
     }
 
     /// <summary>

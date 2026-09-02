@@ -205,27 +205,47 @@ public class OverrideTests
     }
 
     /// <summary>
-    /// The owning element placed after the derived property element would
-    /// write its own value over the one the script chose, so the ordering
-    /// mistake is named rather than reading as a missing element.
+    /// The owning element placed after the derived property element builds,
+    /// and the value the owning element produces stands, because the
+    /// element data the script would have written into did not exist when
+    /// the script ran.
+    ///
+    /// Where an element sits is deliberately not judged at build, for the
+    /// reason given on PipelineCheck_SupplierAfterTheElementLeavesNoValue.
+    /// An override that finds nothing to replace leaves the value alone,
+    /// which is exactly what an override does when it has nothing to say,
+    /// so the outcome here is the owning element's own answer.
     /// </summary>
     [TestMethod]
-    public void PipelineCheck_TargetElementAfterThisElementFails()
+    public void PipelineCheck_TargetElementAfterThisElementLeavesItsValue()
     {
-        var element = new DerivedPropertyElementBuilder(_loggerFactory)
+        var produced = new AspectPropertyValue<bool>(true);
+
+        using (var element = new DerivedPropertyElementBuilder(_loggerFactory)
             .AddScript("CrawlerProof", OverrideScript)
-            .Build();
-        var builder = new PipelineBuilder(_loggerFactory)
+            .Build())
+        using (var pipeline = new PipelineBuilder(_loggerFactory)
             .AddFlowElement(Source("signature", Values("Verified", true)))
             .AddFlowElement(element)
-            .AddFlowElement(Device(new AspectPropertyValue<bool>(true)));
+            .AddFlowElement(Device(produced))
+            .Build())
+        using (var data = pipeline.CreateFlowData())
+        {
+            data.Process();
 
-        var exception = Assert.ThrowsExactly<PipelineConfigurationException>(
-            () => builder.Build());
-        Assert.Contains("StubSourceElement", exception.Message);
-        Assert.Contains(
-            "placed after the derived property element", exception.Message);
-        element.Dispose();
+            var device = (IAspectPropertyValue)data.Get("device")["IsCrawler"];
+            Assert.IsTrue(device.HasValue, device.NoValueMessage);
+            Assert.IsTrue(
+                (bool)device.Value,
+                "the owning element's own value should stand");
+
+            // And nothing of that name is written under the derived key,
+            // because an override never creates a property of its own.
+            Assert.IsFalse(
+                data.Get(DerivedPropertyElement.DerivedElementDataKey)
+                    .TryGet("IsCrawler", out object _),
+                "an override wrote a property under the derived key");
+        }
     }
 
     /// <summary>

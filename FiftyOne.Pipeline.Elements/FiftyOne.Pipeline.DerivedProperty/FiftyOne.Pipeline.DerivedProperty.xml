@@ -1482,7 +1482,29 @@
             and whichever runs last silently wins.
             </summary>
         </member>
-        <member name="M:FiftyOne.Pipeline.DerivedProperty.FlowElements.DerivedPropertyElement.CheckOverrideTargets(System.Collections.Generic.IReadOnlyList{FiftyOne.Pipeline.Core.FlowElements.IFlowElement},System.Int32,System.Collections.Generic.List{System.String})">
+        <member name="M:FiftyOne.Pipeline.DerivedProperty.FlowElements.DerivedPropertyElement.AnyElementSupplies(System.Collections.Generic.IReadOnlyList{FiftyOne.Pipeline.Core.FlowElements.IFlowElement},FiftyOne.Pipeline.DerivedProperty.Data.DerivedSourceProperty)">
+             <summary>
+             Whether any element in the pipeline other than this one supplies
+             a source property.
+            
+             Where the element sits is deliberately not judged. A pipeline
+             holding elements that run in parallel reports them flattened,
+             with the members of a group after every element at the top
+             level, so an element's position in that list does not say what
+             ran before what. Judging it read a source engine inside a
+             parallel group as coming after an element that in truth runs
+             long afterwards, and failed the build with advice nobody could
+             follow. The 51Degrees cloud pipeline is built that way, so this
+             was not a corner case.
+            
+             Nothing is lost by not judging it, because a property that has
+             not been written when this element runs is a property that
+             cannot be read, which the format already has an answer for. The
+             derived property has no value and its message names the
+             property that was missing.
+             </summary>
+        </member>
+        <member name="M:FiftyOne.Pipeline.DerivedProperty.FlowElements.DerivedPropertyElement.CheckOverrideTargets(System.Collections.Generic.IReadOnlyList{FiftyOne.Pipeline.Core.FlowElements.IFlowElement},System.Collections.Generic.List{System.String})">
              <summary>
              A script that replaces the value of a property another element
              owns needs that element to be in the pipeline, to be placed

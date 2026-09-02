@@ -298,12 +298,11 @@ namespace FiftyOne.Pipeline.DerivedProperty.FlowElements
                 return;
             }
 
-            var position = IndexOfSelf(elements);
             var faults = new List<string>();
 
             CheckForCollisions(elements, faults);
-            CheckSourceProperties(elements, position, faults);
-            CheckOverrideTargets(elements, position, faults);
+            CheckSourceProperties(elements, faults);
+            CheckOverrideTargets(elements, faults);
 
             if (faults.Count > 0)
             {
@@ -318,21 +317,6 @@ namespace FiftyOne.Pipeline.DerivedProperty.FlowElements
                 }
                 throw new PipelineConfigurationException(message.ToString());
             }
-        }
-
-        private int IndexOfSelf(IReadOnlyList<IFlowElement> elements)
-        {
-            for (var i = 0; i < elements.Count; i++)
-            {
-                if (ReferenceEquals(elements[i], this))
-                {
-                    return i;
-                }
-            }
-            // Not finding the element means the pipeline is built in a way
-            // this check does not understand, so everything is treated as
-            // being earlier and no false failure is raised.
-            return elements.Count;
         }
 
         /// <summary>
@@ -429,43 +413,13 @@ namespace FiftyOne.Pipeline.DerivedProperty.FlowElements
 
         private void CheckSourceProperties(
             IReadOnlyList<IFlowElement> elements,
-            int position,
             List<string> faults)
         {
             foreach (var script in _scripts)
             {
                 foreach (var property in script.Properties)
                 {
-                    var earlier = false;
-                    var later = new List<string>();
-
-                    for (var i = 0; i < elements.Count; i++)
-                    {
-                        var element = elements[i];
-                        if (ReferenceEquals(element, this))
-                        {
-                            continue;
-                        }
-                        if (string.Equals(
-                            element.ElementDataKey,
-                            property.ElementDataKey,
-                            StringComparison.OrdinalIgnoreCase) == false)
-                        {
-                            continue;
-                        }
-                        if (Supplies(element, property.PropertyName) == false)
-                        {
-                            continue;
-                        }
-                        if (i < position)
-                        {
-                            earlier = true;
-                            break;
-                        }
-                        later.Add(element.GetType().Name);
-                    }
-
-                    if (earlier)
+                    if (AnyElementSupplies(elements, property))
                     {
                         continue;
                     }
@@ -474,28 +428,60 @@ namespace FiftyOne.Pipeline.DerivedProperty.FlowElements
                     // that cannot supply one would produce no value on every
                     // request. Failing the build says so at the point the
                     // mistake was made rather than on the first request.
-                    faults.Add(later.Count > 0
-                        ? string.Format(
-                            CultureInfo.InvariantCulture,
-                            "The script '{0}' needs the property '{1}', " +
-                            "which is supplied by {2}, placed after the " +
-                            "derived property element rather than before " +
-                            "it. Move the derived property element after " +
-                            "{2}.",
-                            script.Name,
-                            property.Name,
-                            string.Join(", ", later))
-                        : string.Format(
-                            CultureInfo.InvariantCulture,
-                            "The script '{0}' needs the property '{1}', " +
-                            "and no element in the pipeline supplies it. " +
-                            "Either add the element that supplies '{1}', " +
-                            "or change the script so that it does not name " +
-                            "'{1}'.",
-                            script.Name,
-                            property.Name));
+                    faults.Add(string.Format(
+                        CultureInfo.InvariantCulture,
+                        "The script '{0}' needs the property '{1}', " +
+                        "and no element in the pipeline supplies it. " +
+                        "Either add the element that supplies '{1}', " +
+                        "or change the script so that it does not name " +
+                        "'{1}'.",
+                        script.Name,
+                        property.Name));
                 }
             }
+        }
+
+        /// <summary>
+        /// Whether any element in the pipeline other than this one supplies
+        /// a source property.
+        ///
+        /// Where the element sits is deliberately not judged. A pipeline
+        /// holding elements that run in parallel reports them flattened,
+        /// with the members of a group after every element at the top
+        /// level, so an element's position in that list does not say what
+        /// ran before what. Judging it read a source engine inside a
+        /// parallel group as coming after an element that in truth runs
+        /// long afterwards, and failed the build with advice nobody could
+        /// follow. The 51Degrees cloud pipeline is built that way, so this
+        /// was not a corner case.
+        ///
+        /// Nothing is lost by not judging it, because a property that has
+        /// not been written when this element runs is a property that
+        /// cannot be read, which the format already has an answer for. The
+        /// derived property has no value and its message names the
+        /// property that was missing.
+        /// </summary>
+        private bool AnyElementSupplies(
+            IReadOnlyList<IFlowElement> elements,
+            DerivedSourceProperty property)
+        {
+            for (var i = 0; i < elements.Count; i++)
+            {
+                var element = elements[i];
+                if (ReferenceEquals(element, this))
+                {
+                    continue;
+                }
+                if (string.Equals(
+                    element.ElementDataKey,
+                    property.ElementDataKey,
+                    StringComparison.OrdinalIgnoreCase) &&
+                    Supplies(element, property.PropertyName))
+                {
+                    return true;
+                }
+            }
+            return false;
         }
 
         /// <summary>
@@ -513,7 +499,6 @@ namespace FiftyOne.Pipeline.DerivedProperty.FlowElements
         /// </summary>
         private void CheckOverrideTargets(
             IReadOnlyList<IFlowElement> elements,
-            int position,
             List<string> faults)
         {
             foreach (var script in _scripts)
@@ -523,9 +508,9 @@ namespace FiftyOne.Pipeline.DerivedProperty.FlowElements
                     continue;
                 }
 
+                // Where the owning element sits is deliberately not judged,
+                // for the reason given on AnyElementSupplies above.
                 IElementPropertyMetaData target = null;
-                var later = new List<string>();
-
                 for (var i = 0; i < elements.Count; i++)
                 {
                     var element = elements[i];
@@ -540,46 +525,27 @@ namespace FiftyOne.Pipeline.DerivedProperty.FlowElements
                     {
                         continue;
                     }
-                    var supplied = Supplied(element, script.Output.Name);
-                    if (supplied == null)
+                    target = Supplied(element, script.Output.Name);
+                    if (target != null)
                     {
-                        continue;
-                    }
-                    if (i < position)
-                    {
-                        target = supplied;
                         break;
                     }
-                    later.Add(element.GetType().Name);
                 }
 
                 if (target == null)
                 {
-                    faults.Add(later.Count > 0
-                        ? string.Format(
-                            CultureInfo.InvariantCulture,
-                            "The script '{0}' replaces the value of the " +
-                            "property '{1}' in the element data '{2}', " +
-                            "which is produced by {3}, placed after the " +
-                            "derived property element rather than before " +
-                            "it. Move the derived property element after " +
-                            "{3}.",
-                            script.Name,
-                            script.Output.Name,
-                            script.Output.ElementDataKey,
-                            string.Join(", ", later))
-                        : string.Format(
-                            CultureInfo.InvariantCulture,
-                            "The script '{0}' replaces the value of the " +
-                            "property '{1}' in the element data '{2}', and " +
-                            "no element in the pipeline produces '{3}'. " +
-                            "Either add the element that produces it, or " +
-                            "change Output.Name to '{1}' so that the " +
-                            "script creates a property of its own.",
-                            script.Name,
-                            script.Output.Name,
-                            script.Output.ElementDataKey,
-                            script.Output.QualifiedName));
+                    faults.Add(string.Format(
+                        CultureInfo.InvariantCulture,
+                        "The script '{0}' replaces the value of the " +
+                        "property '{1}' in the element data '{2}', and " +
+                        "no element in the pipeline produces '{3}'. " +
+                        "Either add the element that produces it, or " +
+                        "change Output.Name to '{1}' so that the " +
+                        "script creates a property of its own.",
+                        script.Name,
+                        script.Output.Name,
+                        script.Output.ElementDataKey,
+                        script.Output.QualifiedName));
                     continue;
                 }
 
