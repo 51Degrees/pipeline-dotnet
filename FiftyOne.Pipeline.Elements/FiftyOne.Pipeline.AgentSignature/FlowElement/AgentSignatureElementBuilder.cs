@@ -234,6 +234,15 @@ namespace FiftyOne.Pipeline.AgentSignature.FlowElement
         /// one agent card URL per line. Call this more than once to add more
         /// than one registry. No registry is read by default.
         /// </summary>
+        /// <remarks>
+        /// The registries are read once for the life of the process, so a
+        /// registry or card that cannot be fetched at that read, for any
+        /// reason including a network fault, is not tried again until the
+        /// process restarts. This is unlike a key directory fetch, which is
+        /// retried and recovers on its own. A missing card never changes a
+        /// signature status, only the card properties reported alongside
+        /// one.
+        /// </remarks>
         /// <param name="url">The registry URL.</param>
         /// <returns>This builder.</returns>
         public AgentSignatureElementBuilder SetRegistry(string url)
