@@ -956,11 +956,12 @@ namespace FiftyOne.Pipeline.AgentSignature.FlowElement
         /// </summary>
         /// <remarks>
         /// A signature may cover any request header, so the element asks
-        /// for every header rather than a fixed list. Of the derived
-        /// components the web integration puts in enough for '@authority'
-        /// and '@scheme' only, so a signature that covers '@target-uri',
-        /// '@method', '@path' or '@query' cannot be rebuilt and reads
-        /// Unverified with the ComponentUnavailable reason.
+        /// for every header rather than a fixed list. The derived
+        /// components are built from those headers and from the request
+        /// line, being the method, the path and the query string. Where an
+        /// integration supplies no request line, a signature covering
+        /// '@target-uri', '@method', '@path' or '@query' cannot be rebuilt
+        /// and reads Unverified with the ComponentUnavailable reason.
         /// </remarks>
         private sealed class FlowDataComponentResolver : IComponentResolver
         {
@@ -1045,12 +1046,84 @@ namespace FiftyOne.Pipeline.AgentSignature.FlowElement
                         }
                         value = protocol.Trim().ToLowerInvariant();
                         return true;
+                    case "@method":
+                        // RFC 9421 section 2.2.1. The method is upper case
+                        // in the base whatever case the request used.
+                        if (GetHeaderByKey(
+                            Core.Constants.EVIDENCE_REQUEST_METHOD_KEY,
+                            out var method) == false)
+                        {
+                            return false;
+                        }
+                        value = method.ToUpperInvariant();
+                        return value.Length > 0;
+                    case "@path":
+                        // RFC 9421 section 2.2.6. An empty path is the
+                        // single slash.
+                        if (GetHeaderByKey(
+                            Core.Constants.EVIDENCE_REQUEST_PATH_KEY,
+                            out var path) == false)
+                        {
+                            return false;
+                        }
+                        value = path.Length == 0 ? "/" : path;
+                        return true;
+                    case "@query":
+                        // RFC 9421 section 2.2.7. The query carries its
+                        // leading question mark, and a request with no
+                        // query at all still has the question mark on its
+                        // own, so the two cases cannot be confused.
+                        if (GetHeaderByKey(
+                            Core.Constants.EVIDENCE_REQUEST_QUERY_KEY,
+                            out var query) == false)
+                        {
+                            return false;
+                        }
+                        value = "?" + query;
+                        return true;
+                    case "@target-uri":
+                        // RFC 9421 section 2.2.2, being the whole address
+                        // the request was made to, which is the scheme, the
+                        // authority, the path and the query joined.
+                        return TryResolveTargetUri(out value);
                     default:
-                        // '@target-uri', '@method', '@path' and '@query'
-                        // need the request line, which the web integration
-                        // does not put into evidence today.
                         return false;
                 }
+            }
+
+            /// <summary>
+            /// Build the '@target-uri' component from the parts that make
+            /// it up. Every part has to be there, because a target address
+            /// missing its path or its query is a different address and
+            /// would produce a signature base the agent never signed.
+            /// </summary>
+            private bool TryResolveTargetUri(out string value)
+            {
+                value = null;
+                if (GetHeaderByKey(
+                        Core.Constants.EVIDENCE_PROTOCOL,
+                        out var scheme) == false ||
+                    GetHeader("host", out var host) == false ||
+                    GetHeaderByKey(
+                        Core.Constants.EVIDENCE_REQUEST_PATH_KEY,
+                        out var path) == false ||
+                    GetHeaderByKey(
+                        Core.Constants.EVIDENCE_REQUEST_QUERY_KEY,
+                        out var query) == false)
+                {
+                    return false;
+                }
+                var authority = SignatureBase.BuildAuthority(
+                    host, scheme.Trim().ToLowerInvariant());
+                if (authority == null)
+                {
+                    return false;
+                }
+                value = scheme.Trim().ToLowerInvariant() + "://" +
+                    authority +
+                    (path.Length == 0 ? "/" : path) +
+                    (query.Length == 0 ? string.Empty : "?" + query);
+                return true;
             }
 
             private static bool TryResolveDictionaryMember(
@@ -1106,10 +1179,15 @@ namespace FiftyOne.Pipeline.AgentSignature.FlowElement
         /// A signature names the parts of the request it covers, and it may
         /// name any request header, so the element cannot write down the
         /// list in advance. It asks for every header instead, together with
-        /// the protocol, which '@authority' and '@scheme' are built from.
-        /// A fixed list would leave a signature covering any other header
-        /// unable to be rebuilt, because the web integration only puts
-        /// evidence into the request that some element has asked for.
+        /// the protocol, which '@authority' and '@scheme' are built from,
+        /// and the three request line values, which '@method', '@path',
+        /// '@query' and '@target-uri' are built from. A fixed list of
+        /// headers would leave a signature covering any other header unable
+        /// to be rebuilt, because the web integration only puts evidence
+        /// into the request that some element has asked for. That same rule
+        /// is why the request line values are named here, and why a
+        /// pipeline holding no element that asks for them carries none of
+        /// them.
         /// </remarks>
         private sealed class AgentSignatureEvidenceKeyFilter
             : IEvidenceKeyFilter
@@ -1117,6 +1195,13 @@ namespace FiftyOne.Pipeline.AgentSignature.FlowElement
             private readonly string _headerPrefix =
                 Core.Constants.EVIDENCE_HTTPHEADER_PREFIX +
                 Core.Constants.EVIDENCE_SEPERATOR;
+
+            private static readonly string[] _requestLineKeys = new[]
+            {
+                Core.Constants.EVIDENCE_REQUEST_METHOD_KEY,
+                Core.Constants.EVIDENCE_REQUEST_PATH_KEY,
+                Core.Constants.EVIDENCE_REQUEST_QUERY_KEY,
+            };
 
             /// <inheritdoc/>
             /// <remarks>
@@ -1126,10 +1211,27 @@ namespace FiftyOne.Pipeline.AgentSignature.FlowElement
             /// </remarks>
             public bool Include(string key)
             {
-                return key != null &&
-                    key.StartsWith(
-                        _headerPrefix,
-                        StringComparison.OrdinalIgnoreCase);
+                if (key == null)
+                {
+                    return false;
+                }
+                if (key.StartsWith(
+                    _headerPrefix,
+                    StringComparison.OrdinalIgnoreCase))
+                {
+                    return true;
+                }
+                foreach (var requestLineKey in _requestLineKeys)
+                {
+                    if (string.Equals(
+                        key,
+                        requestLineKey,
+                        StringComparison.OrdinalIgnoreCase))
+                    {
+                        return true;
+                    }
+                }
+                return false;
             }
 
             /// <inheritdoc/>

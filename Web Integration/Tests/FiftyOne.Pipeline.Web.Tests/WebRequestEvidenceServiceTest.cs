@@ -189,6 +189,106 @@ namespace FiftyOne.Pipeline.Web.Tests
         }
 
         /// <summary>
+        /// The method, the path and the whole query string are added where
+        /// an element asks for them, exactly as the request carried them.
+        /// The values rebuild the text an HTTP message signature was made
+        /// over, so a changed byte here makes a valid signature read as
+        /// invalid.
+        /// </summary>
+        [TestMethod]
+        public void WebRequestEvidenceService_RequestLine()
+        {
+            _request.SetupGet(r => r.Method).Returns("GET");
+            _request.SetupGet(r => r.Path)
+                .Returns(new PathString("/products/compare"));
+            _request.SetupGet(r => r.QueryString)
+                .Returns(new QueryString("?id=7&sort=name"));
+
+            SetRequiredKeys(new List<string>()
+            {
+                Core.Constants.EVIDENCE_REQUEST_METHOD_KEY,
+                Core.Constants.EVIDENCE_REQUEST_PATH_KEY,
+                Core.Constants.EVIDENCE_REQUEST_QUERY_KEY,
+            });
+            _service.AddEvidenceFromRequest(_flowData.Object, _request.Object);
+
+            _flowData.Verify(f => f.AddEvidence(
+                Core.Constants.EVIDENCE_REQUEST_METHOD_KEY, "GET"),
+                Times.Once);
+            _flowData.Verify(f => f.AddEvidence(
+                Core.Constants.EVIDENCE_REQUEST_PATH_KEY,
+                "/products/compare"),
+                Times.Once);
+            // The query string goes into evidence without its leading
+            // question mark, which whatever needs it puts back.
+            _flowData.Verify(f => f.AddEvidence(
+                Core.Constants.EVIDENCE_REQUEST_QUERY_KEY, "id=7&sort=name"),
+                Times.Once);
+        }
+
+        /// <summary>
+        /// A request with no query string still adds the query key, empty,
+        /// so that a missing key always means this integration does not
+        /// supply the request line rather than that the request carried no
+        /// query.
+        /// </summary>
+        [TestMethod]
+        public void WebRequestEvidenceService_RequestLineEmptyQuery()
+        {
+            _request.SetupGet(r => r.Method).Returns("GET");
+            _request.SetupGet(r => r.Path).Returns(new PathString("/"));
+            _request.SetupGet(r => r.QueryString).Returns(new QueryString());
+
+            SetRequiredKey(Core.Constants.EVIDENCE_REQUEST_QUERY_KEY);
+            _service.AddEvidenceFromRequest(_flowData.Object, _request.Object);
+
+            _flowData.Verify(f => f.AddEvidence(
+                Core.Constants.EVIDENCE_REQUEST_QUERY_KEY, ""),
+                Times.Once);
+        }
+
+        /// <summary>
+        /// Where no element asks for the request line, none of it is added.
+        /// This is what keeps the new values out of every pipeline that
+        /// holds no element needing them, which is nearly all of them.
+        /// </summary>
+        [TestMethod]
+        public void WebRequestEvidenceService_RequestLineNotRequired()
+        {
+            _request.SetupGet(r => r.Method).Returns("GET");
+            _request.SetupGet(r => r.Path)
+                .Returns(new PathString("/products/compare"));
+            _request.SetupGet(r => r.QueryString)
+                .Returns(new QueryString("?id=7"));
+
+            SetRequiredKey(Core.Constants.EVIDENCE_CLIENTIP_KEY);
+            _service.AddEvidenceFromRequest(_flowData.Object, _request.Object);
+
+            _flowData.Verify(f => f.AddEvidence(
+                Core.Constants.EVIDENCE_REQUEST_METHOD_KEY,
+                It.IsAny<object>()),
+                Times.Never);
+            _flowData.Verify(f => f.AddEvidence(
+                Core.Constants.EVIDENCE_REQUEST_PATH_KEY,
+                It.IsAny<object>()),
+                Times.Never);
+            _flowData.Verify(f => f.AddEvidence(
+                Core.Constants.EVIDENCE_REQUEST_QUERY_KEY,
+                It.IsAny<object>()),
+                Times.Never);
+        }
+
+        /// <summary>
+        /// Set several required keys in the flow data.
+        /// </summary>
+        /// <param name="keys">the required keys</param>
+        private void SetRequiredKeys(List<string> keys)
+        {
+            _flowData.SetupGet(f => f.EvidenceKeyFilter)
+                .Returns(new EvidenceKeyFilterWhitelist(keys));
+        }
+
+        /// <summary>
         /// Set the required key in the flow data to "prefix.requiredkey" where
         /// prefix is supplied, and the required key is a constant which exists
         /// in headers, cookies and query parameters.

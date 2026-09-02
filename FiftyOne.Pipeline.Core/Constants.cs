@@ -100,6 +100,43 @@ namespace FiftyOne.Pipeline.Core
         public const string EVIDENCE_PROTOCOL = EVIDENCE_HTTPHEADER_PREFIX + EVIDENCE_SEPERATOR + "protocol";
 
         /// <summary>
+        /// The complete key to be used when the HTTP method of the request
+        /// is passed as evidence.
+        /// </summary>
+        /// <remarks>
+        /// This key and the two below carry the request line. The values
+        /// MUST be exactly what the request carried, byte for byte, with no
+        /// decoding and no normalisation, because they are used to rebuild
+        /// the text an HTTP message signature was made over and one changed
+        /// byte makes a valid signature read as invalid. See the
+        /// <see href="https://github.com/51Degrees/specifications/blob/main/pipeline-specification/features/web-integration.md#populating-evidence">Specification</see>.
+        /// </remarks>
+        public const string EVIDENCE_REQUEST_METHOD_KEY = EVIDENCE_SERVER_PREFIX + EVIDENCE_SEPERATOR + "request-method";
+
+        /// <summary>
+        /// The complete key to be used when the path of the request is
+        /// passed as evidence, exactly as the request carried it.
+        /// </summary>
+        public const string EVIDENCE_REQUEST_PATH_KEY = EVIDENCE_SERVER_PREFIX + EVIDENCE_SEPERATOR + "request-path";
+
+        /// <summary>
+        /// The complete key to be used when the whole query string of the
+        /// request is passed as evidence, exactly as the request carried it
+        /// and without the leading question mark.
+        /// </summary>
+        /// <remarks>
+        /// The query string is carried whole here as well as split into
+        /// 'query.' entries, because the split entries lose the ordering and
+        /// the encoding of the original and so cannot rebuild it. An
+        /// integration that supplies the request line supplies this key on
+        /// every request, empty where the request carried no query string,
+        /// so that a missing key always means the integration does not
+        /// supply the request line rather than that the request had no
+        /// query.
+        /// </remarks>
+        public const string EVIDENCE_REQUEST_QUERY_KEY = EVIDENCE_SERVER_PREFIX + EVIDENCE_SEPERATOR + "request-query";
+
+        /// <summary>
         /// The default value for the flag that controls whether the pipeline will automatically 
         /// dispose of its elements when it is disposed.
         /// </summary>

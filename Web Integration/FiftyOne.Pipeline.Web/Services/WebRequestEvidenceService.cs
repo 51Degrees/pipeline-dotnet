@@ -199,6 +199,7 @@ namespace FiftyOne.Pipeline.Web.Services
                 }
 
                 AddRequestProtocolToEvidence(flowData, httpRequest);
+                AddRequestLineToEvidence(flowData, httpRequest);
             }
 #pragma warning disable CA1031 // Do not catch general exception types
             catch (Exception ex)
@@ -255,6 +256,52 @@ namespace FiftyOne.Pipeline.Web.Services
 
             // Add protocol to the evidence.
             CheckAndAdd(flowData, Core.Constants.EVIDENCE_PROTOCOL, protocol);
+        }
+
+        /// <summary>
+        /// Add the method, the path and the whole query string of the
+        /// request to the evidence, exactly as the request carried them.
+        /// </summary>
+        /// <remarks>
+        /// These are only added where an element in the pipeline has asked
+        /// for them, as every other value here is, so a pipeline with no
+        /// such element carries none of them. The values are used to
+        /// rebuild the text an HTTP message signature was made over, so
+        /// they are taken in their original form. 'Path' and 'QueryString'
+        /// hold the request line as received, where 'Query' is the decoded
+        /// split of the same query string and loses its ordering and
+        /// encoding. All three are added together, with an empty query
+        /// string where the request carried none, so that a missing key
+        /// always means this integration did not supply the request line.
+        /// </remarks>
+        private static void AddRequestLineToEvidence(
+            IFlowData flowData,
+            HttpRequest httpRequest)
+        {
+            CheckAndAdd(
+                flowData,
+                Core.Constants.EVIDENCE_REQUEST_METHOD_KEY,
+                httpRequest.Method ?? string.Empty);
+            CheckAndAdd(
+                flowData,
+                Core.Constants.EVIDENCE_REQUEST_PATH_KEY,
+                httpRequest.Path.HasValue
+                    ? httpRequest.Path.Value
+                    : string.Empty);
+            // The framework hands the query string back with its leading
+            // question mark, which the signature base does not include, so
+            // it is taken off here and put back by whatever needs it.
+            var query = httpRequest.QueryString.HasValue
+                ? httpRequest.QueryString.Value
+                : string.Empty;
+            if (query.Length > 0 && query[0] == '?')
+            {
+                query = query.Substring(1);
+            }
+            CheckAndAdd(
+                flowData,
+                Core.Constants.EVIDENCE_REQUEST_QUERY_KEY,
+                query);
         }
     }
 }

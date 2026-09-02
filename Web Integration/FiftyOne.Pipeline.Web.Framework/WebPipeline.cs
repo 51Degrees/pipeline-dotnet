@@ -277,6 +277,7 @@ namespace FiftyOne.Pipeline.Web.Framework
 
                 filler.CheckAndAdd("server.client-ip", request.UserHostAddress);
                 filler.AddRequestProtocolToEvidence(request);
+                filler.AddRequestLineToEvidence(request);
 
                 if (filler.Errors is IList<Exception> errors)
                 {
@@ -436,6 +437,47 @@ namespace FiftyOne.Pipeline.Web.Framework
 
                 // Add protocol to the evidence.
                 CheckAndAdd(Core.Constants.EVIDENCE_PROTOCOL, protocol);
+            }
+
+            /// <summary>
+            /// Add the method, the path and the whole query string of the
+            /// request to the evidence, exactly as the request carried
+            /// them.
+            /// </summary>
+            /// <remarks>
+            /// These are only added where an element in the pipeline has
+            /// asked for them, as every other value here is, so a pipeline
+            /// with no such element carries none of them. The values are
+            /// used to rebuild the text an HTTP message signature was made
+            /// over, so they are taken in their original form.
+            /// 'Url.AbsolutePath' and 'Url.Query' hold the request line as
+            /// received, where the 'query.' entries are the decoded split of
+            /// the same query string and lose its ordering and encoding.
+            /// All three are added together, with an empty query string
+            /// where the request carried none, so that a missing key always
+            /// means this integration did not supply the request line.
+            /// </remarks>
+            public void AddRequestLineToEvidence(HttpRequest request)
+            {
+                CheckAndAdd(
+                    Core.Constants.EVIDENCE_REQUEST_METHOD_KEY,
+                    request.HttpMethod ?? string.Empty);
+                var url = request.Url;
+                CheckAndAdd(
+                    Core.Constants.EVIDENCE_REQUEST_PATH_KEY,
+                    url == null ? string.Empty : url.AbsolutePath);
+                // The framework hands the query string back with its
+                // leading question mark, which the signature base does not
+                // include, so it is taken off here and put back by whatever
+                // needs it.
+                var query = url == null ? string.Empty : url.Query;
+                if (query.Length > 0 && query[0] == '?')
+                {
+                    query = query.Substring(1);
+                }
+                CheckAndAdd(
+                    Core.Constants.EVIDENCE_REQUEST_QUERY_KEY,
+                    query);
             }
         }
     }

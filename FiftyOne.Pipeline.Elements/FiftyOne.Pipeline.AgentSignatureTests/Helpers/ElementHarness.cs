@@ -157,6 +157,30 @@ namespace FiftyOne.Pipeline.AgentSignature.Tests.Helpers
             string scheme = "https",
             CancellationToken stopToken = default)
         {
+            return ProcessSigned(signed, null, host, scheme, stopToken);
+        }
+
+        /// <summary>
+        /// Run a signed request that carries evidence beyond the signature
+        /// headers, such as the request line a web integration adds.
+        /// </summary>
+        /// <param name="signed">The signature headers.</param>
+        /// <param name="extraEvidence">
+        /// Evidence to add beyond the signature headers, or null.
+        /// </param>
+        /// <param name="host">The host header value.</param>
+        /// <param name="scheme">The protocol evidence value.</param>
+        /// <param name="stopToken">
+        /// A token that says the request has been abandoned.
+        /// </param>
+        /// <returns>What the element made of it.</returns>
+        public IAgentSignatureData ProcessSigned(
+            SignedRequest signed,
+            IDictionary<string, string> extraEvidence,
+            string host = "example.com",
+            string scheme = "https",
+            CancellationToken stopToken = default)
+        {
             var evidence = new Dictionary<string, string>
             {
                 { "header.signature", signed.Signature },
@@ -167,6 +191,13 @@ namespace FiftyOne.Pipeline.AgentSignature.Tests.Helpers
             if (signed.SignatureAgent != null)
             {
                 evidence["header.signature-agent"] = signed.SignatureAgent;
+            }
+            if (extraEvidence != null)
+            {
+                foreach (var entry in extraEvidence)
+                {
+                    evidence[entry.Key] = entry.Value;
+                }
             }
             return Process(evidence, stopToken);
         }

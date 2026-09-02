@@ -87,10 +87,22 @@ namespace FiftyOne.Pipeline.Engines.FiftyOne.Data
         /// ('id.email', 'query.id.email', 'header.id.email') are excluded
         /// while an unrelated key such as 'query.valid.email' is not.
         /// </summary>
+        /// <remarks>
+        /// The request path and the whole query string are here because a
+        /// site puts what it likes in either, so both can carry personal
+        /// data, and neither says anything about the device. They fall
+        /// under the 'server' prefix, which is otherwise shared, so without
+        /// this they would be shared as soon as an element asked for them.
+        /// The individual 'query.' entries keep their own rule, which
+        /// shares nothing by default, and the request method is not listed
+        /// because a method is a verb and identifies nobody.
+        /// </remarks>
         private static readonly string[] _neverSharedEvidenceKeys = new[]
         {
             "id.email",
             "id.salt",
+            "request-path",
+            "request-query",
         };
 
         /// <summary>
