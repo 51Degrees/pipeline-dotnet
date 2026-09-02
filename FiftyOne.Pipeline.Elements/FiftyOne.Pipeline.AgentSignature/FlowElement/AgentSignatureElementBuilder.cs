@@ -44,7 +44,6 @@ namespace FiftyOne.Pipeline.AgentSignature.FlowElement
     /// </remarks>
     public class AgentSignatureElementBuilder
     {
-        private readonly ILoggerFactory _loggerFactory;
         private readonly ILogger<AgentSignatureData> _dataLogger;
 
         /// <summary>
@@ -52,6 +51,12 @@ namespace FiftyOne.Pipeline.AgentSignature.FlowElement
         /// </summary>
         protected AgentSignatureConfiguration Configuration { get; } =
             new AgentSignatureConfiguration();
+
+        /// <summary>
+        /// The logger factory, so that a builder deriving from this one
+        /// can make the loggers the element it builds needs.
+        /// </summary>
+        protected ILoggerFactory LoggerFactory { get; }
 
         /// <summary>
         /// Construct a builder.
@@ -66,7 +71,7 @@ namespace FiftyOne.Pipeline.AgentSignature.FlowElement
             {
                 throw new ArgumentNullException(nameof(loggerFactory));
             }
-            _loggerFactory = loggerFactory;
+            LoggerFactory = loggerFactory;
             _dataLogger = loggerFactory.CreateLogger<AgentSignatureData>();
         }
 
@@ -330,15 +335,23 @@ namespace FiftyOne.Pipeline.AgentSignature.FlowElement
         /// Build the element.
         /// </summary>
         /// <returns>The element.</returns>
-        public AgentSignatureElement Build()
+        public virtual AgentSignatureElement Build()
         {
             return new AgentSignatureElement(
-                _loggerFactory.CreateLogger<AgentSignatureElement>(),
+                LoggerFactory.CreateLogger<AgentSignatureElement>(),
                 CreateData,
                 Configuration);
         }
 
-        private IAgentSignatureData CreateData(
+        /// <summary>
+        /// Make this element's data. A builder deriving from this one
+        /// hands the same factory to whatever element it builds, so that
+        /// the data type does not have to be repeated.
+        /// </summary>
+        /// <param name="pipeline">The pipeline the element sits in.</param>
+        /// <param name="element">The element.</param>
+        /// <returns>The element data.</returns>
+        protected IAgentSignatureData CreateData(
             IPipeline pipeline,
             FlowElementBase<IAgentSignatureData, IElementPropertyMetaData>
                 element)
