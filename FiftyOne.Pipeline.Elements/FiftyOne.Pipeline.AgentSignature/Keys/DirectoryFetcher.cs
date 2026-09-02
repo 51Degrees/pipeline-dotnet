@@ -437,7 +437,14 @@ namespace FiftyOne.Pipeline.AgentSignature.Keys
             var request = new HttpRequestMessage(HttpMethod.Get, url);
             request.Headers.TryAddWithoutValidation("Accept", accept);
             request.Headers.TryAddWithoutValidation("User-Agent", _userAgent);
-            return _httpClient.SendAsync(request, token);
+            // The response is returned once the headers arrive, rather than
+            // once the body has been read, because the default has the
+            // client read the whole body into memory before handing the
+            // response over. The limit on response bytes only limits what is
+            // pulled from the network at all when the counting read in
+            // ReadBodyAsync is the first read there is.
+            return _httpClient.SendAsync(
+                request, HttpCompletionOption.ResponseHeadersRead, token);
         }
 
         /// <summary>

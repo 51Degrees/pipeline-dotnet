@@ -24,9 +24,16 @@ using FiftyOne.Pipeline.AgentSignature.Data;
 using FiftyOne.Pipeline.AgentSignature.Keys;
 using FiftyOne.Pipeline.AgentSignature.Tests.Helpers;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
+using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
+using System.Net;
+using System.Net.Http;
+using System.Net.Http.Headers;
 using System.Text;
+using System.Threading;
+using System.Threading.Tasks;
 
 namespace FiftyOne.Pipeline.AgentSignature.Tests
 {
@@ -326,6 +333,47 @@ namespace FiftyOne.Pipeline.AgentSignature.Tests
         }
 
         /// <summary>
+        /// No more than the limit is pulled from the network at all, rather
+        /// than the whole body being downloaded and only the copy kept
+        /// being limited. The client's default is to read the entire body,
+        /// up to two gigabytes, before handing the response over, which
+        /// would make the limit a limit on memory kept rather than on
+        /// bytes downloaded. The response here can serve four megabytes
+        /// and counts every byte anything pulls from it, and the count
+        /// must stay within a few reads of the limit.
+        /// </summary>
+        [TestMethod]
+        public void NoMoreThanTheLimitIsPulledFromTheNetwork()
+        {
+            const int limit = 64 * 1024;
+            var content = new CountingContent(4 * 1024 * 1024);
+            content.Headers.ContentType = new MediaTypeHeaderValue(
+                Constants.DIRECTORY_MEDIA_TYPE);
+            var response = new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = content,
+            };
+            using (var client = new HttpClient(new PresetHandler(response)))
+            {
+                var fetcher = new DirectoryFetcher(
+                    client, null, () => DateTimeOffset.UtcNow, limit);
+                var entry = fetcher.FetchAsync(
+                    Fixtures.SignatureAgentDirectoryUrl,
+                    Constants.AGENT_TYPE_DIRECTORY,
+                    CancellationToken.None).Result;
+
+                Assert.IsFalse(
+                    entry.Success,
+                    "Expected a body over the limit to be refused.");
+                Assert.IsTrue(
+                    content.BytesPulled <= limit + (16 * 1024),
+                    "Expected no more than the limit plus a few reads to " +
+                    "be pulled from the network, and " + content.BytesPulled +
+                    " bytes were pulled against a limit of " + limit + ".");
+            }
+        }
+
+        /// <summary>
         /// A directory exactly as long as the limit allows is read as
         /// normal, whether or not the response states its length, so the
         /// two tests above fail on the length rather than on the limit
@@ -515,5 +563,128 @@ namespace FiftyOne.Pipeline.AgentSignature.Tests
         }
 
         #endregion
+
+        /// <summary>
+        /// Hands back one prepared response whatever is asked for.
+        /// </summary>
+        private sealed class PresetHandler : HttpMessageHandler
+        {
+            private readonly HttpResponseMessage _response;
+
+            public PresetHandler(HttpResponseMessage response)
+            {
+                _response = response;
+            }
+
+            protected override Task<HttpResponseMessage> SendAsync(
+                HttpRequestMessage request,
+                CancellationToken cancellationToken)
+            {
+                _response.RequestMessage = request;
+                return Task.FromResult(_response);
+            }
+        }
+
+        /// <summary>
+        /// A body that can serve the number of bytes it was built with and
+        /// counts every byte anything pulls from it, stating no length, so
+        /// the test can see how much was downloaded rather than how much
+        /// was kept. Both ways a client can drain a body count, the
+        /// buffering path through serialisation and the streaming path
+        /// through the content stream.
+        /// </summary>
+        private sealed class CountingContent : HttpContent
+        {
+            private readonly int _length;
+            private int _pulled;
+
+            public CountingContent(int length)
+            {
+                _length = length;
+            }
+
+            public int BytesPulled => _pulled;
+
+            private int Pull(byte[] buffer, int offset, int count)
+            {
+                var give = Math.Min(count, _length - _pulled);
+                for (var i = 0; i < give; i++)
+                {
+                    buffer[offset + i] = (byte)'a';
+                }
+                _pulled += give;
+                return give;
+            }
+
+            protected override Task SerializeToStreamAsync(
+                Stream stream,
+                System.Net.TransportContext context)
+            {
+                var buffer = new byte[8192];
+                int read;
+                while ((read = Pull(buffer, 0, buffer.Length)) > 0)
+                {
+                    stream.Write(buffer, 0, read);
+                }
+                return Task.FromResult(true);
+            }
+
+            protected override Task<Stream> CreateContentReadStreamAsync()
+            {
+                return Task.FromResult<Stream>(new CountingStream(this));
+            }
+
+            protected override bool TryComputeLength(out long length)
+            {
+                length = 0;
+                return false;
+            }
+
+            private sealed class CountingStream : Stream
+            {
+                private readonly CountingContent _content;
+
+                public CountingStream(CountingContent content)
+                {
+                    _content = content;
+                }
+
+                public override bool CanRead => true;
+
+                public override bool CanSeek => false;
+
+                public override bool CanWrite => false;
+
+                public override long Length =>
+                    throw new NotSupportedException();
+
+                public override long Position
+                {
+                    get => throw new NotSupportedException();
+                    set => throw new NotSupportedException();
+                }
+
+                public override void Flush()
+                {
+                }
+
+                public override int Read(
+                    byte[] buffer, int offset, int count)
+                {
+                    return _content.Pull(buffer, offset, count);
+                }
+
+                public override long Seek(
+                    long offset, SeekOrigin origin) =>
+                    throw new NotSupportedException();
+
+                public override void SetLength(long value) =>
+                    throw new NotSupportedException();
+
+                public override void Write(
+                    byte[] buffer, int offset, int count) =>
+                    throw new NotSupportedException();
+            }
+        }
     }
 }
