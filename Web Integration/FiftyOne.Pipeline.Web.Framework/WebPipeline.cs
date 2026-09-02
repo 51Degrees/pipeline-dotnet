@@ -446,38 +446,96 @@ namespace FiftyOne.Pipeline.Web.Framework
             /// </summary>
             /// <remarks>
             /// These are only added where an element in the pipeline has
-            /// asked for them, as every other value here is, so a pipeline
-            /// with no such element carries none of them. The values are
-            /// used to rebuild the text an HTTP message signature was made
-            /// over, so they are taken in their original form.
-            /// 'Url.AbsolutePath' and 'Url.Query' hold the request line as
-            /// received, where the 'query.' entries are the decoded split of
-            /// the same query string and lose its ordering and encoding.
+            /// asked for them, and nothing is worked out at all where no
+            /// element has, because this runs on every request.
+            /// <para>
+            /// The path and the query come from 'RawUrl' rather than from
+            /// 'Url'. A 'Uri' canonicalises what it holds, taking out dot
+            /// segments and decoding escapes, so a request for '/a%2Fb'
+            /// would arrive here as '/a/b', and these values are used to
+            /// rebuild the text an HTTP message signature was made over,
+            /// where one changed byte makes a valid signature read as
+            /// invalid. 'RawUrl' is what the request line carried. Where it
+            /// cannot be read, or is not in the ordinary form that starts
+            /// with a slash, the canonical form is used instead as the
+            /// closest the framework can give.
+            /// </para>
+            /// <para>
             /// All three are added together, with an empty query string
             /// where the request carried none, so that a missing key always
             /// means this integration did not supply the request line.
+            /// </para>
             /// </remarks>
             public void AddRequestLineToEvidence(HttpRequest request)
             {
-                CheckAndAdd(
-                    Core.Constants.EVIDENCE_REQUEST_METHOD_KEY,
-                    request.HttpMethod ?? string.Empty);
+                var wantsMethod = _evidenceKeyFilter.Include(
+                    Core.Constants.EVIDENCE_REQUEST_METHOD_KEY);
+                var wantsPath = _evidenceKeyFilter.Include(
+                    Core.Constants.EVIDENCE_REQUEST_PATH_KEY);
+                var wantsQuery = _evidenceKeyFilter.Include(
+                    Core.Constants.EVIDENCE_REQUEST_QUERY_KEY);
+                if (wantsMethod == false &&
+                    wantsPath == false &&
+                    wantsQuery == false)
+                {
+                    return;
+                }
+
+                if (wantsMethod)
+                {
+                    CheckAndAdd(
+                        Core.Constants.EVIDENCE_REQUEST_METHOD_KEY,
+                        request.HttpMethod ?? string.Empty);
+                }
+                if (wantsPath == false && wantsQuery == false)
+                {
+                    return;
+                }
+
+                SplitRequestTarget(request, out var path, out var query);
+                if (wantsPath)
+                {
+                    CheckAndAdd(
+                        Core.Constants.EVIDENCE_REQUEST_PATH_KEY, path);
+                }
+                if (wantsQuery)
+                {
+                    CheckAndAdd(
+                        Core.Constants.EVIDENCE_REQUEST_QUERY_KEY, query);
+                }
+            }
+
+            /// <summary>
+            /// Read the path and the query string as the request line
+            /// carried them, without the leading question mark on the
+            /// query.
+            /// </summary>
+            /// <param name="request">The request.</param>
+            /// <param name="path">The path.</param>
+            /// <param name="query">The query string.</param>
+            private static void SplitRequestTarget(
+                HttpRequest request,
+                out string path,
+                out string query)
+            {
+                var rawUrl = request.RawUrl;
+                if (string.IsNullOrEmpty(rawUrl) == false &&
+                    rawUrl[0] == '/')
+                {
+                    var mark = rawUrl.IndexOf('?');
+                    path = mark < 0 ? rawUrl : rawUrl.Substring(0, mark);
+                    query = mark < 0
+                        ? string.Empty
+                        : rawUrl.Substring(mark + 1);
+                    return;
+                }
                 var url = request.Url;
-                CheckAndAdd(
-                    Core.Constants.EVIDENCE_REQUEST_PATH_KEY,
-                    url == null ? string.Empty : url.AbsolutePath);
-                // The framework hands the query string back with its
-                // leading question mark, which the signature base does not
-                // include, so it is taken off here and put back by whatever
-                // needs it.
-                var query = url == null ? string.Empty : url.Query;
+                path = url == null ? string.Empty : url.AbsolutePath;
+                query = url == null ? string.Empty : url.Query;
                 if (query.Length > 0 && query[0] == '?')
                 {
                     query = query.Substring(1);
                 }
-                CheckAndAdd(
-                    Core.Constants.EVIDENCE_REQUEST_QUERY_KEY,
-                    query);
             }
         }
     }

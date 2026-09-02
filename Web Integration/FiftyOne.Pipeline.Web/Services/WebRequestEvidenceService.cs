@@ -27,6 +27,7 @@ using System.Linq;
 using FiftyOne.Pipeline.Core.Data;
 using FiftyOne.Pipeline.Web.Shared;
 using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Http.Features;
 using Microsoft.Extensions.Logging;
 
 namespace FiftyOne.Pipeline.Web.Services
@@ -264,44 +265,107 @@ namespace FiftyOne.Pipeline.Web.Services
         /// </summary>
         /// <remarks>
         /// These are only added where an element in the pipeline has asked
-        /// for them, as every other value here is, so a pipeline with no
-        /// such element carries none of them. The values are used to
-        /// rebuild the text an HTTP message signature was made over, so
-        /// they are taken in their original form. 'Path' and 'QueryString'
-        /// hold the request line as received, where 'Query' is the decoded
-        /// split of the same query string and loses its ordering and
-        /// encoding. All three are added together, with an empty query
-        /// string where the request carried none, so that a missing key
-        /// always means this integration did not supply the request line.
+        /// for them, and nothing is worked out at all where no element has,
+        /// because this runs on every request.
+        /// <para>
+        /// The path and the query come from the raw request target rather
+        /// than from 'Path' and 'QueryString'. The framework hands those
+        /// two back with percent escapes decoded, so a request for
+        /// '/a%2Fb' would arrive here as '/a/b', and these values are used
+        /// to rebuild the text an HTTP message signature was made over,
+        /// where one changed byte makes a valid signature read as invalid.
+        /// The raw target is what the request line carried. Where it
+        /// cannot be read, or where it is not in the ordinary form that
+        /// starts with a slash, being the absolute form a proxy may send
+        /// or the asterisk form of an OPTIONS request, the escaped forms
+        /// of 'Path' and 'QueryString' are used instead, which are as
+        /// close to the original as the framework can give.
+        /// </para>
+        /// <para>
+        /// All three are added together, with an empty query string where
+        /// the request carried none, so that a missing key always means
+        /// this integration did not supply the request line.
+        /// </para>
         /// </remarks>
         private static void AddRequestLineToEvidence(
             IFlowData flowData,
             HttpRequest httpRequest)
         {
-            CheckAndAdd(
-                flowData,
-                Core.Constants.EVIDENCE_REQUEST_METHOD_KEY,
-                httpRequest.Method ?? string.Empty);
-            CheckAndAdd(
-                flowData,
-                Core.Constants.EVIDENCE_REQUEST_PATH_KEY,
-                httpRequest.Path.HasValue
-                    ? httpRequest.Path.Value
-                    : string.Empty);
-            // The framework hands the query string back with its leading
-            // question mark, which the signature base does not include, so
-            // it is taken off here and put back by whatever needs it.
-            var query = httpRequest.QueryString.HasValue
-                ? httpRequest.QueryString.Value
+            var filter = flowData.EvidenceKeyFilter;
+            var wantsMethod = filter.Include(
+                Core.Constants.EVIDENCE_REQUEST_METHOD_KEY);
+            var wantsPath = filter.Include(
+                Core.Constants.EVIDENCE_REQUEST_PATH_KEY);
+            var wantsQuery = filter.Include(
+                Core.Constants.EVIDENCE_REQUEST_QUERY_KEY);
+            if (wantsMethod == false &&
+                wantsPath == false &&
+                wantsQuery == false)
+            {
+                return;
+            }
+
+            if (wantsMethod)
+            {
+                flowData.AddEvidence(
+                    Core.Constants.EVIDENCE_REQUEST_METHOD_KEY,
+                    httpRequest.Method ?? string.Empty);
+            }
+            if (wantsPath == false && wantsQuery == false)
+            {
+                return;
+            }
+
+            SplitRequestTarget(httpRequest, out var path, out var query);
+            if (wantsPath)
+            {
+                flowData.AddEvidence(
+                    Core.Constants.EVIDENCE_REQUEST_PATH_KEY, path);
+            }
+            if (wantsQuery)
+            {
+                flowData.AddEvidence(
+                    Core.Constants.EVIDENCE_REQUEST_QUERY_KEY, query);
+            }
+        }
+
+        /// <summary>
+        /// Read the path and the query string as the request line carried
+        /// them, without the leading question mark on the query.
+        /// </summary>
+        /// <param name="httpRequest">The request.</param>
+        /// <param name="path">The path.</param>
+        /// <param name="query">The query string.</param>
+        private static void SplitRequestTarget(
+            HttpRequest httpRequest,
+            out string path,
+            out string query)
+        {
+            var rawTarget = httpRequest.HttpContext?.Features?
+                .Get<IHttpRequestFeature>()?.RawTarget;
+            if (string.IsNullOrEmpty(rawTarget) == false &&
+                rawTarget[0] == '/')
+            {
+                var mark = rawTarget.IndexOf('?');
+                path = mark < 0 ? rawTarget : rawTarget.Substring(0, mark);
+                query = mark < 0
+                    ? string.Empty
+                    : rawTarget.Substring(mark + 1);
+                return;
+            }
+            // 'ToUriComponent' gives the escaped form, where 'Value' gives
+            // the decoded one, so it is the closer of the two to what the
+            // request line carried.
+            path = httpRequest.Path.HasValue
+                ? httpRequest.Path.ToUriComponent()
+                : string.Empty;
+            query = httpRequest.QueryString.HasValue
+                ? httpRequest.QueryString.ToUriComponent()
                 : string.Empty;
             if (query.Length > 0 && query[0] == '?')
             {
                 query = query.Substring(1);
             }
-            CheckAndAdd(
-                flowData,
-                Core.Constants.EVIDENCE_REQUEST_QUERY_KEY,
-                query);
         }
     }
 }

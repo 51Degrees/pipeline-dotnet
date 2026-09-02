@@ -23,6 +23,7 @@
 using FiftyOne.Pipeline.Core.Data;
 using FiftyOne.Pipeline.Web.Services;
 using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Http.Features;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Primitives;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
@@ -223,6 +224,81 @@ namespace FiftyOne.Pipeline.Web.Tests
             // question mark, which whatever needs it puts back.
             _flowData.Verify(f => f.AddEvidence(
                 Core.Constants.EVIDENCE_REQUEST_QUERY_KEY, "id=7&sort=name"),
+                Times.Once);
+        }
+
+        /// <summary>
+        /// The path and the query are taken from the raw request target,
+        /// so percent escapes survive. 'Path' and 'QueryString' hand back
+        /// the decoded forms, where '/a%2Fb' reads as '/a/b', and these
+        /// values rebuild the text an HTTP message signature was made
+        /// over, so a decoded byte makes a valid signature read as
+        /// invalid.
+        /// </summary>
+        [TestMethod]
+        public void WebRequestEvidenceService_RequestLineKeepsEscapes()
+        {
+            const string rawTarget = "/a%2Fb/c%20d?q=%2Fx%20y&r=1";
+            var features = new FeatureCollection();
+            features.Set<IHttpRequestFeature>(new HttpRequestFeature()
+            {
+                RawTarget = rawTarget,
+            });
+            _request.SetupGet(r => r.Method).Returns("GET");
+            _request.SetupGet(r => r.HttpContext.Features).Returns(features);
+            // The decoded forms the framework would otherwise be read
+            // from, which the assertions below must not see.
+            _request.SetupGet(r => r.Path)
+                .Returns(new PathString("/a/b/c d"));
+            _request.SetupGet(r => r.QueryString)
+                .Returns(new QueryString("?q=/x y&r=1"));
+
+            SetRequiredKeys(new List<string>()
+            {
+                Core.Constants.EVIDENCE_REQUEST_PATH_KEY,
+                Core.Constants.EVIDENCE_REQUEST_QUERY_KEY,
+            });
+            _service.AddEvidenceFromRequest(_flowData.Object, _request.Object);
+
+            _flowData.Verify(f => f.AddEvidence(
+                Core.Constants.EVIDENCE_REQUEST_PATH_KEY, "/a%2Fb/c%20d"),
+                Times.Once);
+            _flowData.Verify(f => f.AddEvidence(
+                Core.Constants.EVIDENCE_REQUEST_QUERY_KEY,
+                "q=%2Fx%20y&r=1"),
+                Times.Once);
+        }
+
+        /// <summary>
+        /// Where the raw request target cannot be read, the escaped forms
+        /// of the framework's own path and query are used, which are as
+        /// close to the request line as it can give. A raw target in the
+        /// absolute form a proxy may send, or the asterisk form of an
+        /// OPTIONS request, takes the same route.
+        /// </summary>
+        [TestMethod]
+        public void WebRequestEvidenceService_RequestLineWithoutARawTarget()
+        {
+            _request.SetupGet(r => r.Method).Returns("GET");
+            _request.SetupGet(r => r.HttpContext.Features)
+                .Returns(new FeatureCollection());
+            _request.SetupGet(r => r.Path)
+                .Returns(new PathString("/a b"));
+            _request.SetupGet(r => r.QueryString)
+                .Returns(new QueryString("?q=1"));
+
+            SetRequiredKeys(new List<string>()
+            {
+                Core.Constants.EVIDENCE_REQUEST_PATH_KEY,
+                Core.Constants.EVIDENCE_REQUEST_QUERY_KEY,
+            });
+            _service.AddEvidenceFromRequest(_flowData.Object, _request.Object);
+
+            _flowData.Verify(f => f.AddEvidence(
+                Core.Constants.EVIDENCE_REQUEST_PATH_KEY, "/a%20b"),
+                Times.Once);
+            _flowData.Verify(f => f.AddEvidence(
+                Core.Constants.EVIDENCE_REQUEST_QUERY_KEY, "q=1"),
                 Times.Once);
         }
 
