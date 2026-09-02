@@ -109,9 +109,22 @@ using CoreConstants = FiftyOne.Pipeline.Core.Constants;
 /// ==========================================
 /// ```
 ///
-/// So that the example is the same every time it runs and never reaches
-/// the network, the public key is served by a message handler inside the
-/// example rather than by the agent itself.
+/// 4. Report the agent card properties, being the agent's name, its
+/// robots.txt product token and the card address, by configuring a
+/// registry of agent cards with `SetRegistry`.
+///
+/// 5. Check a signature against the live services. The example signs a
+/// request with the Ed25519 key printed in RFC 9421 and verifies against
+/// the key directory Cloudflare's Web Bot Auth research service publishes,
+/// and then shows that the key directory OpenAI publishes for ChatGPT,
+/// fetched live, rightly refuses that key. Where a service cannot be
+/// reached the example says so and carries on, because a directory that
+/// cannot be fetched is never evidence against an agent.
+///
+/// So that the first five requests are the same every time they run, their
+/// keys, card and registry are served by a message handler inside the
+/// example rather than by the agent itself. Only the two live checks reach
+/// the network.
 /// </summary>
 namespace Examples.AgentSignature
 {
@@ -182,6 +195,45 @@ namespace Examples.AgentSignature
         /// </summary>
         private const string RequestScheme = "https";
 
+        /// <summary>
+        /// The address of the registry of agent cards this example serves
+        /// from memory, being a text document listing one card address per
+        /// line.
+        /// </summary>
+        private const string RegistryUrl = "https://registry.test/agents.txt";
+
+        /// <summary>
+        /// The address of the agent card this example serves from memory.
+        /// The card's 'client_id' field has to be this same address.
+        /// </summary>
+        private const string CardUrl =
+            "https://signature-agent.test/card.json";
+
+        /// <summary>
+        /// The origin of the Web Bot Auth research service Cloudflare runs,
+        /// which publishes the Ed25519 key printed in RFC 9421, so a request
+        /// signed here with that key verifies against what the service is
+        /// serving right now.
+        /// </summary>
+        private const string ResearchOrigin =
+            "https://http-message-signatures-example.research.cloudflare.com";
+
+        /// <summary>
+        /// The origin of the agent OpenAI runs, which publishes a key
+        /// directory for ChatGPT. OpenAI holds its own private keys, so the
+        /// live check against this origin shows a wrong key being refused
+        /// rather than a signature verifying.
+        /// </summary>
+        private const string ChatGptOrigin = "https://chatgpt.com";
+
+        /// <summary>
+        /// How long the live checks wait for the two services. Generous, so
+        /// that a slow connection still shows the result, whilst an
+        /// unreachable service holds the example up no longer than this.
+        /// </summary>
+        private static readonly TimeSpan LiveTimeout =
+            TimeSpan.FromSeconds(15);
+
         public static void Main(string[] args)
         {
             var instance = new Program();
@@ -206,9 +258,9 @@ namespace Examples.AgentSignature
             WriteIntroduction();
 
             var loggerFactory = new LoggerFactory();
-            // The handler answers the element's key directory fetch from a
-            // table held in memory, so the example never reaches the network
-            // and prints the same thing every time it runs.
+            // The handler answers the element's fetches from a table held
+            // in memory, so the first five requests never reach the network
+            // and print the same thing every time they run.
             using (var handler = new ExampleKeyDirectoryHandler())
             using (var httpClient = new HttpClient(handler, false))
             {
@@ -216,6 +268,9 @@ namespace Examples.AgentSignature
                     AgentOrigin + Constants.DIRECTORY_PATH,
                     "Fetching pages to answer a person's question",
                     TestKeyPublicPart);
+                handler.AddResponse(
+                    RegistryUrl, CardUrl + "\n", "text/plain");
+                handler.AddResponse(CardUrl, CardJson(), "application/json");
 
                 // Create a pipeline holding one agent signature element.
                 using (var pipeline = new PipelineBuilder(loggerFactory)
@@ -237,7 +292,23 @@ namespace Examples.AgentSignature
                     RunTamperedRequest(pipeline);
                     RunSilentAgentRequest(pipeline);
                 }
+
+                // A second pipeline with a registry of agent cards
+                // configured, so the card properties have values.
+                using (var pipeline = new PipelineBuilder(loggerFactory)
+                    .AddFlowElement(
+                        new AgentSignatureElementBuilder(loggerFactory)
+                            .SetHttpClient(httpClient)
+                            .SetWaitBudget(TimeSpan.FromSeconds(5))
+                            .SetRegistry(RegistryUrl)
+                            .Build())
+                    .Build())
+                {
+                    RunCardRequest(pipeline);
+                }
             }
+
+            RunLiveChecks(loggerFactory);
 
             Console.WriteLine(Separator);
             Console.WriteLine(
@@ -270,9 +341,12 @@ namespace Examples.AgentSignature
                 "'Signature-Agent' header names and reports whether the " +
                 "signature checks out.");
             Console.WriteLine(
-                "The four requests below show each of the outcomes. The " +
-                "key directory is served from inside this example, so " +
-                "nothing here reaches the network.");
+                "The five requests below show each of the outcomes and the " +
+                "agent card properties. Their keys, card and registry are " +
+                "served from inside this example, so they print the same " +
+                "thing every time. Two live checks follow, which reach the " +
+                "key directories Cloudflare and OpenAI publish, and which " +
+                "say so plainly where a service cannot be reached.");
         }
 
         /// <summary>
@@ -349,6 +423,152 @@ namespace Examples.AgentSignature
             Console.WriteLine(
                 "There was no key to check the signature against, so this " +
                 "is not evidence against the agent.");
+        }
+
+        /// <summary>
+        /// The same signed request again with a registry of agent cards
+        /// configured, so the agent's name, product token and card address
+        /// are reported alongside the verified signature.
+        /// </summary>
+        /// <param name="pipeline">The pipeline to process with.</param>
+        private void RunCardRequest(IPipeline pipeline)
+        {
+            Console.WriteLine(Separator);
+            Console.WriteLine(
+                "5. The same request with a registry of agent cards " +
+                "configured");
+            var signed = SignRequest(AgentOrigin);
+            var result = Process(pipeline, ToEvidence(signed));
+            WriteStatus(result);
+            WriteDetails(result);
+            Console.WriteLine(
+                "An agent card is where an agent says who it is. The name, " +
+                "the product token to look for in robots.txt and the card " +
+                "address now have values, because the registry configured " +
+                "with SetRegistry lists a card whose keys are the ones the " +
+                "signature verified against.");
+        }
+
+        /// <summary>
+        /// Check a signature against the two live services, saying plainly
+        /// where one cannot be reached. Nothing an unreachable service
+        /// causes is evidence against an agent, so the example carries on
+        /// either way.
+        /// </summary>
+        /// <param name="loggerFactory">The logger factory.</param>
+        private void RunLiveChecks(ILoggerFactory loggerFactory)
+        {
+            // No handler is set here, so the element fetches with a client
+            // of its own over the real network, exactly as a deployment
+            // does.
+            using (var pipeline = new PipelineBuilder(loggerFactory)
+                .AddFlowElement(
+                    new AgentSignatureElementBuilder(loggerFactory)
+                        // The live checks wait for the fetch so the result
+                        // shows in one request. A web server keeps the
+                        // default budget instead, reporting Timeout whilst
+                        // the fetch finishes in the background.
+                        .SetWaitBudget(LiveTimeout)
+                        .SetFetchTimeout(LiveTimeout)
+                        .Build())
+                .Build())
+            {
+                RunResearchServiceRequest(pipeline);
+                RunChatGptRequest(pipeline);
+            }
+        }
+
+        /// <summary>
+        /// Sign a request with the RFC 9421 test key and verify against the
+        /// key directory Cloudflare's Web Bot Auth research service is
+        /// publishing right now, which serves that same key.
+        /// </summary>
+        /// <param name="pipeline">The pipeline to process with.</param>
+        private void RunResearchServiceRequest(IPipeline pipeline)
+        {
+            Console.WriteLine(Separator);
+            Console.WriteLine(
+                "6. Live: a request checked against Cloudflare's Web Bot " +
+                "Auth research service");
+            var signed = SignRequest(ResearchOrigin);
+            var result = Process(pipeline, ToEvidence(signed));
+            WriteStatus(result);
+            if (string.Equals(
+                result.AgentSignature.Value,
+                Constants.STATUS_VERIFIED,
+                StringComparison.Ordinal))
+            {
+                WriteDetails(result);
+                Console.WriteLine(
+                    "The signature was checked against the key directory " +
+                    "the research service at " + ResearchOrigin +
+                    " is publishing right now, fetched over the real " +
+                    "network.");
+            }
+            else
+            {
+                Console.WriteLine(
+                    "The research service could not be reached, so this " +
+                    "check was skipped. An unreachable directory is never " +
+                    "evidence against an agent.");
+            }
+        }
+
+        /// <summary>
+        /// The same signed request naming the agent OpenAI runs. OpenAI
+        /// holds its own private keys, so the live key directory ChatGPT
+        /// publishes rightly refuses the test key.
+        /// </summary>
+        /// <param name="pipeline">The pipeline to process with.</param>
+        private void RunChatGptRequest(IPipeline pipeline)
+        {
+            Console.WriteLine(Separator);
+            Console.WriteLine(
+                "7. Live: the same request pretending to be ChatGPT");
+            var signed = SignRequest(ChatGptOrigin);
+            var result = Process(pipeline, ToEvidence(signed));
+            WriteStatus(result);
+            if (string.Equals(
+                result.AgentSignature.Value,
+                Constants.STATUS_INVALID,
+                StringComparison.Ordinal))
+            {
+                Console.WriteLine(
+                    "The key directory OpenAI publishes at " +
+                    ChatGptOrigin + " was fetched over the real network " +
+                    "and read, and it holds no key matching this " +
+                    "signature, so a request claiming to be ChatGPT " +
+                    "without OpenAI's private key is refused. This is the " +
+                    "protection working.");
+            }
+            else
+            {
+                Console.WriteLine(
+                    "The ChatGPT key directory could not be reached, so " +
+                    "this check was skipped. An unreachable directory is " +
+                    "never evidence against an agent.");
+            }
+        }
+
+        /// <summary>
+        /// The agent card this example serves, in which the agent says who
+        /// it is. The 'client_id' has to be the address the card is served
+        /// from, and the 'jwks_uri' names the same key directory the
+        /// signature verifies against, which is how a card is tied to an
+        /// agent.
+        /// </summary>
+        /// <returns>The card as JSON.</returns>
+        private static string CardJson()
+        {
+            return "{" +
+                "\"client_id\":\"" + CardUrl + "\"," +
+                "\"client_name\":\"Example Signing Agent\"," +
+                "\"client_uri\":\"" + AgentOrigin + "\"," +
+                "\"jwks_uri\":\"" + AgentOrigin + Constants.DIRECTORY_PATH +
+                "\"," +
+                "\"web_bot_auth\":{" +
+                "\"rfc9309-product-token\":\"ExampleAgent\"" +
+                "}}";
         }
 
         /// <summary>

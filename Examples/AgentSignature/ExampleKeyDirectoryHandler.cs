@@ -45,8 +45,9 @@ namespace Examples.AgentSignature
     /// </remarks>
     public class ExampleKeyDirectoryHandler : HttpMessageHandler
     {
-        private readonly IDictionary<string, string> _directories =
-            new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        private readonly IDictionary<string, (string Body, string MediaType)>
+            _responses = new Dictionary<string, (string, string)>(
+                StringComparer.OrdinalIgnoreCase);
 
         /// <summary>
         /// Answer the given URL with a key directory holding the given
@@ -77,7 +78,25 @@ namespace Examples.AgentSignature
             body.Append("\"keys\":[")
                 .Append(string.Join(",", keysJson))
                 .Append("]}");
-            _directories[url] = body.ToString();
+            return AddResponse(
+                url, body.ToString(), Constants.DIRECTORY_MEDIA_TYPE);
+        }
+
+        /// <summary>
+        /// Answer the given URL with the given body, which is how the
+        /// example serves an agent card and a registry of cards as well as
+        /// key directories.
+        /// </summary>
+        /// <param name="url">The URL the body is served from.</param>
+        /// <param name="body">The body.</param>
+        /// <param name="mediaType">The media type of the body.</param>
+        /// <returns>This handler.</returns>
+        public ExampleKeyDirectoryHandler AddResponse(
+            string url,
+            string body,
+            string mediaType)
+        {
+            _responses[url] = (body, mediaType);
             return this;
         }
 
@@ -93,7 +112,7 @@ namespace Examples.AgentSignature
             cancellationToken.ThrowIfCancellationRequested();
 
             var url = request.RequestUri.AbsoluteUri;
-            if (_directories.TryGetValue(url, out var body) == false)
+            if (_responses.TryGetValue(url, out var found) == false)
             {
                 // An agent that publishes no keys looks exactly like this,
                 // which the element reports as Unverified rather than as
@@ -104,11 +123,11 @@ namespace Examples.AgentSignature
 
             var response = new HttpResponseMessage(HttpStatusCode.OK)
             {
-                Content = new StringContent(body, Encoding.UTF8),
+                Content = new StringContent(found.Body, Encoding.UTF8),
                 RequestMessage = request,
             };
             response.Content.Headers.ContentType =
-                new MediaTypeHeaderValue(Constants.DIRECTORY_MEDIA_TYPE)
+                new MediaTypeHeaderValue(found.MediaType)
                 {
                     CharSet = "utf-8",
                 };
