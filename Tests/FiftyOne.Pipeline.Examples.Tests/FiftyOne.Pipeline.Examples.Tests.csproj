@@ -18,6 +18,7 @@
     <ProjectReference Include="..\..\Examples\AgentSignature\Examples.AgentSignature.csproj" />
     <ProjectReference Include="..\..\Examples\CustomFlowElement\1. Simple Flow Element\Examples.CustomFlowElement.csproj" />
     <ProjectReference Include="..\..\Examples\CustomFlowElement\2. On Premise Engine\Examples.OnPremiseEngine.csproj" />
+    <ProjectReference Include="..\..\Examples\DerivedProperty\Examples.DerivedProperty.csproj" />
     <ProjectReference Include="..\..\Examples\ResultCaching\Examples.ResultCaching.csproj" />
     <ProjectReference Include="..\..\Examples\UsageSharing\Examples.UsageSharing.csproj" />
   </ItemGroup>

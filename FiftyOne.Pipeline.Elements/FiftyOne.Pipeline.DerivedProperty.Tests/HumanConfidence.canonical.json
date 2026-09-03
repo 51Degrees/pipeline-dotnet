@@ -1,0 +1,162 @@
+{
+  "Format": 1,
+  "Name": "HumanConfidence",
+  "Version": "0.4.0",
+  "Output": {
+    "Name": "HumanConfidence",
+    "Description": "The confidence that the request came from a device being used by a human who is viewing the page. Returns one of High, Medium, or Low. The property has no value until the 51Degrees JavaScript has run, because whether the browser window was in view cannot be known from the request alone.",
+    "ValueType": "string",
+    "IsList": false,
+    "IsMandatory": false,
+    "IsObsolete": false,
+    "Category": "Human Detection",
+    "IsPopular": true,
+    "ExportValues": true,
+    "Dependencies": [
+      "device.IsCrawler",
+      "device.HasWebDriver",
+      "device.IsHeadless",
+      "device.IsVisible",
+      "device.BrowserReleaseYear",
+      "device.BrowserReleaseAge",
+      "ip.HumanProbability",
+      "ip.ConnectionType"
+    ],
+    "Values": [
+      {
+        "Name": "High",
+        "Description": "High confidence that the request is from a device being used by a human who is viewing the page."
+      },
+      {
+        "Name": "Medium",
+        "Description": "The evidence is mixed and the request cannot be placed either way. A human may be viewing the page."
+      },
+      {
+        "Name": "Low",
+        "Description": "Almost certainly no human is directly involved in viewing the page content."
+      }
+    ]
+  },
+  "Properties": {
+    "device.IsCrawler": {
+      "Type": "bool"
+    },
+    "device.HasWebDriver": {
+      "Type": "bool"
+    },
+    "device.IsHeadless": {
+      "Type": "bool"
+    },
+    "device.IsVisible": {
+      "Type": "bool"
+    },
+    "device.BrowserReleaseYear": {
+      "Type": "int"
+    },
+    "device.BrowserReleaseAge": {
+      "Type": "int"
+    },
+    "ip.HumanProbability": {
+      "Type": "int"
+    },
+    "ip.ConnectionType": {
+      "Type": "string"
+    }
+  },
+  "Checks": {
+    "IsCrawler": {
+      "Property": "device.IsCrawler",
+      "Eq": true
+    },
+    "HasWebDriver": {
+      "Property": "device.HasWebDriver",
+      "Eq": true
+    },
+    "IsHeadless": {
+      "Property": "device.IsHeadless",
+      "Eq": true
+    },
+    "IsVisible": {
+      "Property": "device.IsVisible",
+      "Eq": true
+    },
+    "BrowserIsCurrent": {
+      "All": [
+        {
+          "Property": "device.BrowserReleaseYear",
+          "Gt": 0
+        },
+        {
+          "Property": "device.BrowserReleaseAge",
+          "Lt": 24
+        }
+      ]
+    },
+    "AddressNotAgainstHuman": {
+      "Any": [
+        {
+          "Property": "ip.HumanProbability",
+          "Ge": 7
+        },
+        {
+          "Property": "ip.HumanProbability",
+          "Lt": 0
+        }
+      ]
+    },
+    "ConnectionCarriesPeople": {
+      "Property": "ip.ConnectionType",
+      "In": [
+        "Broadband",
+        "Cellular"
+      ]
+    }
+  },
+  "Rules": [
+    {
+      "When": {
+        "Check": "IsCrawler"
+      },
+      "Then": "Low"
+    },
+    {
+      "When": {
+        "Check": "HasWebDriver"
+      },
+      "Then": "Low"
+    },
+    {
+      "When": {
+        "Check": "IsHeadless"
+      },
+      "Then": "Low"
+    },
+    {
+      "When": {
+        "Failed": [
+          "IsVisible",
+          "BrowserIsCurrent",
+          "AddressNotAgainstHuman",
+          "ConnectionCarriesPeople"
+        ],
+        "Eq": 0
+      },
+      "Then": "High"
+    },
+    {
+      "When": {
+        "Failed": [
+          "IsVisible",
+          "BrowserIsCurrent",
+          "AddressNotAgainstHuman",
+          "ConnectionCarriesPeople"
+        ],
+        "Le": 1
+      },
+      "Then": "Medium"
+    },
+    {
+      "Else": "Low"
+    }
+  ]
+}
