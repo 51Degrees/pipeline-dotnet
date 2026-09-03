@@ -1465,7 +1465,7 @@ namespace FiftyOne.Pipeline.AgentSignature.FlowElement
             private readonly bool _trustForwarded;
 
             public AgentSignatureEvidenceKeyFilter(bool trustForwarded)
-                : base(NamedKeys(trustForwarded))
+                : base(NamedKeys())
             {
                 _trustForwarded = trustForwarded;
             }
@@ -1473,7 +1473,10 @@ namespace FiftyOne.Pipeline.AgentSignature.FlowElement
             /// <summary>
             /// The keys this element cannot do without, named under the
             /// prefix a request carries them in when it arrives here
-            /// directly, and never under the query prefix.
+            /// directly, and never under the query prefix. The list is
+            /// the same whether or not forwarded evidence is trusted,
+            /// because what is published to callers must never depend on
+            /// how this deployment reads what it receives.
             /// </summary>
             /// <remarks>
             /// Anything reading the whitelist, such as the cloud
@@ -1489,7 +1492,7 @@ namespace FiftyOne.Pipeline.AgentSignature.FlowElement
             /// signature reaches the wire only where the site actually
             /// received one.
             /// </remarks>
-            private static List<string> NamedKeys(bool trustForwarded)
+            private static List<string> NamedKeys()
             {
                 var names = new[]
                 {
