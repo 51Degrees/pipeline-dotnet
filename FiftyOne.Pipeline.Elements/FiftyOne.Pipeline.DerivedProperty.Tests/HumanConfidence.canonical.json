@@ -9,7 +9,7 @@
     "IsList": false,
     "IsMandatory": false,
     "IsObsolete": false,
-    "Category": "General",
+    "Category": "Human Detection",
     "IsPopular": true,
     "ExportValues": true,
     "Dependencies": [
