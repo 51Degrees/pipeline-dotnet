@@ -57,20 +57,17 @@ namespace FiftyOne.Pipeline.Engines.FiftyOne.Tests.Data
         }
 
         /// <summary>
-        /// The method and the path are shared like the other values under
-        /// the 'server' prefix. 51Degrees and the customer are joint
-        /// controllers of shared usage data under the terms of service,
-        /// and the contract prevents the data being used for anything
-        /// else, so a path that carries personal data is covered by that
-        /// agreement rather than by a filter here.
+        /// The method is shared like the other values under the 'server'
+        /// prefix. It names no address and carries nothing a site put
+        /// there, so neither reason for holding the path and the query
+        /// back applies to it.
         /// </summary>
         [TestMethod]
-        public void ShareAll_IncludesTheMethodAndThePath()
+        public void ShareAll_IncludesTheMethod()
         {
             var filter = new EvidenceKeyFilterShareUsage();
 
             Assert.IsTrue(filter.Include("server.request-method"));
-            Assert.IsTrue(filter.Include("server.request-path"));
             Assert.IsTrue(filter.Include("server.client-ip"));
         }
 
@@ -86,6 +83,42 @@ namespace FiftyOne.Pipeline.Engines.FiftyOne.Tests.Data
         /// prefix and shared under its 'server' prefix, undoing a choice
         /// the caller had made without anyone deciding to.
         /// </remarks>
+        /// <summary>
+        /// The path is never shared, in either mode.
+        /// </summary>
+        /// <remarks>
+        /// <see cref="EvidenceKeyFilterShareUsageTracker"/> derives from
+        /// this class, so anything shared is also part of the key usage
+        /// sharing de-duplicates on. Sharing the path would make every
+        /// address a visitor opens look like a different session, so one
+        /// visitor moving through thirty pages would send thirty records
+        /// where the tracker is meant to send one. The path is also the
+        /// part of a URL most likely to carry a name or an identifier a
+        /// site has put in it.
+        /// </remarks>
+        [TestMethod]
+        public void ThePathIsNeverShared()
+        {
+            var shareAll = new EvidenceKeyFilterShareUsage();
+
+            Assert.IsFalse(shareAll.Include("server.request-path"));
+            Assert.IsFalse(shareAll.Include("SERVER.REQUEST-PATH"));
+
+            var configured = new EvidenceKeyFilterShareUsage(
+                new List<string>(),
+                new List<string>(),
+                false,
+                "sessionid");
+
+            Assert.IsFalse(configured.Include("server.request-path"));
+
+            // The tracker inherits the rule, which is the point of it.
+            var tracker = new EvidenceKeyFilterShareUsageTracker();
+
+            Assert.IsFalse(tracker.Include("server.request-path"));
+            Assert.IsFalse(tracker.Include("server.request-query"));
+        }
+
         [TestMethod]
         public void TheWholeQueryStringIsNeverShared()
         {

@@ -166,6 +166,51 @@ namespace FiftyOne.Pipeline.AgentSignature.Tests
             }
         }
 
+        /// <summary>
+        /// An element disposed whilst the check is still running says
+        /// nothing about reachability, because that is an ordinary
+        /// shutdown rather than a deployment that cannot fetch keys.
+        /// </summary>
+        /// <remarks>
+        /// The failure this pins is quiet. The fetcher treats the
+        /// cancellation and the disposed client a shutdown produces as
+        /// network failures and hands back a failed entry rather than
+        /// throwing, so the check completes normally into its failure
+        /// branch instead of reaching its catch. Guarding only the catch
+        /// therefore left an ordinary shutdown logging, at Error, that
+        /// signature checking was switched off.
+        /// </remarks>
+        [TestMethod]
+        public void DisposingWhilstTheCheckRunsRaisesNoAlarm()
+        {
+            var logger = new CapturingLoggerFactory();
+            using (var handler = new FakeHttpHandler())
+            {
+                // Nothing is added to the handler, so the fetch is still
+                // in flight when the element is disposed underneath it.
+                var client = new HttpClient(handler, false);
+                var element = new AgentSignatureElementBuilder(logger)
+                    .SetHttpClient(client)
+                    .SetReachabilityCheckUrl(
+                        Fixtures.SignatureAgentDirectoryUrl)
+                    .Build();
+                element.Dispose();
+                client.Dispose();
+
+                // Give the check every chance to log before concluding it
+                // stayed quiet, so this fails when the guard is removed
+                // rather than passing on timing.
+                Thread.Sleep(200);
+
+                Assert.AreEqual(
+                    0,
+                    logger.Errors.Count,
+                    "Expected an ordinary shutdown to say nothing about " +
+                    "reachability, and it logged: " +
+                    string.Join(" | ", logger.Errors));
+            }
+        }
+
         private static bool WaitFor(Func<bool> condition)
         {
             for (var i = 0; i < 100; i++)

@@ -216,7 +216,15 @@ namespace FiftyOne.Pipeline.AgentSignature.FlowElement
                                 Messages.LogReachabilityGood,
                                 url));
                         }
-                        else
+                        // An element disposed whilst the check was still
+                        // running reaches here rather than the catch, and
+                        // must not raise the alarm either. The fetcher
+                        // treats the cancellation and the disposed client
+                        // that a shutdown produces as network failures and
+                        // hands back a failed entry instead of throwing,
+                        // so this branch sees an ordinary shutdown as an
+                        // unreachable directory unless it checks too.
+                        else if (Volatile.Read(ref _disposing) == false)
                         {
                             Logger.LogError(string.Format(
                                 CultureInfo.InvariantCulture,
@@ -1319,6 +1327,26 @@ namespace FiftyOne.Pipeline.AgentSignature.FlowElement
                 {
                     return false;
                 }
+                // A request that carried no query at all and one that
+                // carried an empty query, being a target ending in a bare
+                // '?', both arrive here as an empty string, because the
+                // evidence keys hold the query without its leading '?'
+                // and there is nothing left to tell the two apart. The
+                // common case by far is no query at all, and its target
+                // address carries no '?', so that is what is built here.
+                //
+                // A request for '/search?' therefore resolves to
+                // 'https://host/search' whilst '@query' resolves to '?'
+                // for the same request, which is right for '@query' under
+                // RFC 9421 section 2.2.7. An agent that signs over both
+                // components of such a target reads as a mismatch rather
+                // than as unverifiable, which is the one answer this
+                // element otherwise avoids giving a genuine agent.
+                //
+                // Telling the two apart needs the evidence to carry the
+                // '?' where the request had one, which is a change to the
+                // Pipeline specification and so to every language, not
+                // something to do here alone. Raised as issue #391.
                 value = scheme.Trim().ToLowerInvariant() + "://" +
                     authority +
                     (path.Length == 0 ? "/" : path) +

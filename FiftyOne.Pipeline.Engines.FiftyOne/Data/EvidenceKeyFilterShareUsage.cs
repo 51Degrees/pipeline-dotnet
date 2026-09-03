@@ -99,9 +99,24 @@ namespace FiftyOne.Pipeline.Engines.FiftyOne.Data
         /// one of those parameters together. Without this entry the same
         /// value would be withheld under its 'query' prefix and shared under
         /// its 'server' prefix, which would quietly undo a choice a caller
-        /// had made. An element that needs the query string still receives
-        /// it in evidence, because this filter governs only what usage
-        /// sharing sends.
+        /// had made.
+        /// </para>
+        /// <para>
+        /// 'request-path' is held back for a different reason, being what it
+        /// does to usage sharing itself rather than what it carries.
+        /// <see cref="EvidenceKeyFilterShareUsageTracker"/> derives
+        /// from this class, so every key shared is also part of the key the
+        /// tracker de-duplicates on. Sharing the path makes each address a
+        /// visitor opens look like a different session, so one visitor
+        /// moving through thirty pages sends thirty records where the
+        /// tracker is meant to send one. The path is also the part of a URL
+        /// most likely to carry a name or an identifier a site has put in
+        /// it.
+        /// </para>
+        /// <para>
+        /// An element that needs either value still receives it in evidence,
+        /// because this filter governs only what usage sharing sends, not
+        /// what a pipeline collects.
         /// </para>
         /// </remarks>
         private static readonly string[] _neverSharedEvidenceKeys = new[]
@@ -109,6 +124,7 @@ namespace FiftyOne.Pipeline.Engines.FiftyOne.Data
             "id.email",
             "id.salt",
             "request-query",
+            "request-path",
         };
 
         /// <summary>
