@@ -1,0 +1,45 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+
+    <IsPackable>false</IsPackable>
+    <IsTestProject>true</IsTestProject>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="coverlet.collector" Version="6.0.0" />
+    <PackageReference Include="FiftyOne.Common.TestHelpers" Version="5.1.7" />
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.8.0" />
+    <!-- MSTest 4.0.2, not the 3.1.1 the Translation test project uses,
+         because FiftyOne.Common.TestHelpers 5.1.7 asks for MSTest.TestFramework
+         4.0.2 or newer and NuGet treats the downgrade as an error. The same
+         4.0.2 adapter is used by FiftyOne.Pipeline.Core.Tests. -->
+    <PackageReference Include="MSTest.TestAdapter" Version="4.0.2" />
+    <PackageReference Include="MSTest.TestFramework" Version="4.0.2" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\FiftyOne.Pipeline.DerivedProperty\FiftyOne.Pipeline.DerivedProperty.csproj" />
+    <!-- Referenced by JsonBuilderIntegrationTests only. The cloud serves a
+         derived property by putting the JSON builder after this element, so
+         the two working together is a contract worth pinning here rather
+         than being found later in the cloud. -->
+    <ProjectReference Include="..\FiftyOne.Pipeline.JsonBuilderElement\FiftyOne.Pipeline.JsonBuilder.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Using Include="Microsoft.VisualStudio.TestTools.UnitTesting" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- The canonical JSON the JavaScript reference prints for the
+         HumanConfidence script. DerivedScriptWriterTests compares the text
+         the writer prints against this file, which is how the two languages
+         are held to one canonical form. -->
+    <Content Include="HumanConfidence.canonical.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+  </ItemGroup>
+
+</Project>

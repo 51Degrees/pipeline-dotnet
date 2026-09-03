@@ -65,6 +65,7 @@ Rather than wait, the Stubble source is vendored under [`vendor/Stubble/`](vendo
   - *FiftyOne.Pipeline.Web.Shared* - Shared code that is used by both Core and Framework ASP.NET integrations.
 - **FiftyOne.Pipeline.Elements** - Projects for various common Flow Elements that are used by multiple other solutions.
   - *FiftyOne.Pipeline.AgentSignature* - An element that checks the request signature an automated agent sends under the IETF Web Bot Auth protocol and reports which agent signed the request.
+  - *FiftyOne.Pipeline.DerivedProperty* - An element that computes a new property from properties other elements have already put into the flow data, following a script written in YAML or JSON.
   - *FiftyOne.Pipeline.JavaScriptBuilder* - An element that packages values from all 'JavaScript' properties from all engines into a single JavaScript function.
   - *FiftyOne.Pipeline.JsonBuilder* - An element that serializes all properties from all engines into JSON format.
 - **FiftyOne.CloudRequestEngine** - Projects related to making general requests to the 51Degrees cloud.
@@ -102,6 +103,7 @@ If you want examples that demonstrate how to use 51Degrees products such as devi
 | CustomFlowElement\2. On Premise Engine    | Shows how to modify SimpleFlowElement to make use of the 'engine' functionality and use a custom data file to map dates to star signs rather than relying on hard coded data. |
 | CustomFlowElement\3. Client-side evidence | Shows how to modify SimpleFlowElement to request the data of birth from the user using client-side JavaScript. |
 | CustomFlowElement\4. Cloud Engine         | Shows how to modify SimpleFlowElement to perform the star sign lookup via a cloud service rather than locally. |
+| DerivedProperty                           | Shows how to compute a new property from properties already in the flow data, using a script written in YAML. Covers a script built into the package, a script read from a file, building from a configuration file, and what a customer sees when a source property is missing. |
 | ResultCaching                             | Shows how the result caching feature works. |
 | UsageSharing                              | Shows how to share usage with 51Degrees. This helps us to keep our products up to date and accurate. |
 | Did\CreatorContextWeb                     | A demo web server for the 51Did creator context flow, run the way production does, with the browser verifying and the server redeeming. See Examples\Did\README.md. |

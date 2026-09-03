@@ -97,13 +97,23 @@ namespace FiftyOne.Pipeline.AgentSignature.Tests
                         "The reason was expected to be '" +
                         Constants.REASON_DIRECTORY_PENDING + "', but " +
                         Describe(first) + ".");
+                    // The fetch is still held at this point, so reading
+                    // Timeout above already proves the request gave up
+                    // rather than waiting for the agent. This bound only
+                    // guards against an implementation that waits far past
+                    // its budget, and the leeway is generous because a
+                    // busy shared runner can stall a waking thread for
+                    // hundreds of milliseconds. A tight 100ms leeway
+                    // failed the nightly build of 3 September 2026 on
+                    // macOS at 314ms and 532ms.
                     Assert.IsTrue(
                         watch.ElapsedMilliseconds <
-                            budget.TotalMilliseconds + 100,
-                        "The request was expected to come back inside the " +
+                            budget.TotalMilliseconds + 2000,
+                        "The request was expected to give up inside the " +
                         "wait budget of " +
                         Text(budget.TotalMilliseconds) +
-                        "ms plus 100ms of leeway, but it took " +
+                        "ms rather than wait for the agent, allowing two " +
+                        "seconds of leeway for a busy runner, but it took " +
                         Text(watch.ElapsedMilliseconds) + "ms and " +
                         Describe(first) + ".");
 
