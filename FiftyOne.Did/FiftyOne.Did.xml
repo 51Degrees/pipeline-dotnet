@@ -7,9 +7,10 @@
         <member name="T:FiftyOne.Did.Client.ContextOutcome">
             <summary>
             The creator context verdict the cloud's redeem endpoint reports,
-            mapped from the <c>context</c> string in its answer. The first four
-            are verdicts about the identifier. The rest describe the redemption
-            itself, being why no verdict could be read this time.
+            mapped from the <c>context</c> string in its answer. Some describe
+            the identifier, one describes the service that checked it, and the
+            rest describe the redemption itself, being why no verdict could be
+            read this time.
             </summary>
         </member>
         <member name="F:FiftyOne.Did.Client.ContextOutcome.Verified">
@@ -34,8 +35,11 @@
         </member>
         <member name="F:FiftyOne.Did.Client.ContextOutcome.NotCheckable">
             <summary>
-            Nothing could be checked, because the service holds no context
-            key covering the identifier's creation time.
+            No longer reported by the service, and kept only because it has
+            been public since this enumeration was added. What used to give
+            this answer now gives <see cref="F:FiftyOne.Did.Client.ContextOutcome.Misconfigured"/> where the
+            service is at fault, or <see cref="F:FiftyOne.Did.Client.ContextOutcome.InvalidDate"/> where the
+            identifier could not have been created.
             </summary>
         </member>
         <member name="F:FiftyOne.Did.Client.ContextOutcome.Expired">
@@ -66,6 +70,33 @@
             <summary>
             The service could not confirm first use of the sealed result and
             answered 503. Not a verdict. The caller may retry.
+            </summary>
+        </member>
+        <member name="F:FiftyOne.Did.Client.ContextOutcome.Misconfigured">
+            <summary>
+            The service that checked the identifier could not complete the
+            check, and the reason is that service rather than the identifier.
+            Either it compared nothing, because it holds no context key for a
+            creation time inside the scheme or runs a build too old for the
+            version it was given, or it compared some factors and
+            <see cref="P:FiftyOne.Did.Client.RedeemResult.Factors"/> reports at least one as
+            <see cref="F:FiftyOne.Did.Client.FactorOutcome.Misconfigured"/>.
+            <para>
+            Nothing a caller sends can produce this, so it is a signal about
+            the deployment. Against 51Degrees public cloud it should not
+            occur. Against a self-hosted service it means that service is not
+            configured to read the client's own connection, or is missing an
+            engine it needs, and its own logs name the setting to change.
+            </para>
+            </summary>
+        </member>
+        <member name="F:FiftyOne.Did.Client.ContextOutcome.InvalidDate">
+            <summary>
+            The identifier's creation date is one the scheme could not have
+            produced, being in the future or before the creator context
+            scheme began. Nothing can be created in the future and nothing
+            existed before the first key, so this says the identifier is
+            fabricated rather than that anything is wrong with the service.
             </summary>
         </member>
         <member name="T:FiftyOne.Did.Client.DidClient">
@@ -430,8 +461,9 @@
         </member>
         <member name="T:FiftyOne.Did.Client.FactorOutcome">
             <summary>
-            The outcome of one creator context factor, reported when the
-            context is <see cref="F:FiftyOne.Did.Client.ContextOutcome.Mismatch"/>.
+            The outcome of one creator context factor, reported when the context
+            is <see cref="F:FiftyOne.Did.Client.ContextOutcome.Mismatch"/> or
+            <see cref="F:FiftyOne.Did.Client.ContextOutcome.Misconfigured"/>.
             </summary>
         </member>
         <member name="F:FiftyOne.Did.Client.FactorOutcome.Verified">
@@ -439,6 +471,15 @@
         </member>
         <member name="F:FiftyOne.Did.Client.FactorOutcome.Mismatch">
             <summary>The factor did not match the verifying connection.</summary>
+        </member>
+        <member name="F:FiftyOne.Did.Client.FactorOutcome.Misconfigured">
+            <summary>
+            The service that checked the identifier is not configured to
+            determine this factor, so it could not have checked it for any
+            request. This is not a mismatch and must not be read as one, since
+            the identifier says nothing about it either way. Nothing a caller
+            sends can produce it.
+            </summary>
         </member>
         <member name="T:FiftyOne.Did.Client.RedeemResult">
             <summary>
@@ -1336,6 +1377,12 @@
             <param name="others"></param>
             <returns></returns>
         </member>
+        <member name="M:Owid.Client.Creator.SignWithOthers(Owid.Client.Model.Owid,Owid.Client.Model.Owid[],System.DateTime)">
+            <summary>
+            Sign the OWID provided AND the other OWIDs provided, stamping it
+            with the date given rather than the moment of signing.
+            </summary>
+        </member>
         <member name="M:Owid.Client.Creator.Create(System.String)">
             <summary>
             Create a new OWID for the creator containing the value as the 
@@ -1368,6 +1415,47 @@
             domain, the date and the signature; a caller supplies the payload
             and nothing else, so there is no moment at which a partly built
             OWID exists for anyone to hold or pass on.
+            </remarks>
+        </member>
+        <member name="M:Owid.Client.Creator.Create(System.Byte[],System.DateTime,Owid.Client.Model.Owid[])">
+            <summary>
+            Creates and signs an OWID carrying the value and the date, with
+            the other OWIDs covered by the signature.
+            </summary>
+            <param name="value">Payload value</param>
+            <param name="date">
+            The date the OWID states. A caller that wants an OWID to say less
+            than the moment it was made - the day rather than the minute, say,
+            so that two identifiers issued to the same person an hour apart
+            cannot be told apart by their dates - supplies that date here.
+            Converted to UTC, and truncated to the whole minute the wire
+            format carries, so the OWID in hand states exactly what its bytes
+            state.
+            </param>
+            <param name="others">
+            OWIDs this one is signed alongside.
+            </param>
+            <returns>Signed OWID with the payload and date provided.</returns>
+            <exception cref="T:System.ArgumentOutOfRangeException">
+            <paramref name="date"/> is before the base date the format counts
+            minutes from. That date cannot be written, and casting it into the
+            count would silently record a far later one.
+            </exception>
+        </member>
+        <member name="M:Owid.Client.Creator.ToStampedDate(System.DateTime)">
+            <summary>
+            The date as the OWID will state it: UTC, and whole minutes,
+            because versions 2 and 3 count minutes since
+            <see cref="F:Owid.Client.Constants.BaseDate"/> and anything finer is dropped on
+            the way to the bytes. Doing it here means the OWID a caller holds
+            says the same thing as the OWID it hands on, which matters because
+            the signature covers the bytes.
+            </summary>
+            <remarks>
+            A date of <see cref="F:System.DateTimeKind.Unspecified"/> is taken as UTC.
+            The alternative, reading it as local time, would silently move an
+            identifier by the machine's offset and make the same call produce
+            different OWIDs on different servers.
             </remarks>
         </member>
         <member name="M:Owid.Client.Creator.ValidateDomain(System.String,System.String)">

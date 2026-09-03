@@ -675,6 +675,73 @@ namespace FiftyOne.Did.Tests
         // Redeem
         // ----------------------------------------------------------------
 
+        private const string RedeemedMisconfigured =
+            "{\"signature\":\"verified\",\"context\":\"misconfigured\","
+            + "\"factors\":{\"transport\":\"misconfigured\","
+            + "\"device\":\"verified\",\"browserip\":\"verified\","
+            + "\"connectionip\":\"verified\",\"asn\":\"misconfigured\","
+            + "\"browser\":\"verified\"},"
+            + "\"verifiedAt\":\"2026-09-03T09:15:32Z\",\"secondsSinceVerified\":1}";
+
+        private const string RedeemedInvalidDate =
+            "{\"signature\":\"invalid\",\"context\":\"invaliddate\","
+            + "\"verifiedAt\":\"2026-09-03T09:15:32Z\",\"secondsSinceVerified\":1}";
+
+        /// <summary>
+        /// A misconfigured factor says the checking service could not
+        /// determine it, so it must NOT read as a mismatch. Reading it as one
+        /// would report a replay indicator for something the identifier says
+        /// nothing about, which is the failure this value exists to prevent.
+        /// </summary>
+        [TestMethod]
+        public async Task Redeem_MisconfiguredFactors_AreNotMismatches()
+        {
+            _handler.Enqueue(HttpStatusCode.OK, RedeemedMisconfigured);
+            using var client = NewClient();
+
+            var result = await client.RedeemAsync(
+                SignedAt(T0.AddDays(1)), "sealed", "abc123");
+
+            Assert.AreEqual(ContextOutcome.Misconfigured, result.Context);
+            Assert.AreEqual("misconfigured", result.ContextValue);
+            Assert.IsNotNull(result.Factors);
+            Assert.AreEqual(6, result.Factors!.Count);
+            Assert.AreEqual(
+                FactorOutcome.Misconfigured, result.Factors["transport"]);
+            Assert.AreEqual(FactorOutcome.Misconfigured, result.Factors["asn"]);
+            Assert.AreEqual(FactorOutcome.Verified, result.Factors["device"]);
+            Assert.AreEqual(FactorOutcome.Verified, result.Factors["browserip"]);
+            Assert.AreEqual(
+                FactorOutcome.Verified, result.Factors["connectionip"]);
+            Assert.AreEqual(FactorOutcome.Verified, result.Factors["browser"]);
+            Assert.AreEqual(
+                0,
+                System.Linq.Enumerable.Count(
+                    result.Factors,
+                    f => f.Value == FactorOutcome.Mismatch),
+                "no factor should read as a mismatch");
+        }
+
+        /// <summary>
+        /// An impossible creation date is a statement about the identifier
+        /// rather than about the service, so it reports on its own with no
+        /// factor block, and it is independent of the signature outcome.
+        /// </summary>
+        [TestMethod]
+        public async Task Redeem_InvalidDate_IsReadAndCarriesNoFactors()
+        {
+            _handler.Enqueue(HttpStatusCode.OK, RedeemedInvalidDate);
+            using var client = NewClient();
+
+            var result = await client.RedeemAsync(
+                SignedAt(T0.AddDays(1)), "sealed", "abc123");
+
+            Assert.AreEqual(ContextOutcome.InvalidDate, result.Context);
+            Assert.AreEqual("invaliddate", result.ContextValue);
+            Assert.AreEqual(SignatureOutcome.Invalid, result.Signature);
+            Assert.IsNull(result.Factors);
+        }
+
         private const string RedeemedMismatch =
             "{\"signature\":\"verified\",\"context\":\"mismatch\","
             + "\"factors\":{\"transport\":\"verified\",\"device\":\"mismatch\","
