@@ -10,17 +10,17 @@
     
     <!-- NuGet package properties -->
     <PackageId>FiftyOne.Did.Core</PackageId>
-    <Title>51Degrees Did Core - Device Identification Core Library</Title>
-    <PackageDescription>Core library for 51Degrees Device Identification (Did). Provides foundational components and data structures for device identification within the 51Degrees Pipeline API.</PackageDescription>
+    <Title>51Degrees Identifier (51Did) core types</Title>
+    <PackageDescription>Shared types for the 51Degrees Identifier (51Did), used by every engine that returns one. A 51Did is issued by the 51Degrees Cloud service in six forms, being probabilistic, random and hashed-email, each of which is either global across all callers or scoped to the caller's licence key. This package holds the data interface those engines expose and the property builder they share, so most callers should reference an engine package such as FiftyOne.Did.Cloud rather than this one.</PackageDescription>
     <Authors>51Degrees Engineering</Authors>
     <PackageLicenseExpression>EUPL-1.2</PackageLicenseExpression>
     <PackageIconUrl>https://51degrees.com/portals/0/Logos/Square%20Logo.png?width=64</PackageIconUrl>
     <Copyright>51Degrees Mobile Experts Limited</Copyright>
-    <PackageTags>51degrees,device-identification,did,pipeline,core</PackageTags>
+    <PackageTags>51degrees,51did,fodid,identifier,pipeline,owid,core</PackageTags>
     <RepositoryUrl>https://github.com/51Degrees/pipeline-dotnet</RepositoryUrl>
     <PackageIcon>51d-logo.png</PackageIcon>
     <PackageProjectUrl>https://51degrees.com?utm_source=nuget&amp;utm_medium=package&amp;utm_campaign=pipeline-dotnet&amp;utm_content=fiftyone.did.core-fiftyone.did.core.csproj&amp;utm_term=packageprojecturl</PackageProjectUrl>
-    <Description>Core library for 51Degrees Device Identification (Did). Provides foundational components and data structures for device identification within the 51Degrees Pipeline API.</Description>
+    <Description>Shared types for the 51Degrees Identifier (51Did), used by every engine that returns one.</Description>
     <RepositoryType>git</RepositoryType>
     <NeutralLanguage>en</NeutralLanguage>
     <PackageReadmeFile>README.md</PackageReadmeFile>
