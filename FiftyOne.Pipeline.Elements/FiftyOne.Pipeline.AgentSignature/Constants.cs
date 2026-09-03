@@ -100,15 +100,16 @@ namespace FiftyOne.Pipeline.AgentSignature
         /// The element data key used by default for this element.
         /// </summary>
         /// <remarks>
-        /// The key carries no punctuation, as every other element key a
-        /// customer sees does, being 'device', 'hardware', 'ip',
-        /// 'location', 'robotstxt' and 'fodid'. The cloud service uses the
-        /// key as the name of this element's section in the JSON it
-        /// returns, so a hyphen here would be a hyphen in the published
-        /// interface and in the accessor every language's SDK generates
-        /// from it.
+        /// Every other element key a customer sees carries no
+        /// punctuation, being 'device', 'hardware', 'ip', 'location',
+        /// 'robotstxt' and 'fodid', and the cloud service uses the key as
+        /// the name of this element's section in the JSON it returns, so
+        /// 'agentsignature' would have read better there. The hyphen
+        /// stays because this key already went out in version 4.5.88 of
+        /// the package, and changing what a published version calls
+        /// something costs more than the tidier name is worth.
         /// </remarks>
-        public const string DEFAULT_ELEMENT_DATA_KEY = "agentsignature";
+        public const string DEFAULT_ELEMENT_DATA_KEY = "agent-signature";
 
         #endregion
 

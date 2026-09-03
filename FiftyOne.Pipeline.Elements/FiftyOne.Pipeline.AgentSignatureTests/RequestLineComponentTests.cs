@@ -404,48 +404,61 @@ namespace FiftyOne.Pipeline.AgentSignature.Tests
         }
 
         /// <summary>
-        /// The element asks for the keys a forwarded request carries by
-        /// name, not only through the rule that accepts any header. The
-        /// cloud service builds the list of evidence it accepts from the
-        /// named keys, and a rule about a prefix cannot be written into
-        /// such a list, so without these a forwarded signature would
-        /// arrive carrying nothing.
+        /// The keys this element publishes name only the forms a request
+        /// carries when it arrives here directly, and never the query
+        /// forms.
         /// </summary>
+        /// <remarks>
+        /// The cloud service builds its published list of accepted
+        /// evidence from this whitelist, and that list decides what a
+        /// caller's own Pipeline collects and forwards. A caller
+        /// collects a query string value only where the list names it, so
+        /// naming a query form here would have every caller collect a
+        /// signature typed into a visitor's address bar and forward it as
+        /// though their site had received it as a header. That is how a
+        /// visitor could have been reported as a verified agent on a
+        /// customer's own site, so the absence of these keys is a
+        /// security property and not an oversight.
+        /// </remarks>
         [TestMethod]
-        public void NamedKeysCoverWhatAForwardedRequestNeeds()
+        public void PublishedKeysNeverNameTheQueryForms()
         {
-            using (var harness = ElementHarness.CreateWithTestKey(
-                builder => builder.SetTrustForwardedEvidence(true)))
+            foreach (var trusted in new[] { false, true })
             {
-                var whitelist =
-                    ((EvidenceKeyFilterWhitelist)harness.Element
-                        .EvidenceKeyFilter).Whitelist;
-                foreach (var key in new[]
+                using (var harness = ElementHarness.CreateWithTestKey(
+                    builder => builder.SetTrustForwardedEvidence(trusted)))
                 {
-                    "query.signature",
-                    "query.signature-input",
-                    "query.signature-agent",
-                    "query.host",
-                    "query.protocol",
-                    "query.request-method",
-                    "query.request-path",
-                    "query.request-query",
-                    "header.signature",
-                    "header.signature-input",
-                    "header.signature-agent",
-                    "header.host",
-                    "header.protocol",
-                    Core.Constants.EVIDENCE_REQUEST_METHOD_KEY,
-                    Core.Constants.EVIDENCE_REQUEST_PATH_KEY,
-                    Core.Constants.EVIDENCE_REQUEST_QUERY_KEY,
-                })
-                {
-                    Assert.IsTrue(
-                        whitelist.ContainsKey(key),
-                        "Expected '" + key + "' to be named in the " +
-                        "whitelist, because a service that reads the " +
-                        "whitelist to decide what to forward cannot see " +
-                        "a rule about a prefix.");
+                    var whitelist =
+                        ((EvidenceKeyFilterWhitelist)harness.Element
+                            .EvidenceKeyFilter).Whitelist;
+                    foreach (var key in new[]
+                    {
+                        "header.signature",
+                        "header.signature-input",
+                        "header.signature-agent",
+                        "header.host",
+                        "header.protocol",
+                        Core.Constants.EVIDENCE_REQUEST_METHOD_KEY,
+                        Core.Constants.EVIDENCE_REQUEST_PATH_KEY,
+                        Core.Constants.EVIDENCE_REQUEST_QUERY_KEY,
+                    })
+                    {
+                        Assert.IsTrue(
+                            whitelist.ContainsKey(key),
+                            "Expected '" + key + "' to be published, " +
+                            "because a caller only collects and forwards " +
+                            "the evidence the published list names.");
+                    }
+                    foreach (var key in whitelist.Keys)
+                    {
+                        Assert.IsFalse(
+                            key.StartsWith("query.", System.StringComparison.Ordinal),
+                            "No query form may ever be published, and '" +
+                            key + "' was, which would have every caller " +
+                            "collect a signature from a visitor's address " +
+                            "bar and forward it as though it were a header " +
+                            "their own site received.");
+                    }
                 }
             }
         }

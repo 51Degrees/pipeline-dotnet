@@ -1471,12 +1471,24 @@ namespace FiftyOne.Pipeline.AgentSignature.FlowElement
             }
 
             /// <summary>
-            /// The keys this element cannot do without, under both the
-            /// prefix a request carries directly and the prefix a
-            /// forwarded request carries. Anything reading the whitelist,
-            /// such as the cloud service's list of accepted evidence,
-            /// sees these.
+            /// The keys this element cannot do without, named under the
+            /// prefix a request carries them in when it arrives here
+            /// directly, and never under the query prefix.
             /// </summary>
+            /// <remarks>
+            /// Anything reading the whitelist, such as the cloud
+            /// service's published list of accepted evidence, sees these
+            /// and only these. That list decides what a caller's own
+            /// Pipeline collects and forwards, and a caller collects a
+            /// query string value only where the list names it. Naming
+            /// the query forms here would therefore have every caller
+            /// collect a signature typed into a visitor's address bar
+            /// and forward it as though it were a header their site had
+            /// received, which is how a visitor could have been reported
+            /// as a verified agent. Naming only the header forms means a
+            /// signature reaches the wire only where the site actually
+            /// received one.
+            /// </remarks>
             private static List<string> NamedKeys(bool trustForwarded)
             {
                 var names = new[]
@@ -1491,26 +1503,10 @@ namespace FiftyOne.Pipeline.AgentSignature.FlowElement
                 foreach (var name in names)
                 {
                     keys.Add(_headerPrefix + name);
-                    if (trustForwarded)
-                    {
-                        keys.Add(_queryPrefix + name);
-                    }
                 }
                 foreach (var key in RequestLineKeys)
                 {
                     keys.Add(key);
-                    if (trustForwarded)
-                    {
-                        // The request line keys reach a service that
-                        // receives forwarded evidence with the 'server'
-                        // prefix taken off, in the same way as the
-                        // headers.
-                        keys.Add(
-                            _queryPrefix +
-                            key.Substring(key.IndexOf(
-                                Core.Constants.EVIDENCE_SEPERATOR,
-                                StringComparison.Ordinal) + 1));
-                    }
                 }
                 return keys;
             }
