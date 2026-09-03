@@ -80,17 +80,35 @@ namespace FiftyOne.Pipeline.Engines.FiftyOne.Data
 
         /// <summary>
         /// Evidence keys that are never shared, regardless of the share-all
-        /// setting. These carry caller-supplied secrets (the raw email and
-        /// salt used to derive hashed-email identifiers) that must not leave
-        /// the server. They are matched on a whole-segment boundary by
+        /// setting. They are matched on a whole-segment boundary by
         /// <see cref="Include"/>, so both the bare key and any prefixed form
         /// ('id.email', 'query.id.email', 'header.id.email') are excluded
         /// while an unrelated key such as 'query.valid.email' is not.
         /// </summary>
+        /// <remarks>
+        /// 'id.email' and 'id.salt' carry caller-supplied secrets, being the
+        /// raw email address and the salt used to derive hashed-email
+        /// identifiers, which must not leave the server.
+        /// <para>
+        /// 'request-query' is the whole query string of the request, added
+        /// as 'server.request-query' by the web integrations so that a
+        /// signature made over the request line can be checked. It is held
+        /// back here because this class already withholds query string
+        /// parameters by default, only sharing the ones a caller names
+        /// through the constructor, and the whole query string carries every
+        /// one of those parameters together. Without this entry the same
+        /// value would be withheld under its 'query' prefix and shared under
+        /// its 'server' prefix, which would quietly undo a choice a caller
+        /// had made. An element that needs the query string still receives
+        /// it in evidence, because this filter governs only what usage
+        /// sharing sends.
+        /// </para>
+        /// </remarks>
         private static readonly string[] _neverSharedEvidenceKeys = new[]
         {
             "id.email",
             "id.salt",
+            "request-query",
         };
 
         /// <summary>
@@ -189,8 +207,8 @@ namespace FiftyOne.Pipeline.Engines.FiftyOne.Data
                 throw new ArgumentNullException(nameof(key));
             }
 
-            // Caller-supplied secrets (the raw email and salt) must never
-            // leave the server, even when every other piece of evidence is
+            // The keys listed in _neverSharedEvidenceKeys must never leave
+            // the server, even when every other piece of evidence is
             // shared. Matched on a whole-segment boundary - the bare key or
             // a separator-prefixed form - so 'query.valid.email' is not
             // mistaken for the 'id.email' secret. Checked before the

@@ -57,22 +57,61 @@ namespace FiftyOne.Pipeline.Engines.FiftyOne.Tests.Data
         }
 
         /// <summary>
-        /// The request line values are shared like the other values under
+        /// The method and the path are shared like the other values under
         /// the 'server' prefix. 51Degrees and the customer are joint
         /// controllers of shared usage data under the terms of service,
         /// and the contract prevents the data being used for anything
-        /// else, so a path or a query string that carries personal data is
-        /// covered by that agreement rather than by a filter here.
+        /// else, so a path that carries personal data is covered by that
+        /// agreement rather than by a filter here.
         /// </summary>
         [TestMethod]
-        public void ShareAll_IncludesTheRequestLine()
+        public void ShareAll_IncludesTheMethodAndThePath()
         {
             var filter = new EvidenceKeyFilterShareUsage();
 
             Assert.IsTrue(filter.Include("server.request-method"));
             Assert.IsTrue(filter.Include("server.request-path"));
-            Assert.IsTrue(filter.Include("server.request-query"));
             Assert.IsTrue(filter.Include("server.client-ip"));
+        }
+
+        /// <summary>
+        /// The whole query string is never shared, in either mode.
+        /// </summary>
+        /// <remarks>
+        /// This class withholds query string parameters by default and only
+        /// shares the ones a caller names through the constructor, so
+        /// 'query.email' is withheld unless it was asked for. The whole
+        /// query string carries every one of those parameters at once, so
+        /// without this the same value would be withheld under its 'query'
+        /// prefix and shared under its 'server' prefix, undoing a choice
+        /// the caller had made without anyone deciding to.
+        /// </remarks>
+        [TestMethod]
+        public void TheWholeQueryStringIsNeverShared()
+        {
+            var shareAll = new EvidenceKeyFilterShareUsage();
+
+            Assert.IsFalse(shareAll.Include("server.request-query"));
+            Assert.IsFalse(shareAll.Include("SERVER.REQUEST-QUERY"));
+
+            var configured = new EvidenceKeyFilterShareUsage(
+                new List<string>(),
+                new List<string>(),
+                false,
+                "sessionid");
+
+            Assert.IsFalse(configured.Include("server.request-query"));
+
+            // Naming a parameter for sharing does not bring the whole query
+            // string with it.
+            var namedParameter = new EvidenceKeyFilterShareUsage(
+                new List<string>(),
+                new List<string>() { "utm_source" },
+                false,
+                "sessionid");
+
+            Assert.IsTrue(namedParameter.Include("query.utm_source"));
+            Assert.IsFalse(namedParameter.Include("server.request-query"));
         }
 
         [TestMethod]
