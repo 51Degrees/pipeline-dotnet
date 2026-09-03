@@ -189,6 +189,8 @@ namespace FiftyOne.Did.Client
                 case "mismatch": return ContextOutcome.Mismatch;
                 case "nocontext": return ContextOutcome.NoContext;
                 case "notcheckable": return ContextOutcome.NotCheckable;
+                case "misconfigured": return ContextOutcome.Misconfigured;
+                case "invaliddate": return ContextOutcome.InvalidDate;
                 case "expired": return ContextOutcome.Expired;
                 case "replayed": return ContextOutcome.Replayed;
                 case "unconfirmed": return ContextOutcome.Unconfirmed;
@@ -210,6 +212,8 @@ namespace FiftyOne.Did.Client
                 case ContextOutcome.Mismatch: return "mismatch";
                 case ContextOutcome.NoContext: return "nocontext";
                 case ContextOutcome.NotCheckable: return "notcheckable";
+                case ContextOutcome.Misconfigured: return "misconfigured";
+                case ContextOutcome.InvalidDate: return "invaliddate";
                 case ContextOutcome.Expired: return "expired";
                 case ContextOutcome.Replayed: return "replayed";
                 case ContextOutcome.Unconfirmed: return "unconfirmed";
@@ -251,14 +255,24 @@ namespace FiftyOne.Did.Client
                 StringComparer.Ordinal);
             foreach (var factor in element.EnumerateObject())
             {
-                // Anything other than the one word verified is a mismatch,
-                // so an unexpected value never reads as a pass.
-                var verified = factor.Value.ValueKind == JsonValueKind.String
-                    && string.Equals(
-                        factor.Value.GetString(), "verified",
-                        StringComparison.OrdinalIgnoreCase);
-                factors[factor.Name] = verified
-                    ? FactorOutcome.Verified
+                // Misconfigured is read on its own, because it is the one
+                // value that must NOT fall through to mismatch. It says the
+                // checking service could not determine that factor, so
+                // reading it as a mismatch would report a replay indicator
+                // for something the identifier says nothing about. Everything
+                // else that is not the one word verified is a mismatch, so an
+                // unexpected value never reads as a pass.
+                var value = factor.Value.ValueKind == JsonValueKind.String
+                    ? factor.Value.GetString()
+                    : null;
+                factors[factor.Name] =
+                    string.Equals(
+                        value, "verified", StringComparison.OrdinalIgnoreCase)
+                        ? FactorOutcome.Verified
+                    : string.Equals(
+                        value, "misconfigured",
+                        StringComparison.OrdinalIgnoreCase)
+                        ? FactorOutcome.Misconfigured
                     : FactorOutcome.Mismatch;
             }
             return factors;

@@ -23,8 +23,9 @@
 namespace FiftyOne.Did.Client
 {
     /// <summary>
-    /// The outcome of one creator context factor, reported when the
-    /// context is <see cref="ContextOutcome.Mismatch"/>.
+    /// The outcome of one creator context factor, reported when the context
+    /// is <see cref="ContextOutcome.Mismatch"/> or
+    /// <see cref="ContextOutcome.Misconfigured"/>.
     /// </summary>
     public enum FactorOutcome
     {
@@ -33,5 +34,14 @@ namespace FiftyOne.Did.Client
 
         /// <summary>The factor did not match the verifying connection.</summary>
         Mismatch,
+
+        /// <summary>
+        /// The service that checked the identifier is not configured to
+        /// determine this factor, so it could not have checked it for any
+        /// request. This is not a mismatch and must not be read as one, since
+        /// the identifier says nothing about it either way. Nothing a caller
+        /// sends can produce it.
+        /// </summary>
+        Misconfigured,
     }
 }

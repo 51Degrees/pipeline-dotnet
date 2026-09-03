@@ -24,9 +24,10 @@ namespace FiftyOne.Did.Client
 {
     /// <summary>
     /// The creator context verdict the cloud's redeem endpoint reports,
-    /// mapped from the <c>context</c> string in its answer. The first four
-    /// are verdicts about the identifier. The rest describe the redemption
-    /// itself, being why no verdict could be read this time.
+    /// mapped from the <c>context</c> string in its answer. Some describe
+    /// the identifier, one describes the service that checked it, and the
+    /// rest describe the redemption itself, being why no verdict could be
+    /// read this time.
     /// </summary>
     public enum ContextOutcome
     {
@@ -51,8 +52,11 @@ namespace FiftyOne.Did.Client
         NoContext,
 
         /// <summary>
-        /// Nothing could be checked, because the service holds no context
-        /// key covering the identifier's creation time.
+        /// No longer reported by the service, and kept only because it has
+        /// been public since this enumeration was added. What used to give
+        /// this answer now gives <see cref="Misconfigured"/> where the
+        /// service is at fault, or <see cref="InvalidDate"/> where the
+        /// identifier could not have been created.
         /// </summary>
         NotCheckable,
 
@@ -85,5 +89,32 @@ namespace FiftyOne.Did.Client
         /// answered 503. Not a verdict. The caller may retry.
         /// </summary>
         Unconfirmed,
+
+        /// <summary>
+        /// The service that checked the identifier could not complete the
+        /// check, and the reason is that service rather than the identifier.
+        /// Either it compared nothing, because it holds no context key for a
+        /// creation time inside the scheme or runs a build too old for the
+        /// version it was given, or it compared some factors and
+        /// <see cref="RedeemResult.Factors"/> reports at least one as
+        /// <see cref="FactorOutcome.Misconfigured"/>.
+        /// <para>
+        /// Nothing a caller sends can produce this, so it is a signal about
+        /// the deployment. Against 51Degrees public cloud it should not
+        /// occur. Against a self-hosted service it means that service is not
+        /// configured to read the client's own connection, or is missing an
+        /// engine it needs, and its own logs name the setting to change.
+        /// </para>
+        /// </summary>
+        Misconfigured,
+
+        /// <summary>
+        /// The identifier's creation date is one the scheme could not have
+        /// produced, being in the future or before the creator context
+        /// scheme began. Nothing can be created in the future and nothing
+        /// existed before the first key, so this says the identifier is
+        /// fabricated rather than that anything is wrong with the service.
+        /// </summary>
+        InvalidDate,
     }
 }
