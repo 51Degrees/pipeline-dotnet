@@ -277,6 +277,7 @@ namespace FiftyOne.Pipeline.Web.Framework
 
                 filler.CheckAndAdd("server.client-ip", request.UserHostAddress);
                 filler.AddRequestProtocolToEvidence(request);
+                filler.AddRequestLineToEvidence(request);
 
                 if (filler.Errors is IList<Exception> errors)
                 {
@@ -436,6 +437,102 @@ namespace FiftyOne.Pipeline.Web.Framework
 
                 // Add protocol to the evidence.
                 CheckAndAdd(Core.Constants.EVIDENCE_PROTOCOL, protocol);
+            }
+
+            /// <summary>
+            /// Add the method, the path and the whole query string of the
+            /// request to the evidence, exactly as the request carried
+            /// them.
+            /// </summary>
+            /// <remarks>
+            /// These are only added where an element in the pipeline has
+            /// asked for them, and nothing is worked out at all where no
+            /// element has, because this runs on every request.
+            /// <para>
+            /// The path and the query come from 'RawUrl' rather than from
+            /// 'Url'. A 'Uri' canonicalises what it holds, taking out dot
+            /// segments and decoding escapes, so a request for '/a%2Fb'
+            /// would arrive here as '/a/b', and these values are used to
+            /// rebuild the text an HTTP message signature was made over,
+            /// where one changed byte makes a valid signature read as
+            /// invalid. 'RawUrl' is what the request line carried. Where it
+            /// cannot be read, or is not in the ordinary form that starts
+            /// with a slash, the canonical form is used instead as the
+            /// closest the framework can give.
+            /// </para>
+            /// <para>
+            /// All three are added together, with an empty query string
+            /// where the request carried none, so that a missing key always
+            /// means this integration did not supply the request line.
+            /// </para>
+            /// </remarks>
+            public void AddRequestLineToEvidence(HttpRequest request)
+            {
+                if (_evidenceKeyFilter.Include(
+                    Core.Constants.EVIDENCE_REQUEST_METHOD_KEY))
+                {
+                    CheckAndAdd(
+                        Core.Constants.EVIDENCE_REQUEST_METHOD_KEY,
+                        request.HttpMethod ?? string.Empty);
+                }
+
+                // The path and the query are split out of the request
+                // target together, so the one reading serves both and is
+                // only done where at least one of them is wanted.
+                if (_evidenceKeyFilter.Include(
+                        Core.Constants.EVIDENCE_REQUEST_PATH_KEY) ||
+                    _evidenceKeyFilter.Include(
+                        Core.Constants.EVIDENCE_REQUEST_QUERY_KEY))
+                {
+                    SplitRequestTarget(request, out var path, out var query);
+
+                    if (_evidenceKeyFilter.Include(
+                        Core.Constants.EVIDENCE_REQUEST_PATH_KEY))
+                    {
+                        CheckAndAdd(
+                            Core.Constants.EVIDENCE_REQUEST_PATH_KEY, path);
+                    }
+
+                    if (_evidenceKeyFilter.Include(
+                        Core.Constants.EVIDENCE_REQUEST_QUERY_KEY))
+                    {
+                        CheckAndAdd(
+                            Core.Constants.EVIDENCE_REQUEST_QUERY_KEY, query);
+                    }
+                }
+            }
+
+            /// <summary>
+            /// Read the path and the query string as the request line
+            /// carried them, without the leading question mark on the
+            /// query.
+            /// </summary>
+            /// <param name="request">The request.</param>
+            /// <param name="path">The path.</param>
+            /// <param name="query">The query string.</param>
+            private static void SplitRequestTarget(
+                HttpRequest request,
+                out string path,
+                out string query)
+            {
+                var rawUrl = request.RawUrl;
+                if (string.IsNullOrEmpty(rawUrl) == false &&
+                    rawUrl[0] == '/')
+                {
+                    var mark = rawUrl.IndexOf('?');
+                    path = mark < 0 ? rawUrl : rawUrl.Substring(0, mark);
+                    query = mark < 0
+                        ? string.Empty
+                        : rawUrl.Substring(mark + 1);
+                    return;
+                }
+                var url = request.Url;
+                path = url == null ? string.Empty : url.AbsolutePath;
+                query = url == null ? string.Empty : url.Query;
+                if (query.Length > 0 && query[0] == '?')
+                {
+                    query = query.Substring(1);
+                }
             }
         }
     }

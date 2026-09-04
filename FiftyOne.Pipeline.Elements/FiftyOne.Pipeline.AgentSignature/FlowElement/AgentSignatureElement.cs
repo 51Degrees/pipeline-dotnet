@@ -59,6 +59,7 @@ namespace FiftyOne.Pipeline.AgentSignature.FlowElement
         private readonly HttpClient _httpClient;
         private readonly bool _ownsHttpClient;
         private readonly DirectoryCache _cache;
+        private bool _disposing;
         private readonly DirectoryFetcher _fetcher;
         private readonly Lazy<Task<IDictionary<string, AgentCard>>>
             _cardsByKeyUrl;
@@ -120,7 +121,8 @@ namespace FiftyOne.Pipeline.AgentSignature.FlowElement
             }
             _configuration = configuration;
 
-            _evidenceKeyFilter = new AgentSignatureEvidenceKeyFilter();
+            _evidenceKeyFilter = new AgentSignatureEvidenceKeyFilter(
+                configuration.TrustForwardedEvidence);
 
             _properties = new List<IElementPropertyMetaData>()
             {
@@ -167,6 +169,97 @@ namespace FiftyOne.Pipeline.AgentSignature.FlowElement
             _cardsByKeyUrl =
                 new Lazy<Task<IDictionary<string, AgentCard>>>(LoadCards);
             _createData = CreateElementData;
+            StartReachabilityCheck();
+        }
+
+        /// <summary>
+        /// Where an address to check has been configured, fetch it once in
+        /// the background and say plainly in the log whether this
+        /// deployment can reach an agent's keys at all.
+        /// </summary>
+        /// <remarks>
+        /// A deployment with no outbound access answers every signed
+        /// request Unverified, one request at a time, which looks like
+        /// agents behaving oddly rather than like a deployment that cannot
+        /// work. One line at start up says which it is.
+        /// <para>
+        /// The check runs in the background and its outcome changes
+        /// nothing. Nothing is awaited, nothing is thrown and no request
+        /// waits for it, because an element that reached the network
+        /// whilst being built would stop a site starting at all when the
+        /// network was down, which is the fault this repository already
+        /// fixed once in issues 44 and 312.
+        /// </para>
+        /// </remarks>
+        private void StartReachabilityCheck()
+        {
+            if (string.IsNullOrEmpty(_configuration.ReachabilityCheckUrl))
+            {
+                return;
+            }
+            var url = _configuration.ReachabilityCheckUrl;
+            _ = Task.Run(async () =>
+            {
+                try
+                {
+                    using (var source = new CancellationTokenSource(
+                        _configuration.FetchTimeout))
+                    {
+                        var entry = await _fetcher.FetchAsync(
+                            url,
+                            Constants.AGENT_TYPE_DIRECTORY,
+                            source.Token).ConfigureAwait(false);
+                        if (entry.Success)
+                        {
+                            Logger.LogInformation(string.Format(
+                                CultureInfo.InvariantCulture,
+                                Messages.LogReachabilityGood,
+                                url));
+                        }
+                        // An element disposed whilst the check was still
+                        // running reaches here rather than the catch, and
+                        // must not raise the alarm either. The fetcher
+                        // treats the cancellation and the disposed client
+                        // that a shutdown produces as network failures and
+                        // hands back a failed entry instead of throwing,
+                        // so this branch sees an ordinary shutdown as an
+                        // unreachable directory unless it checks too.
+                        else if (Volatile.Read(ref _disposing) == false)
+                        {
+                            Logger.LogError(string.Format(
+                                CultureInfo.InvariantCulture,
+                                Messages.LogReachabilityBad,
+                                url,
+                                entry.FailureReason ??
+                                    "no reason was given"));
+                        }
+                    }
+                }
+#pragma warning disable CA1031 // Do not catch general exception types
+                catch (Exception exception)
+#pragma warning restore CA1031
+                {
+                    // The catch is deliberately broad. This runs on a
+                    // thread nobody is waiting on, so anything escaping it
+                    // would be an unobserved failure rather than a message
+                    // to whoever is reading the log.
+                    //
+                    // An element disposed whilst the check was still
+                    // running takes the client with it, and that is an
+                    // ordinary shutdown rather than a deployment that
+                    // cannot reach the keys, so it must not raise the
+                    // alarm that says signature checking is switched off.
+                    if (Volatile.Read(ref _disposing))
+                    {
+                        return;
+                    }
+                    Logger.LogError(string.Format(
+                        CultureInfo.InvariantCulture,
+                        Messages.LogReachabilityBad,
+                        url,
+                        exception.Message));
+                }
+            });
         }
 
         /// <inheritdoc/>
@@ -204,26 +297,124 @@ namespace FiftyOne.Pipeline.AgentSignature.FlowElement
 
             // Nearly every request has no signature at all, so answer that
             // case before anything is parsed or allocated.
-            var hasSignature = data.TryGetEvidence(
-                Constants.EVIDENCE_SIGNATURE_KEY, out object signatureValue);
-            var hasInput = data.TryGetEvidence(
-                Constants.EVIDENCE_SIGNATURE_INPUT_KEY, out object inputValue);
+            //
+            // Where the signature came from decides where everything else
+            // comes from. A caller's own Pipeline forwards its evidence
+            // with the prefix taken off, so a forwarded signature sits
+            // under 'query' whilst 'header' holds the call to this server,
+            // and mixing the two would check part of one request against
+            // part of another. Reading only the prefix the signature came
+            // from means a forwarded request whose caller sent no host or
+            // no request line reports that a component was unavailable,
+            // which says the check could not be made, rather than
+            // reporting a mismatch, which would say the agent was lying.
+            var source = FindSource(data);
+            var hasSignature = TryGetBySource(
+                data,
+                source,
+                Constants.EVIDENCE_SIGNATURE_NAME,
+                out var signatureValue);
+            var hasInput = TryGetBySource(
+                data,
+                source,
+                Constants.EVIDENCE_SIGNATURE_INPUT_NAME,
+                out var inputValue);
             if (hasSignature == false && hasInput == false)
             {
                 ApplyAbsent(elementData);
                 return;
             }
 
-            var outcome = Evaluate(
-                data,
-                hasSignature ? signatureValue?.ToString() : null,
-                hasInput ? inputValue?.ToString() : null);
+            var outcome = Evaluate(data, source, signatureValue, inputValue);
             Apply(outcome, elementData);
+        }
+
+        /// <summary>
+        /// Decide which prefix this request's signature arrived under, so
+        /// that every part of the request is read from the same place.
+        /// </summary>
+        /// <remarks>
+        /// A signature under the query prefix was forwarded by a caller's
+        /// own Pipeline, which takes the prefix off every key it sends on,
+        /// and describes the request that reached the caller. Anything
+        /// under the header prefix describes the call this server
+        /// received. The two are different requests, so a base built from
+        /// both would be a base no agent ever signed.
+        /// </remarks>
+        /// <param name="data">The flow data.</param>
+        /// <returns>The prefix to read this request from.</returns>
+        private string FindSource(IFlowData data)
+        {
+            // Without this, a visitor could put a signature, a host and a
+            // path in the address bar of an ordinary page, have the web
+            // integration turn them into evidence under the query prefix,
+            // and have those checked in place of the request that
+            // actually arrived. A signature captured from a genuine agent
+            // anywhere could then be replayed here and reported as
+            // Verified, which is what covering the authority and the path
+            // exists to prevent. Only a service that knows it receives
+            // forwarded evidence may turn this on, because forwarded
+            // evidence and a typed query string cannot be told apart once
+            // they have arrived.
+            if (_configuration.TrustForwardedEvidence &&
+                (data.TryGetEvidence<object>(
+                        QuerySignatureKey, out _) ||
+                    data.TryGetEvidence<object>(
+                        QuerySignatureInputKey, out _)))
+            {
+                return Core.Constants.EVIDENCE_QUERY_PREFIX;
+            }
+            return Core.Constants.EVIDENCE_HTTPHEADER_PREFIX;
+        }
+
+        /// <summary>
+        /// The two keys that say a request's evidence was forwarded,
+        /// built once rather than on every request, because this runs
+        /// whether or not a request carries a signature at all.
+        /// </summary>
+        private static readonly string QuerySignatureKey =
+            Core.Constants.EVIDENCE_QUERY_PREFIX +
+            Core.Constants.EVIDENCE_SEPERATOR +
+            Constants.EVIDENCE_SIGNATURE_NAME;
+
+        private static readonly string QuerySignatureInputKey =
+            Core.Constants.EVIDENCE_QUERY_PREFIX +
+            Core.Constants.EVIDENCE_SEPERATOR +
+            Constants.EVIDENCE_SIGNATURE_INPUT_NAME;
+
+        /// <summary>
+        /// Read a value by name from the prefix the signature came from.
+        /// </summary>
+        /// <param name="data">The flow data.</param>
+        /// <param name="source">The prefix to read from.</param>
+        /// <param name="name">The name, with no prefix.</param>
+        /// <param name="value">The value found.</param>
+        /// <returns>True where that prefix carried the name.</returns>
+        private static bool TryGetBySource(
+            IFlowData data,
+            string source,
+            string name,
+            out string value)
+        {
+            value = null;
+            if (data.TryGetEvidence(
+                    source + Core.Constants.EVIDENCE_SEPERATOR + name,
+                    out object raw) &&
+                raw != null)
+            {
+                value = raw.ToString();
+                return true;
+            }
+            return false;
         }
 
         /// <inheritdoc/>
         protected override void ManagedResourcesCleanup()
         {
+            // Read by the start up check, which runs on a thread nobody
+            // waits for and would otherwise report an ordinary shutdown
+            // as a deployment that cannot reach the keys.
+            Volatile.Write(ref _disposing, true);
             _cache.Dispose();
             if (_ownsHttpClient)
             {
@@ -238,6 +429,7 @@ namespace FiftyOne.Pipeline.AgentSignature.FlowElement
 
         private AgentSignatureOutcome Evaluate(
             IFlowData data,
+            string source,
             string signatureHeader,
             string inputHeader)
         {
@@ -263,12 +455,14 @@ namespace FiftyOne.Pipeline.AgentSignature.FlowElement
             }
 
             IList<SignatureAgentEntry> agents = null;
-            if (data.TryGetEvidence(
-                Constants.EVIDENCE_SIGNATURE_AGENT_KEY,
-                out object agentValue))
+            if (TryGetBySource(
+                data,
+                source,
+                Constants.EVIDENCE_SIGNATURE_AGENT_NAME,
+                out var agentValue))
             {
                 if (SignatureAgentEntry.TryParse(
-                    agentValue?.ToString(),
+                    agentValue,
                     _configuration.AllowLegacySignatureAgent,
                     out agents) == false)
                 {
@@ -316,7 +510,8 @@ namespace FiftyOne.Pipeline.AgentSignature.FlowElement
                     MissingDetailMessage = Messages.NoValueDetailNotSent,
                     Agent = outcome.Agent,
                 };
-                var result = EvaluateCandidate(data, possible, agents, attempt);
+                var result = EvaluateCandidate(
+                    data, source, possible, agents, attempt);
                 if (string.Equals(
                     result.Status,
                     Constants.STATUS_VERIFIED,
@@ -346,6 +541,10 @@ namespace FiftyOne.Pipeline.AgentSignature.FlowElement
         /// publishes.
         /// </summary>
         /// <param name="data">The flow data the evidence is read from.</param>
+        /// <param name="source">
+        /// The evidence prefix this request's signature arrived under,
+        /// which every other part of the request is read from too.
+        /// </param>
         /// <param name="candidate">The signature being checked.</param>
         /// <param name="agents">
         /// The 'Signature-Agent' members the request carried, or null when
@@ -355,6 +554,7 @@ namespace FiftyOne.Pipeline.AgentSignature.FlowElement
         /// <returns>The outcome.</returns>
         private AgentSignatureOutcome EvaluateCandidate(
             IFlowData data,
+            string source,
             SignatureCandidate candidate,
             IList<SignatureAgentEntry> agents,
             AgentSignatureOutcome outcome)
@@ -456,7 +656,7 @@ namespace FiftyOne.Pipeline.AgentSignature.FlowElement
                     Messages.NoValueDetailUnbound);
             }
 
-            var resolver = new FlowDataComponentResolver(data);
+            var resolver = new FlowDataComponentResolver(data, source);
             if (SignatureBase.TryBuild(
                 candidate.CoveredComponents,
                 candidate.SignatureParams,
@@ -956,19 +1156,23 @@ namespace FiftyOne.Pipeline.AgentSignature.FlowElement
         /// </summary>
         /// <remarks>
         /// A signature may cover any request header, so the element asks
-        /// for every header rather than a fixed list. Of the derived
-        /// components the web integration puts in enough for '@authority'
-        /// and '@scheme' only, so a signature that covers '@target-uri',
-        /// '@method', '@path' or '@query' cannot be rebuilt and reads
-        /// Unverified with the ComponentUnavailable reason.
+        /// for every header rather than a fixed list. The derived
+        /// components are built from those headers and from the request
+        /// line, being the method, the path and the query string. Where an
+        /// integration supplies no request line, a signature covering
+        /// '@target-uri', '@method', '@path' or '@query' cannot be rebuilt
+        /// and reads Unverified with the ComponentUnavailable reason.
         /// </remarks>
         private sealed class FlowDataComponentResolver : IComponentResolver
         {
             private readonly IFlowData _data;
 
-            public FlowDataComponentResolver(IFlowData data)
+            private readonly string _source;
+
+            public FlowDataComponentResolver(IFlowData data, string source)
             {
                 _data = data;
+                _source = source;
             }
 
             public bool TryResolve(
@@ -1030,27 +1234,124 @@ namespace FiftyOne.Pipeline.AgentSignature.FlowElement
                         {
                             return false;
                         }
-                        GetHeaderByKey(
-                            Core.Constants.EVIDENCE_PROTOCOL,
+                        GetHeader(
+                            "protocol",
                             out var scheme);
                         value = SignatureBase.BuildAuthority(
                             host, scheme?.Trim().ToLowerInvariant());
                         return value != null;
                     case "@scheme":
-                        if (GetHeaderByKey(
-                            Core.Constants.EVIDENCE_PROTOCOL,
+                        if (GetHeader(
+                            "protocol",
                             out var protocol) == false)
                         {
                             return false;
                         }
                         value = protocol.Trim().ToLowerInvariant();
                         return true;
+                    case "@method":
+                        // RFC 9421 section 2.2.1 takes the method as the
+                        // request carried it. The published text is
+                        // explicit that "no transformation to the input
+                        // method value's case is performed", where an
+                        // earlier draft had said to upper case it, so a
+                        // request whose method arrived in lower case is
+                        // signed and checked in lower case.
+                        if (GetRequestLineValue(
+                            Core.Constants.EVIDENCE_REQUEST_METHOD_KEY,
+                            out var method) == false)
+                        {
+                            return false;
+                        }
+                        value = method;
+                        return value.Length > 0;
+                    case "@path":
+                        // RFC 9421 section 2.2.6. An empty path is the
+                        // single slash.
+                        if (GetRequestLineValue(
+                            Core.Constants.EVIDENCE_REQUEST_PATH_KEY,
+                            out var path) == false)
+                        {
+                            return false;
+                        }
+                        value = path.Length == 0 ? "/" : path;
+                        return true;
+                    case "@query":
+                        // RFC 9421 section 2.2.7. The query carries its
+                        // leading question mark, and a request with no
+                        // query at all still has the question mark on its
+                        // own, so the two cases cannot be confused.
+                        if (GetRequestLineValue(
+                            Core.Constants.EVIDENCE_REQUEST_QUERY_KEY,
+                            out var query) == false)
+                        {
+                            return false;
+                        }
+                        value = "?" + query;
+                        return true;
+                    case "@target-uri":
+                        // RFC 9421 section 2.2.2, being the whole address
+                        // the request was made to, which is the scheme, the
+                        // authority, the path and the query joined.
+                        return TryResolveTargetUri(out value);
                     default:
-                        // '@target-uri', '@method', '@path' and '@query'
-                        // need the request line, which the web integration
-                        // does not put into evidence today.
                         return false;
                 }
+            }
+
+            /// <summary>
+            /// Build the '@target-uri' component from the parts that make
+            /// it up. Every part has to be there, because a target address
+            /// missing its path or its query is a different address and
+            /// would produce a signature base the agent never signed.
+            /// </summary>
+            private bool TryResolveTargetUri(out string value)
+            {
+                value = null;
+                if (GetHeader(
+                        "protocol",
+                        out var scheme) == false ||
+                    GetHeader("host", out var host) == false ||
+                    GetRequestLineValue(
+                        Core.Constants.EVIDENCE_REQUEST_PATH_KEY,
+                        out var path) == false ||
+                    GetRequestLineValue(
+                        Core.Constants.EVIDENCE_REQUEST_QUERY_KEY,
+                        out var query) == false)
+                {
+                    return false;
+                }
+                var authority = SignatureBase.BuildAuthority(
+                    host, scheme.Trim().ToLowerInvariant());
+                if (authority == null)
+                {
+                    return false;
+                }
+                // A request that carried no query at all and one that
+                // carried an empty query, being a target ending in a bare
+                // '?', both arrive here as an empty string, because the
+                // evidence keys hold the query without its leading '?'
+                // and there is nothing left to tell the two apart. The
+                // common case by far is no query at all, and its target
+                // address carries no '?', so that is what is built here.
+                //
+                // A request for '/search?' therefore resolves to
+                // 'https://host/search' whilst '@query' resolves to '?'
+                // for the same request, which is right for '@query' under
+                // RFC 9421 section 2.2.7. An agent that signs over both
+                // components of such a target reads as a mismatch rather
+                // than as unverifiable, which is the one answer this
+                // element otherwise avoids giving a genuine agent.
+                //
+                // Telling the two apart needs the evidence to carry the
+                // '?' where the request had one, which is a change to the
+                // Pipeline specification and so to every language, not
+                // something to do here alone. Raised as issue #391.
+                value = scheme.Trim().ToLowerInvariant() + "://" +
+                    authority +
+                    (path.Length == 0 ? "/" : path) +
+                    (query.Length == 0 ? string.Empty : "?" + query);
+                return true;
             }
 
             private static bool TryResolveDictionaryMember(
@@ -1077,16 +1378,54 @@ namespace FiftyOne.Pipeline.AgentSignature.FlowElement
                 return true;
             }
 
+            /// <summary>
+            /// Read a header by name from the prefix the signature came
+            /// from, and from no other.
+            /// </summary>
+            /// <remarks>
+            /// A forwarded signature describes the request that reached
+            /// the caller, and the headers under the header prefix
+            /// describe the call the caller then made to this server.
+            /// They are two different requests, so taking one part from
+            /// each would build a base no agent ever signed, and the
+            /// signature would read as a mismatch, which says the agent
+            /// was lying. Reading only the one source means a forwarded
+            /// request whose caller sent no host reports instead that a
+            /// component was unavailable, which says only that the check
+            /// could not be made.
+            /// </remarks>
             private bool GetHeader(string name, out string value)
             {
-                return GetHeaderByKey(
-                    Core.Constants.EVIDENCE_HTTPHEADER_PREFIX +
-                        Core.Constants.EVIDENCE_SEPERATOR +
-                        name,
+                return GetEvidence(
+                    _source + Core.Constants.EVIDENCE_SEPERATOR + name,
                     out value);
             }
 
-            private bool GetHeaderByKey(string key, out string value)
+            /// <summary>
+            /// Read one of the request line values from the prefix the
+            /// signature came from, for the same reason as a header. A
+            /// request that arrived here directly carries them under the
+            /// server prefix, and a forwarded one under the query prefix
+            /// with the server prefix taken off.
+            /// </summary>
+            private bool GetRequestLineValue(string key, out string value)
+            {
+                if (string.Equals(
+                    _source,
+                    Core.Constants.EVIDENCE_HTTPHEADER_PREFIX,
+                    StringComparison.Ordinal))
+                {
+                    return GetEvidence(key, out value);
+                }
+                var name = key.Substring(key.IndexOf(
+                    Core.Constants.EVIDENCE_SEPERATOR,
+                    StringComparison.Ordinal) + 1);
+                return GetEvidence(
+                    _source + Core.Constants.EVIDENCE_SEPERATOR + name,
+                    out value);
+            }
+
+            private bool GetEvidence(string key, out string value)
             {
                 value = null;
                 if (_data.TryGetEvidence(key, out object raw) == false ||
@@ -1104,36 +1443,156 @@ namespace FiftyOne.Pipeline.AgentSignature.FlowElement
         /// </summary>
         /// <remarks>
         /// A signature names the parts of the request it covers, and it may
-        /// name any request header, so the element cannot write down the
-        /// list in advance. It asks for every header instead, together with
-        /// the protocol, which '@authority' and '@scheme' are built from.
-        /// A fixed list would leave a signature covering any other header
-        /// unable to be rebuilt, because the web integration only puts
-        /// evidence into the request that some element has asked for.
+        /// name any request header, so the element cannot write the list
+        /// down in advance. It accepts every header instead, together with
+        /// the protocol, which '@authority' and '@scheme' are built from,
+        /// and the three request line values, which '@method', '@path',
+        /// '@query' and '@target-uri' are built from. A fixed list of
+        /// headers would leave a signature covering any other header unable
+        /// to be rebuilt, because a web integration only puts evidence into
+        /// the request that some element has asked for.
+        /// <para>
+        /// The 'query' prefix is accepted as well as 'header', because a
+        /// caller's own Pipeline sends its evidence on to the cloud service
+        /// with the prefix taken off, so a header that started as
+        /// 'header.signature' reaches the cloud as 'query.signature'.
+        /// Accepting both is what lets one element serve a request that
+        /// arrived directly and one that was forwarded.
+        /// </para>
+        /// <para>
+        /// The class derives from the whitelist filter, holding the keys
+        /// this element cannot work without, so that anything reading the
+        /// whitelist can say what to send. The cloud service builds the
+        /// list of evidence it accepts that way, and a prefix rule alone
+        /// cannot be written down in such a list, so a signature forwarded
+        /// to the cloud would carry none of its headers.
+        /// </para>
         /// </remarks>
         private sealed class AgentSignatureEvidenceKeyFilter
-            : IEvidenceKeyFilter
+            : EvidenceKeyFilterWhitelist
         {
-            private readonly string _headerPrefix =
+            private static readonly string _headerPrefix =
                 Core.Constants.EVIDENCE_HTTPHEADER_PREFIX +
                 Core.Constants.EVIDENCE_SEPERATOR;
 
-            /// <inheritdoc/>
-            /// <remarks>
-            /// The protocol, which '@scheme' and the port in '@authority'
-            /// are built from, is itself written as 'header.protocol', so
-            /// the one test on the prefix covers it as well.
-            /// </remarks>
-            public bool Include(string key)
+            private static readonly string _queryPrefix =
+                Core.Constants.EVIDENCE_QUERY_PREFIX +
+                Core.Constants.EVIDENCE_SEPERATOR;
+
+            /// <summary>
+            /// The keys carrying the request line, which '@method',
+            /// '@path', '@query' and '@target-uri' are built from.
+            /// </summary>
+            private static readonly string[] RequestLineKeys = new[]
             {
-                return key != null &&
-                    key.StartsWith(
-                        _headerPrefix,
-                        StringComparison.OrdinalIgnoreCase);
+                Core.Constants.EVIDENCE_REQUEST_METHOD_KEY,
+                Core.Constants.EVIDENCE_REQUEST_PATH_KEY,
+                Core.Constants.EVIDENCE_REQUEST_QUERY_KEY,
+            };
+
+            private readonly bool _trustForwarded;
+
+            public AgentSignatureEvidenceKeyFilter(bool trustForwarded)
+                : base(NamedKeys())
+            {
+                _trustForwarded = trustForwarded;
+            }
+
+            /// <summary>
+            /// The keys this element cannot do without, named under the
+            /// prefix a request carries them in when it arrives here
+            /// directly, and never under the query prefix. The list is
+            /// the same whether or not forwarded evidence is trusted,
+            /// because what is published to callers must never depend on
+            /// how this deployment reads what it receives.
+            /// </summary>
+            /// <remarks>
+            /// Anything reading the whitelist, such as the cloud
+            /// service's published list of accepted evidence, sees these
+            /// and only these. That list decides what a caller's own
+            /// Pipeline collects and forwards, and a caller collects a
+            /// query string value only where the list names it. Naming
+            /// the query forms here would therefore have every caller
+            /// collect a signature typed into a visitor's address bar
+            /// and forward it as though it were a header their site had
+            /// received, which is how a visitor could have been reported
+            /// as a verified agent. Naming only the header forms means a
+            /// signature reaches the wire only where the site actually
+            /// received one.
+            /// <para>
+            /// The request line keys carry a cost that the header keys do
+            /// not, and it is worth writing down because it cannot be
+            /// settled here. The published list is one list for the whole
+            /// service, fetched with no resource key, so naming the path
+            /// and the query in it has every caller collect and forward
+            /// the address a visitor asked for on every request, whether
+            /// or not that caller uses this element and whether or not it
+            /// is entitled to. Leaving them out is not the answer either:
+            /// a forwarded request would then arrive carrying no path and
+            /// no query, and a signature covering '@path', '@query' or
+            /// '@target-uri' could not be rebuilt at all, which is the
+            /// greater part of what this element is for on the cloud
+            /// path. Narrowing what is sent is not open either, because
+            /// '@query' is defined as the whole query string.
+            /// </para>
+            /// <para>
+            /// Holding the cost to the callers who need it therefore
+            /// wants the published list to depend on what a caller is
+            /// entitled to, which is a change to the service that
+            /// publishes the list rather than to this element. Until that
+            /// is done, a deployment that does not want a visitor's
+            /// addresses leaving it should not send its evidence to the
+            /// cloud. The change belongs to the cloud service and is
+            /// tracked there rather than in this repository.
+            /// </para>
+            /// </remarks>
+            private static List<string> NamedKeys()
+            {
+                var names = new[]
+                {
+                    Constants.EVIDENCE_SIGNATURE_NAME,
+                    Constants.EVIDENCE_SIGNATURE_INPUT_NAME,
+                    Constants.EVIDENCE_SIGNATURE_AGENT_NAME,
+                    "host",
+                    "protocol",
+                };
+                var keys = new List<string>();
+                foreach (var name in names)
+                {
+                    keys.Add(_headerPrefix + name);
+                }
+                foreach (var key in RequestLineKeys)
+                {
+                    keys.Add(key);
+                }
+                return keys;
             }
 
             /// <inheritdoc/>
-            public int? Order(string key)
+            /// <remarks>
+            /// Any header at all is accepted beyond the named keys,
+            /// because a signature may cover one this element cannot know
+            /// in advance. The protocol, which '@scheme' and the port in
+            /// '@authority' are built from, is itself written as
+            /// 'header.protocol', so the test on the prefix covers it too.
+            /// </remarks>
+            public override bool Include(string key)
+            {
+                if (key == null)
+                {
+                    return false;
+                }
+                return key.StartsWith(
+                        _headerPrefix, StringComparison.OrdinalIgnoreCase) ||
+                    (_trustForwarded &&
+                        key.StartsWith(
+                            _queryPrefix,
+                            StringComparison.OrdinalIgnoreCase)) ||
+                    base.Include(key);
+            }
+
+            /// <inheritdoc/>
+            public override int? Order(string key)
             {
                 return Include(key) ? 100 : (int?)null;
             }

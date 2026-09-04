@@ -91,6 +91,12 @@ namespace FiftyOne.Pipeline.AgentSignature.Tests
             true,
             "an evidence key is matched whatever its case")]
         [DataRow(
+            "query.signature",
+            false,
+            "a query string value is written by whoever sent the " +
+            "request, so it is only read where a service has said it " +
+            "receives forwarded evidence")]
+        [DataRow(
             "query.foo",
             false,
             "a query string value is not a request header")]

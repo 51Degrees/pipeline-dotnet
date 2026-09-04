@@ -37,13 +37,33 @@ namespace FiftyOne.Pipeline.AgentSignature
         #region Evidence keys
 
         /// <summary>
+        /// The name of the 'Signature' HTTP header, without a prefix. A
+        /// request that arrives here directly carries it under the
+        /// 'header' prefix, and one forwarded by a caller's own Pipeline
+        /// carries it under 'query', so the name is held on its own.
+        /// </summary>
+        public const string EVIDENCE_SIGNATURE_NAME = "signature";
+
+        /// <summary>
+        /// The name of the 'Signature-Input' HTTP header, without a
+        /// prefix.
+        /// </summary>
+        public const string EVIDENCE_SIGNATURE_INPUT_NAME = "signature-input";
+
+        /// <summary>
+        /// The name of the 'Signature-Agent' HTTP header, without a
+        /// prefix.
+        /// </summary>
+        public const string EVIDENCE_SIGNATURE_AGENT_NAME = "signature-agent";
+
+        /// <summary>
         /// The complete key used when the 'Signature' HTTP header is
         /// passed as evidence.
         /// </summary>
         public const string EVIDENCE_SIGNATURE_KEY =
             Core.Constants.EVIDENCE_HTTPHEADER_PREFIX +
             Core.Constants.EVIDENCE_SEPERATOR +
-            "signature";
+            EVIDENCE_SIGNATURE_NAME;
 
         /// <summary>
         /// The complete key used when the 'Signature-Input' HTTP header is
@@ -52,7 +72,7 @@ namespace FiftyOne.Pipeline.AgentSignature
         public const string EVIDENCE_SIGNATURE_INPUT_KEY =
             Core.Constants.EVIDENCE_HTTPHEADER_PREFIX +
             Core.Constants.EVIDENCE_SEPERATOR +
-            "signature-input";
+            EVIDENCE_SIGNATURE_INPUT_NAME;
 
         /// <summary>
         /// The complete key used when the 'Signature-Agent' HTTP header is
@@ -61,7 +81,7 @@ namespace FiftyOne.Pipeline.AgentSignature
         public const string EVIDENCE_SIGNATURE_AGENT_KEY =
             Core.Constants.EVIDENCE_HTTPHEADER_PREFIX +
             Core.Constants.EVIDENCE_SEPERATOR +
-            "signature-agent";
+            EVIDENCE_SIGNATURE_AGENT_NAME;
 
         /// <summary>
         /// The complete key used when the 'Host' HTTP header is passed as
@@ -79,6 +99,16 @@ namespace FiftyOne.Pipeline.AgentSignature
         /// <summary>
         /// The element data key used by default for this element.
         /// </summary>
+        /// <remarks>
+        /// Every other element key a customer sees carries no
+        /// punctuation, being 'device', 'hardware', 'ip', 'location',
+        /// 'robotstxt' and 'fodid', and the cloud service uses the key as
+        /// the name of this element's section in the JSON it returns, so
+        /// 'agentsignature' would have read better there. The hyphen
+        /// stays because this key already went out in version 4.5.88 of
+        /// the package, and changing what a published version calls
+        /// something costs more than the tidier name is worth.
+        /// </remarks>
         public const string DEFAULT_ELEMENT_DATA_KEY = "agent-signature";
 
         #endregion
@@ -441,6 +471,16 @@ namespace FiftyOne.Pipeline.AgentSignature
         /// says nothing about which agent sent the request.
         /// </summary>
         public const bool DEFAULT_ALLOW_INLINE_DIRECTORY = false;
+
+        /// <summary>
+        /// The default for whether evidence under the 'query' prefix is
+        /// trusted to describe the request that was signed. This is off,
+        /// because a web integration turns query string parameters into
+        /// evidence under that prefix, so a visitor could otherwise put a
+        /// signature, a host and a path in the address bar and have those
+        /// checked instead of the request that actually arrived.
+        /// </summary>
+        public const bool DEFAULT_TRUST_FORWARDED_EVIDENCE = false;
 
         /// <summary>
         /// The default number of bytes read from a key directory, an agent

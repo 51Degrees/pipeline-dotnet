@@ -27,6 +27,7 @@ using System.Linq;
 using FiftyOne.Pipeline.Core.Data;
 using FiftyOne.Pipeline.Web.Shared;
 using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Http.Features;
 using Microsoft.Extensions.Logging;
 
 namespace FiftyOne.Pipeline.Web.Services
@@ -199,6 +200,7 @@ namespace FiftyOne.Pipeline.Web.Services
                 }
 
                 AddRequestProtocolToEvidence(flowData, httpRequest);
+                AddRequestLineToEvidence(flowData, httpRequest);
             }
 #pragma warning disable CA1031 // Do not catch general exception types
             catch (Exception ex)
@@ -255,6 +257,122 @@ namespace FiftyOne.Pipeline.Web.Services
 
             // Add protocol to the evidence.
             CheckAndAdd(flowData, Core.Constants.EVIDENCE_PROTOCOL, protocol);
+        }
+
+        /// <summary>
+        /// Add the method, the path and the whole query string of the
+        /// request to the evidence, exactly as the request carried them.
+        /// </summary>
+        /// <remarks>
+        /// These are only added where an element in the pipeline has asked
+        /// for them, and nothing is worked out at all where no element has,
+        /// because this runs on every request.
+        /// <para>
+        /// The path and the query come from the raw request target rather
+        /// than from 'Path' and 'QueryString'. The framework hands those
+        /// two back with percent escapes decoded, so a request for
+        /// '/a%2Fb' would arrive here as '/a/b', and these values are used
+        /// to rebuild the text an HTTP message signature was made over,
+        /// where one changed byte makes a valid signature read as invalid.
+        /// The raw target is what the request line carried. Where it
+        /// cannot be read, or where it is not in the ordinary form that
+        /// starts with a slash, being the absolute form a proxy may send
+        /// or the asterisk form of an OPTIONS request, the escaped forms
+        /// of 'PathBase', 'Path' and 'QueryString' are used instead, which
+        /// are as close to the original as the framework can give. The
+        /// base is part of that reading because 'UsePathBase' takes it off
+        /// 'Path' before the application sees it, whilst the request line
+        /// carried it.
+        /// </para>
+        /// <para>
+        /// All three are added together, with an empty query string where
+        /// the request carried none, so that a missing key always means
+        /// this integration did not supply the request line.
+        /// </para>
+        /// </remarks>
+        private static void AddRequestLineToEvidence(
+            IFlowData flowData,
+            HttpRequest httpRequest)
+        {
+            var filter = flowData.EvidenceKeyFilter;
+
+            if (filter.Include(Core.Constants.EVIDENCE_REQUEST_METHOD_KEY))
+            {
+                flowData.AddEvidence(
+                    Core.Constants.EVIDENCE_REQUEST_METHOD_KEY,
+                    httpRequest.Method ?? string.Empty);
+            }
+
+            // The path and the query are split out of the request target
+            // together, so the one reading serves both and is only done
+            // where at least one of them is wanted.
+            if (filter.Include(Core.Constants.EVIDENCE_REQUEST_PATH_KEY) ||
+                filter.Include(Core.Constants.EVIDENCE_REQUEST_QUERY_KEY))
+            {
+                SplitRequestTarget(httpRequest, out var path, out var query);
+
+                if (filter.Include(Core.Constants.EVIDENCE_REQUEST_PATH_KEY))
+                {
+                    flowData.AddEvidence(
+                        Core.Constants.EVIDENCE_REQUEST_PATH_KEY, path);
+                }
+
+                if (filter.Include(Core.Constants.EVIDENCE_REQUEST_QUERY_KEY))
+                {
+                    flowData.AddEvidence(
+                        Core.Constants.EVIDENCE_REQUEST_QUERY_KEY, query);
+                }
+            }
+        }
+
+        /// <summary>
+        /// Read the path and the query string as the request line carried
+        /// them, without the leading question mark on the query.
+        /// </summary>
+        /// <param name="httpRequest">The request.</param>
+        /// <param name="path">The path.</param>
+        /// <param name="query">The query string.</param>
+        private static void SplitRequestTarget(
+            HttpRequest httpRequest,
+            out string path,
+            out string query)
+        {
+            var rawTarget = httpRequest.HttpContext?.Features?
+                .Get<IHttpRequestFeature>()?.RawTarget;
+            if (string.IsNullOrEmpty(rawTarget) == false &&
+                rawTarget[0] == '/')
+            {
+                var mark = rawTarget.IndexOf('?');
+                path = mark < 0 ? rawTarget : rawTarget.Substring(0, mark);
+                query = mark < 0
+                    ? string.Empty
+                    : rawTarget.Substring(mark + 1);
+                return;
+            }
+            // 'ToUriComponent' gives the escaped form, where 'Value' gives
+            // the decoded one, so it is the closer of the two to what the
+            // request line carried.
+            //
+            // 'PathBase' carries the part of the path the application is
+            // mounted under, which 'UsePathBase' takes off 'Path' before
+            // the application sees it. The request line carried the two
+            // together, so the two are put back together here. Leaving the
+            // base out would build a path shorter than the one that was
+            // signed, and a signature covering '@path' or '@target-uri'
+            // would then read as a mismatch, which says the agent was
+            // lying, rather than as a value this integration could not
+            // supply. 'ToUriComponent' gives an empty string where there
+            // is no value, so an application mounted at the root is
+            // unaffected.
+            path = httpRequest.PathBase.ToUriComponent() +
+                httpRequest.Path.ToUriComponent();
+            query = httpRequest.QueryString.HasValue
+                ? httpRequest.QueryString.ToUriComponent()
+                : string.Empty;
+            if (query.Length > 0 && query[0] == '?')
+            {
+                query = query.Substring(1);
+            }
         }
     }
 }

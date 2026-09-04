@@ -92,6 +92,50 @@ namespace FiftyOne.Pipeline.AgentSignature.FlowElement
             Constants.DEFAULT_ALLOW_LEGACY_SIGNATURE_AGENT;
 
         /// <summary>
+        /// True when evidence under the 'query' prefix is trusted to
+        /// describe the request that was signed. This is off by default
+        /// and must stay off anywhere a request can reach this Pipeline
+        /// from a browser.
+        /// </summary>
+        /// <remarks>
+        /// A web integration turns query string parameters into evidence
+        /// under the 'query' prefix, so with this on, a visitor could put
+        /// a signature, a host and a path in the address bar and have the
+        /// element check that instead of the request that actually
+        /// arrived. A signature captured from a genuine agent on any site
+        /// could then be replayed here and reported as Verified, which is
+        /// exactly what covering the authority and the path is supposed to
+        /// prevent.
+        /// <para>
+        /// The only place it belongs is a service that receives evidence
+        /// a caller's own Pipeline collected and forwarded, where the
+        /// prefix has been taken off every key on the way, being the
+        /// 51Degrees cloud service. Such a service knows it is in that
+        /// position; the element cannot work it out from the evidence,
+        /// because forwarded evidence and a typed query string are
+        /// indistinguishable once they arrive.
+        /// </para>
+        /// </remarks>
+        public bool TrustForwardedEvidence { get; set; } =
+            Constants.DEFAULT_TRUST_FORWARDED_EVIDENCE;
+
+        /// <summary>
+        /// The address of a key directory to fetch once at start up, so
+        /// that the log says whether this deployment can reach the keys
+        /// agents publish at all. Null, the default, means no check is
+        /// made.
+        /// </summary>
+        /// <remarks>
+        /// A deployment with no outbound access answers every signed
+        /// request Unverified, one request at a time, which reads as
+        /// agents behaving oddly rather than as a deployment that cannot
+        /// do the work. The check is made in the background, changes
+        /// nothing about how requests are answered and never stops the
+        /// element being built.
+        /// </remarks>
+        public string ReachabilityCheckUrl { get; set; }
+
+        /// <summary>
         /// True when a key set carried inline in a 'data:' URI is accepted.
         /// This is off by default, because such a key set is chosen by
         /// whoever sent the request rather than published at an address the
