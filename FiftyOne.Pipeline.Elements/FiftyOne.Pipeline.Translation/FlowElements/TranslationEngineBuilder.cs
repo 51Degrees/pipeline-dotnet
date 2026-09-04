@@ -168,6 +168,39 @@ namespace FiftyOne.Pipeline.Translation.FlowElements
         }
 
         /// <summary>
+        /// Add translated property. This defines a translation from one property
+        /// to another.
+        /// </summary>
+        /// <typeparam name="TDestination">
+        /// The value type readers of the destination property expect. When
+        /// the source property has no value, the no-value placeholder stored
+        /// against the destination is created with this type so typed reads
+        /// of the destination do not fail with an invalid cast.
+        /// </typeparam>
+        /// <param name="source">
+        /// The key for the source property to translate.
+        /// </param>
+        /// <param name="destination">
+        /// The key to store the translated value under on the translation engine data.
+        /// </param>
+        /// <returns>
+        /// This builder.
+        /// </returns>
+        public TranslationEngineBuilder AddTranslation<TDestination>(
+            string source,
+            string destination)
+        {
+            if (source == null || destination == null)
+            {
+                throw new ArgumentNullException();
+            }
+
+            _translationProperties.Add(
+                TranslationProperty.Create<TDestination>(source, destination));
+            return this;
+        }
+
+        /// <summary>
         /// Add a source file containing translations. These follow the naming
         /// convention 'abc.en_GB.yml' where 'abc' can be any idenitifier,
         /// 'en_GB' is the locale code, and 'yml' is the file extension. The
