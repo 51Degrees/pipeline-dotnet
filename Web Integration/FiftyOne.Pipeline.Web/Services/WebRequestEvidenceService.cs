@@ -278,8 +278,11 @@ namespace FiftyOne.Pipeline.Web.Services
         /// cannot be read, or where it is not in the ordinary form that
         /// starts with a slash, being the absolute form a proxy may send
         /// or the asterisk form of an OPTIONS request, the escaped forms
-        /// of 'Path' and 'QueryString' are used instead, which are as
-        /// close to the original as the framework can give.
+        /// of 'PathBase', 'Path' and 'QueryString' are used instead, which
+        /// are as close to the original as the framework can give. The
+        /// base is part of that reading because 'UsePathBase' takes it off
+        /// 'Path' before the application sees it, whilst the request line
+        /// carried it.
         /// </para>
         /// <para>
         /// All three are added together, with an empty query string where
@@ -349,9 +352,20 @@ namespace FiftyOne.Pipeline.Web.Services
             // 'ToUriComponent' gives the escaped form, where 'Value' gives
             // the decoded one, so it is the closer of the two to what the
             // request line carried.
-            path = httpRequest.Path.HasValue
-                ? httpRequest.Path.ToUriComponent()
-                : string.Empty;
+            //
+            // 'PathBase' carries the part of the path the application is
+            // mounted under, which 'UsePathBase' takes off 'Path' before
+            // the application sees it. The request line carried the two
+            // together, so the two are put back together here. Leaving the
+            // base out would build a path shorter than the one that was
+            // signed, and a signature covering '@path' or '@target-uri'
+            // would then read as a mismatch, which says the agent was
+            // lying, rather than as a value this integration could not
+            // supply. 'ToUriComponent' gives an empty string where there
+            // is no value, so an application mounted at the root is
+            // unaffected.
+            path = httpRequest.PathBase.ToUriComponent() +
+                httpRequest.Path.ToUriComponent();
             query = httpRequest.QueryString.HasValue
                 ? httpRequest.QueryString.ToUriComponent()
                 : string.Empty;

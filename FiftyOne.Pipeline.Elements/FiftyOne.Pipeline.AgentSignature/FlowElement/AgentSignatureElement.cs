@@ -1519,6 +1519,32 @@ namespace FiftyOne.Pipeline.AgentSignature.FlowElement
             /// as a verified agent. Naming only the header forms means a
             /// signature reaches the wire only where the site actually
             /// received one.
+            /// <para>
+            /// The request line keys carry a cost that the header keys do
+            /// not, and it is worth writing down because it cannot be
+            /// settled here. The published list is one list for the whole
+            /// service, fetched with no resource key, so naming the path
+            /// and the query in it has every caller collect and forward
+            /// the address a visitor asked for on every request, whether
+            /// or not that caller uses this element and whether or not it
+            /// is entitled to. Leaving them out is not the answer either:
+            /// a forwarded request would then arrive carrying no path and
+            /// no query, and a signature covering '@path', '@query' or
+            /// '@target-uri' could not be rebuilt at all, which is the
+            /// greater part of what this element is for on the cloud
+            /// path. Narrowing what is sent is not open either, because
+            /// '@query' is defined as the whole query string.
+            /// </para>
+            /// <para>
+            /// Holding the cost to the callers who need it therefore
+            /// wants the published list to depend on what a caller is
+            /// entitled to, which is a change to the service that
+            /// publishes the list rather than to this element. Until that
+            /// is done, a deployment that does not want a visitor's
+            /// addresses leaving it should not send its evidence to the
+            /// cloud. The change belongs to the cloud service and is
+            /// tracked there rather than in this repository.
+            /// </para>
             /// </remarks>
             private static List<string> NamedKeys()
             {

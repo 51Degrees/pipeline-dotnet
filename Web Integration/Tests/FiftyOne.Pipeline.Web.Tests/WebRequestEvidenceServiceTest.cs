@@ -303,6 +303,46 @@ namespace FiftyOne.Pipeline.Web.Tests
         }
 
         /// <summary>
+        /// An application mounted under a path base signs the whole path,
+        /// because that is what the request line carried, so the base goes
+        /// back on the front of the framework's own path.
+        /// </summary>
+        /// <remarks>
+        /// 'UsePathBase' takes the mounted part off 'Path' before the
+        /// application sees it, so reading 'Path' alone builds a path
+        /// shorter than the one that was signed. A signature covering
+        /// '@path' or '@target-uri' would then read as a mismatch, which
+        /// says the agent was lying, rather than as a value this
+        /// integration could not supply. This only arises where the raw
+        /// target cannot be read, because the raw target already carries
+        /// the whole path.
+        /// </remarks>
+        [TestMethod]
+        public void WebRequestEvidenceService_RequestLineKeepsThePathBase()
+        {
+            _request.SetupGet(r => r.Method).Returns("GET");
+            _request.SetupGet(r => r.HttpContext.Features)
+                .Returns(new FeatureCollection());
+            _request.SetupGet(r => r.PathBase)
+                .Returns(new PathString("/app"));
+            _request.SetupGet(r => r.Path)
+                .Returns(new PathString("/search"));
+            _request.SetupGet(r => r.QueryString)
+                .Returns(new QueryString("?q=1"));
+
+            SetRequiredKeys(new List<string>()
+            {
+                Core.Constants.EVIDENCE_REQUEST_PATH_KEY,
+                Core.Constants.EVIDENCE_REQUEST_QUERY_KEY,
+            });
+            _service.AddEvidenceFromRequest(_flowData.Object, _request.Object);
+
+            _flowData.Verify(f => f.AddEvidence(
+                Core.Constants.EVIDENCE_REQUEST_PATH_KEY, "/app/search"),
+                Times.Once);
+        }
+
+        /// <summary>
         /// A request with no query string still adds the query key, empty,
         /// so that a missing key always means this integration does not
         /// supply the request line rather than that the request carried no

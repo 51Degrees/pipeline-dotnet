@@ -72,18 +72,6 @@ namespace FiftyOne.Pipeline.Engines.FiftyOne.Tests.Data
         }
 
         /// <summary>
-        /// The whole query string is never shared, in either mode.
-        /// </summary>
-        /// <remarks>
-        /// This class withholds query string parameters by default and only
-        /// shares the ones a caller names through the constructor, so
-        /// 'query.email' is withheld unless it was asked for. The whole
-        /// query string carries every one of those parameters at once, so
-        /// without this the same value would be withheld under its 'query'
-        /// prefix and shared under its 'server' prefix, undoing a choice
-        /// the caller had made without anyone deciding to.
-        /// </remarks>
-        /// <summary>
         /// The path is never shared, in either mode.
         /// </summary>
         /// <remarks>
@@ -119,6 +107,18 @@ namespace FiftyOne.Pipeline.Engines.FiftyOne.Tests.Data
             Assert.IsFalse(tracker.Include("server.request-query"));
         }
 
+        /// <summary>
+        /// The whole query string is never shared, in either mode.
+        /// </summary>
+        /// <remarks>
+        /// This class withholds query string parameters by default and only
+        /// shares the ones a caller names through the constructor, so
+        /// 'query.email' is withheld unless it was asked for. The whole
+        /// query string carries every one of those parameters at once, so
+        /// without this the same value would be withheld under its 'query'
+        /// prefix and shared under its 'server' prefix, undoing a choice
+        /// the caller had made without anyone deciding to.
+        /// </remarks>
         [TestMethod]
         public void TheWholeQueryStringIsNeverShared()
         {
