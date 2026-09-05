@@ -1766,13 +1766,22 @@
         </member>
         <member name="T:Owid.Client.Model.DatedPublicKey">
             <summary>
-            A signing public key together with the date it was created.
+            A signing public key together with the moment it comes into force.
             </summary>
         </member>
-        <member name="P:Owid.Client.Model.DatedPublicKey.Created">
+        <member name="P:Owid.Client.Model.DatedPublicKey.StartsAt">
             <summary>
-            The UTC date the key was created.
+            The UTC moment from which this key signs. It stays in force until
+            the next key starts, so the last key of a schedule covers every
+            date after it.
             </summary>
+            <remarks>
+            This is the schedule position, not the moment the key material
+            was generated. The two are not the same, because a creator may
+            generate many weeks of keys in one run, and selecting on the
+            moment of generation then picks a key whose period has not
+            started. See <see cref="T:Owid.Client.Model.DatedKeyStore"/> for what that did.
+            </remarks>
         </member>
         <member name="P:Owid.Client.Model.DatedPublicKey.PublicKey">
             <summary>
@@ -1781,10 +1790,24 @@
         </member>
         <member name="T:Owid.Client.Model.DatedKeyStore">
             <summary>
-            <see cref="T:Owid.Client.Model.IPublicKeyStore"/> over a set of dated keys. Returns the key
-            that was current at the requested date: the newest key created on or
-            before it. A date that predates every key yields null.
+            <see cref="T:Owid.Client.Model.IPublicKeyStore"/> over a set of scheduled keys. Returns
+            the key that was in force at the requested date, being the latest key
+            whose <see cref="P:Owid.Client.Model.DatedPublicKey.StartsAt"/> is at or before it. A date
+            that precedes every key yields null.
             </summary>
+            <remarks>
+            Selection used to run on the moment each key was generated, which was
+            a fair stand-in whilst keys were generated one per week, so the order
+            of generation matched the order of the schedule. It stopped being one
+            on 1 September 2026, when a 51Degrees creator wrote thirteen keys in a
+            single run. All thirteen shared one moment of generation whilst their
+            start dates ran forward a week at a time, so an identifier dated
+            4 September 2026 selected the key that starts on 7 September and the
+            signature came back as invalid. Invalid is the answer that means
+            forgery, so genuine identifiers were rejected as forged. The published
+            schedule and one of those identifiers are the fixture behind
+            PublishedScheduleTests.
+            </remarks>
         </member>
         <member name="M:Owid.Client.Model.DatedKeyStore.#ctor(System.Collections.Generic.IEnumerable{Owid.Client.Model.DatedPublicKey})">
             <summary>
@@ -1804,11 +1827,19 @@
         </member>
         <member name="M:Owid.Client.Model.IPublicKeyStore.GetPublicKey(System.Nullable{System.UInt32})">
             <summary>
-            The public key (PEM) that was current at the given date, expressed
-            as minutes since 2020-01-01 UTC (the OWID date encoding). When the
-            date is null the current key is returned. Returns null when the date
-            predates the oldest known key.
+            The public key (PEM) that was in force at the given date,
+            expressed as minutes since 2020-01-01 UTC (the OWID date
+            encoding). When the date is null the key in force now is
+            returned. Returns null when the date precedes the oldest known
+            key.
             </summary>
+            <remarks>
+            In force means the key the creator was signing with at that date,
+            which for a creator that publishes its schedule ahead of time is
+            not the newest key it holds. An implementation that returns a key
+            whose period has not begun makes every genuine identifier of that
+            date read as forged.
+            </remarks>
             <param name="dateMinutes">
             Minutes since 2020-01-01 UTC, or null for the current key.
             </param>
