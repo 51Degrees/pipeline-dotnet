@@ -166,6 +166,19 @@ namespace FiftyOne.Did.Model
         /// The identifier type carried in bits 6-7 of <see cref="Flags"/>.
         /// </summary>
         public IdType Type => TypeOf(Flags);
+        /// <summary>
+        /// The usage carried in bits 0-2 of <see cref="Flags"/>, as the
+        /// highest usage granted. See <see cref="Model.Usage"/> for why
+        /// it is read that way.
+        /// </summary>
+        public Usage Usage => UsageOf(Flags);
+        /// <summary>
+        /// Whether the usage was derived from an IAB consent string the
+        /// caller sent, rather than stated by the caller directly. Bit 3
+        /// of <see cref="Flags"/>. Both are legitimate ways to arrive at
+        /// a usage, and this says nothing about which usage it is.
+        /// </summary>
+        public bool UsageFromConsent => (Flags & 0b1000) != 0;
 
         /// <summary>
         /// The 4-byte little-endian License Id from the payload, as the
@@ -515,6 +528,15 @@ namespace FiftyOne.Did.Model
         }
 
         private static IdType TypeOf(byte flags) => (IdType)((flags >> 6) & 0b11);
+
+        // The highest usage granted. The bits are cumulative, so the
+        // highest set bit names the usage and the lower bits say nothing
+        // more. See Usage.
+        private static Usage UsageOf(byte flags) =>
+            (flags & 0b100) != 0 ? Usage.Personalized
+            : (flags & 0b010) != 0 ? Usage.Standard
+            : (flags & 0b001) != 0 ? Usage.NonMarketing
+            : Usage.None;
 
         /// <summary>
         /// Builds the instance once <see cref="Unpack"/> has accepted the

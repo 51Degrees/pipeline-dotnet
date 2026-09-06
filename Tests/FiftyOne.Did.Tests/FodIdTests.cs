@@ -377,6 +377,41 @@ namespace FiftyOne.Did.Tests
             Assert.AreEqual(expected, fodId.Type);
         }
 
+        /// <summary>
+        /// The usage is the highest granted, because the bits are
+        /// cumulative. A mask for the non-marketing bit alone would say yes
+        /// for every marketing identifier, which is the wrong answer for a
+        /// data protection decision.
+        /// </summary>
+        [TestMethod]
+        [DataRow((byte)0b0100_0000, Usage.None)]
+        [DataRow((byte)0b0100_0001, Usage.NonMarketing)]
+        [DataRow((byte)0b0100_0011, Usage.Standard)]
+        [DataRow((byte)0b0100_0111, Usage.Personalized)]
+        public void Usage_IsTheHighestGranted(byte flags, Usage expected)
+        {
+            var payload = CanonicalRandomPayload();
+            payload[FodId.FlagsOffset] = flags;
+
+            var fodId = new FodId(_factory.SignedOwidBase64(payload));
+
+            Assert.AreEqual(expected, fodId.Usage);
+            Assert.AreEqual(IdType.Random, fodId.Type, "the type bits are untouched");
+            Assert.IsFalse(fodId.UsageFromConsent);
+        }
+
+        [TestMethod]
+        public void UsageFromConsent_IsBitThree()
+        {
+            var payload = CanonicalRandomPayload();
+            payload[FodId.FlagsOffset] = 0b0100_1011;
+
+            var fodId = new FodId(_factory.SignedOwidBase64(payload));
+
+            Assert.IsTrue(fodId.UsageFromConsent);
+            Assert.AreEqual(Usage.Standard, fodId.Usage);
+        }
+
         [TestMethod]
         public void Type_RandomWhenBits01()
         {
