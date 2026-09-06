@@ -1,4 +1,4 @@
-/* *********************************************************************
+﻿/* *********************************************************************
  * This Original Work is copyright of 51 Degrees Mobile Experts Limited.
  * Copyright 2026 51 Degrees Mobile Experts Limited, Davidson House,
  * Forbury Square, Reading, Berkshire, United Kingdom RG1 3EU.
@@ -24,7 +24,7 @@ namespace FiftyOne.Did.Model
 {
     /// <summary>
     /// The usage a 51Did was created for, carried in bits 0-2 of
-    /// <see cref="FodId.Flags"/>. It decides where the identifier may
+    /// the 51Did flags byte. It decides where the identifier may
     /// go: one created for <see cref="NonMarketing"/> must never be
     /// passed to a demand source, and one created for
     /// <see cref="Standard"/> or <see cref="Personalized"/> may be

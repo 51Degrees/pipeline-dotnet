@@ -678,16 +678,14 @@
             </para>
             <para>
             Payload layout. The header (offsets 0-4) is shared by every
-            identifier type; bits 6-7 of Flags select the type and the length
-            of the match key that follows:
+            identifier type, and bits 6-7 of the flags byte select the type
+            and the length of the match key that follows. The byte structure
+            is specified once for all six languages at
+            https://github.com/51Degrees/specifications/blob/main/did-specification/identifier-layout.md
+            and is not repeated here. What this package exposes, and what it
+            deliberately does not, is at
+            https://github.com/51Degrees/specifications/blob/main/did-specification/package-surface.md
             </para>
-            <list type="table">
-              <listheader><term>Offset</term><term>Length</term><term>Field</term></listheader>
-              <item><term>0</term><term>1</term><term>Flags (bits 0-2 usage, bits 6-7 type)</term></item>
-              <item><term>1</term><term>4</term><term>LicenseId (uint32 LE)</term></item>
-              <item><term>5</term><term>32</term><term>Match key: SHA-256 (Probabilistic, HashedEmail)</term></item>
-              <item><term>5</term><term>16</term><term>Match key: GUID (Random)</term></item>
-            </list>
             <para>
             Only a lower bound is applied to the payload. Anything after the
             match key is a creator context section whose lengths belong to the
@@ -717,7 +715,11 @@
         </member>
         <member name="F:FiftyOne.Did.Model.FodId.FlagsOffset">
             <summary>
-            Byte offset of the Flags field within the payload.
+            Byte offset of the Flags field within the payload. The byte
+            layout is deliberately not public, because the only reason to
+            want an offset is to read the payload by hand, and the only
+            reason to do that is to read a field that already has a name.
+            See the package surface specification linked above.
             </summary>
         </member>
         <member name="F:FiftyOne.Did.Model.FodId.LicenseIdOffset">
@@ -740,20 +742,6 @@
             Byte length of the match key field (SHA-256).
             </summary>
         </member>
-        <member name="F:FiftyOne.Did.Model.FodId.HashOffset">
-            <summary>
-            Obsolete alias for <see cref="F:FiftyOne.Did.Model.FodId.MatchKeyOffset"/>. The stable,
-            comparable part of a 51Did is now called the match key,
-            mirroring the Model Terms for Marketing vocabulary.
-            </summary>
-        </member>
-        <member name="F:FiftyOne.Did.Model.FodId.HashLength">
-            <summary>
-            Obsolete alias for <see cref="F:FiftyOne.Did.Model.FodId.MatchKeyLength"/>. The stable,
-            comparable part of a 51Did is now called the match key,
-            mirroring the Model Terms for Marketing vocabulary.
-            </summary>
-        </member>
         <member name="F:FiftyOne.Did.Model.FodId.HeaderLength">
             <summary>
             Byte length of the payload header (Flags + LicenseId) that is
@@ -765,36 +753,48 @@
             Byte length of the GUID match key carried by Random identifiers.
             </summary>
         </member>
-        <member name="F:FiftyOne.Did.Model.FodId.RandomPayloadLength">
+        <member name="F:FiftyOne.Did.Model.FodId.MinimumRandomPayloadLength">
             <summary>
-            Minimum byte length of a Random 51Did payload
+            Least byte length of a Random 51Did payload
             (Flags + LicenseId + GUID).
             </summary>
         </member>
-        <member name="F:FiftyOne.Did.Model.FodId.PayloadLength">
+        <member name="F:FiftyOne.Did.Model.FodId.MinimumPayloadLength">
             <summary>
-            Minimum byte length of a Probabilistic or HashedEmail 51Did
+            Least byte length of a Probabilistic or HashedEmail 51Did
             payload (Flags + LicenseId + MatchKey). Random payloads are
-            shorter - see <see cref="F:FiftyOne.Did.Model.FodId.RandomPayloadLength"/>.
+            shorter, see <see cref="F:FiftyOne.Did.Model.FodId.MinimumRandomPayloadLength"/>. The
+            length of a particular payload is <c>Payload.Length</c>.
             </summary>
-            <remarks>
-            This constant predates the OWID library's instance property of
-            the same name, which reports how many bytes a particular
-            payload holds, and it is kept because callers reference it by
-            type. On a <see cref="T:FiftyOne.Did.Model.FodId"/> reference the name resolves to
-            this constant. The actual length of an instance's payload is
-            <c>Payload.Length</c>, or the inherited property through an
-            <see cref="T:Owid.Client.Model.Owid"/> reference.
-            </remarks>
         </member>
         <member name="P:FiftyOne.Did.Model.FodId.Flags">
             <summary>
-            The 1-byte usage flags bit-mask from the payload.
+            The 1-byte flags bit-mask from the payload, kept for the typed
+            accessors built on it and for the package's own tests. It is
+            not public, because a caller masking the byte for the
+            non-marketing bit would read every marketing identifier as
+            non-marketing. Read <see cref="P:FiftyOne.Did.Model.FodId.Usage"/>,
+            <see cref="P:FiftyOne.Did.Model.FodId.UsageFromConsent"/> and <see cref="P:FiftyOne.Did.Model.FodId.Type"/> instead.
             </summary>
         </member>
         <member name="P:FiftyOne.Did.Model.FodId.Type">
             <summary>
-            The identifier type carried in bits 6-7 of <see cref="P:FiftyOne.Did.Model.FodId.Flags"/>.
+            The identifier type carried in bits 6-7 of the flags byte.
+            </summary>
+        </member>
+        <member name="P:FiftyOne.Did.Model.FodId.Usage">
+            <summary>
+            The usage carried in bits 0-2 of the flags byte, as the
+            highest usage granted. See <see cref="T:FiftyOne.Did.Model.Usage"/> for why
+            it is read that way.
+            </summary>
+        </member>
+        <member name="P:FiftyOne.Did.Model.FodId.UsageFromConsent">
+            <summary>
+            Whether the usage was derived from an IAB consent string the
+            caller sent, rather than stated by the caller directly. Bit 3
+            of the flags byte. Both are legitimate ways to arrive at a
+            usage, and this says nothing about which usage it is.
             </summary>
         </member>
         <member name="P:FiftyOne.Did.Model.FodId.LicenseId">
@@ -817,28 +817,13 @@
             every issue. Treat it as the cache / dedup key.
             </summary>
         </member>
-        <member name="P:FiftyOne.Did.Model.FodId.Hash">
-            <summary>
-            Obsolete alias for <see cref="P:FiftyOne.Did.Model.FodId.MatchKey"/>. The stable, comparable
-            part of a 51Did is now called the match key, mirroring the Model
-            Terms for Marketing vocabulary.
-            </summary>
-        </member>
         <member name="F:FiftyOne.Did.Model.FodId.DateBase">
             <summary>
             The moment the envelope's date field counts minutes from,
-            2020-01-01T00:00:00Z. See <see cref="P:FiftyOne.Did.Model.FodId.DateMinutes"/>.
-            </summary>
-        </member>
-        <member name="P:FiftyOne.Did.Model.FodId.DateMinutes">
-            <summary>
-            The envelope's own date as the unsigned 32-bit count of minutes
-            since <see cref="F:FiftyOne.Did.Model.FodId.DateBase"/>, which is the value the field holds
-            on the wire and the value the OWID <c>public-key?date=</c>
-            parameter takes. Callers comparing creation times want this
-            integer rather than the converted
+            2020-01-01T00:00:00Z. This is part of the wire encoding rather
+            than of the surface a caller reads, so it is not public.
+            Callers comparing creation times compare
             <see cref="P:Owid.Client.Model.Owid.Date"/>.
-            A date before the base gives zero.
             </summary>
         </member>
         <member name="M:FiftyOne.Did.Model.FodId.TryParse(System.String,FiftyOne.Did.Model.FodId@,FiftyOne.Did.Model.FodIdParseStatus@)">
@@ -1259,6 +1244,56 @@
             <summary>
             Not yet assigned. Parsed best-effort: the header fields are
             unpacked and the remaining payload bytes are exposed as-is.
+            </summary>
+        </member>
+        <member name="T:FiftyOne.Did.Model.Usage">
+            <summary>
+            The usage a 51Did was created for, carried in bits 0-2 of
+            the 51Did flags byte. It decides where the identifier may
+            go: one created for <see cref="F:FiftyOne.Did.Model.Usage.NonMarketing"/> must never be
+            passed to a demand source, and one created for
+            <see cref="F:FiftyOne.Did.Model.Usage.Standard"/> or <see cref="F:FiftyOne.Did.Model.Usage.Personalized"/> may be
+            passed only to a recipient that has accepted the applicable terms.
+            <para>
+            The three usages are cumulative rather than exclusive in the byte.
+            Non-marketing sets bit 0, standard sets bits 0 and 1, and
+            personalized sets bits 0, 1 and 2, so every marketing identifier
+            also carries the non-marketing bit. A caller who masked the byte
+            for that bit alone would read every marketing identifier as
+            non-marketing, which is the wrong way round for a data protection
+            decision. <see cref="P:FiftyOne.Did.Model.FodId.Usage"/> answers with the highest
+            usage granted, so that mistake cannot be made.
+            </para>
+            <para>
+            The names match the cloud's <c>id.usage</c> values,
+            <c>non-marketing</c>, <c>standard</c> and <c>personalized</c>, and
+            are the same in every 51Did package.
+            </para>
+            </summary>
+        </member>
+        <member name="F:FiftyOne.Did.Model.Usage.None">
+            <summary>
+            No usage bit is set. The cloud never issues such an identifier,
+            so this is an identifier from somewhere else or a damaged one,
+            and it should be treated as though it may not be passed on.
+            </summary>
+        </member>
+        <member name="F:FiftyOne.Did.Model.Usage.NonMarketing">
+            <summary>
+            Created for use that is not marketing. Must not be passed to a
+            demand source.
+            </summary>
+        </member>
+        <member name="F:FiftyOne.Did.Model.Usage.Standard">
+            <summary>
+            Created for standard marketing, being targeting unrelated to
+            the person's browsing history or interactions.
+            </summary>
+        </member>
+        <member name="F:FiftyOne.Did.Model.Usage.Personalized">
+            <summary>
+            Created for personalized marketing, being targeting related to
+            the person's browsing history or interactions.
             </summary>
         </member>
         <member name="F:Owid.Client.Constants.BaseDate">

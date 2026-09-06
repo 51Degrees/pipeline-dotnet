@@ -1,4 +1,4 @@
-# FiftyOne.Did
+﻿# FiftyOne.Did
 
 Strongly-typed .NET parser for the 51Did (51Degrees Identifier)
 returned by the 51Degrees Cloud service, and the client a server uses
@@ -29,7 +29,13 @@ envelopes.
 
 ## Payload layout
 
-The header is shared by every identifier type. Bits 6-7 of Flags
+The byte structure is specified once for all six 51Did packages at
+[Identifier layout](https://github.com/51Degrees/specifications/blob/main/did-specification/identifier-layout.md),
+and what this package exposes, and deliberately does not, is at
+[Package surface](https://github.com/51Degrees/specifications/blob/main/did-specification/package-surface.md).
+The summary below is for convenience and those pages are the authority.
+
+The header is shared by every identifier type. Bits 6-7 of the flags byte
 select the type and the length of the match key that follows.
 
 | Offset | Length | Field      | Type                                            |
@@ -141,7 +147,8 @@ using FiftyOne.Did.Model;
 // The throwing form, for a value you already trust to be a 51Did.
 var fodId = FodId.FromBase64(base64FromCloudService);
 
-byte    flags     = fodId.Flags;
+Usage   usage     = fodId.Usage;       // the highest usage granted
+bool    fromConsent = fodId.UsageFromConsent;
 IdType  type      = fodId.Type;        // Probabilistic / Random / HashedEmail
 uint    licenseId = fodId.LicenseId;
 byte[]  matchKey  = fodId.MatchKey;    // SHA-256 or GUID bytes, see Type
@@ -149,7 +156,6 @@ byte[]  matchKey  = fodId.MatchKey;    // SHA-256 or GUID bytes, see Type
 // Inherited OWID-level fields.
 string   domain   = fodId.Domain;
 DateTime date     = fodId.Date;
-uint     minutes  = fodId.DateMinutes; // the date field as minutes since 2020
 
 // Base64 in both alphabets.
 string   roundTrip = fodId.AsBase64();    // standard, with padding

@@ -1,4 +1,4 @@
-/* *********************************************************************
+﻿/* *********************************************************************
  * This Original Work is copyright of 51 Degrees Mobile Experts Limited.
  * Copyright 2026 51 Degrees Mobile Experts Limited, Davidson House,
  * Forbury Square, Reading, Berkshire, United Kingdom RG1 3EU.
@@ -45,16 +45,14 @@ namespace FiftyOne.Did.Model
     /// </para>
     /// <para>
     /// Payload layout. The header (offsets 0-4) is shared by every
-    /// identifier type; bits 6-7 of Flags select the type and the length
-    /// of the match key that follows:
+    /// identifier type, and bits 6-7 of the flags byte select the type
+    /// and the length of the match key that follows. The byte structure
+    /// is specified once for all six languages at
+    /// https://github.com/51Degrees/specifications/blob/main/did-specification/identifier-layout.md
+    /// and is not repeated here. What this package exposes, and what it
+    /// deliberately does not, is at
+    /// https://github.com/51Degrees/specifications/blob/main/did-specification/package-surface.md
     /// </para>
-    /// <list type="table">
-    ///   <listheader><term>Offset</term><term>Length</term><term>Field</term></listheader>
-    ///   <item><term>0</term><term>1</term><term>Flags (bits 0-2 usage, bits 6-7 type)</term></item>
-    ///   <item><term>1</term><term>4</term><term>LicenseId (uint32 LE)</term></item>
-    ///   <item><term>5</term><term>32</term><term>Match key: SHA-256 (Probabilistic, HashedEmail)</term></item>
-    ///   <item><term>5</term><term>16</term><term>Match key: GUID (Random)</term></item>
-    /// </list>
     /// <para>
     /// Only a lower bound is applied to the payload. Anything after the
     /// match key is a creator context section whose lengths belong to the
@@ -84,90 +82,77 @@ namespace FiftyOne.Did.Model
     public class FodId : Owid.Client.Model.Owid
     {
         /// <summary>
-        /// Byte offset of the Flags field within the payload.
+        /// Byte offset of the Flags field within the payload. The byte
+        /// layout is deliberately not public, because the only reason to
+        /// want an offset is to read the payload by hand, and the only
+        /// reason to do that is to read a field that already has a name.
+        /// See the package surface specification linked above.
         /// </summary>
-        public const int FlagsOffset = 0;
+        internal const int FlagsOffset = 0;
 
         /// <summary>
         /// Byte offset of the License Id field within the payload.
         /// </summary>
-        public const int LicenseIdOffset = 1;
+        internal const int LicenseIdOffset = 1;
 
         /// <summary>
         /// Byte length of the License Id field.
         /// </summary>
-        public const int LicenseIdLength = 4;
+        internal const int LicenseIdLength = 4;
 
         /// <summary>
         /// Byte offset of the match key field within the payload.
         /// </summary>
-        public const int MatchKeyOffset = 5;
+        internal const int MatchKeyOffset = 5;
 
         /// <summary>
         /// Byte length of the match key field (SHA-256).
         /// </summary>
-        public const int MatchKeyLength = 32;
-
-        /// <summary>
-        /// Obsolete alias for <see cref="MatchKeyOffset"/>. The stable,
-        /// comparable part of a 51Did is now called the match key,
-        /// mirroring the Model Terms for Marketing vocabulary.
-        /// </summary>
-        [Obsolete("Renamed to MatchKeyOffset. This alias will be removed in a future release.")]
-        public const int HashOffset = MatchKeyOffset;
-
-        /// <summary>
-        /// Obsolete alias for <see cref="MatchKeyLength"/>. The stable,
-        /// comparable part of a 51Did is now called the match key,
-        /// mirroring the Model Terms for Marketing vocabulary.
-        /// </summary>
-        [Obsolete("Renamed to MatchKeyLength. This alias will be removed in a future release.")]
-        public const int HashLength = MatchKeyLength;
+        internal const int MatchKeyLength = 32;
 
         /// <summary>
         /// Byte length of the payload header (Flags + LicenseId) that is
         /// common to every identifier type.
         /// </summary>
-        public const int HeaderLength = MatchKeyOffset;
+        internal const int HeaderLength = MatchKeyOffset;
 
         /// <summary>
         /// Byte length of the GUID match key carried by Random identifiers.
         /// </summary>
-        public const int GuidLength = 16;
+        internal const int GuidLength = 16;
 
         /// <summary>
-        /// Minimum byte length of a Random 51Did payload
+        /// Least byte length of a Random 51Did payload
         /// (Flags + LicenseId + GUID).
         /// </summary>
-        public const int RandomPayloadLength = HeaderLength + GuidLength;
+        internal const int MinimumRandomPayloadLength =
+            HeaderLength + GuidLength;
 
         /// <summary>
-        /// Minimum byte length of a Probabilistic or HashedEmail 51Did
+        /// Least byte length of a Probabilistic or HashedEmail 51Did
         /// payload (Flags + LicenseId + MatchKey). Random payloads are
-        /// shorter - see <see cref="RandomPayloadLength"/>.
+        /// shorter, see <see cref="MinimumRandomPayloadLength"/>. The
+        /// length of a particular payload is <c>Payload.Length</c>.
         /// </summary>
-        /// <remarks>
-        /// This constant predates the OWID library's instance property of
-        /// the same name, which reports how many bytes a particular
-        /// payload holds, and it is kept because callers reference it by
-        /// type. On a <see cref="FodId"/> reference the name resolves to
-        /// this constant. The actual length of an instance's payload is
-        /// <c>Payload.Length</c>, or the inherited property through an
-        /// <see cref="global::Owid.Client.Model.Owid"/> reference.
-        /// </remarks>
-        public new const int PayloadLength = MatchKeyOffset + MatchKeyLength;
+        internal const int MinimumPayloadLength =
+            MatchKeyOffset + MatchKeyLength;
 
         /// <summary>
-        /// The 1-byte usage flags bit-mask from the payload.
+        /// The 1-byte flags bit-mask from the payload, kept for the typed
+        /// accessors built on it and for the package's own tests. It is
+        /// not public, because a caller masking the byte for the
+        /// non-marketing bit would read every marketing identifier as
+        /// non-marketing. Read <see cref="Usage"/>,
+        /// <see cref="UsageFromConsent"/> and <see cref="Type"/> instead.
         /// </summary>
-        public byte Flags { get; }
+        internal byte Flags { get; }
 
         /// <summary>
-        /// The identifier type carried in bits 6-7 of <see cref="Flags"/>.
+        /// The identifier type carried in bits 6-7 of the flags byte.
         /// </summary>
         public IdType Type => TypeOf(Flags);
         /// <summary>
-        /// The usage carried in bits 0-2 of <see cref="Flags"/>, as the
+        /// The usage carried in bits 0-2 of the flags byte, as the
         /// highest usage granted. See <see cref="Model.Usage"/> for why
         /// it is read that way.
         /// </summary>
@@ -175,8 +160,8 @@ namespace FiftyOne.Did.Model
         /// <summary>
         /// Whether the usage was derived from an IAB consent string the
         /// caller sent, rather than stated by the caller directly. Bit 3
-        /// of <see cref="Flags"/>. Both are legitimate ways to arrive at
-        /// a usage, and this says nothing about which usage it is.
+        /// of the flags byte. Both are legitimate ways to arrive at a
+        /// usage, and this says nothing about which usage it is.
         /// </summary>
         public bool UsageFromConsent => (Flags & 0b1000) != 0;
 
@@ -201,41 +186,14 @@ namespace FiftyOne.Did.Model
         public byte[] MatchKey { get; }
 
         /// <summary>
-        /// Obsolete alias for <see cref="MatchKey"/>. The stable, comparable
-        /// part of a 51Did is now called the match key, mirroring the Model
-        /// Terms for Marketing vocabulary.
-        /// </summary>
-        [Obsolete("Renamed to MatchKey. This alias will be removed in a future release.")]
-        public byte[] Hash => MatchKey;
-
-        /// <summary>
         /// The moment the envelope's date field counts minutes from,
-        /// 2020-01-01T00:00:00Z. See <see cref="DateMinutes"/>.
-        /// </summary>
-        public static readonly DateTime DateBase =
-            new DateTime(2020, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc);
-
-        /// <summary>
-        /// The envelope's own date as the unsigned 32-bit count of minutes
-        /// since <see cref="DateBase"/>, which is the value the field holds
-        /// on the wire and the value the OWID <c>public-key?date=</c>
-        /// parameter takes. Callers comparing creation times want this
-        /// integer rather than the converted
+        /// 2020-01-01T00:00:00Z. This is part of the wire encoding rather
+        /// than of the surface a caller reads, so it is not public.
+        /// Callers comparing creation times compare
         /// <see cref="global::Owid.Client.Model.Owid.Date"/>.
-        /// A date before the base gives zero.
         /// </summary>
-        public uint DateMinutes
-        {
-            get
-            {
-                var minutes = (Date - DateBase).TotalMinutes;
-                if (minutes <= 0)
-                {
-                    return 0;
-                }
-                return minutes >= uint.MaxValue ? uint.MaxValue : (uint)minutes;
-            }
-        }
+        internal static readonly DateTime DateBase =
+            new DateTime(2020, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc);
 
         /// <summary>
         /// Reads a 51Did from its base64 form, in either alphabet, saying

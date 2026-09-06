@@ -1,4 +1,4 @@
-/* *********************************************************************
+﻿/* *********************************************************************
  * This Original Work is copyright of 51 Degrees Mobile Experts Limited.
  * Copyright 2026 51 Degrees Mobile Experts Limited, Davidson House,
  * Forbury Square, Reading, Berkshire, United Kingdom RG1 3EU.
@@ -290,10 +290,8 @@ namespace FiftyOne.Did.Client
             }
             // Reachable only for the Reserved type, which the parser accepts
             // down to the five header bytes. The other types cannot reach
-            // here short, because the parser refuses them. The length is
-            // read through the OWID reference because on a FodId the name
-            // PayloadLength is the type's minimum constant.
-            if (((Owid.Client.Model.Owid)fodId).PayloadLength < BaseLength(fodId))
+            // here short, because the parser refuses them.
+            if (fodId.PayloadLength < BaseLength(fodId))
             {
                 return SignatureCheck.InvalidLength;
             }

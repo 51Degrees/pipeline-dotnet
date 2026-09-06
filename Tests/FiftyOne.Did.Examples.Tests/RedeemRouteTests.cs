@@ -1,4 +1,4 @@
-/* *********************************************************************
+﻿/* *********************************************************************
  * This Original Work is copyright of 51 Degrees Mobile Experts Limited.
  * Copyright 2026 51 Degrees Mobile Experts Limited, Davidson House,
  * Forbury Square, Reading, Berkshire, United Kingdom RG1 3EU.
@@ -78,7 +78,7 @@ namespace FiftyOne.Did.Examples.Tests
         /// <summary>A signed 51Did dated inside the key's period.</summary>
         private FodId Signed()
         {
-            var payload = new byte[FodId.PayloadLength];
+            var payload = new byte[FodId.MinimumPayloadLength];
             payload[FodId.FlagsOffset] = 0b0000_0101;
             for (var i = FodId.MatchKeyOffset; i < payload.Length; i++)
             {

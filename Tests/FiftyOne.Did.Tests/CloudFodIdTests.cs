@@ -1,4 +1,4 @@
-/* *********************************************************************
+﻿/* *********************************************************************
  * This Original Work is copyright of 51 Degrees Mobile Experts Limited.
  * Copyright 2026 51 Degrees Mobile Experts Limited, Davidson House,
  * Forbury Square, Reading, Berkshire, United Kingdom RG1 3EU.
@@ -253,9 +253,9 @@ namespace FiftyOne.Did.Tests
             // bearing envelope.
             Assert.AreEqual(FodId.MatchKeyLength, fodId.MatchKey.Length,
                 $"{label}: match key length");
-            Assert.IsTrue(fodId.Payload.Length >= FodId.PayloadLength,
+            Assert.IsTrue(fodId.Payload.Length >= FodId.MinimumPayloadLength,
                 $"{label}: payload length {fodId.Payload.Length} is below " +
-                $"the {FodId.PayloadLength} byte minimum");
+                $"the {FodId.MinimumPayloadLength} byte minimum");
             Assert.IsFalse(string.IsNullOrEmpty(fodId.Domain),
                 $"{label}: domain should not be empty");
 

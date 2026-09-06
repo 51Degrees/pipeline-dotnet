@@ -1,4 +1,4 @@
-/* *********************************************************************
+﻿/* *********************************************************************
  * This Original Work is copyright of 51 Degrees Mobile Experts Limited.
  * Copyright 2026 51 Degrees Mobile Experts Limited, Davidson House,
  * Forbury Square, Reading, Berkshire, United Kingdom RG1 3EU.
@@ -84,7 +84,7 @@ namespace FiftyOne.Did.Tests
         {
             yield return ("not base64 in any alphabet!", FodIdParseStatus.InvalidBase64);
             var shortRandom = CanonicalRandomPayload()
-                .Take(FodId.RandomPayloadLength - 1).ToArray();
+                .Take(FodId.MinimumRandomPayloadLength - 1).ToArray();
             yield return (
                 _factory.SignedOwidBase64(shortRandom),
                 FodIdParseStatus.InvalidTypePayloadLength);

@@ -1,4 +1,4 @@
-/* *********************************************************************
+﻿/* *********************************************************************
  * This Original Work is copyright of 51 Degrees Mobile Experts Limited.
  * Copyright 2026 51 Degrees Mobile Experts Limited, Davidson House,
  * Forbury Square, Reading, Berkshire, United Kingdom RG1 3EU.
@@ -159,7 +159,7 @@ namespace FiftyOne.Did.Tests
             Assert.IsTrue(await client.VerifyAsync(fodId), "cloud signature check");
 
             Console.WriteLine(
-                $"domain={fodId.Domain} minutes={fodId.DateMinutes} " +
+                $"domain={fodId.Domain} date={fodId.Date:o} " +
                 $"key starts {key!.StartsAt:o} " +
                 $"payload={fodId.Payload.Length} bytes");
         }

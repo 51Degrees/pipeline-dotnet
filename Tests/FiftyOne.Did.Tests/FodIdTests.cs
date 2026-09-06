@@ -1,4 +1,4 @@
-/* *********************************************************************
+﻿/* *********************************************************************
  * This Original Work is copyright of 51 Degrees Mobile Experts Limited.
  * Copyright 2026 51 Degrees Mobile Experts Limited, Davidson House,
  * Forbury Square, Reading, Berkshire, United Kingdom RG1 3EU.
@@ -55,7 +55,7 @@ namespace FiftyOne.Did.Tests
 #pragma warning disable MSTEST0032
             Assert.AreEqual(
                 FodId.MatchKeyOffset + FodId.MatchKeyLength,
-                FodId.PayloadLength);
+                FodId.MinimumPayloadLength);
             Assert.AreEqual(
                 FodId.LicenseIdOffset + FodId.LicenseIdLength,
                 FodId.MatchKeyOffset);
@@ -81,16 +81,6 @@ namespace FiftyOne.Did.Tests
             Assert.AreEqual(CanonicalLicenseId, fodId.LicenseId);
             CollectionAssert.AreEqual(CanonicalHash, fodId.MatchKey);
             Assert.AreEqual(TestDomain, fodId.Domain);
-        }
-
-        [TestMethod]
-        public void ObsoleteHash_ReturnsMatchKey()
-        {
-            var fodId = new FodId(_factory.SignedOwidBase64(CanonicalPayload()));
-
-#pragma warning disable 618 // deliberately exercising the obsolete alias
-            CollectionAssert.AreEqual(fodId.MatchKey, fodId.Hash);
-#pragma warning restore 618
         }
 
         [TestMethod]
@@ -218,7 +208,7 @@ namespace FiftyOne.Did.Tests
         public void Constructor_PayloadOneByteShort_Throws()
         {
             // 36 bytes, one short of the minimum 37.
-            var base64 = _factory.SignedOwidBase64(new byte[FodId.PayloadLength - 1]);
+            var base64 = _factory.SignedOwidBase64(new byte[FodId.MinimumPayloadLength - 1]);
 
             Assert.ThrowsExactly<ArgumentException>(() => new FodId(base64));
         }
@@ -292,8 +282,8 @@ namespace FiftyOne.Did.Tests
             // Build a 64-byte payload whose first 37 bytes match canonical;
             // remaining bytes are 0xCC and should be ignored.
             var payload = new byte[64];
-            Array.Copy(CanonicalPayload(), payload, FodId.PayloadLength);
-            for (int i = FodId.PayloadLength; i < payload.Length; i++)
+            Array.Copy(CanonicalPayload(), payload, FodId.MinimumPayloadLength);
+            for (int i = FodId.MinimumPayloadLength; i < payload.Length; i++)
             {
                 payload[i] = 0xCC;
             }
@@ -437,7 +427,7 @@ namespace FiftyOne.Did.Tests
         public void Constructor_RandomPayloadOneByteShort_Throws()
         {
             var payload = CanonicalRandomPayload()
-                .Take(FodId.RandomPayloadLength - 1).ToArray();
+                .Take(FodId.MinimumRandomPayloadLength - 1).ToArray();
 
             Assert.ThrowsExactly<ArgumentException>(
                 () => new FodId(_factory.SignedOwidBase64(payload)));
@@ -446,10 +436,10 @@ namespace FiftyOne.Did.Tests
         [TestMethod]
         public void Constructor_RandomPayloadLargerThanSpec_UsesFirst16ValueBytes()
         {
-            var payload = new byte[FodId.PayloadLength];
+            var payload = new byte[FodId.MinimumPayloadLength];
             Array.Copy(
-                CanonicalRandomPayload(), payload, FodId.RandomPayloadLength);
-            for (int i = FodId.RandomPayloadLength; i < payload.Length; i++)
+                CanonicalRandomPayload(), payload, FodId.MinimumRandomPayloadLength);
+            for (int i = FodId.MinimumRandomPayloadLength; i < payload.Length; i++)
             {
                 payload[i] = 0xCC;
             }
@@ -466,7 +456,7 @@ namespace FiftyOne.Did.Tests
             // CanonicalFlags (0xA5) carries the HashedEmail tag in bits 6-7,
             // so the 37-byte minimum still applies to this payload.
             var payload = CanonicalPayload()
-                .Take(FodId.PayloadLength - 1).ToArray();
+                .Take(FodId.MinimumPayloadLength - 1).ToArray();
 
             Assert.ThrowsExactly<ArgumentException>(
                 () => new FodId(_factory.SignedOwidBase64(payload)));
@@ -490,7 +480,7 @@ namespace FiftyOne.Did.Tests
 #pragma warning disable MSTEST0032
             Assert.AreEqual(
                 FodId.MatchKeyOffset + FodId.GuidLength,
-                FodId.RandomPayloadLength);
+                FodId.MinimumRandomPayloadLength);
 #pragma warning restore MSTEST0032
         }
 
