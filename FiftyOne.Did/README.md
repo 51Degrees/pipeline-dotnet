@@ -1,4 +1,4 @@
-﻿# FiftyOne.Did
+# FiftyOne.Did
 
 Strongly-typed .NET parser for the 51Did (51Degrees Identifier)
 returned by the 51Degrees Cloud service, and the client a server uses
