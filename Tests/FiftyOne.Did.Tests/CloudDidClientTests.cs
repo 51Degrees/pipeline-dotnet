@@ -159,7 +159,7 @@ namespace FiftyOne.Did.Tests
             Assert.IsTrue(await client.VerifyAsync(fodId), "cloud signature check");
 
             Console.WriteLine(
-                $"domain={fodId.Domain} minutes={fodId.DateMinutes} " +
+                $"domain={fodId.Domain} date={fodId.Date:o} " +
                 $"key starts {key!.StartsAt:o} " +
                 $"payload={fodId.Payload.Length} bytes");
         }

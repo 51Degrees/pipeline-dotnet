@@ -84,7 +84,7 @@ namespace FiftyOne.Did.Tests
         {
             yield return ("not base64 in any alphabet!", FodIdParseStatus.InvalidBase64);
             var shortRandom = CanonicalRandomPayload()
-                .Take(FodId.RandomPayloadLength - 1).ToArray();
+                .Take(FodId.MinimumRandomPayloadLength - 1).ToArray();
             yield return (
                 _factory.SignedOwidBase64(shortRandom),
                 FodIdParseStatus.InvalidTypePayloadLength);

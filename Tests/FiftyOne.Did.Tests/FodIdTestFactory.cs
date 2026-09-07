@@ -103,7 +103,7 @@ namespace FiftyOne.Did.Tests
         /// </summary>
         public static byte[] CanonicalPayload()
         {
-            var payload = new byte[FodId.PayloadLength];
+            var payload = new byte[FodId.MinimumPayloadLength];
             payload[FodId.FlagsOffset] = CanonicalFlags;
             WriteCanonicalLicenseId(payload);
             Array.Copy(CanonicalHash, 0, payload, FodId.MatchKeyOffset, FodId.MatchKeyLength);
@@ -117,7 +117,7 @@ namespace FiftyOne.Did.Tests
         /// </summary>
         public static byte[] CanonicalRandomPayload()
         {
-            var payload = new byte[FodId.RandomPayloadLength];
+            var payload = new byte[FodId.MinimumRandomPayloadLength];
             payload[FodId.FlagsOffset] = (byte)((byte)IdType.Random << 6 | 0b001);
             WriteCanonicalLicenseId(payload);
             for (int i = 0; i < FodId.GuidLength; i++)

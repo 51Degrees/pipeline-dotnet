@@ -96,7 +96,7 @@ namespace FiftyOne.Did.Tests
         // than the base and nothing here depends on how much longer.
         private static byte[] PayloadWithContext()
         {
-            var payload = new byte[FodId.PayloadLength + 128];
+            var payload = new byte[FodId.MinimumPayloadLength + 128];
             CanonicalPayload().CopyTo(payload, 0);
             return payload;
         }
@@ -517,7 +517,7 @@ namespace FiftyOne.Did.Tests
             // cloud's business, so the check only cares that the payload
             // reaches its base length.
             var payload = PayloadWithContext();
-            payload[FodId.PayloadLength] = 0;
+            payload[FodId.MinimumPayloadLength] = 0;
             var fodId = SignedAt(T0.AddDays(1), payload);
 
             Assert.IsTrue(await client.VerifySignatureAsync(fodId));

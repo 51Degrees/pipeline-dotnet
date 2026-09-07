@@ -149,9 +149,9 @@ namespace FiftyOne.Did.Tests
             // A creator context section follows the match key. Its length is
             // the cloud's business, so an older reader accepts it at any
             // length and still exposes the same three fields.
-            var payload = new byte[FodId.PayloadLength + 300];
+            var payload = new byte[FodId.MinimumPayloadLength + 300];
             CanonicalPayload().CopyTo(payload, 0);
-            for (var i = FodId.PayloadLength; i < payload.Length; i++)
+            for (var i = FodId.MinimumPayloadLength; i < payload.Length; i++)
             {
                 payload[i] = 0xCC;
             }
@@ -167,10 +167,10 @@ namespace FiftyOne.Did.Tests
         }
 
         [TestMethod]
-        [DataRow(IdType.Random, FodId.RandomPayloadLength + 1)]
-        [DataRow(IdType.Random, FodId.PayloadLength)]
-        [DataRow(IdType.Probabilistic, FodId.PayloadLength + 1)]
-        [DataRow(IdType.HashedEmail, FodId.PayloadLength + 4000)]
+        [DataRow(IdType.Random, FodId.MinimumRandomPayloadLength + 1)]
+        [DataRow(IdType.Random, FodId.MinimumPayloadLength)]
+        [DataRow(IdType.Probabilistic, FodId.MinimumPayloadLength + 1)]
+        [DataRow(IdType.HashedEmail, FodId.MinimumPayloadLength + 4000)]
         [DataRow(IdType.Reserved, FodId.HeaderLength + 9000)]
         public void TryParse_LongerPayload_IsNotRejectedForItsLength(
             IdType type,
@@ -194,7 +194,7 @@ namespace FiftyOne.Did.Tests
         public void TryParse_RandomOneByteShort_InvalidTypePayloadLength()
         {
             var payload = CanonicalRandomPayload()
-                .Take(FodId.RandomPayloadLength - 1).ToArray();
+                .Take(FodId.MinimumRandomPayloadLength - 1).ToArray();
 
             var ok = FodId.TryParse(
                 _factory.SignedOwidBase64(payload), out var fodId, out var status);
@@ -208,7 +208,7 @@ namespace FiftyOne.Did.Tests
         public void TryParse_HashTypeOneByteShort_InvalidTypePayloadLength(
             IdType type)
         {
-            var payload = PayloadOfType(type, FodId.PayloadLength - 1);
+            var payload = PayloadOfType(type, FodId.MinimumPayloadLength - 1);
 
             var ok = FodId.TryParse(
                 _factory.SignedOwidBase64(payload), out var fodId, out var status);
@@ -633,7 +633,7 @@ namespace FiftyOne.Did.Tests
         public void Throwing_ShortForType_Argument()
         {
             var payload = CanonicalRandomPayload()
-                .Take(FodId.RandomPayloadLength - 1).ToArray();
+                .Take(FodId.MinimumRandomPayloadLength - 1).ToArray();
             var owid = _factory.SignedOwid(payload);
 
             var fromString = Assert.ThrowsExactly<ArgumentException>(
@@ -660,7 +660,7 @@ namespace FiftyOne.Did.Tests
             var good = _factory.SignedBytes(CanonicalPayload(), DateTime.UtcNow);
             var trailing = good.Concat(new byte[] { 1 }).ToArray();
             var shortRandom = _factory.SignedBytes(
-                CanonicalRandomPayload().Take(FodId.RandomPayloadLength - 1).ToArray(),
+                CanonicalRandomPayload().Take(FodId.MinimumRandomPayloadLength - 1).ToArray(),
                 DateTime.UtcNow);
             foreach (var bytes in new[] { good, trailing, shortRandom, Array.Empty<byte>() })
             {

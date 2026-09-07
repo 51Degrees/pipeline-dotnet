@@ -31,7 +31,7 @@ namespace FiftyOne.Did.Tests
 {
     /// <summary>
     /// Tests for the two base64 alphabets <see cref="FodId"/> accepts and
-    /// produces, and for <see cref="FodId.DateMinutes"/>.
+    /// produces, and for the envelope date it carries.
     /// </summary>
     [TestClass]
     public class FodIdBase64Tests
@@ -146,7 +146,7 @@ namespace FiftyOne.Did.Tests
         }
 
         [TestMethod]
-        public void DateMinutes_EqualsTheEnvelopeDateField()
+        public void Date_EqualsTheEnvelopeDateField()
         {
             const uint minutes = 3_456_789u;
             var owid = _factory.SignedOwid(
@@ -154,30 +154,29 @@ namespace FiftyOne.Did.Tests
 
             var fodId = FodId.FromBase64(owid.AsBase64());
 
-            Assert.AreEqual(minutes, fodId.DateMinutes);
-            // The same value read straight off the wire: after the version
-            // byte and the zero-terminated domain comes the little-endian
-            // 32-bit minute count.
+            // The date read straight off the wire: after the version byte
+            // and the zero-terminated domain comes the little-endian
+            // 32-bit count of minutes since the base.
             var bytes = owid.AsByteArray();
             var dateOffset = 1 + bytes.Skip(1).ToList().IndexOf(0) + 1;
             var onTheWire = BitConverter.ToUInt32(bytes, dateOffset);
-            Assert.AreEqual(onTheWire, fodId.DateMinutes);
+            Assert.AreEqual(minutes, onTheWire);
+            Assert.AreEqual(FodId.DateBase.AddMinutes(onTheWire), fodId.Date);
         }
 
         [TestMethod]
-        public void DateMinutes_AtTheBase_IsZero()
+        public void Date_AtTheBase_ReadsBack()
         {
             // The wire field is an unsigned count, so the base itself is
             // the earliest date an envelope can carry.
             var fodId = new FodId(_factory.SignedBytes(
                 CanonicalPayload(), FodId.DateBase));
 
-            Assert.AreEqual(0u, fodId.DateMinutes);
             Assert.AreEqual(FodId.DateBase, fodId.Date);
         }
 
         [TestMethod]
-        public void DateMinutes_SubMinuteIsTruncated()
+        public void Date_SubMinuteIsTruncated()
         {
             // The wire carries whole minutes, so the seconds are lost when
             // the envelope is written and the parsed date sits on the
@@ -186,7 +185,6 @@ namespace FiftyOne.Did.Tests
                 CanonicalPayload(),
                 FodId.DateBase.AddMinutes(10).AddSeconds(59)));
 
-            Assert.AreEqual(10u, fodId.DateMinutes);
             Assert.AreEqual(FodId.DateBase.AddMinutes(10), fodId.Date);
         }
     }

@@ -51,6 +51,20 @@ namespace FiftyOne.Did.Examples.Tests
         private static readonly DateTime KeyStart =
             new DateTime(2026, 8, 3, 0, 0, 0, DateTimeKind.Utc);
 
+        // This test writes a payload and an envelope by hand, which makes
+        // it a creator rather than a caller reading an identifier. The
+        // package keeps the layout to itself, because a caller reading one
+        // has a named accessor for every field, so a creator states the
+        // few values it needs. They are specified at
+        // https://github.com/51Degrees/specifications/blob/main/did-specification/identifier-layout.md
+        private const int FlagsOffset = 0;
+        private const int MatchKeyOffset = 5;
+        private const int MatchKeyLength = 32;
+        private const int PayloadLength = MatchKeyOffset + MatchKeyLength;
+
+        private static readonly DateTime DateBase =
+            new DateTime(2020, 1, 1, 0, 0, 0, DateTimeKind.Utc);
+
         private ECDsa _signer = null!;
         private string _publicPem = null!;
         private FakeHandler _handler = null!;
@@ -78,9 +92,9 @@ namespace FiftyOne.Did.Examples.Tests
         /// <summary>A signed 51Did dated inside the key's period.</summary>
         private FodId Signed()
         {
-            var payload = new byte[FodId.PayloadLength];
-            payload[FodId.FlagsOffset] = 0b0000_0101;
-            for (var i = FodId.MatchKeyOffset; i < payload.Length; i++)
+            var payload = new byte[PayloadLength];
+            payload[FlagsOffset] = 0b0000_0101;
+            for (var i = MatchKeyOffset; i < payload.Length; i++)
             {
                 payload[i] = (byte)i;
             }
@@ -96,7 +110,7 @@ namespace FiftyOne.Did.Examples.Tests
                 writer.Write((byte)3);
                 writer.Write(Encoding.ASCII.GetBytes("51degrees.com"));
                 writer.Write((byte)0);
-                writer.Write((uint)(KeyStart.AddDays(1) - FodId.DateBase).TotalMinutes);
+                writer.Write((uint)(KeyStart.AddDays(1) - DateBase).TotalMinutes);
                 writer.Write((uint)payload.Length);
                 writer.Write(payload);
             }
