@@ -1,4 +1,4 @@
-/* *********************************************************************
+﻿/* *********************************************************************
  * This Original Work is copyright of 51 Degrees Mobile Experts Limited.
  * Copyright 2026 51 Degrees Mobile Experts Limited, Davidson House,
  * Forbury Square, Reading, Berkshire, United Kingdom RG1 3EU.
@@ -287,6 +287,53 @@ public class DerivedPropertyElementTests
                 data.Process();
                 Assert.AreEqual("Low", TextOf(data, "Configured"));
             }
+        }
+    }
+
+    // -----------------------------------------------------------------
+    // Subclassing the element.
+    // -----------------------------------------------------------------
+
+    /// <summary>
+    /// A host that has to decide for itself whether the element may run,
+    /// or that has to tell the pipeline which properties the scripts read,
+    /// needs an element of its own. Overriding the construction step gives
+    /// it one without repeating the script loading or the validation.
+    /// </summary>
+    [TestMethod]
+    public void Builder_CreateElementOverrideReturnsSubclass()
+    {
+        using (var element = new StubSubclassElementBuilder(_loggerFactory)
+            .AddScript("Subclassed", Script("Subclassed", "Subclassed"))
+            .Build())
+        {
+            Assert.IsInstanceOfType<StubSubclassElement>(element);
+            Assert.HasCount(1, element.Scripts);
+        }
+    }
+
+    /// <summary>
+    /// The subclass is a working element and not just the right type, so
+    /// the scripts compiled by the base builder are the ones it runs.
+    /// </summary>
+    [TestMethod]
+    public void Builder_SubclassProcessesTheScriptsItWasBuiltWith()
+    {
+        using (var element = new StubSubclassElementBuilder(_loggerFactory)
+            .AddScript("Subclassed", Script("Subclassed", "Subclassed"))
+            .Build())
+        using (var pipeline = new PipelineBuilder(_loggerFactory)
+            .AddFlowElement(Source("a", "P", false))
+            .AddFlowElement(element)
+            .Build())
+        using (var data = pipeline.CreateFlowData())
+        {
+            data.Process();
+            Assert.AreEqual("Low", TextOf(data, "Subclassed"));
+            Assert.IsTrue(
+                ((StubSubclassElement)element).Processed,
+                "The subclass did not see the request, so a host could " +
+                "not decide whether the element should run.");
         }
     }
 
@@ -998,6 +1045,65 @@ public class DerivedPropertyElementTests
                 FlowElementBase<StubSourceData, ElementPropertyMetaData>>(),
             elementDataKey,
             new Dictionary<string, object> { { propertyName, value } });
+    }
+
+    /// <summary>
+    /// Stands for an element a host writes to add its own rules about
+    /// when the element runs and what it declares to the pipeline.
+    /// </summary>
+    private sealed class StubSubclassElement : DerivedPropertyElement
+    {
+        public StubSubclassElement(
+            IReadOnlyCollection<DerivedScript> scripts,
+            ILogger<FlowElementBase<
+                IDerivedPropertyData,
+                IElementPropertyMetaData>> logger,
+            Func<
+                IPipeline,
+                FlowElementBase<
+                    IDerivedPropertyData,
+                    IElementPropertyMetaData>,
+                IDerivedPropertyData> elementDataFactory)
+            : base(scripts, logger, elementDataFactory)
+        {
+        }
+
+        public bool Processed { get; private set; }
+
+        protected override void ProcessInternal(IFlowData data)
+        {
+            Processed = true;
+            base.ProcessInternal(data);
+        }
+    }
+
+    /// <summary>
+    /// Builds a <see cref="StubSubclassElement"/> by overriding only the
+    /// construction step.
+    /// </summary>
+    private sealed class StubSubclassElementBuilder
+        : DerivedPropertyElementBuilder
+    {
+        public StubSubclassElementBuilder(ILoggerFactory loggerFactory)
+            : base(loggerFactory)
+        {
+        }
+
+        protected override DerivedPropertyElement CreateElement(
+            IReadOnlyCollection<DerivedScript> scripts,
+            ILogger<FlowElementBase<
+                IDerivedPropertyData,
+                IElementPropertyMetaData>> logger,
+            Func<
+                IPipeline,
+                FlowElementBase<
+                    IDerivedPropertyData,
+                    IElementPropertyMetaData>,
+                IDerivedPropertyData> elementDataFactory)
+        {
+            return new StubSubclassElement(
+                scripts, logger, elementDataFactory);
+        }
     }
 
     private static string TextOf(IFlowData data, string propertyName)
