@@ -1675,6 +1675,31 @@
             Thrown where no script was added.
             </exception>
         </member>
+        <member name="M:FiftyOne.Pipeline.DerivedProperty.FlowElements.DerivedPropertyElementBuilder.CreateElement(System.Collections.Generic.IReadOnlyCollection{FiftyOne.Pipeline.DerivedProperty.Data.DerivedScript},Microsoft.Extensions.Logging.ILogger{FiftyOne.Pipeline.Core.FlowElements.FlowElementBase{FiftyOne.Pipeline.DerivedProperty.Data.IDerivedPropertyData,FiftyOne.Pipeline.Core.Data.IElementPropertyMetaData}},System.Func{FiftyOne.Pipeline.Core.FlowElements.IPipeline,FiftyOne.Pipeline.Core.FlowElements.FlowElementBase{FiftyOne.Pipeline.DerivedProperty.Data.IDerivedPropertyData,FiftyOne.Pipeline.Core.Data.IElementPropertyMetaData},FiftyOne.Pipeline.DerivedProperty.Data.IDerivedPropertyData})">
+            <summary>
+            Construct the element from the compiled scripts. Override to
+            return a subclass of <see cref="T:FiftyOne.Pipeline.DerivedProperty.FlowElements.DerivedPropertyElement"/> whilst
+            keeping every other step of the build, being the script loading,
+            the validation and the element data factory.
+            </summary>
+            <remarks>
+            A host with its own rules about when an element may run needs a
+            subclass rather than a different builder, because those rules
+            are expressed by overriding
+            <see cref="M:FiftyOne.Pipeline.DerivedProperty.FlowElements.DerivedPropertyElement.ProcessInternal(FiftyOne.Pipeline.Core.Data.IFlowData)"/> or by
+            implementing an interface this package knows nothing about. The
+            51Degrees cloud does both, to skip the element for a request
+            that has not asked for a derived property and to declare the
+            properties its scripts read so that the elements supplying them
+            are not skipped in turn.
+            </remarks>
+            <param name="scripts">The compiled scripts.</param>
+            <param name="logger">Logger for the element.</param>
+            <param name="elementDataFactory">
+            Creates the element data the element writes to.
+            </param>
+            <returns>The element.</returns>
+        </member>
         <member name="M:FiftyOne.Pipeline.DerivedProperty.FlowElements.DerivedPropertyElementBuilder.ScriptNameOf(System.String)">
             <summary>
             The script name inside an embedded resource name, being the part

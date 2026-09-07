@@ -1,4 +1,4 @@
-/* *********************************************************************
+﻿/* *********************************************************************
  * This Original Work is copyright of 51 Degrees Mobile Experts Limited.
  * Copyright 2026 51 Degrees Mobile Experts Limited, Davidson House,
  * Forbury Square, Reading, Berkshire, United Kingdom RG1 3EU.
@@ -258,10 +258,51 @@ namespace FiftyOne.Pipeline.DerivedProperty.FlowElements
                     "AddScript, AddScriptFile, or the Scripts and " +
                     "ScriptFiles configuration keys.");
             }
-            return new DerivedPropertyElement(
+            return CreateElement(
                 _scripts,
                 _loggerFactory.CreateLogger<DerivedPropertyElement>(),
                 CreateData);
+        }
+
+        /// <summary>
+        /// Construct the element from the compiled scripts. Override to
+        /// return a subclass of <see cref="DerivedPropertyElement"/> whilst
+        /// keeping every other step of the build, being the script loading,
+        /// the validation and the element data factory.
+        /// </summary>
+        /// <remarks>
+        /// A host with its own rules about when an element may run needs a
+        /// subclass rather than a different builder, because those rules
+        /// are expressed by overriding
+        /// <see cref="DerivedPropertyElement.ProcessInternal"/> or by
+        /// implementing an interface this package knows nothing about. The
+        /// 51Degrees cloud does both, to skip the element for a request
+        /// that has not asked for a derived property and to declare the
+        /// properties its scripts read so that the elements supplying them
+        /// are not skipped in turn.
+        /// </remarks>
+        /// <param name="scripts">The compiled scripts.</param>
+        /// <param name="logger">Logger for the element.</param>
+        /// <param name="elementDataFactory">
+        /// Creates the element data the element writes to.
+        /// </param>
+        /// <returns>The element.</returns>
+        protected virtual DerivedPropertyElement CreateElement(
+            IReadOnlyCollection<DerivedScript> scripts,
+            ILogger<FlowElementBase<
+                IDerivedPropertyData,
+                IElementPropertyMetaData>> logger,
+            Func<
+                IPipeline,
+                FlowElementBase<
+                    IDerivedPropertyData,
+                    IElementPropertyMetaData>,
+                IDerivedPropertyData> elementDataFactory)
+        {
+            return new DerivedPropertyElement(
+                scripts,
+                logger,
+                elementDataFactory);
         }
 
         // ---------------------------------------------------------------
