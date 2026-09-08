@@ -32,19 +32,13 @@ namespace FiftyOne.Pipeline.DerivedProperty.Tests;
 /// element writes to its debug log at build.
 ///
 /// The text has to match the JavaScript reference at tools/canonical.mjs of
-/// the derived-properties repository character for character, so the last
-/// test here compares against output produced by that reference and saved
-/// beside this file as HumanConfidence.canonical.json.
+/// the derived-properties repository character for character. That is held
+/// by the tests in that repository, against the scripts it owns, rather
+/// than by a copy of its output kept here.
 /// </summary>
 [TestClass]
 public class DerivedScriptWriterTests
 {
-    /// <summary>
-    /// Set by MSTest, and used to say why the cross language test could not
-    /// run on a machine without the derived-properties submodule.
-    /// </summary>
-    public TestContext TestContext { get; set; }
-
     /// <summary>
     /// A script written to cover the parts of the form that are easy to get
     /// wrong, being the order of the Output fields, named checks, All, Not,
@@ -368,49 +362,6 @@ public class DerivedScriptWriterTests
     }
 
     /// <summary>
-    /// The cross language test. HumanConfidence is read from the
-    /// derived-properties submodule and the text printed here is compared
-    /// with the text the JavaScript reference printed for the same script,
-    /// which was produced by running
-    ///
-    ///   node -e "import('./tools/run-cases.mjs').then(async rc=>{
-    ///     const c=await import('./tools/canonical.mjs');
-    ///     const s=rc.loadScripts('.').find(x=>x.name==='HumanConfidence');
-    ///     console.log(c.canonical(s.model));})"
-    ///
-    /// from the root of the derived-properties repository, and saved as
-    /// HumanConfidence.canonical.json.
-    ///
-    /// The submodule is not checked out on every machine, and no test may
-    /// depend on the content of another repository, so a missing script
-    /// leaves a message in the test output rather than failing.
-    /// </summary>
-    [TestMethod]
-    public void HumanConfidenceMatchesTheJavaScriptReference()
-    {
-        var path = FindScript("HumanConfidence.yaml");
-        if (path == null)
-        {
-            TestContext.WriteLine(
-                "The derived-properties submodule is not checked out, so " +
-                "there is no HumanConfidence.yaml to print and the two " +
-                "languages were not compared. Run 'git submodule update " +
-                "--init' to include this test.");
-            return;
-        }
-
-        var reference = Path.Combine(
-            AppContext.BaseDirectory, "HumanConfidence.canonical.json");
-        Assert.IsTrue(
-            File.Exists(reference),
-            $"The JavaScript reference output is missing from {reference}.");
-
-        Assert.AreEqual(
-            Normalise(File.ReadAllText(reference)),
-            Canonical(File.ReadAllText(path), "HumanConfidence"));
-    }
-
-    /// <summary>
     /// Validates the text of a script and prints it, failing the test with
     /// every fault where the script does not validate.
     /// </summary>
@@ -427,37 +378,11 @@ public class DerivedScriptWriterTests
 
     /// <summary>
     /// The writer always ends a line with a single line feed, as
-    /// JSON.stringify does, so text held in this file or read from a file
-    /// is compared with its line endings put into the same form.
+    /// JSON.stringify does, so text held in this file is compared with its
+    /// line endings put into the same form.
     /// </summary>
     private static string Normalise(string text)
     {
         return text.Replace("\r\n", "\n", StringComparison.Ordinal);
-    }
-
-    /// <summary>
-    /// Finds a script in the derived-properties submodule by walking up
-    /// from the folder the tests run in until the checked out repository is
-    /// found. Returns null where the submodule is not checked out.
-    /// </summary>
-    private static string FindScript(string name)
-    {
-        var relative = Path.Combine(
-            "FiftyOne.Pipeline.Elements",
-            "FiftyOne.Pipeline.DerivedProperty",
-            "Scripts",
-            "scripts",
-            name);
-        var folder = new DirectoryInfo(AppContext.BaseDirectory);
-        while (folder != null)
-        {
-            var candidate = Path.Combine(folder.FullName, relative);
-            if (File.Exists(candidate))
-            {
-                return candidate;
-            }
-            folder = folder.Parent;
-        }
-        return null;
     }
 }

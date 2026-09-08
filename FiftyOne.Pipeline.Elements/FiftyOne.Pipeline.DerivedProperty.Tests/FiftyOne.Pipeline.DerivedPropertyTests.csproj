@@ -32,14 +32,4 @@
     <Using Include="Microsoft.VisualStudio.TestTools.UnitTesting" />
   </ItemGroup>
 
-  <ItemGroup>
-    <!-- The canonical JSON the JavaScript reference prints for the
-         HumanConfidence script. DerivedScriptWriterTests compares the text
-         the writer prints against this file, which is how the two languages
-         are held to one canonical form. -->
-    <Content Include="HumanConfidence.canonical.json">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </Content>
-  </ItemGroup>
-
 </Project>
