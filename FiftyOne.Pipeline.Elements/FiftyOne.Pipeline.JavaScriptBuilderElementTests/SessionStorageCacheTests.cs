@@ -663,11 +663,11 @@ namespace FiftyOne.Pipeline.JavaScript.Tests
                 servedJavaScript = javaScript;
                 return javaScript;
             });
-            await app.StartAsync();
 
             ChromeDriver driver = null;
             try
             {
+                await app.StartAsync();
                 driver = CreateDriver();
                 IJavaScriptExecutor js = driver;
 
@@ -778,15 +778,7 @@ namespace FiftyOne.Pipeline.JavaScript.Tests
             }
             finally
             {
-                try
-                {
-                    driver?.Quit();
-                }
-                catch (WebDriverException)
-                {
-                    // A dead session must not mask the real failure or stop the
-                    // web application being disposed.
-                }
+                QuitDriver(driver);
                 await app.DisposeAsync();
             }
         }
@@ -860,15 +852,7 @@ namespace FiftyOne.Pipeline.JavaScript.Tests
             }
             finally
             {
-                try
-                {
-                    driver?.Quit();
-                }
-                catch (WebDriverException)
-                {
-                    // A dead session must not mask the real failure or stop the
-                    // web application being disposed.
-                }
+                QuitDriver(driver);
                 await app.DisposeAsync();
             }
         }
@@ -954,15 +938,7 @@ namespace FiftyOne.Pipeline.JavaScript.Tests
             }
             finally
             {
-                try
-                {
-                    driver?.Quit();
-                }
-                catch (WebDriverException)
-                {
-                    // A dead session must not mask the real failure or stop the
-                    // web application being disposed.
-                }
+                QuitDriver(driver);
                 await app.DisposeAsync();
             }
         }
@@ -1021,15 +997,7 @@ namespace FiftyOne.Pipeline.JavaScript.Tests
             }
             finally
             {
-                try
-                {
-                    driver?.Quit();
-                }
-                catch (WebDriverException)
-                {
-                    // A dead session must not mask the real failure or stop the
-                    // web application being disposed.
-                }
+                QuitDriver(driver);
                 await app.DisposeAsync();
             }
         }
@@ -1107,15 +1075,7 @@ namespace FiftyOne.Pipeline.JavaScript.Tests
             }
             finally
             {
-                try
-                {
-                    driver?.Quit();
-                }
-                catch (WebDriverException)
-                {
-                    // A dead session must not mask the real failure or stop the
-                    // web application being disposed.
-                }
+                QuitDriver(driver);
                 await app.DisposeAsync();
             }
         }
@@ -1164,15 +1124,7 @@ namespace FiftyOne.Pipeline.JavaScript.Tests
             }
             finally
             {
-                try
-                {
-                    driver?.Quit();
-                }
-                catch (WebDriverException)
-                {
-                    // A dead session must not mask the real failure or stop the
-                    // web application being disposed.
-                }
+                QuitDriver(driver);
                 await app.DisposeAsync();
             }
         }
