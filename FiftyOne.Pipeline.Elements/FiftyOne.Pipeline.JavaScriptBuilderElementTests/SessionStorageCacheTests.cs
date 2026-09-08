@@ -715,7 +715,7 @@ namespace FiftyOne.Pipeline.JavaScript.Tests
             }
             finally
             {
-                driver?.Quit();
+                QuitDriver(driver);
                 await app.DisposeAsync();
             }
         }
