@@ -417,6 +417,34 @@ namespace FiftyOne.Pipeline.DerivedProperty.Data
                 return;
             }
 
+            // A Boolean source cannot say that the data holds no answer
+            // yet. The conversion behind the typed accessor turns any
+            // stored value that is not the literal True into False and
+            // reports it as a value, so a placeholder such as Unknown
+            // arrives here as a confident False and a script counts it as
+            // a definite No. Reading the same property as a string
+            // recovers what the data holds, and a value that is not a
+            // Boolean leaves the script with no value, which is the state
+            // the format already has a reason for.
+            if (raw is IAspectPropertyValue<bool> boolean &&
+                boolean.HasValue &&
+                SourceStringReader.TryRead(
+                    elementData,
+                    propertyName,
+                    out var stored) &&
+                bool.TryParse(stored, out _) == false)
+            {
+                context.Available[slot] = false;
+                context.Reasons[slot] = NotAvailable(
+                    elementKey,
+                    propertyName,
+                    string.Format(
+                        CultureInfo.InvariantCulture,
+                        "the data holds '{0}', which is not a Boolean",
+                        stored));
+                return;
+            }
+
             // A source value that carries its own no value state hands over
             // its message, so the reason a derived property is missing
             // reaches back to the element that actually knows.
