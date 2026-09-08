@@ -348,6 +348,7 @@ namespace FiftyOne.Pipeline.DerivedProperty.Data
             var elementData = elements[_slotElementIndex[slot]];
             var elementKey = _elementDataKeys[_slotElementIndex[slot]];
             var propertyName = _slotPropertyName[slot];
+            var valueType = _slotValueType[slot];
 
             if (elementData == null)
             {
@@ -371,7 +372,30 @@ namespace FiftyOne.Pipeline.DerivedProperty.Data
             object raw;
             try
             {
-                raw = elementData[propertyName];
+                // Where the script compares this property with text, and
+                // the element can hand a value back as the string it
+                // stored, the string is what the script reads. A typed
+                // accessor has to answer in its own type, so a value that
+                // is not one of that type's values has to become
+                // something. Device detection stores "Unknown" for the
+                // properties the 51Degrees JavaScript fills in, meaning
+                // the JavaScript has not run, and the boolean accessor
+                // turns that into False. Reading through the indexer a
+                // script can therefore never see "Unknown", and a request
+                // nobody has measured reads as one that was measured and
+                // found negative. Anything else, being an element that
+                // does not offer its stored strings or a script comparing
+                // with something other than text, reads through the
+                // indexer exactly as it did before.
+                if (valueType == DerivedValueType.String &&
+                    elementData is IProvidesValuesAsString asString)
+                {
+                    raw = asString.GetValueAsString(propertyName);
+                }
+                else
+                {
+                    raw = elementData[propertyName];
+                }
             }
             catch (PropertyMissingException missing)
             {
@@ -480,7 +504,6 @@ namespace FiftyOne.Pipeline.DerivedProperty.Data
                 }
             }
 
-            var valueType = _slotValueType[slot];
             if (DerivedValueConverter.TryConvert(
                 raw, valueType, out var converted) == false)
             {
