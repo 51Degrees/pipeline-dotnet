@@ -1404,7 +1404,9 @@
             The terms table from the specification, which is the whole of the
             definition of which index is which document. It is at
             https://github.com/51Degrees/specifications/blob/main/did-specification/identifier-layout.md#terms
-            and this class is the only place in the package that carries it.
+            and this class is the only place in the shipped code that carries
+            it. The tests write the address out again on purpose, so that a test
+            never compares the reader with itself.
             <para>
             A new terms document is a new row in <see cref="F:FiftyOne.Did.Model.TermsTable.Addresses"/> and a
             new member of <see cref="T:FiftyOne.Did.Model.Terms"/> holding its index, and nothing
