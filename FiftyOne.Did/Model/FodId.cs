@@ -58,11 +58,10 @@ namespace FiftyOne.Did.Model
     /// Only a lower bound is applied to the payload. The byte after the
     /// match key is the Terms, and anything after that is a creator
     /// context section whose lengths belong to the cloud, so a longer
-    /// payload is accepted here and the same four fields are exposed. An
-    /// identifier issued before the Terms existed ends at the match key
-    /// and reads as <see cref="Model.Terms.NotStated"/>, which is the
-    /// same answer as a Terms byte of zero, so nothing has to tell the
-    /// two apart.
+    /// payload is accepted here and the same four fields are exposed. A
+    /// payload that ends at the match key reads as
+    /// <see cref="Model.Terms.NotStated"/>, which is the same answer as
+    /// a Terms byte of zero, so nothing has to tell the two apart.
     /// </para>
     /// <para>
     /// How an instance comes to exist. An OWID cannot be assembled by a
@@ -144,9 +143,9 @@ namespace FiftyOne.Did.Model
 
         /// <summary>
         /// The Terms index that says the terms are not stated in the
-        /// identifier. A payload that ends at the match key was issued
-        /// before the Terms existed and reads as this, so absence and
-        /// zero mean the same thing and nothing has to tell them apart.
+        /// identifier. A payload that ends at the match key reads as
+        /// this, so absence and zero mean the same thing and nothing has
+        /// to tell them apart.
         /// </summary>
         private const byte TermsNotStatedIndex = 0;
 
@@ -649,9 +648,9 @@ namespace FiftyOne.Did.Model
             var matchKey = new byte[valueLength];
             Array.Copy(payload, MatchKeyOffset, matchKey, 0, valueLength);
             // The Terms sits after the match key, so where it sits
-            // depends on the type. A payload that ends there was issued
-            // before the Terms existed and reads as the not stated
-            // index, which is the same answer a zero byte gives.
+            // depends on the type. A payload that ends there reads as
+            // the not stated index, which is the same answer a zero byte
+            // gives.
             //
             // A Reserved identifier reads as not stated as well, and
             // that is the right answer rather than a gap to close. The

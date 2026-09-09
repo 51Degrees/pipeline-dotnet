@@ -56,10 +56,10 @@ namespace FiftyOne.Did.Model
     {
         /// <summary>
         /// The terms are not stated in the identifier. This is what an
-        /// identifier issued before the byte existed reads as, and what a
-        /// non-marketing identifier carries, because the Model Terms
-        /// govern marketing and a non-marketing identifier is not created
-        /// under them.
+        /// identifier whose payload ends at the match key reads as, and
+        /// what a non-marketing identifier carries, because the Model
+        /// Terms govern marketing and a non-marketing identifier is not
+        /// created under them.
         /// <para>
         /// It does not mean the identifier is unrestricted. It means only
         /// that the identifier does not carry the answer, so the answer

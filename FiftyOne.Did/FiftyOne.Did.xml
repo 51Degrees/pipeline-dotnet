@@ -691,11 +691,10 @@
             Only a lower bound is applied to the payload. The byte after the
             match key is the Terms, and anything after that is a creator
             context section whose lengths belong to the cloud, so a longer
-            payload is accepted here and the same four fields are exposed. An
-            identifier issued before the Terms existed ends at the match key
-            and reads as <see cref="F:FiftyOne.Did.Model.Terms.NotStated"/>, which is the
-            same answer as a Terms byte of zero, so nothing has to tell the
-            two apart.
+            payload is accepted here and the same four fields are exposed. A
+            payload that ends at the match key reads as
+            <see cref="F:FiftyOne.Did.Model.Terms.NotStated"/>, which is the same answer as
+            a Terms byte of zero, so nothing has to tell the two apart.
             </para>
             <para>
             How an instance comes to exist. An OWID cannot be assembled by a
@@ -775,9 +774,9 @@
         <member name="F:FiftyOne.Did.Model.FodId.TermsNotStatedIndex">
             <summary>
             The Terms index that says the terms are not stated in the
-            identifier. A payload that ends at the match key was issued
-            before the Terms existed and reads as this, so absence and
-            zero mean the same thing and nothing has to tell them apart.
+            identifier. A payload that ends at the match key reads as
+            this, so absence and zero mean the same thing and nothing has
+            to tell them apart.
             </summary>
         </member>
         <member name="F:FiftyOne.Did.Model.FodId.ModelTermsForMarketing2Index">
@@ -1342,10 +1341,10 @@
         <member name="F:FiftyOne.Did.Model.Terms.NotStated">
             <summary>
             The terms are not stated in the identifier. This is what an
-            identifier issued before the byte existed reads as, and what a
-            non-marketing identifier carries, because the Model Terms
-            govern marketing and a non-marketing identifier is not created
-            under them.
+            identifier whose payload ends at the match key reads as, and
+            what a non-marketing identifier carries, because the Model
+            Terms govern marketing and a non-marketing identifier is not
+            created under them.
             <para>
             It does not mean the identifier is unrestricted. It means only
             that the identifier does not carry the answer, so the answer

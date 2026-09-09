@@ -98,12 +98,12 @@ issued says it agreed to.
 |     1 | `ModelTermsForMarketing2` | `https://m4ow.uk/mtm/2.txt` |
 | other | `Unknown`                 | `null`                      |
 
-An identifier issued before the Terms existed has a payload that ends at
-the match key and reads as `NotStated`, which is the same answer a zero
-byte gives, so absence and zero never have to be told apart and no
-presence flag exists. A `Reserved` identifier reads as `NotStated` too,
-because the match key length of that type is not defined, so every byte
-after the header is the match key and none is left for the Terms.
+An identifier whose payload ends at the match key reads as `NotStated`,
+which is the same answer a zero byte gives, so absence and zero never
+have to be told apart and no presence flag exists. A `Reserved`
+identifier reads as `NotStated` too, because the match key length of
+that type is not defined, so every byte after the header is the match
+key and none is left for the Terms.
 
 An index this package does not know reads as `Unknown` and never as
 `NotStated`. `NotStated` says no terms are stated whilst `Unknown` says

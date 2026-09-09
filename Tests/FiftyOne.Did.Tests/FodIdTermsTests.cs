@@ -70,9 +70,9 @@ namespace FiftyOne.Did.Tests
         }
 
         /// <summary>
-        /// An identifier issued before the Terms existed has a payload
-        /// that ends at the match key, and reads as terms that are not
-        /// stated with no address. Nothing else about it changes.
+        /// An identifier whose payload ends at the match key reads as
+        /// terms that are not stated with no address. Nothing else about
+        /// it changes.
         /// </summary>
         [TestMethod]
         public void Terms_PayloadEndingAtMatchKey_IsNotStatedWithNoAddress()
@@ -256,10 +256,9 @@ namespace FiftyOne.Did.Tests
 
         /// <summary>
         /// A Reserved identifier takes everything after the header as its
-        /// value, which is behaviour this package had before the Terms
-        /// and which is left alone, so no byte is left for the Terms and
-        /// it reads as not stated. The type is not in the terms table,
-        /// and an identifier of a type this package cannot lay out is one
+        /// value, so no byte is left for the Terms and it reads as not
+        /// stated. The match key length of that type is not defined, and
+        /// an identifier of a type this package cannot lay out is one
         /// whose Terms it cannot place either.
         /// </summary>
         [TestMethod]
