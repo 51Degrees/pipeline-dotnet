@@ -161,28 +161,6 @@ namespace FiftyOne.Did.Model
         private const byte SupportedPayloadVersion = 0;
 
         /// <summary>
-        /// The Terms index that says the terms are not stated in the
-        /// identifier. A payload that ends at the match key reads as
-        /// this, so absence and zero mean the same thing and nothing has
-        /// to tell them apart.
-        /// </summary>
-        private const byte TermsNotStatedIndex = 0;
-
-        /// <summary>
-        /// The Terms index of the Model Terms for Marketing, version 2.
-        /// </summary>
-        private const byte ModelTermsForMarketing2Index = 1;
-
-        /// <summary>
-        /// The address of the Model Terms for Marketing, version 2. The
-        /// exact version is named because a document at an unversioned
-        /// address can be edited afterwards, and a receiver has to know
-        /// the document that was in force when the identifier was made.
-        /// </summary>
-        private const string ModelTermsForMarketing2Url =
-            "https://m4ow.uk/mtm/2.txt";
-
-        /// <summary>
         /// The 1-byte flags bit-mask from the payload, kept for the typed
         /// accessors built on it and for the package's own tests. It is
         /// not public, because a caller masking the byte for the
@@ -262,7 +240,7 @@ namespace FiftyOne.Did.Model
         /// demand source.
         /// </para>
         /// </remarks>
-        public string? Terms => TermsUrlOf(TermsOf(_termsIndex));
+        public string? Terms => TermsTable.AddressFor(_termsIndex);
 
         /// <summary>
         /// The moment the envelope's date field counts minutes from,
@@ -588,31 +566,6 @@ namespace FiftyOne.Did.Model
             : (flags & 0b001) != 0 ? Usage.NonMarketing
             : Usage.None;
 
-        // The terms table from the specification, which is the whole of
-        // the definition. An index this package does not know is Unknown
-        // and never NotStated, because NotStated says no terms are stated
-        // whilst Unknown says terms are stated that this package cannot
-        // name, and a receiver confusing the two would read an identifier
-        // created under terms as one created under none.
-        private static Model.Terms TermsOf(byte index) => index switch
-        {
-            TermsNotStatedIndex => Model.Terms.NotStated,
-            ModelTermsForMarketing2Index =>
-                Model.Terms.ModelTermsForMarketing2,
-            _ => Model.Terms.Unknown,
-        };
-
-        // The address hangs off the named value rather than off the
-        // index, so one place decides which index is which document.
-        // Both NotStated and Unknown answer with no address, the first
-        // because no terms are stated and the second because this package
-        // cannot name the document that is.
-        private static string? TermsUrlOf(Model.Terms terms) => terms switch
-        {
-            Model.Terms.ModelTermsForMarketing2 => ModelTermsForMarketing2Url,
-            _ => null,
-        };
-
         // Bits 4 and 5 of the flags byte, being the version of the payload
         // layout the identifier follows. The envelope carries a version of
         // its own at its first byte, which versions the envelope, whilst
@@ -707,7 +660,7 @@ namespace FiftyOne.Did.Model
             var termsOffset = HeaderLength + valueLength;
             var termsIndex = payload.Length > termsOffset
                 ? payload[termsOffset]
-                : TermsNotStatedIndex;
+                : TermsTable.NotStatedIndex;
             unpacked = new Unpacked(
                 owid, flags, licenseId, matchKey, termsIndex);
             return FodIdParseStatus.Parsed;

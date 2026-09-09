@@ -19,6 +19,7 @@
  * in the end user terms of the application under an appropriate heading,
  * such notice(s) shall fulfill the requirements of that article.
  * ********************************************************************* */
+using System;
 using FiftyOne.Did.Model;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using static FiftyOne.Did.Tests.FodIdTestFactory;
@@ -58,6 +59,90 @@ namespace FiftyOne.Did.Tests
         public void TestInitialize()
         {
             _factory = new FodIdTestFactory();
+        }
+
+        /// <summary>
+        /// The terms table is the one place the package says which index is
+        /// which document, so these check the table itself rather than only
+        /// its effect through a parsed identifier. Adding a document is a
+        /// row here and a member of the enumeration, and if a later change
+        /// puts the address somewhere else as well then two places can
+        /// disagree, which these would not catch. They exist so that the
+        /// table stays the definition.
+        /// </summary>
+        [TestMethod]
+        public void TermsTable_IndexOne_IsTheModelTermsForMarketing2()
+        {
+            Assert.AreEqual(
+                Terms.ModelTermsForMarketing2,
+                TermsTable.Named(1));
+            Assert.AreEqual(
+                ModelTermsForMarketing2Url, TermsTable.AddressFor(1));
+        }
+
+        /// <summary>
+        /// Zero is not stated in the identifier, which is a different
+        /// answer from an index the package cannot name even though both
+        /// give no address.
+        /// </summary>
+        [TestMethod]
+        public void TermsTable_Zero_IsNotStatedAndNotUnknown()
+        {
+            Assert.AreEqual(Terms.NotStated, TermsTable.Named(0));
+            Assert.AreNotEqual(Terms.Unknown, TermsTable.Named(0));
+            Assert.IsNull(TermsTable.AddressFor(0));
+            Assert.AreEqual(0, TermsTable.NotStatedIndex);
+        }
+
+        /// <summary>
+        /// Every index the table does not carry is Unknown and answers with
+        /// no address. This is the rule the specification warns hardest
+        /// about, because reading such an index as NotStated would take an
+        /// identifier created under terms for one created under none.
+        /// </summary>
+        [TestMethod]
+        [DataRow((byte)2)]
+        [DataRow((byte)3)]
+        [DataRow((byte)127)]
+        [DataRow((byte)128)]
+        [DataRow((byte)200)]
+        [DataRow((byte)255)]
+        public void TermsTable_IndexNotInTheTable_IsUnknownWithNoAddress(
+            byte index)
+        {
+            Assert.AreEqual(Terms.Unknown, TermsTable.Named(index));
+            Assert.IsNull(TermsTable.AddressFor(index));
+        }
+
+        /// <summary>
+        /// Every member of the enumeration is reachable from the table, so
+        /// a member added without a row, or a row without a member, is
+        /// caught here rather than by a caller reading no address for a
+        /// document the package is supposed to know.
+        /// </summary>
+        [TestMethod]
+        public void TermsTable_EveryNamedDocument_HasAnAddress()
+        {
+            foreach (Terms terms in Enum.GetValues(typeof(Terms)))
+            {
+                if (terms == Terms.NotStated
+                    || terms == Terms.Unknown)
+                {
+                    // Neither names a document, so neither has an address.
+                    Assert.IsNull(TermsTable.AddressFor((byte)terms));
+                    continue;
+                }
+                var address = TermsTable.AddressFor((byte)terms);
+                Assert.IsNotNull(
+                    address,
+                    $"{terms} names a document with no address in the "
+                    + "table.");
+                Assert.AreEqual(
+                    terms,
+                    TermsTable.Named((byte)terms),
+                    $"{terms} does not read back from its own index.");
+                StringAssert.StartsWith(address, "https://");
+            }
         }
 
         /// <summary>

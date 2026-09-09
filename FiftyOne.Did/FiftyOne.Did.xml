@@ -790,27 +790,6 @@
             than read under this layout.
             </summary>
         </member>
-        <member name="F:FiftyOne.Did.Model.FodId.TermsNotStatedIndex">
-            <summary>
-            The Terms index that says the terms are not stated in the
-            identifier. A payload that ends at the match key reads as
-            this, so absence and zero mean the same thing and nothing has
-            to tell them apart.
-            </summary>
-        </member>
-        <member name="F:FiftyOne.Did.Model.FodId.ModelTermsForMarketing2Index">
-            <summary>
-            The Terms index of the Model Terms for Marketing, version 2.
-            </summary>
-        </member>
-        <member name="F:FiftyOne.Did.Model.FodId.ModelTermsForMarketing2Url">
-            <summary>
-            The address of the Model Terms for Marketing, version 2. The
-            exact version is named because a document at an unversioned
-            address can be edited afterwards, and a receiver has to know
-            the document that was in force when the identifier was made.
-            </summary>
-        </member>
         <member name="P:FiftyOne.Did.Model.FodId.Flags">
             <summary>
             The 1-byte flags bit-mask from the payload, kept for the typed
@@ -1418,6 +1397,62 @@
             newer package or refuse the identifier. It answers with no
             address, as <see cref="F:FiftyOne.Did.Model.Terms.NotStated"/> does, because no package
             may build an address from an index it does not know.
+            </summary>
+        </member>
+        <member name="T:FiftyOne.Did.Model.TermsTable">
+            <summary>
+            The terms table from the specification, which is the whole of the
+            definition of which index is which document. It is at
+            https://github.com/51Degrees/specifications/blob/main/did-specification/identifier-layout.md#terms
+            and this class is the only place in the package that carries it.
+            <para>
+            A new terms document is a new row in <see cref="F:FiftyOne.Did.Model.TermsTable.Addresses"/> and a
+            new member of <see cref="T:FiftyOne.Did.Model.Terms"/> holding its index, and nothing
+            else in the package changes. That is the point of the index being
+            an index rather than a version number, so the cost of a new
+            document is one row and not a search for every place a number was
+            written down.
+            </para>
+            </summary>
+        </member>
+        <member name="F:FiftyOne.Did.Model.TermsTable.Addresses">
+            <summary>
+            The address of each terms document this package knows, keyed by
+            the named value whose own value is the index carried in the
+            payload. An index absent from here is one this package cannot
+            name, and it answers with no address rather than an address
+            composed from the number, since composing one would name a
+            document nobody wrote.
+            <para>
+            Each address names an exact version rather than a landing page,
+            because a document at an unversioned address can be edited
+            afterwards and a receiver has to know the document that was in
+            force when the identifier was made.
+            </para>
+            </summary>
+        </member>
+        <member name="P:FiftyOne.Did.Model.TermsTable.NotStatedIndex">
+            <summary>
+            The index that says the terms are not stated in the identifier.
+            A payload ending at the match key reads as this, so absence and
+            a zero byte mean the same thing and nothing has to tell them
+            apart.
+            </summary>
+        </member>
+        <member name="M:FiftyOne.Did.Model.TermsTable.Named(System.Byte)">
+            <summary>
+            The named value for a Terms index, being
+            <see cref="F:FiftyOne.Did.Model.Terms.NotStated"/> for zero, the member for an index
+            in the table, and <see cref="F:FiftyOne.Did.Model.Terms.Unknown"/> for anything
+            else.
+            </summary>
+        </member>
+        <member name="M:FiftyOne.Did.Model.TermsTable.AddressFor(System.Byte)">
+            <summary>
+            The address for a Terms index, and <c>null</c> where there is
+            none to give, being index zero and an index this package cannot
+            name. Neither is in <see cref="F:FiftyOne.Did.Model.TermsTable.Addresses"/>, so one lookup
+            answers both.
             </summary>
         </member>
         <member name="T:FiftyOne.Did.Model.Usage">

@@ -19,6 +19,8 @@
  * in the end user terms of the application under an appropriate heading,
  * such notice(s) shall fulfill the requirements of that article.
  * ********************************************************************* */
+using System.Collections.Generic;
+
 namespace FiftyOne.Did.Model
 {
     /// <summary>
@@ -98,5 +100,75 @@ namespace FiftyOne.Did.Model
         /// may build an address from an index it does not know.
         /// </summary>
         Unknown = -1,
+    }
+
+    /// <summary>
+    /// The terms table from the specification, which is the whole of the
+    /// definition of which index is which document. It is at
+    /// https://github.com/51Degrees/specifications/blob/main/did-specification/identifier-layout.md#terms
+    /// and this class is the only place in the package that carries it.
+    /// <para>
+    /// A new terms document is a new row in <see cref="Addresses"/> and a
+    /// new member of <see cref="Terms"/> holding its index, and nothing
+    /// else in the package changes. That is the point of the index being
+    /// an index rather than a version number, so the cost of a new
+    /// document is one row and not a search for every place a number was
+    /// written down.
+    /// </para>
+    /// </summary>
+    internal static class TermsTable
+    {
+        /// <summary>
+        /// The address of each terms document this package knows, keyed by
+        /// the named value whose own value is the index carried in the
+        /// payload. An index absent from here is one this package cannot
+        /// name, and it answers with no address rather than an address
+        /// composed from the number, since composing one would name a
+        /// document nobody wrote.
+        /// <para>
+        /// Each address names an exact version rather than a landing page,
+        /// because a document at an unversioned address can be edited
+        /// afterwards and a receiver has to know the document that was in
+        /// force when the identifier was made.
+        /// </para>
+        /// </summary>
+        private static readonly IReadOnlyDictionary<Terms, string> Addresses =
+            new Dictionary<Terms, string>
+            {
+                [Terms.ModelTermsForMarketing2] =
+                    "https://m4ow.uk/mtm/2.txt",
+            };
+
+        /// <summary>
+        /// The index that says the terms are not stated in the identifier.
+        /// A payload ending at the match key reads as this, so absence and
+        /// a zero byte mean the same thing and nothing has to tell them
+        /// apart.
+        /// </summary>
+        internal static byte NotStatedIndex => (byte)Terms.NotStated;
+
+        /// <summary>
+        /// The named value for a Terms index, being
+        /// <see cref="Terms.NotStated"/> for zero, the member for an index
+        /// in the table, and <see cref="Terms.Unknown"/> for anything
+        /// else.
+        /// </summary>
+        internal static Terms Named(byte index) =>
+            index == NotStatedIndex
+                ? Terms.NotStated
+                : Addresses.ContainsKey((Terms)index)
+                    ? (Terms)index
+                    : Terms.Unknown;
+
+        /// <summary>
+        /// The address for a Terms index, and <c>null</c> where there is
+        /// none to give, being index zero and an index this package cannot
+        /// name. Neither is in <see cref="Addresses"/>, so one lookup
+        /// answers both.
+        /// </summary>
+        internal static string? AddressFor(byte index) =>
+            Addresses.TryGetValue(Named(index), out var address)
+                ? address
+                : null;
     }
 }
