@@ -26,9 +26,10 @@ using System;
 namespace FiftyOne.Did.Model
 {
     /// <summary>
-    /// An OWID whose payload encodes the three fields of a 51Did: a 1-byte
-    /// flags bitmask (usage tier and identifier type), a 4-byte
-    /// little-endian License Id, and the match key.
+    /// An OWID whose payload encodes the four fields of a 51Did, being a
+    /// 1-byte flags bitmask (usage, payload version and identifier type),
+    /// a 4-byte little-endian License Id, the match key, and the Terms
+    /// byte naming the terms document the identifier was created under.
     /// </summary>
     /// <remarks>
     /// <para>
@@ -54,10 +55,25 @@ namespace FiftyOne.Did.Model
     /// https://github.com/51Degrees/specifications/blob/main/did-specification/package-surface.md
     /// </para>
     /// <para>
-    /// Only a lower bound is applied to the payload. Anything after the
-    /// match key is a creator context section whose lengths belong to the
-    /// cloud, so a longer payload is accepted here and the same three
-    /// fields are exposed.
+    /// Only a lower bound is applied to the payload. The byte after the
+    /// match key is the Terms, and anything after that is a creator
+    /// context section whose lengths belong to the cloud, so a longer
+    /// payload is accepted here and the same four fields are read. A
+    /// payload that ends at the match key carries no Terms byte and reads
+    /// as a Terms of zero, which is the same answer a Terms byte holding
+    /// zero gives, so nothing has to tell the two apart.
+    /// </para>
+    /// <para>
+    /// Bits 4 and 5 of the flags byte say which payload layout the
+    /// identifier follows, and this package reads version 0. A payload
+    /// naming any other version is refused with
+    /// <see cref="FodIdParseStatus.UnsupportedPayloadVersion"/> rather
+    /// than read under the layout this package knows, because a later
+    /// version exists precisely because a field moved, so reading it here
+    /// would answer with values that are wrong rather than absent. The
+    /// version is not exposed, because a caller has nothing to decide
+    /// with it, since either the package read the layout or there is no
+    /// identifier to read fields from.
     /// </para>
     /// <para>
     /// How an instance comes to exist. An OWID cannot be assembled by a
@@ -138,6 +154,13 @@ namespace FiftyOne.Did.Model
             MatchKeyOffset + MatchKeyLength;
 
         /// <summary>
+        /// The payload layout version this package reads, carried in bits
+        /// 4 and 5 of the flags byte. Any other version is refused rather
+        /// than read under this layout.
+        /// </summary>
+        private const byte SupportedPayloadVersion = 0;
+
+        /// <summary>
         /// The 1-byte flags bit-mask from the payload, kept for the typed
         /// accessors built on it and for the package's own tests. It is
         /// not public, because a caller masking the byte for the
@@ -184,6 +207,40 @@ namespace FiftyOne.Did.Model
         /// every issue. Treat it as the cache / dedup key.
         /// </summary>
         public byte[] MatchKey { get; }
+
+        /// <summary>
+        /// The address of the terms document the identifier was created
+        /// under, read from the byte after the match key, or <c>null</c>
+        /// where the identifier names no document this package knows.
+        /// </summary>
+        /// <remarks>
+        /// <para>
+        /// The byte is an index into a table in the specification and
+        /// this package turns the index into the address, so a caller
+        /// never handles the byte. The address is answered and never
+        /// fetched, so what to do with the document is the caller's
+        /// decision. It is never an empty string and never an address
+        /// built from the index.
+        /// </para>
+        /// <para>
+        /// <c>null</c> covers both an index of zero, which says the terms
+        /// are not stated in the identifier, and an index added to the
+        /// table after this package was released, which this package
+        /// cannot name. A caller cannot tell those two apart, which is
+        /// deliberate, because both lead to the same place, being that
+        /// the identifier does not say which terms it was created under
+        /// and the answer has to come from somewhere else. What no
+        /// package may do is build an address from an index it does not
+        /// know, since that would name a document nobody wrote.
+        /// </para>
+        /// <para>
+        /// No address does not mean the identifier is unrestricted. Where
+        /// an identifier may go is a separate question <see cref="Usage"/>
+        /// answers, which still bars a non-marketing identifier from a
+        /// demand source.
+        /// </para>
+        /// </remarks>
+        public string? Terms => TermsTable.AddressFor(_termsIndex);
 
         /// <summary>
         /// The moment the envelope's date field counts minutes from,
@@ -458,7 +515,17 @@ namespace FiftyOne.Did.Model
             Flags = unpacked.Flags;
             LicenseId = unpacked.LicenseId;
             MatchKey = unpacked.MatchKey;
+            _termsIndex = unpacked.TermsIndex;
         }
+
+        /// <summary>
+        /// The Terms byte itself, being the index into the terms table in
+        /// the specification, and zero where the payload ends at the match
+        /// key. It is not public, because the package turns the index into
+        /// the address that <see cref="Terms"/> answers with and a caller
+        /// never handles the byte.
+        /// </summary>
+        private readonly byte _termsIndex;
 
         /// <summary>
         /// The fields of a 51Did once the payload rules have accepted the
@@ -471,18 +538,21 @@ namespace FiftyOne.Did.Model
                 Owid.Client.Model.Owid owid,
                 byte flags,
                 uint licenseId,
-                byte[] matchKey)
+                byte[] matchKey,
+                byte termsIndex)
             {
                 Owid = owid;
                 Flags = flags;
                 LicenseId = licenseId;
                 MatchKey = matchKey;
+                TermsIndex = termsIndex;
             }
 
             public Owid.Client.Model.Owid Owid { get; }
             public byte Flags { get; }
             public uint LicenseId { get; }
             public byte[] MatchKey { get; }
+            public byte TermsIndex { get; }
         }
 
         private static IdType TypeOf(byte flags) => (IdType)((flags >> 6) & 0b11);
@@ -495,6 +565,13 @@ namespace FiftyOne.Did.Model
             : (flags & 0b010) != 0 ? Usage.Standard
             : (flags & 0b001) != 0 ? Usage.NonMarketing
             : Usage.None;
+
+        // Bits 4 and 5 of the flags byte, being the version of the payload
+        // layout the identifier follows. The envelope carries a version of
+        // its own at its first byte, which versions the envelope, whilst
+        // this one versions the payload.
+        private static byte PayloadVersionOf(byte flags) =>
+            (byte)((flags >> 4) & 0b11);
 
         /// <summary>
         /// Builds the instance once <see cref="Unpack"/> has accepted the
@@ -536,6 +613,16 @@ namespace FiftyOne.Did.Model
                 return FodIdParseStatus.PayloadTooShort;
             }
             var flags = payload[FlagsOffset];
+            // The version is read before any field, because a later
+            // version exists precisely because a field moved. Reading a
+            // payload of a version this package does not know under the
+            // layout it does know would answer with values that are wrong
+            // rather than absent, which is worse than refusing, and a
+            // version that nothing checks protects nothing.
+            if (PayloadVersionOf(flags) != SupportedPayloadVersion)
+            {
+                return FodIdParseStatus.UnsupportedPayloadVersion;
+            }
             // Only a lower bound is applied. Anything beyond the base
             // length for the type is a creator context section, whose
             // exact lengths belong to the cloud, so any longer payload is
@@ -559,7 +646,23 @@ namespace FiftyOne.Did.Model
                 | (payload[LicenseIdOffset + 3] << 24));
             var matchKey = new byte[valueLength];
             Array.Copy(payload, MatchKeyOffset, matchKey, 0, valueLength);
-            unpacked = new Unpacked(owid, flags, licenseId, matchKey);
+            // The Terms sits after the match key, so where it sits
+            // depends on the type. A payload that ends there reads as
+            // the not stated index, which is the same answer a zero byte
+            // gives.
+            //
+            // A Reserved identifier reads as not stated as well, and
+            // that is the right answer rather than a gap to close. The
+            // match key length of that type is not defined, so every
+            // byte after the header is the match key and none is left
+            // for the Terms. An identifier of a type this package cannot
+            // lay out is one whose Terms it cannot place either.
+            var termsOffset = HeaderLength + valueLength;
+            var termsIndex = payload.Length > termsOffset
+                ? payload[termsOffset]
+                : TermsTable.NotStatedIndex;
+            unpacked = new Unpacked(
+                owid, flags, licenseId, matchKey, termsIndex);
             return FodIdParseStatus.Parsed;
         }
 
@@ -611,7 +714,13 @@ namespace FiftyOne.Did.Model
             var status = Unpack(owid, out var unpacked);
             if (status != FodIdParseStatus.Parsed)
             {
-                throw ExceptionFor(status, paramName);
+                var payload = owid.PayloadInternal;
+                throw ExceptionFor(
+                    status,
+                    paramName,
+                    payload.Length > FlagsOffset
+                        ? PayloadVersionOf(payload[FlagsOffset])
+                        : SupportedPayloadVersion);
             }
             return unpacked;
         }
@@ -624,7 +733,8 @@ namespace FiftyOne.Did.Model
         /// </summary>
         private static Exception ExceptionFor(
             FodIdParseStatus status,
-            string paramName)
+            string paramName,
+            byte payloadVersion = SupportedPayloadVersion)
         {
             switch (status)
             {
@@ -640,6 +750,11 @@ namespace FiftyOne.Did.Model
                     return new ArgumentException(
                         "51Did payload is shorter than the minimum for its "
                         + $"identifier type ({status}).",
+                        paramName);
+                case FodIdParseStatus.UnsupportedPayloadVersion:
+                    return new ArgumentException(
+                        $"51Did payload version {payloadVersion} is not one "
+                        + $"this package can read ({status}).",
                         paramName);
                 default:
                     return new FormatException(

@@ -68,9 +68,10 @@ namespace FiftyOne.Did.Tests
         public void FromBase64_AcceptsStandardUrlSafeAndUnpadded()
         {
             var standard = StandardWithBothSpecials();
-            // The canonical envelope is 124 bytes, so the standard form ends
-            // in two padding characters and the unpadded form differs.
-            Assert.IsTrue(standard.EndsWith("==", StringComparison.Ordinal));
+            // The canonical envelope is 125 bytes, so the standard form ends
+            // in one padding character and the unpadded form differs.
+            Assert.IsTrue(standard.EndsWith("=", StringComparison.Ordinal));
+            Assert.IsFalse(standard.EndsWith("==", StringComparison.Ordinal));
             var urlSafePadded = standard.Replace('+', '-').Replace('/', '_');
             var urlSafe = urlSafePadded.TrimEnd('=');
 

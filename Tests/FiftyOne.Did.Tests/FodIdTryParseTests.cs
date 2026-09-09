@@ -377,9 +377,9 @@ namespace FiftyOne.Did.Tests
         [TestMethod]
         public void ParseStatus_CarriesEveryOwidStatusByNameAndValue()
         {
-            // The 51Did vocabulary is the OWID one plus two. A rename or a
-            // renumbering on either side would let a status be reported as
-            // a different one, which this catches.
+            // The 51Did vocabulary is the OWID one plus three. A rename
+            // or a renumbering on either side would let a status be
+            // reported as a different one, which this catches.
             foreach (var owid in Enum.GetValues<OwidParseStatus>())
             {
                 Assert.IsTrue(
@@ -393,7 +393,12 @@ namespace FiftyOne.Did.Tests
                 .OrderBy(name => name)
                 .ToArray();
             CollectionAssert.AreEqual(
-                new[] { "InvalidTypePayloadLength", "PayloadTooShort" },
+                new[]
+                {
+                    "InvalidTypePayloadLength",
+                    "PayloadTooShort",
+                    "UnsupportedPayloadVersion",
+                },
                 extra);
         }
 
