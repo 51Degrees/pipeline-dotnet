@@ -43,6 +43,7 @@ select the type and the length of the match key that follows.
 |      0 |      1 | Flags      | uint8: bits 0-2 usage, bits 6-7 identifier type |
 |      1 |      4 | LicenseId  | uint32 (little-endian)                          |
 |      5 |  16/32 | Match key  | SHA-256 (Probabilistic, HashedEmail) or GUID bytes (Random) |
+|  21/37 |      1 | Terms      | uint8, an index into the terms table below      |
 
 | Bits 7-6 | `FodId.Type`    | Match key length | Minimum payload |
 |---------:|-----------------|-------------:|----------------:|
@@ -57,10 +58,10 @@ and decode as `Probabilistic`.
 The minimum payload is a lower bound and the only length rule this
 package applies. A 51Did that carries a creator context, which binds
 the identifier to the browser and connection it was created on, has a
-section after the match key, so its payload is longer than the minimum.
+section after the Terms, so its payload is longer than the minimum.
 The lengths of that section belong to the cloud, and this package has
 no upper bound of its own, so a longer payload is accepted and the
-same three fields are exposed. An older reader therefore keeps working
+same four fields are exposed. An older reader therefore keeps working
 when a newer context version ships. On such an identifier the four
 LicenseId bytes hold an encrypted value that only 51Degrees can turn
 back into a licence identifier, so `LicenseId` is the raw field value
@@ -70,11 +71,60 @@ and identifies nothing outside 51Degrees.
 [SWAN-community/owid-dotnet](https://github.com/SWAN-community/owid-dotnet)),
 so a `FodId` instance behaves as an OWID for all OWID-level concerns
 (domain, date, payload bytes, signature, base64 round-tripping) and
-adds strongly-typed accessors for the three 51Did payload fields on
+adds strongly-typed accessors for the four 51Did payload fields on
 top. An OWID cannot be assembled by calling code, because an unsigned
 one would be indistinguishable from a signed one downstream, so a
 `FodId` reaches your code only by parsing bytes that were already a
 complete, signed envelope.
+
+### Terms
+
+The Terms says which terms document the identifier was created under, so
+that the terms travel with the identifier rather than beside it. A
+receiver may only use an identifier created for marketing where it has
+accepted the terms that identifier was created under, and an identifier
+passed on its own, as a query string parameter for instance, arrives with
+nowhere to put a separate answer.
+
+The byte is an index into the table below and is not a version number, so
+that a later document can live at any address rather than only at one a
+number could be composed into. An index is never reused or repointed once
+published, because repointing one rewrites what an identifier already
+issued says it agreed to.
+
+| Index | `FodId.Terms`             | `FodId.TermsUrl`            |
+|------:|---------------------------|-----------------------------|
+|     0 | `NotStated`               | `null`                      |
+|     1 | `ModelTermsForMarketing2` | `https://m4ow.uk/mtm/2.txt` |
+| other | `Unknown`                 | `null`                      |
+
+An identifier issued before the Terms existed has a payload that ends at
+the match key and reads as `NotStated`, which is the same answer a zero
+byte gives, so absence and zero never have to be told apart and no
+presence flag exists. A `Reserved` identifier reads as `NotStated` too,
+because the match key length of that type is not defined, so every byte
+after the header is the match key and none is left for the Terms.
+
+An index this package does not know reads as `Unknown` and never as
+`NotStated`. `NotStated` says no terms are stated whilst `Unknown` says
+terms are stated that this package cannot name, and a receiver confusing
+the two would read an identifier created under terms as one created under
+none. `FodId.TermsIndex` gives the index itself, which is the only raw
+payload value this package exposes, so a caller meeting a row this
+package cannot name can still say which one it met and look the document
+up by hand.
+
+`NotStated` does not mean the identifier is unrestricted. It means only
+that the identifier does not carry the answer, so the answer has to come
+from somewhere else, being the Terms Document Locator in an OpenRTB
+request or whatever the surrounding protocol provides. Carrying the Terms
+does not remove the need to carry a Terms Document Locator where a
+protocol has one. Where an identifier may go is a separate question
+answered by `FodId.Usage`, which still bars a non-marketing identifier
+from a demand source.
+
+This package answers with the address and never fetches it, so what to do
+with the address is the caller's decision.
 
 ## Parsing
 
@@ -152,6 +202,9 @@ bool    fromConsent = fodId.UsageFromConsent;
 IdType  type      = fodId.Type;        // Probabilistic / Random / HashedEmail
 uint    licenseId = fodId.LicenseId;
 byte[]  matchKey  = fodId.MatchKey;    // SHA-256 or GUID bytes, see Type
+Terms   terms     = fodId.Terms;       // the document it was created under
+byte    termsIndex = fodId.TermsIndex; // the index behind that named value
+string? termsUrl  = fodId.TermsUrl;    // its address, null where there is none
 
 // Inherited OWID-level fields.
 string   domain   = fodId.Domain;

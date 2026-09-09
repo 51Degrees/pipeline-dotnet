@@ -26,9 +26,10 @@ using System;
 namespace FiftyOne.Did.Model
 {
     /// <summary>
-    /// An OWID whose payload encodes the three fields of a 51Did: a 1-byte
-    /// flags bitmask (usage tier and identifier type), a 4-byte
-    /// little-endian License Id, and the match key.
+    /// An OWID whose payload encodes the four fields of a 51Did, being a
+    /// 1-byte flags bitmask (usage tier and identifier type), a 4-byte
+    /// little-endian License Id, the match key, and the Terms byte naming
+    /// the terms document the identifier was created under.
     /// </summary>
     /// <remarks>
     /// <para>
@@ -54,10 +55,14 @@ namespace FiftyOne.Did.Model
     /// https://github.com/51Degrees/specifications/blob/main/did-specification/package-surface.md
     /// </para>
     /// <para>
-    /// Only a lower bound is applied to the payload. Anything after the
-    /// match key is a creator context section whose lengths belong to the
-    /// cloud, so a longer payload is accepted here and the same three
-    /// fields are exposed.
+    /// Only a lower bound is applied to the payload. The byte after the
+    /// match key is the Terms, and anything after that is a creator
+    /// context section whose lengths belong to the cloud, so a longer
+    /// payload is accepted here and the same four fields are exposed. An
+    /// identifier issued before the Terms existed ends at the match key
+    /// and reads as <see cref="Model.Terms.NotStated"/>, which is the
+    /// same answer as a Terms byte of zero, so nothing has to tell the
+    /// two apart.
     /// </para>
     /// <para>
     /// How an instance comes to exist. An OWID cannot be assembled by a
@@ -138,6 +143,28 @@ namespace FiftyOne.Did.Model
             MatchKeyOffset + MatchKeyLength;
 
         /// <summary>
+        /// The Terms index that says the terms are not stated in the
+        /// identifier. A payload that ends at the match key was issued
+        /// before the Terms existed and reads as this, so absence and
+        /// zero mean the same thing and nothing has to tell them apart.
+        /// </summary>
+        private const byte TermsNotStatedIndex = 0;
+
+        /// <summary>
+        /// The Terms index of the Model Terms for Marketing, version 2.
+        /// </summary>
+        private const byte ModelTermsForMarketing2Index = 1;
+
+        /// <summary>
+        /// The address of the Model Terms for Marketing, version 2. The
+        /// exact version is named because a document at an unversioned
+        /// address can be edited afterwards, and a receiver has to know
+        /// the document that was in force when the identifier was made.
+        /// </summary>
+        private const string ModelTermsForMarketing2Url =
+            "https://m4ow.uk/mtm/2.txt";
+
+        /// <summary>
         /// The 1-byte flags bit-mask from the payload, kept for the typed
         /// accessors built on it and for the package's own tests. It is
         /// not public, because a caller masking the byte for the
@@ -184,6 +211,40 @@ namespace FiftyOne.Did.Model
         /// every issue. Treat it as the cache / dedup key.
         /// </summary>
         public byte[] MatchKey { get; }
+
+        /// <summary>
+        /// The terms document the identifier was created under, read from
+        /// the byte after the match key. An identifier whose payload ends
+        /// at the match key reads as <see cref="Model.Terms.NotStated"/>,
+        /// and an index added to the table after this package was
+        /// released reads as <see cref="Model.Terms.Unknown"/> rather
+        /// than as <see cref="Model.Terms.NotStated"/>, because the two
+        /// say different things. See <see cref="Model.Terms"/>.
+        /// </summary>
+        public Terms Terms => TermsOf(TermsIndex);
+
+        /// <summary>
+        /// The Terms byte itself, being the index into the terms table in
+        /// the specification, and zero on an identifier whose payload
+        /// ends at the match key. Unlike <see cref="Flags"/> this raw
+        /// value is public, because a caller meeting an index added after
+        /// this package was released holds
+        /// <see cref="Model.Terms.Unknown"/> and would otherwise have no
+        /// way to say which index it met or to look the document up by
+        /// hand.
+        /// </summary>
+        public byte TermsIndex { get; }
+
+        /// <summary>
+        /// The address of the terms document, or <c>null</c> where the
+        /// terms are not stated and where the index is one this package
+        /// does not know. It is never an empty string and never an
+        /// address built from the index, because a receiver has to know
+        /// the exact document in force when the identifier was made. This
+        /// package answers with the address and never fetches it, so what
+        /// to do with it is the caller's decision.
+        /// </summary>
+        public string? TermsUrl => TermsUrlOf(Terms);
 
         /// <summary>
         /// The moment the envelope's date field counts minutes from,
@@ -458,6 +519,7 @@ namespace FiftyOne.Did.Model
             Flags = unpacked.Flags;
             LicenseId = unpacked.LicenseId;
             MatchKey = unpacked.MatchKey;
+            TermsIndex = unpacked.TermsIndex;
         }
 
         /// <summary>
@@ -471,18 +533,21 @@ namespace FiftyOne.Did.Model
                 Owid.Client.Model.Owid owid,
                 byte flags,
                 uint licenseId,
-                byte[] matchKey)
+                byte[] matchKey,
+                byte termsIndex)
             {
                 Owid = owid;
                 Flags = flags;
                 LicenseId = licenseId;
                 MatchKey = matchKey;
+                TermsIndex = termsIndex;
             }
 
             public Owid.Client.Model.Owid Owid { get; }
             public byte Flags { get; }
             public uint LicenseId { get; }
             public byte[] MatchKey { get; }
+            public byte TermsIndex { get; }
         }
 
         private static IdType TypeOf(byte flags) => (IdType)((flags >> 6) & 0b11);
@@ -495,6 +560,30 @@ namespace FiftyOne.Did.Model
             : (flags & 0b010) != 0 ? Usage.Standard
             : (flags & 0b001) != 0 ? Usage.NonMarketing
             : Usage.None;
+
+        // The terms table from the specification, which is the whole of
+        // the definition. An index this package does not know is Unknown
+        // and never NotStated, because NotStated says no terms are stated
+        // whilst Unknown says terms are stated that this package cannot
+        // name, and a receiver confusing the two would read an identifier
+        // created under terms as one created under none.
+        private static Terms TermsOf(byte index) => index switch
+        {
+            TermsNotStatedIndex => Terms.NotStated,
+            ModelTermsForMarketing2Index => Terms.ModelTermsForMarketing2,
+            _ => Terms.Unknown,
+        };
+
+        // The address hangs off the named value rather than off the
+        // index, so one place decides which index is which document.
+        // Both NotStated and Unknown answer with no address, the first
+        // because no terms are stated and the second because this package
+        // cannot name the document that is.
+        private static string? TermsUrlOf(Terms terms) => terms switch
+        {
+            Terms.ModelTermsForMarketing2 => ModelTermsForMarketing2Url,
+            _ => null,
+        };
 
         /// <summary>
         /// Builds the instance once <see cref="Unpack"/> has accepted the
@@ -559,7 +648,23 @@ namespace FiftyOne.Did.Model
                 | (payload[LicenseIdOffset + 3] << 24));
             var matchKey = new byte[valueLength];
             Array.Copy(payload, MatchKeyOffset, matchKey, 0, valueLength);
-            unpacked = new Unpacked(owid, flags, licenseId, matchKey);
+            // The Terms sits after the match key, so where it sits
+            // depends on the type. A payload that ends there was issued
+            // before the Terms existed and reads as the not stated
+            // index, which is the same answer a zero byte gives.
+            //
+            // A Reserved identifier reads as not stated as well, and
+            // that is the right answer rather than a gap to close. The
+            // match key length of that type is not defined, so every
+            // byte after the header is the match key and none is left
+            // for the Terms. An identifier of a type this package cannot
+            // lay out is one whose Terms it cannot place either.
+            var termsOffset = HeaderLength + valueLength;
+            var termsIndex = payload.Length > termsOffset
+                ? payload[termsOffset]
+                : TermsNotStatedIndex;
+            unpacked = new Unpacked(
+                owid, flags, licenseId, matchKey, termsIndex);
             return FodIdParseStatus.Parsed;
         }
 

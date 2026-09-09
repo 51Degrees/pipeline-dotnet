@@ -659,9 +659,10 @@
         </member>
         <member name="T:FiftyOne.Did.Model.FodId">
             <summary>
-            An OWID whose payload encodes the three fields of a 51Did: a 1-byte
-            flags bitmask (usage tier and identifier type), a 4-byte
-            little-endian License Id, and the match key.
+            An OWID whose payload encodes the four fields of a 51Did, being a
+            1-byte flags bitmask (usage tier and identifier type), a 4-byte
+            little-endian License Id, the match key, and the Terms byte naming
+            the terms document the identifier was created under.
             </summary>
             <remarks>
             <para>
@@ -687,10 +688,14 @@
             https://github.com/51Degrees/specifications/blob/main/did-specification/package-surface.md
             </para>
             <para>
-            Only a lower bound is applied to the payload. Anything after the
-            match key is a creator context section whose lengths belong to the
-            cloud, so a longer payload is accepted here and the same three
-            fields are exposed.
+            Only a lower bound is applied to the payload. The byte after the
+            match key is the Terms, and anything after that is a creator
+            context section whose lengths belong to the cloud, so a longer
+            payload is accepted here and the same four fields are exposed. An
+            identifier issued before the Terms existed ends at the match key
+            and reads as <see cref="F:FiftyOne.Did.Model.Terms.NotStated"/>, which is the
+            same answer as a Terms byte of zero, so nothing has to tell the
+            two apart.
             </para>
             <para>
             How an instance comes to exist. An OWID cannot be assembled by a
@@ -767,6 +772,27 @@
             length of a particular payload is <c>Payload.Length</c>.
             </summary>
         </member>
+        <member name="F:FiftyOne.Did.Model.FodId.TermsNotStatedIndex">
+            <summary>
+            The Terms index that says the terms are not stated in the
+            identifier. A payload that ends at the match key was issued
+            before the Terms existed and reads as this, so absence and
+            zero mean the same thing and nothing has to tell them apart.
+            </summary>
+        </member>
+        <member name="F:FiftyOne.Did.Model.FodId.ModelTermsForMarketing2Index">
+            <summary>
+            The Terms index of the Model Terms for Marketing, version 2.
+            </summary>
+        </member>
+        <member name="F:FiftyOne.Did.Model.FodId.ModelTermsForMarketing2Url">
+            <summary>
+            The address of the Model Terms for Marketing, version 2. The
+            exact version is named because a document at an unversioned
+            address can be edited afterwards, and a receiver has to know
+            the document that was in force when the identifier was made.
+            </summary>
+        </member>
         <member name="P:FiftyOne.Did.Model.FodId.Flags">
             <summary>
             The 1-byte flags bit-mask from the payload, kept for the typed
@@ -815,6 +841,40 @@
             envelope. Two 51Dids for the same inputs share the same match
             key even though their envelopes (date, signature) differ on
             every issue. Treat it as the cache / dedup key.
+            </summary>
+        </member>
+        <member name="P:FiftyOne.Did.Model.FodId.Terms">
+            <summary>
+            The terms document the identifier was created under, read from
+            the byte after the match key. An identifier whose payload ends
+            at the match key reads as <see cref="F:FiftyOne.Did.Model.Terms.NotStated"/>,
+            and an index added to the table after this package was
+            released reads as <see cref="F:FiftyOne.Did.Model.Terms.Unknown"/> rather
+            than as <see cref="F:FiftyOne.Did.Model.Terms.NotStated"/>, because the two
+            say different things. See <see cref="T:FiftyOne.Did.Model.Terms"/>.
+            </summary>
+        </member>
+        <member name="P:FiftyOne.Did.Model.FodId.TermsIndex">
+            <summary>
+            The Terms byte itself, being the index into the terms table in
+            the specification, and zero on an identifier whose payload
+            ends at the match key. Unlike <see cref="P:FiftyOne.Did.Model.FodId.Flags"/> this raw
+            value is public, because a caller meeting an index added after
+            this package was released holds
+            <see cref="F:FiftyOne.Did.Model.Terms.Unknown"/> and would otherwise have no
+            way to say which index it met or to look the document up by
+            hand.
+            </summary>
+        </member>
+        <member name="P:FiftyOne.Did.Model.FodId.TermsUrl">
+            <summary>
+            The address of the terms document, or <c>null</c> where the
+            terms are not stated and where the index is one this package
+            does not know. It is never an empty string and never an
+            address built from the index, because a receiver has to know
+            the exact document in force when the identifier was made. This
+            package answers with the address and never fetches it, so what
+            to do with it is the caller's decision.
             </summary>
         </member>
         <member name="F:FiftyOne.Did.Model.FodId.DateBase">
@@ -1244,6 +1304,78 @@
             <summary>
             Not yet assigned. Parsed best-effort: the header fields are
             unpacked and the remaining payload bytes are exposed as-is.
+            </summary>
+        </member>
+        <member name="T:FiftyOne.Did.Model.Terms">
+            <summary>
+            The terms document a 51Did was created under, carried in the byte
+            after the match key so that the terms travel with the identifier
+            rather than beside it. A receiver may only use an identifier
+            created for marketing where it has accepted the terms that
+            identifier was created under, and an identifier passed on its own,
+            as a query string parameter for instance, arrives with nowhere to
+            put a separate answer.
+            <para>
+            The byte is an index into a table in the specification and is not
+            a version number, so that a later document can live at any address
+            rather than only at one a number could be composed into. An index
+            is never reused or repointed once published, because repointing
+            one rewrites what an identifier already issued says it agreed to.
+            The table is the whole of the definition, at
+            https://github.com/51Degrees/specifications/blob/main/did-specification/identifier-layout.md#terms
+            and every package has to be released to know a new row in it.
+            </para>
+            <para>
+            The named value is deliberately not the index. Every one of the
+            256 byte values is a possible index, so no byte could stand for
+            <see cref="F:FiftyOne.Did.Model.Terms.Unknown"/>, which is why this is not a byte-backed
+            enumeration as <see cref="T:FiftyOne.Did.Model.Usage"/> and <see cref="T:FiftyOne.Did.Model.IdType"/> are.
+            Read <see cref="P:FiftyOne.Did.Model.FodId.TermsIndex"/> for the index itself.
+            </para>
+            <para>
+            The usage says where an identifier may go and the terms say which
+            document it was created under, so they answer different questions
+            and a receiver needs both. See <see cref="T:FiftyOne.Did.Model.Usage"/>.
+            </para>
+            </summary>
+        </member>
+        <member name="F:FiftyOne.Did.Model.Terms.NotStated">
+            <summary>
+            The terms are not stated in the identifier. This is what an
+            identifier issued before the byte existed reads as, and what a
+            non-marketing identifier carries, because the Model Terms
+            govern marketing and a non-marketing identifier is not created
+            under them.
+            <para>
+            It does not mean the identifier is unrestricted. It means only
+            that the identifier does not carry the answer, so the answer
+            has to come from somewhere else, being the Terms Document
+            Locator in an OpenRTB request or whatever the surrounding
+            protocol provides. Where an identifier may go is a separate
+            question answered by <see cref="T:FiftyOne.Did.Model.Usage"/>, which still bars a
+            non-marketing identifier from a demand source.
+            </para>
+            </summary>
+        </member>
+        <member name="F:FiftyOne.Did.Model.Terms.ModelTermsForMarketing2">
+            <summary>
+            The Model Terms for Marketing, version 2, whose address
+            <see cref="P:FiftyOne.Did.Model.FodId.TermsUrl"/> gives.
+            </summary>
+        </member>
+        <member name="F:FiftyOne.Did.Model.Terms.Unknown">
+            <summary>
+            An index added to the table after this package was released,
+            so this package cannot name the document. It is not
+            <see cref="F:FiftyOne.Did.Model.Terms.NotStated"/>, because <see cref="F:FiftyOne.Did.Model.Terms.NotStated"/> says
+            no terms are stated whilst this says terms are stated that
+            this package cannot name, and a receiver confusing the two
+            would read an identifier created under terms as one created
+            under none. A caller meeting this should treat the identifier
+            as covered by terms it cannot yet read, and either take a
+            newer package or refuse the identifier.
+            <see cref="P:FiftyOne.Did.Model.FodId.TermsIndex"/> says which index it met, so the
+            document can be looked up by hand and named in a report.
             </summary>
         </member>
         <member name="T:FiftyOne.Did.Model.Usage">
