@@ -229,10 +229,7 @@ namespace FiftyOne.Pipeline.JavaScript.Tests
 
         public static Task ClassCleanup()
         {
-            if (Driver != null)
-            {
-                Driver.Quit();
-            }
+            try { Driver?.Quit(); } catch (WebDriverException) { /* already gone */ }
             return Task.CompletedTask;
         }
     }
