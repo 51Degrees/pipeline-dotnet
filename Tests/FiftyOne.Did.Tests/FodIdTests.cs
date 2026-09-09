@@ -179,14 +179,18 @@ namespace FiftyOne.Did.Tests
         }
 
         [TestMethod]
-        public void Flags_AllBitsSet_Exposed()
+        public void Flags_EveryBitOutsideTheVersionSet_Exposed()
         {
+            // Bits 4 and 5 are the payload version and only version 0 is
+            // read, so every other bit is set and those two are left
+            // clear. A payload with them set is refused rather than read,
+            // which FodIdVersionTests covers.
             var payload = CanonicalPayload();
-            payload[FodId.FlagsOffset] = 0xFF;
+            payload[FodId.FlagsOffset] = 0b1100_1111;
 
             var fodId = new FodId(_factory.SignedOwidBase64(payload));
 
-            Assert.AreEqual(0xFF, fodId.Flags);
+            Assert.AreEqual(0b1100_1111, fodId.Flags);
         }
 
         [TestMethod]
@@ -453,7 +457,7 @@ namespace FiftyOne.Did.Tests
         [TestMethod]
         public void Constructor_HemPayloadOneByteShort_Throws()
         {
-            // CanonicalFlags (0xA5) carries the HashedEmail tag in bits 6-7,
+            // CanonicalFlags (0x85) carries the HashedEmail tag in bits 6-7,
             // so the 37-byte minimum still applies to this payload.
             var payload = CanonicalPayload()
                 .Take(FodId.MinimumPayloadLength - 1).ToArray();

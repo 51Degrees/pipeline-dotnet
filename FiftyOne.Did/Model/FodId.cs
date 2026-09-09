@@ -27,9 +27,9 @@ namespace FiftyOne.Did.Model
 {
     /// <summary>
     /// An OWID whose payload encodes the four fields of a 51Did, being a
-    /// 1-byte flags bitmask (usage tier and identifier type), a 4-byte
-    /// little-endian License Id, the match key, and the Terms byte naming
-    /// the terms document the identifier was created under.
+    /// 1-byte flags bitmask (usage, payload version and identifier type),
+    /// a 4-byte little-endian License Id, the match key, and the Terms
+    /// byte naming the terms document the identifier was created under.
     /// </summary>
     /// <remarks>
     /// <para>
@@ -58,10 +58,22 @@ namespace FiftyOne.Did.Model
     /// Only a lower bound is applied to the payload. The byte after the
     /// match key is the Terms, and anything after that is a creator
     /// context section whose lengths belong to the cloud, so a longer
-    /// payload is accepted here and the same four fields are exposed. A
-    /// payload that ends at the match key reads as
-    /// <see cref="Model.Terms.NotStated"/>, which is the same answer as
-    /// a Terms byte of zero, so nothing has to tell the two apart.
+    /// payload is accepted here and the same four fields are read. A
+    /// payload that ends at the match key carries no Terms byte and reads
+    /// as a Terms of zero, which is the same answer a Terms byte holding
+    /// zero gives, so nothing has to tell the two apart.
+    /// </para>
+    /// <para>
+    /// Bits 4 and 5 of the flags byte say which payload layout the
+    /// identifier follows, and this package reads version 0. A payload
+    /// naming any other version is refused with
+    /// <see cref="FodIdParseStatus.UnsupportedPayloadVersion"/> rather
+    /// than read under the layout this package knows, because a later
+    /// version exists precisely because a field moved, so reading it here
+    /// would answer with values that are wrong rather than absent. The
+    /// version is not exposed, because a caller has nothing to decide
+    /// with it, since either the package read the layout or there is no
+    /// identifier to read fields from.
     /// </para>
     /// <para>
     /// How an instance comes to exist. An OWID cannot be assembled by a
@@ -142,6 +154,13 @@ namespace FiftyOne.Did.Model
             MatchKeyOffset + MatchKeyLength;
 
         /// <summary>
+        /// The payload layout version this package reads, carried in bits
+        /// 4 and 5 of the flags byte. Any other version is refused rather
+        /// than read under this layout.
+        /// </summary>
+        private const byte SupportedPayloadVersion = 0;
+
+        /// <summary>
         /// The Terms index that says the terms are not stated in the
         /// identifier. A payload that ends at the match key reads as
         /// this, so absence and zero mean the same thing and nothing has
@@ -212,38 +231,38 @@ namespace FiftyOne.Did.Model
         public byte[] MatchKey { get; }
 
         /// <summary>
-        /// The terms document the identifier was created under, read from
-        /// the byte after the match key. An identifier whose payload ends
-        /// at the match key reads as <see cref="Model.Terms.NotStated"/>,
-        /// and an index added to the table after this package was
-        /// released reads as <see cref="Model.Terms.Unknown"/> rather
-        /// than as <see cref="Model.Terms.NotStated"/>, because the two
-        /// say different things. See <see cref="Model.Terms"/>.
+        /// The address of the terms document the identifier was created
+        /// under, read from the byte after the match key, or <c>null</c>
+        /// where the identifier names no document this package knows.
         /// </summary>
-        public Terms Terms => TermsOf(TermsIndex);
-
-        /// <summary>
-        /// The Terms byte itself, being the index into the terms table in
-        /// the specification, and zero on an identifier whose payload
-        /// ends at the match key. Unlike <see cref="Flags"/> this raw
-        /// value is public, because a caller meeting an index added after
-        /// this package was released holds
-        /// <see cref="Model.Terms.Unknown"/> and would otherwise have no
-        /// way to say which index it met or to look the document up by
-        /// hand.
-        /// </summary>
-        public byte TermsIndex { get; }
-
-        /// <summary>
-        /// The address of the terms document, or <c>null</c> where the
-        /// terms are not stated and where the index is one this package
-        /// does not know. It is never an empty string and never an
-        /// address built from the index, because a receiver has to know
-        /// the exact document in force when the identifier was made. This
-        /// package answers with the address and never fetches it, so what
-        /// to do with it is the caller's decision.
-        /// </summary>
-        public string? TermsUrl => TermsUrlOf(Terms);
+        /// <remarks>
+        /// <para>
+        /// The byte is an index into a table in the specification and
+        /// this package turns the index into the address, so a caller
+        /// never handles the byte. The address is answered and never
+        /// fetched, so what to do with the document is the caller's
+        /// decision. It is never an empty string and never an address
+        /// built from the index.
+        /// </para>
+        /// <para>
+        /// <c>null</c> covers both an index of zero, which says the terms
+        /// are not stated in the identifier, and an index added to the
+        /// table after this package was released, which this package
+        /// cannot name. A caller cannot tell those two apart, which is
+        /// deliberate, because both lead to the same place, being that
+        /// the identifier does not say which terms it was created under
+        /// and the answer has to come from somewhere else. What no
+        /// package may do is build an address from an index it does not
+        /// know, since that would name a document nobody wrote.
+        /// </para>
+        /// <para>
+        /// No address does not mean the identifier is unrestricted. Where
+        /// an identifier may go is a separate question <see cref="Usage"/>
+        /// answers, which still bars a non-marketing identifier from a
+        /// demand source.
+        /// </para>
+        /// </remarks>
+        public string? Terms => TermsUrlOf(TermsOf(_termsIndex));
 
         /// <summary>
         /// The moment the envelope's date field counts minutes from,
@@ -518,8 +537,17 @@ namespace FiftyOne.Did.Model
             Flags = unpacked.Flags;
             LicenseId = unpacked.LicenseId;
             MatchKey = unpacked.MatchKey;
-            TermsIndex = unpacked.TermsIndex;
+            _termsIndex = unpacked.TermsIndex;
         }
+
+        /// <summary>
+        /// The Terms byte itself, being the index into the terms table in
+        /// the specification, and zero where the payload ends at the match
+        /// key. It is not public, because the package turns the index into
+        /// the address that <see cref="Terms"/> answers with and a caller
+        /// never handles the byte.
+        /// </summary>
+        private readonly byte _termsIndex;
 
         /// <summary>
         /// The fields of a 51Did once the payload rules have accepted the
@@ -566,11 +594,12 @@ namespace FiftyOne.Did.Model
         // whilst Unknown says terms are stated that this package cannot
         // name, and a receiver confusing the two would read an identifier
         // created under terms as one created under none.
-        private static Terms TermsOf(byte index) => index switch
+        private static Model.Terms TermsOf(byte index) => index switch
         {
-            TermsNotStatedIndex => Terms.NotStated,
-            ModelTermsForMarketing2Index => Terms.ModelTermsForMarketing2,
-            _ => Terms.Unknown,
+            TermsNotStatedIndex => Model.Terms.NotStated,
+            ModelTermsForMarketing2Index =>
+                Model.Terms.ModelTermsForMarketing2,
+            _ => Model.Terms.Unknown,
         };
 
         // The address hangs off the named value rather than off the
@@ -578,11 +607,18 @@ namespace FiftyOne.Did.Model
         // Both NotStated and Unknown answer with no address, the first
         // because no terms are stated and the second because this package
         // cannot name the document that is.
-        private static string? TermsUrlOf(Terms terms) => terms switch
+        private static string? TermsUrlOf(Model.Terms terms) => terms switch
         {
-            Terms.ModelTermsForMarketing2 => ModelTermsForMarketing2Url,
+            Model.Terms.ModelTermsForMarketing2 => ModelTermsForMarketing2Url,
             _ => null,
         };
+
+        // Bits 4 and 5 of the flags byte, being the version of the payload
+        // layout the identifier follows. The envelope carries a version of
+        // its own at its first byte, which versions the envelope, whilst
+        // this one versions the payload.
+        private static byte PayloadVersionOf(byte flags) =>
+            (byte)((flags >> 4) & 0b11);
 
         /// <summary>
         /// Builds the instance once <see cref="Unpack"/> has accepted the
@@ -624,6 +660,16 @@ namespace FiftyOne.Did.Model
                 return FodIdParseStatus.PayloadTooShort;
             }
             var flags = payload[FlagsOffset];
+            // The version is read before any field, because a later
+            // version exists precisely because a field moved. Reading a
+            // payload of a version this package does not know under the
+            // layout it does know would answer with values that are wrong
+            // rather than absent, which is worse than refusing, and a
+            // version that nothing checks protects nothing.
+            if (PayloadVersionOf(flags) != SupportedPayloadVersion)
+            {
+                return FodIdParseStatus.UnsupportedPayloadVersion;
+            }
             // Only a lower bound is applied. Anything beyond the base
             // length for the type is a creator context section, whose
             // exact lengths belong to the cloud, so any longer payload is
@@ -715,7 +761,13 @@ namespace FiftyOne.Did.Model
             var status = Unpack(owid, out var unpacked);
             if (status != FodIdParseStatus.Parsed)
             {
-                throw ExceptionFor(status, paramName);
+                var payload = owid.PayloadInternal;
+                throw ExceptionFor(
+                    status,
+                    paramName,
+                    payload.Length > FlagsOffset
+                        ? PayloadVersionOf(payload[FlagsOffset])
+                        : SupportedPayloadVersion);
             }
             return unpacked;
         }
@@ -728,7 +780,8 @@ namespace FiftyOne.Did.Model
         /// </summary>
         private static Exception ExceptionFor(
             FodIdParseStatus status,
-            string paramName)
+            string paramName,
+            byte payloadVersion = SupportedPayloadVersion)
         {
             switch (status)
             {
@@ -744,6 +797,11 @@ namespace FiftyOne.Did.Model
                     return new ArgumentException(
                         "51Did payload is shorter than the minimum for its "
                         + $"identifier type ({status}).",
+                        paramName);
+                case FodIdParseStatus.UnsupportedPayloadVersion:
+                    return new ArgumentException(
+                        $"51Did payload version {payloadVersion} is not one "
+                        + $"this package can read ({status}).",
                         paramName);
                 default:
                     return new FormatException(

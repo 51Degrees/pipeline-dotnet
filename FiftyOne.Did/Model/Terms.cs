@@ -44,7 +44,13 @@ namespace FiftyOne.Did.Model
     /// 256 byte values is a possible index, so no byte could stand for
     /// <see cref="Unknown"/>, which is why this is not a byte-backed
     /// enumeration as <see cref="Usage"/> and <see cref="IdType"/> are.
-    /// Read <see cref="FodId.TermsIndex"/> for the index itself.
+    /// </para>
+    /// <para>
+    /// It is not public, and neither is the index behind it. The package
+    /// turns the index into the address that <see cref="FodId.Terms"/>
+    /// answers with, so a caller never handles the byte, and the names
+    /// here are the ones the specification gives so that every package
+    /// describes one document the same way.
     /// </para>
     /// <para>
     /// The usage says where an identifier may go and the terms say which
@@ -52,7 +58,7 @@ namespace FiftyOne.Did.Model
     /// and a receiver needs both. See <see cref="Usage"/>.
     /// </para>
     /// </summary>
-    public enum Terms
+    internal enum Terms
     {
         /// <summary>
         /// The terms are not stated in the identifier. This is what an
@@ -74,7 +80,7 @@ namespace FiftyOne.Did.Model
 
         /// <summary>
         /// The Model Terms for Marketing, version 2, whose address
-        /// <see cref="FodId.TermsUrl"/> gives.
+        /// <see cref="FodId.Terms"/> gives.
         /// </summary>
         ModelTermsForMarketing2 = 1,
 
@@ -87,9 +93,9 @@ namespace FiftyOne.Did.Model
         /// would read an identifier created under terms as one created
         /// under none. A caller meeting this should treat the identifier
         /// as covered by terms it cannot yet read, and either take a
-        /// newer package or refuse the identifier.
-        /// <see cref="FodId.TermsIndex"/> says which index it met, so the
-        /// document can be looked up by hand and named in a report.
+        /// newer package or refuse the identifier. It answers with no
+        /// address, as <see cref="NotStated"/> does, because no package
+        /// may build an address from an index it does not know.
         /// </summary>
         Unknown = -1,
     }

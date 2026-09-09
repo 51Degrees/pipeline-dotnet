@@ -135,5 +135,14 @@ namespace FiftyOne.Did.Model
         /// Probabilistic and HashedEmail.
         /// </summary>
         InvalidTypePayloadLength = 101,
+
+        /// <summary>
+        /// Bits 4 and 5 of the flags byte name a payload layout version
+        /// this package does not know, so the fields are not read. A later
+        /// version exists precisely because a field moved, so reading the
+        /// payload under the layout this package knows would answer with
+        /// values that are wrong rather than absent.
+        /// </summary>
+        UnsupportedPayloadVersion = 102,
     }
 }

@@ -57,10 +57,25 @@ namespace FiftyOne.Did.Tests
         public const string TestDomain = "51degrees.com";
 
         /// <summary>
-        /// The canonical flags byte (0xA5): usage bits plus the HashedEmail type
-        /// tag in bits 6-7, so the 37-byte payload minimum applies.
+        /// The canonical flags byte (0x85), being the personalized marketing
+        /// usage in bits 0-2, the payload version 0 in bits 4-5 and the
+        /// HashedEmail type tag in bits 6-7, so the 37-byte match key
+        /// minimum applies.
         /// </summary>
-        public const byte CanonicalFlags = 0b1010_0101;
+        public const byte CanonicalFlags = 0b1000_0101;
+
+        /// <summary>
+        /// The Terms index a marketing identifier carries, being the Model
+        /// Terms for Marketing version 2.
+        /// </summary>
+        public const byte MarketingTermsIndex = 1;
+
+        /// <summary>
+        /// The Terms index a non-marketing identifier carries, since the
+        /// Model Terms govern marketing use and a non-marketing identifier
+        /// is not created under them.
+        /// </summary>
+        public const byte NonMarketingTermsIndex = 0;
 
         /// <summary>The canonical little-endian License Id, 0x12345678.</summary>
         public const uint CanonicalLicenseId = 0x12345678u;
@@ -97,11 +112,23 @@ namespace FiftyOne.Did.Tests
         }
 
         /// <summary>
-        /// A canonical 37-byte 51Did payload: <see cref="CanonicalFlags"/>,
-        /// <see cref="CanonicalLicenseId"/> (little-endian) and
-        /// <see cref="CanonicalHash"/>.
+        /// A canonical 38-byte 51Did payload, being
+        /// <see cref="CanonicalFlags"/>, <see cref="CanonicalLicenseId"/>
+        /// (little-endian), <see cref="CanonicalHash"/> and the Terms byte
+        /// a personalized marketing identifier carries. This is the
+        /// creating side, so it writes every field an issuer writes,
+        /// including the payload version in the flags byte.
         /// </summary>
-        public static byte[] CanonicalPayload()
+        public static byte[] CanonicalPayload() =>
+            WithTerms(PayloadEndingAtMatchKey(), MarketingTermsIndex);
+
+        /// <summary>
+        /// The canonical payload cut off at the end of the match key, so it
+        /// carries no Terms byte. A reader takes that as a Terms of zero,
+        /// and this is the fixture for that rule rather than anything an
+        /// issuer would write.
+        /// </summary>
+        public static byte[] PayloadEndingAtMatchKey()
         {
             var payload = new byte[FodId.MinimumPayloadLength];
             payload[FodId.FlagsOffset] = CanonicalFlags;
@@ -111,11 +138,34 @@ namespace FiftyOne.Did.Tests
         }
 
         /// <summary>
-        /// A canonical 21-byte Random payload: the Random type tag in bits 6-7
-        /// plus usage bits 0b001, <see cref="CanonicalLicenseId"/>, and a stable
-        /// 16-byte GUID block (0x40..0x4F).
+        /// The given payload with the given bytes appended, which is where
+        /// the Terms and anything after it sit, whatever the match key
+        /// length.
         /// </summary>
-        public static byte[] CanonicalRandomPayload()
+        public static byte[] WithTerms(byte[] payload, params byte[] tail)
+        {
+            var extended = new byte[payload.Length + tail.Length];
+            Array.Copy(payload, extended, payload.Length);
+            Array.Copy(tail, 0, extended, payload.Length, tail.Length);
+            return extended;
+        }
+
+        /// <summary>
+        /// A canonical 22-byte Random payload, being the Random type tag in
+        /// bits 6-7 with the payload version 0 in bits 4-5 and the
+        /// non-marketing usage in bits 0-2, <see cref="CanonicalLicenseId"/>,
+        /// a stable 16-byte GUID block (0x40..0x4F) and the Terms byte a
+        /// non-marketing identifier carries.
+        /// </summary>
+        public static byte[] CanonicalRandomPayload() =>
+            WithTerms(
+                RandomPayloadEndingAtMatchKey(), NonMarketingTermsIndex);
+
+        /// <summary>
+        /// The canonical Random payload cut off at the end of its GUID, so
+        /// it carries no Terms byte.
+        /// </summary>
+        public static byte[] RandomPayloadEndingAtMatchKey()
         {
             var payload = new byte[FodId.MinimumRandomPayloadLength];
             payload[FodId.FlagsOffset] = (byte)((byte)IdType.Random << 6 | 0b001);

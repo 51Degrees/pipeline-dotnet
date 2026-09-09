@@ -660,9 +660,9 @@
         <member name="T:FiftyOne.Did.Model.FodId">
             <summary>
             An OWID whose payload encodes the four fields of a 51Did, being a
-            1-byte flags bitmask (usage tier and identifier type), a 4-byte
-            little-endian License Id, the match key, and the Terms byte naming
-            the terms document the identifier was created under.
+            1-byte flags bitmask (usage, payload version and identifier type),
+            a 4-byte little-endian License Id, the match key, and the Terms
+            byte naming the terms document the identifier was created under.
             </summary>
             <remarks>
             <para>
@@ -691,10 +691,22 @@
             Only a lower bound is applied to the payload. The byte after the
             match key is the Terms, and anything after that is a creator
             context section whose lengths belong to the cloud, so a longer
-            payload is accepted here and the same four fields are exposed. A
-            payload that ends at the match key reads as
-            <see cref="F:FiftyOne.Did.Model.Terms.NotStated"/>, which is the same answer as
-            a Terms byte of zero, so nothing has to tell the two apart.
+            payload is accepted here and the same four fields are read. A
+            payload that ends at the match key carries no Terms byte and reads
+            as a Terms of zero, which is the same answer a Terms byte holding
+            zero gives, so nothing has to tell the two apart.
+            </para>
+            <para>
+            Bits 4 and 5 of the flags byte say which payload layout the
+            identifier follows, and this package reads version 0. A payload
+            naming any other version is refused with
+            <see cref="F:FiftyOne.Did.Model.FodIdParseStatus.UnsupportedPayloadVersion"/> rather
+            than read under the layout this package knows, because a later
+            version exists precisely because a field moved, so reading it here
+            would answer with values that are wrong rather than absent. The
+            version is not exposed, because a caller has nothing to decide
+            with it, since either the package read the layout or there is no
+            identifier to read fields from.
             </para>
             <para>
             How an instance comes to exist. An OWID cannot be assembled by a
@@ -771,6 +783,13 @@
             length of a particular payload is <c>Payload.Length</c>.
             </summary>
         </member>
+        <member name="F:FiftyOne.Did.Model.FodId.SupportedPayloadVersion">
+            <summary>
+            The payload layout version this package reads, carried in bits
+            4 and 5 of the flags byte. Any other version is refused rather
+            than read under this layout.
+            </summary>
+        </member>
         <member name="F:FiftyOne.Did.Model.FodId.TermsNotStatedIndex">
             <summary>
             The Terms index that says the terms are not stated in the
@@ -844,37 +863,37 @@
         </member>
         <member name="P:FiftyOne.Did.Model.FodId.Terms">
             <summary>
-            The terms document the identifier was created under, read from
-            the byte after the match key. An identifier whose payload ends
-            at the match key reads as <see cref="F:FiftyOne.Did.Model.Terms.NotStated"/>,
-            and an index added to the table after this package was
-            released reads as <see cref="F:FiftyOne.Did.Model.Terms.Unknown"/> rather
-            than as <see cref="F:FiftyOne.Did.Model.Terms.NotStated"/>, because the two
-            say different things. See <see cref="T:FiftyOne.Did.Model.Terms"/>.
+            The address of the terms document the identifier was created
+            under, read from the byte after the match key, or <c>null</c>
+            where the identifier names no document this package knows.
             </summary>
-        </member>
-        <member name="P:FiftyOne.Did.Model.FodId.TermsIndex">
-            <summary>
-            The Terms byte itself, being the index into the terms table in
-            the specification, and zero on an identifier whose payload
-            ends at the match key. Unlike <see cref="P:FiftyOne.Did.Model.FodId.Flags"/> this raw
-            value is public, because a caller meeting an index added after
-            this package was released holds
-            <see cref="F:FiftyOne.Did.Model.Terms.Unknown"/> and would otherwise have no
-            way to say which index it met or to look the document up by
-            hand.
-            </summary>
-        </member>
-        <member name="P:FiftyOne.Did.Model.FodId.TermsUrl">
-            <summary>
-            The address of the terms document, or <c>null</c> where the
-            terms are not stated and where the index is one this package
-            does not know. It is never an empty string and never an
-            address built from the index, because a receiver has to know
-            the exact document in force when the identifier was made. This
-            package answers with the address and never fetches it, so what
-            to do with it is the caller's decision.
-            </summary>
+            <remarks>
+            <para>
+            The byte is an index into a table in the specification and
+            this package turns the index into the address, so a caller
+            never handles the byte. The address is answered and never
+            fetched, so what to do with the document is the caller's
+            decision. It is never an empty string and never an address
+            built from the index.
+            </para>
+            <para>
+            <c>null</c> covers both an index of zero, which says the terms
+            are not stated in the identifier, and an index added to the
+            table after this package was released, which this package
+            cannot name. A caller cannot tell those two apart, which is
+            deliberate, because both lead to the same place, being that
+            the identifier does not say which terms it was created under
+            and the answer has to come from somewhere else. What no
+            package may do is build an address from an index it does not
+            know, since that would name a document nobody wrote.
+            </para>
+            <para>
+            No address does not mean the identifier is unrestricted. Where
+            an identifier may go is a separate question <see cref="P:FiftyOne.Did.Model.FodId.Usage"/>
+            answers, which still bars a non-marketing identifier from a
+            demand source.
+            </para>
+            </remarks>
         </member>
         <member name="F:FiftyOne.Did.Model.FodId.DateBase">
             <summary>
@@ -1076,6 +1095,15 @@
             without copying.
             </summary>
         </member>
+        <member name="F:FiftyOne.Did.Model.FodId._termsIndex">
+            <summary>
+            The Terms byte itself, being the index into the terms table in
+            the specification, and zero where the payload ends at the match
+            key. It is not public, because the package turns the index into
+            the address that <see cref="P:FiftyOne.Did.Model.FodId.Terms"/> answers with and a caller
+            never handles the byte.
+            </summary>
+        </member>
         <member name="T:FiftyOne.Did.Model.FodId.Unpacked">
             <summary>
             The fields of a 51Did once the payload rules have accepted the
@@ -1108,7 +1136,7 @@
             walk.
             </summary>
         </member>
-        <member name="M:FiftyOne.Did.Model.FodId.ExceptionFor(FiftyOne.Did.Model.FodIdParseStatus,System.String)">
+        <member name="M:FiftyOne.Did.Model.FodId.ExceptionFor(FiftyOne.Did.Model.FodIdParseStatus,System.String,System.Byte)">
             <summary>
             The exception the throwing surface documents for each failure.
             Nothing supplied and a payload that breaks the 51Did rules are
@@ -1275,6 +1303,15 @@
             Probabilistic and HashedEmail.
             </summary>
         </member>
+        <member name="F:FiftyOne.Did.Model.FodIdParseStatus.UnsupportedPayloadVersion">
+            <summary>
+            Bits 4 and 5 of the flags byte name a payload layout version
+            this package does not know, so the fields are not read. A later
+            version exists precisely because a field moved, so reading the
+            payload under the layout this package knows would answer with
+            values that are wrong rather than absent.
+            </summary>
+        </member>
         <member name="T:FiftyOne.Did.Model.IdType">
             <summary>
             The identifier type carried in bits 6-7 of the 51Did flags byte.
@@ -1329,7 +1366,13 @@
             256 byte values is a possible index, so no byte could stand for
             <see cref="F:FiftyOne.Did.Model.Terms.Unknown"/>, which is why this is not a byte-backed
             enumeration as <see cref="T:FiftyOne.Did.Model.Usage"/> and <see cref="T:FiftyOne.Did.Model.IdType"/> are.
-            Read <see cref="P:FiftyOne.Did.Model.FodId.TermsIndex"/> for the index itself.
+            </para>
+            <para>
+            It is not public, and neither is the index behind it. The package
+            turns the index into the address that <see cref="P:FiftyOne.Did.Model.FodId.Terms"/>
+            answers with, so a caller never handles the byte, and the names
+            here are the ones the specification gives so that every package
+            describes one document the same way.
             </para>
             <para>
             The usage says where an identifier may go and the terms say which
@@ -1359,7 +1402,7 @@
         <member name="F:FiftyOne.Did.Model.Terms.ModelTermsForMarketing2">
             <summary>
             The Model Terms for Marketing, version 2, whose address
-            <see cref="P:FiftyOne.Did.Model.FodId.TermsUrl"/> gives.
+            <see cref="P:FiftyOne.Did.Model.FodId.Terms"/> gives.
             </summary>
         </member>
         <member name="F:FiftyOne.Did.Model.Terms.Unknown">
@@ -1372,9 +1415,9 @@
             would read an identifier created under terms as one created
             under none. A caller meeting this should treat the identifier
             as covered by terms it cannot yet read, and either take a
-            newer package or refuse the identifier.
-            <see cref="P:FiftyOne.Did.Model.FodId.TermsIndex"/> says which index it met, so the
-            document can be looked up by hand and named in a report.
+            newer package or refuse the identifier. It answers with no
+            address, as <see cref="F:FiftyOne.Did.Model.Terms.NotStated"/> does, because no package
+            may build an address from an index it does not know.
             </summary>
         </member>
         <member name="T:FiftyOne.Did.Model.Usage">

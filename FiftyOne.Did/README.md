@@ -40,7 +40,7 @@ select the type and the length of the match key that follows.
 
 | Offset | Length | Field      | Type                                            |
 |-------:|-------:|------------|-------------------------------------------------|
-|      0 |      1 | Flags      | uint8: bits 0-2 usage, bits 6-7 identifier type |
+|      0 |      1 | Flags      | uint8: bits 0-2 usage, bits 4-5 payload version, bits 6-7 identifier type |
 |      1 |      4 | LicenseId  | uint32 (little-endian)                          |
 |      5 |  16/32 | Match key  | SHA-256 (Probabilistic, HashedEmail) or GUID bytes (Random) |
 |  21/37 |      1 | Terms      | uint8, an index into the terms table below      |
@@ -54,6 +54,23 @@ select the type and the length of the match key that follows.
 
 Identifiers issued before the type tag existed have bits 6-7 zeroed
 and decode as `Probabilistic`.
+
+### Payload version
+
+Bits 4 and 5 of the flags byte say which payload layout the identifier
+follows, and this package reads version 0. A payload naming version 1, 2
+or 3 is refused with `FodIdParseStatus.UnsupportedPayloadVersion`, and
+the throwing surface names the version it found in the exception message.
+
+The fields are never read under the layout this package knows once the
+version says otherwise. A later version exists precisely because a field
+moved, so reading such a payload here would answer with values that are
+wrong rather than absent, which is worse than refusing. A version that
+nothing checks protects nothing.
+
+The version is not exposed. Either this package read the layout, in which
+case the accessors are the answer, or it did not, in which case there is
+no identifier to read fields from.
 
 The minimum payload is a lower bound and the only length rule this
 package applies. A 51Did that carries a creator context, which binds
@@ -92,29 +109,32 @@ number could be composed into. An index is never reused or repointed once
 published, because repointing one rewrites what an identifier already
 issued says it agreed to.
 
-| Index | `FodId.Terms`             | `FodId.TermsUrl`            |
-|------:|---------------------------|-----------------------------|
-|     0 | `NotStated`               | `null`                      |
-|     1 | `ModelTermsForMarketing2` | `https://m4ow.uk/mtm/2.txt` |
-| other | `Unknown`                 | `null`                      |
+`FodId.Terms` answers with the address of the document. The package
+turns the index into the address, so a caller never handles the byte.
 
-An identifier whose payload ends at the match key reads as `NotStated`,
-which is the same answer a zero byte gives, so absence and zero never
-have to be told apart and no presence flag exists. A `Reserved`
-identifier reads as `NotStated` too, because the match key length of
-that type is not defined, so every byte after the header is the match
-key and none is left for the Terms.
+| Index | Document                             | `FodId.Terms`               |
+|------:|--------------------------------------|-----------------------------|
+|     0 | Not stated in the identifier         | `null`                      |
+|     1 | Model Terms for Marketing, version 2 | `https://m4ow.uk/mtm/2.txt` |
+| other | One this package cannot name         | `null`                      |
 
-An index this package does not know reads as `Unknown` and never as
-`NotStated`. `NotStated` says no terms are stated whilst `Unknown` says
-terms are stated that this package cannot name, and a receiver confusing
-the two would read an identifier created under terms as one created under
-none. `FodId.TermsIndex` gives the index itself, which is the only raw
-payload value this package exposes, so a caller meeting a row this
-package cannot name can still say which one it met and look the document
-up by hand.
+An identifier whose payload ends at the match key carries no Terms byte
+and answers with no address, which is the same answer a zero byte gives,
+so absence and zero never have to be told apart and no presence flag
+exists. A `Reserved` identifier answers with no address too, because the
+match key length of that type is not defined, so every byte after the
+header is the match key and none is left for the Terms.
 
-`NotStated` does not mean the identifier is unrestricted. It means only
+An index this package does not know answers with no address as well, and
+the package never builds an address from the index, because that would
+name a document nobody wrote and a receiver would record having accepted
+terms that do not exist. A caller therefore cannot tell an index of zero
+from an index this package cannot name, which is deliberate, since both
+lead to the same place, being that the identifier does not say which
+terms it was created under and the answer has to come from somewhere
+else.
+
+No address does not mean the identifier is unrestricted. It means only
 that the identifier does not carry the answer, so the answer has to come
 from somewhere else, being the Terms Document Locator in an OpenRTB
 request or whatever the surrounding protocol provides. Carrying the Terms
@@ -202,9 +222,10 @@ bool    fromConsent = fodId.UsageFromConsent;
 IdType  type      = fodId.Type;        // Probabilistic / Random / HashedEmail
 uint    licenseId = fodId.LicenseId;
 byte[]  matchKey  = fodId.MatchKey;    // SHA-256 or GUID bytes, see Type
-Terms   terms     = fodId.Terms;       // the document it was created under
-byte    termsIndex = fodId.TermsIndex; // the index behind that named value
-string? termsUrl  = fodId.TermsUrl;    // its address, null where there is none
+string? terms     = fodId.Terms;       // address of the document it was
+                                       // created under, null where the
+                                       // identifier names none this
+                                       // package knows
 
 // Inherited OWID-level fields.
 string   domain   = fodId.Domain;
