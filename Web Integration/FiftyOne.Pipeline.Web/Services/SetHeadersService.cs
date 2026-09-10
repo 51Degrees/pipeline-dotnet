@@ -22,6 +22,7 @@
 
 using FiftyOne.Pipeline.Core.Data;
 using FiftyOne.Pipeline.Core.FlowElements;
+using FiftyOne.Pipeline.Engines.FiftyOne.Data;
 using FiftyOne.Pipeline.Engines.FiftyOne.FlowElements;
 using FiftyOne.Pipeline.Web.Shared;
 using Microsoft.AspNetCore.Http;
@@ -75,10 +76,16 @@ namespace FiftyOne.Pipeline.Web.Services
         }
 
         /// <summary>
-        /// Set the HTTP headers in the response using values from 
+        /// Set the HTTP headers in the response using values from
         /// the supplied flow data.
         /// If the supplied headers already have values in the response
         /// then they will be amended rather than replaced.
+        /// If the pipeline has no <see cref="ISetHeadersElement"/>, or the
+        /// flow data has no data for it (its processing can fail before the
+        /// data is added, for example when the cloud service could not be
+        /// reached, with the pipeline configured to suppress process
+        /// exceptions), then no headers are set. The upstream failure is
+        /// already reported by the pipeline's own error handling.
         /// </summary>
         /// <param name="context">
         /// The <see cref="HttpContext"/> to set the response headers in
@@ -86,15 +93,25 @@ namespace FiftyOne.Pipeline.Web.Services
         /// <param name="flowData">
         /// The flow data containing the headers to set.
         /// </param>
-        public static void SetHeaders(HttpContext context, 
+        public static void SetHeaders(HttpContext context,
             IFlowData flowData)
         {
             if (context == null) throw new ArgumentNullException(nameof(context));
             if (flowData == null) throw new ArgumentNullException(nameof(flowData));
 
             var element = flowData.Pipeline.GetElement<ISetHeadersElement>();
-            foreach (var header in flowData.GetFromElement(element)
-                .ResponseHeaderDictionary)
+            if (element == null)
+            {
+                return;
+            }
+            if (flowData.TryGetValue(
+                    element.ElementDataKeyTyped,
+                    out var setHeadersData) == false ||
+                setHeadersData.ResponseHeaderDictionary == null)
+            {
+                return;
+            }
+            foreach (var header in setHeadersData.ResponseHeaderDictionary)
             {
                 context.Response.Headers.Append(header.Key, header.Value);
             }
