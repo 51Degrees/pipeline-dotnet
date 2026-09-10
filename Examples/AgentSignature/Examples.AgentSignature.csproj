@@ -1,0 +1,22 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <Platforms>AnyCPU</Platforms>
+    <TargetFramework>net8.0</TargetFramework>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\FiftyOne.Pipeline.Elements\FiftyOne.Pipeline.AgentSignature\FiftyOne.Pipeline.AgentSignature.csproj" />
+    <ProjectReference Include="..\..\FiftyOne.Pipeline.Examples.Shared\FiftyOne.Pipeline.Examples.Shared.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- The example signs its own requests, the way an agent would, and
+         Ed25519 is not in the .NET base library. This is the same version
+         the element's own package depends on. -->
+    <PackageReference Include="BouncyCastle.Cryptography" Version="2.7.0" />
+  </ItemGroup>
+
+</Project>

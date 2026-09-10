@@ -46,6 +46,10 @@
   <ItemGroup>
     <Reference Include="System" />
     <Reference Include="System.Core" />
+    <!-- The evidence population tests build an HttpRequest, which lives
+         in System.Web, the same assembly the integration under test
+         reads its values from. -->
+    <Reference Include="System.Web" />
   </ItemGroup>
   <ItemGroup>
     <Compile Include="Dependencies.cs" />

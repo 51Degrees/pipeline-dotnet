@@ -24,6 +24,7 @@ using FiftyOne.Pipeline.Core.Data;
 using FiftyOne.Pipeline.Core.Exceptions;
 using System;
 using System.Collections.Generic;
+using System.Threading;
 
 namespace FiftyOne.Pipeline.Core.FlowElements
 {
@@ -64,6 +65,13 @@ namespace FiftyOne.Pipeline.Core.FlowElements
         /// Control field that indicates if the Pipeline will throw an
         /// aggregate exception during processing or suppress it and ignore the
         /// exceptions added to <see cref="IFlowData.Errors"/>.
+        /// When true, exceptions thrown by flow elements are also not logged
+        /// at error level. They are logged at debug level instead and remain
+        /// available through <see cref="IFlowData.Errors"/>.
+        /// This applies to exceptions that a flow element allows to escape
+        /// its Process method. Errors that an element records itself by
+        /// calling AddError on the flow data are logged as that element
+        /// requests, regardless of this setting.
         /// </summary>
         bool SuppressProcessExceptions { get; }
 
@@ -125,6 +133,18 @@ namespace FiftyOne.Pipeline.Core.FlowElements
     /// </summary>
     internal interface IPipelineInternal : IPipeline
     {
+        /// <summary>
+        /// Create a new flow data that stops processing when the supplied
+        /// token is cancelled.
+        /// </summary>
+        /// <param name="cancellationToken">
+        /// Token that cancels processing of the created flow data.
+        /// </param>
+        /// <returns>
+        /// A new <see cref="IFlowData"/> instance.
+        /// </returns>
+        IFlowData CreateFlowData(CancellationToken cancellationToken);
+
         /// <summary>
         /// Process the given <see cref="IFlowData"/> using the 
         /// <see cref="IFlowElement"/>s in the pipeline.

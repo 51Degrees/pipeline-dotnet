@@ -26,6 +26,7 @@ using Microsoft.Extensions.Logging;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading;
 
 namespace FiftyOne.Pipeline.Core.FlowElements
 {
@@ -242,16 +243,20 @@ namespace FiftyOne.Pipeline.Core.FlowElements
         /// <param name="pipeline">
         /// The pipeline that is being used to create the flow data instance.
         /// </param>
+        /// <param name="cancellationToken">
+        /// Token that cancels processing of the created flow data.
+        /// </param>
         /// <returns>
         /// A new <see cref="FlowData"/> that is linked to the given pipeline.
         /// </returns>
-        private IFlowData NewFlowData(IPipelineInternal pipeline)
+        private IFlowData NewFlowData(IPipelineInternal pipeline, CancellationToken cancellationToken)
         {
             var evidence = new Evidence(_evidenceLogger);
             return new FlowData(
                 _flowDataLogger,
                 pipeline,
-                evidence);
+                evidence,
+                cancellationToken);
         }
 
     }

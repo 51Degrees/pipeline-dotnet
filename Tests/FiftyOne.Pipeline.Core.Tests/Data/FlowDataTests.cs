@@ -32,6 +32,7 @@ using Moq;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading;
 
 namespace FiftyOne.Pipeline.Core.Tests.Data
 {
@@ -84,6 +85,240 @@ namespace FiftyOne.Pipeline.Core.Tests.Data
         {
             _flowData.Process();
             _pipeline.Verify(p => p.Process(_flowData));
+        }
+
+        /// <summary>
+        /// Check that cancelling the external token stops the flow data.
+        /// </summary>
+        [TestMethod]
+        public void FlowData_StopToken_LinksExternalToken()
+        {
+            using var externalCts = new CancellationTokenSource();
+            using var flowData = new FlowData(_logger.Object, _pipeline.Object,
+                new Evidence(new Mock<ILogger<Evidence>>().Object), externalCts.Token);
+
+            Assert.IsFalse(flowData.GetStopToken().IsCancellationRequested);
+            externalCts.Cancel();
+            Assert.IsTrue(flowData.GetStopToken().IsCancellationRequested);
+#pragma warning disable CS0618 // Stop is obsolete
+            Assert.IsTrue(flowData.Stop);
+#pragma warning restore CS0618
+        }
+
+        /// <summary>
+        /// Check that setting the obsolete Stop flag cancels the token source.
+        /// </summary>
+        [TestMethod]
+        public void FlowData_SettingStop_CancelsTokenSource()
+        {
+            Assert.IsFalse(_flowData.GetStopToken().IsCancellationRequested);
+#pragma warning disable CS0618 // Stop is obsolete
+            _flowData.Stop = true;
+#pragma warning restore CS0618
+            Assert.IsTrue(_flowData.GetStopToken().IsCancellationRequested);
+        }
+
+        /// <summary>
+        /// GetStopToken must stay safe after Dispose: reading the stop token
+        /// of an already disposed flow data must not throw
+        /// ObjectDisposedException.
+        /// </summary>
+        [TestMethod]
+        public void FlowData_GetStopToken_AfterDispose_DoesNotThrow()
+        {
+            var flowData = new FlowData(_logger.Object, _pipeline.Object,
+                new Evidence(new Mock<ILogger<Evidence>>().Object));
+
+            flowData.Dispose();
+
+            var token = flowData.GetStopToken();
+            Assert.IsFalse(token.IsCancellationRequested);
+        }
+
+        /// <summary>
+        /// The stop token stays truthful after Dispose: a flow data cancelled
+        /// before disposal still reports cancellation afterwards. This is the
+        /// reason the token is captured into a field in the constructor rather
+        /// than read from the (now disposed) source.
+        /// </summary>
+        [TestMethod]
+        public void FlowData_GetStopToken_CancelledThenDisposed_StaysCancelled()
+        {
+            var flowData = new FlowData(_logger.Object, _pipeline.Object,
+                new Evidence(new Mock<ILogger<Evidence>>().Object));
+
+            flowData.SetStopToken(new CancellationToken(canceled: true));
+            flowData.Dispose();
+
+            Assert.IsTrue(flowData.GetStopToken().IsCancellationRequested);
+        }
+
+        /// <summary>
+        /// A fresh flow data is not stopped (its stop token is not cancelled).
+        /// </summary>
+        [TestMethod]
+        public void FlowData_GetStopToken_NoCancellation_NotRequested()
+        {
+            Assert.IsFalse(_flowData.GetStopToken().IsCancellationRequested);
+        }
+
+        /// <summary>
+        /// Setting an already-cancelled token stops the flow data immediately.
+        /// </summary>
+        [TestMethod]
+        public void FlowData_SetStopToken_AlreadyCancelled_StopsData()
+        {
+            _flowData.SetStopToken(new CancellationToken(canceled: true));
+
+            Assert.IsTrue(_flowData.GetStopToken().IsCancellationRequested);
+        }
+
+        /// <summary>
+        /// Cancelling a token passed to SetStopToken stops the flow data.
+        /// </summary>
+        [TestMethod]
+        public void FlowData_SetStopToken_ExternalToken_PropagatesCancellation()
+        {
+            using var external = new CancellationTokenSource();
+
+            _flowData.SetStopToken(external.Token);
+            Assert.IsFalse(_flowData.GetStopToken().IsCancellationRequested);
+
+            external.Cancel();
+            Assert.IsTrue(_flowData.GetStopToken().IsCancellationRequested);
+        }
+
+        /// <summary>
+        /// Calling SetStopToken twice drops the first registration: the
+        /// superseded token no longer stops the flow data, the latest one
+        /// does, and nothing leaks or throws.
+        /// </summary>
+        [TestMethod]
+        public void FlowData_SetStopToken_CalledTwice_LatestTokenWins()
+        {
+            using var first = new CancellationTokenSource();
+            using var second = new CancellationTokenSource();
+
+            _flowData.SetStopToken(first.Token);
+            _flowData.SetStopToken(second.Token);
+
+            // The superseded token must no longer affect the flow data.
+            first.Cancel();
+            Assert.IsFalse(_flowData.GetStopToken().IsCancellationRequested);
+
+            second.Cancel();
+            Assert.IsTrue(_flowData.GetStopToken().IsCancellationRequested);
+        }
+
+        /// <summary>
+        /// GetStopToken reflects the current stop state.
+        /// </summary>
+        [TestMethod]
+        public void FlowData_GetStopToken_TracksCancellation()
+        {
+            Assert.IsFalse(_flowData.GetStopToken().IsCancellationRequested);
+
+            _flowData.SetStopToken(new CancellationToken(canceled: true));
+            Assert.IsTrue(_flowData.GetStopToken().IsCancellationRequested);
+        }
+
+        /// <summary>
+        /// Regression: after a flow data that linked an external token via
+        /// SetStopToken is disposed, cancelling that external token must not
+        /// throw (the registration is disposed with the flow data).
+        /// </summary>
+        [TestMethod]
+        public void FlowData_SetStopToken_DisposeThenExternalCancel_DoesNotThrow()
+        {
+            using var external = new CancellationTokenSource();
+            var flowData = new FlowData(_logger.Object, _pipeline.Object,
+                new Evidence(new Mock<ILogger<Evidence>>().Object));
+
+            flowData.SetStopToken(external.Token);
+            flowData.Dispose();
+
+            external.Cancel();
+        }
+
+        /// <summary>
+        /// Regression: setting the obsolete Stop flag after Dispose must not
+        /// throw ObjectDisposedException.
+        /// </summary>
+        [TestMethod]
+        public void FlowData_SettingStop_AfterDispose_DoesNotThrow()
+        {
+            var flowData = new FlowData(_logger.Object, _pipeline.Object,
+                new Evidence(new Mock<ILogger<Evidence>>().Object));
+
+            flowData.Dispose();
+
+#pragma warning disable CS0618 // Stop is obsolete
+            flowData.Stop = true;
+#pragma warning restore CS0618
+        }
+
+        /// <summary>
+        /// Regression: calling SetStopToken after Dispose must not throw
+        /// ObjectDisposedException.
+        /// </summary>
+        [TestMethod]
+        public void FlowData_SetStopToken_AfterDispose_DoesNotThrow()
+        {
+            var flowData = new FlowData(_logger.Object, _pipeline.Object,
+                new Evidence(new Mock<ILogger<Evidence>>().Object));
+
+            flowData.Dispose();
+
+            flowData.SetStopToken(new CancellationToken(canceled: true));
+        }
+
+        /// <summary>
+        /// ShouldRun is true for a fresh flow data and false once its stop
+        /// token has been cancelled.
+        /// </summary>
+        [TestMethod]
+        public void FlowData_ShouldRun_TracksCancellation()
+        {
+            Assert.IsTrue(_flowData.ShouldRun());
+
+            _flowData.SetStopToken(new CancellationToken(canceled: true));
+
+            Assert.IsFalse(_flowData.ShouldRun());
+        }
+
+        /// <summary>
+        /// The SetStopToken extension maps an already-cancelled token to the
+        /// Stop flag for a non-FlowData implementation that has no linkable
+        /// stop token of its own.
+        /// </summary>
+        [TestMethod]
+        public void FlowData_SetStopTokenExtension_ThirdPartyImplementation_SetsStop()
+        {
+            var data = new Mock<IFlowData>();
+            bool stop = false;
+#pragma warning disable CS0618 // Stop is obsolete
+            data.SetupSet(d => d.Stop = It.IsAny<bool>()).Callback<bool>(v => stop = v);
+#pragma warning restore CS0618
+
+            data.Object.SetStopToken(new CancellationToken(canceled: true));
+
+            Assert.IsTrue(stop);
+        }
+
+        /// <summary>
+        /// The GetStopToken extension degrades to a boolean snapshot of Stop
+        /// for a non-FlowData implementation.
+        /// </summary>
+        [TestMethod]
+        public void FlowData_GetStopTokenExtension_ThirdPartyImplementation_ReflectsStop()
+        {
+            var data = new Mock<IFlowData>();
+#pragma warning disable CS0618 // Stop is obsolete
+            data.SetupGet(d => d.Stop).Returns(true);
+#pragma warning restore CS0618
+
+            Assert.IsTrue(data.Object.GetStopToken().IsCancellationRequested);
+            Assert.IsFalse(data.Object.ShouldRun());
         }
 
         /// <summary>
@@ -794,7 +1029,6 @@ namespace FiftyOne.Pipeline.Core.Tests.Data
 
         public interface IDisposableData : IElementData, IDisposable
         {
-
         }
 
         /// <summary>
@@ -836,5 +1070,144 @@ namespace FiftyOne.Pipeline.Core.Tests.Data
 
             DisposeFlowData();
         }
+
+        #region Warnings
+
+        /// <summary>
+        /// A flow data that nothing has warned about has no warnings.
+        /// </summary>
+        [TestMethod]
+        public void FlowData_Warnings_NoneByDefault()
+        {
+            Assert.IsEmpty(_flowData.Warnings);
+            Assert.IsEmpty(((IFlowData)_flowData).GetWarnings());
+        }
+
+        /// <summary>
+        /// A recorded warning is readable, in order, with the element that
+        /// recorded it.
+        /// </summary>
+        [TestMethod]
+        public void FlowData_Warnings_Added()
+        {
+            var element = new Mock<IFlowElement>();
+
+            _flowData.AddWarning("first", element.Object);
+            _flowData.AddWarning("second", null);
+
+            var warnings = _flowData.Warnings;
+            Assert.HasCount(2, warnings);
+            Assert.AreEqual("first", warnings[0].Message);
+            Assert.AreEqual(element.Object, warnings[0].FlowElement);
+            Assert.AreEqual("second", warnings[1].Message);
+            Assert.IsNull(warnings[1].FlowElement);
+        }
+
+        /// <summary>
+        /// A warning must not make the pipeline throw the way an error does,
+        /// which is the whole reason for the collection existing.
+        /// </summary>
+        [TestMethod]
+        public void FlowData_Warnings_NotAddedToErrors()
+        {
+            _flowData.AddWarning("a warning", null);
+
+            Assert.IsTrue(
+                _flowData.Errors == null || _flowData.Errors.Count == 0);
+        }
+
+        /// <summary>
+        /// The returned collection is a snapshot, so a caller holding it
+        /// while further warnings are recorded does not see them appear.
+        /// </summary>
+        [TestMethod]
+        public void FlowData_Warnings_IsSnapshot()
+        {
+            _flowData.AddWarning("first", null);
+            var warnings = _flowData.Warnings;
+
+            _flowData.AddWarning("second", null);
+
+            Assert.HasCount(1, warnings);
+            Assert.HasCount(2, _flowData.Warnings);
+        }
+
+        /// <summary>
+        /// A null message is a caller error rather than something to record.
+        /// </summary>
+        [TestMethod]
+        public void FlowData_Warnings_NullMessage()
+        {
+            Assert.ThrowsExactly<ArgumentNullException>(
+                () => _flowData.AddWarning(null, null));
+        }
+
+        /// <summary>
+        /// Elements in a ParallelElements group can warn at the same time,
+        /// so no warning may be lost and the collection may not be observed
+        /// part-written. This is the requirement the collection exists to
+        /// meet - see 51Degrees/pipeline-dotnet#363.
+        /// </summary>
+        [TestMethod]
+        public void FlowData_Warnings_AddedConcurrently()
+        {
+            const int threads = 8;
+            const int perThread = 250;
+            var start = new ManualResetEventSlim(false);
+            var readerFailure = 0;
+
+            var writers = Enumerable.Range(0, threads).Select(t =>
+            {
+                var thread = new Thread(() =>
+                {
+                    start.Wait();
+                    for (var i = 0; i < perThread; i++)
+                    {
+                        _flowData.AddWarning($"{t}-{i}", null);
+                    }
+                });
+                thread.Start();
+                return thread;
+            }).ToList();
+
+            // Read throughout, so a reader overlapping a writer is covered
+            // as well as writers overlapping each other.
+            var reader = new Thread(() =>
+            {
+                start.Wait();
+                for (var i = 0; i < 500; i++)
+                {
+                    try
+                    {
+                        foreach (var warning in _flowData.Warnings)
+                        {
+                            if (warning == null)
+                            {
+                                Interlocked.Increment(ref readerFailure);
+                            }
+                        }
+                    }
+                    catch (InvalidOperationException)
+                    {
+                        Interlocked.Increment(ref readerFailure);
+                    }
+                }
+            });
+            reader.Start();
+
+            start.Set();
+            foreach (var thread in writers)
+            {
+                thread.Join();
+            }
+            reader.Join();
+
+            Assert.AreEqual(0, readerFailure,
+                "Reading the warnings while they were being added failed.");
+            Assert.HasCount(threads * perThread, _flowData.Warnings,
+                "Warnings were lost when several threads recorded them.");
+        }
+
+        #endregion
     }
 }

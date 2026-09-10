@@ -1,0 +1,47 @@
+Structured field conformance test suite of the IETF HTTP Working Group.
+
+Repository: https://github.com/httpwg/structured-field-tests
+Commit:     1e280c3ed9ffe0ca5fdb1d97219dddc389007677
+            (authored 9 June 2026, "Merge pull request #112 from
+            apasel422/decimal, Add must-fail test for trailing decimal
+            point")
+Fetched:    1 September 2026, from
+            https://raw.githubusercontent.com/httpwg/structured-field-tests/
+            1e280c3ed9ffe0ca5fdb1d97219dddc389007677/<file>
+
+Licence:    BSD 3-Clause, copyright (c) 2018- IETF Trust and the persons
+            identified as authors of the code. The full notice and
+            disclaimer are in LICENSE.md in this folder, kept verbatim as
+            the licence requires.
+
+Files taken, being the ones that bear on what the agent signature element
+parses, which is a dictionary or a single item:
+  binary.json
+  boolean.json
+  dictionary.json
+  examples.json
+  item.json
+  key-generated.json
+  number.json
+  param-dict.json
+  string-generated.json
+  string.json
+  token-generated.json
+  token.json
+
+Files deliberately left behind:
+  list.json, listlist.json, param-list.json, param-listlist.json, because
+  the element never parses a bare list.
+  date.json, display-string.json, because the parser implements only the
+  RFC 8941 types the three Web Bot Auth headers use, so dates and display
+  strings added by RFC 9651 are out of scope.
+  large-generated.json, number-generated.json, serialisation-tests and
+  the schema folder, because they were not asked for and the first two
+  only repeat the coverage of number.json and string-generated.json at
+  greater length.
+  README.md, generate.py and .editorconfig, because they are not test
+  data.
+
+The JSON files and LICENSE.md are held exactly as downloaded and must not
+be edited. A refresh means downloading them again and recording the new
+commit here.

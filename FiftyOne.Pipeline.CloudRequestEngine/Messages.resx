@@ -136,7 +136,7 @@
     <value>The '{0}' did not process because the JSON response from the CloudRequestEngine was null or empty. This indicates that the cloud request failed.</value>
   </data>
   <data name="ExceptionFailedToLoadProperties" xml:space="preserve">
-    <value>Failed to load aspect properties for element '{0}'. This is because your resource key does not include access to any properties under '{0}'. For more details on resource keys, see our explainer: https://51degrees.com/documentation/_info__resource_keys.html?utm_source=code&amp;utm_medium=comment&amp;utm_campaign=pipeline-dotnet&amp;utm_content=fiftyone.pipeline.cloudrequestengine-messages.resx&amp;utm_term=exceptionfailedtoloadproperties</value>
+    <value>Failed to load properties for '{0}'. This usually means your resource key does not include access to any properties under '{0}'. Check or create a resource key with the properties you need in the configurator at https://configure.51degrees.com?utm_source=code&amp;utm_medium=comment&amp;utm_campaign=pipeline-dotnet&amp;utm_content=fiftyone.pipeline.cloudrequestengine-messages.resx&amp;utm_term=exceptionfailedtoloadproperties.</value>
   </data>
   <data name="ExceptionResourceKeyNeeded" xml:space="preserve">
     <value>A resource key is required to access the 51Degrees cloud service. Please use the 'SetResourceKey' method to supply your resource key. You can obtain one for free from https://configure.51degrees.com?utm_source=code&amp;utm_medium=comment&amp;utm_campaign=pipeline-dotnet&amp;utm_content=fiftyone.pipeline.cloudrequestengine-messages.resx&amp;utm_term=exceptionresourcekeyneeded</value>

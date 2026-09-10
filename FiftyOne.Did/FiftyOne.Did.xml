@@ -4,11 +4,665 @@
         <name>FiftyOne.Did</name>
     </assembly>
     <members>
+        <member name="T:FiftyOne.Did.Client.ContextOutcome">
+            <summary>
+            The creator context verdict the cloud's redeem endpoint reports,
+            mapped from the <c>context</c> string in its answer. Some describe
+            the identifier, one describes the service that checked it, and the
+            rest describe the redemption itself, being why no verdict could be
+            read this time.
+            </summary>
+        </member>
+        <member name="F:FiftyOne.Did.Client.ContextOutcome.Verified">
+            <summary>
+            Every factor of the creator context matched the connection the
+            identifier was verified on.
+            </summary>
+        </member>
+        <member name="F:FiftyOne.Did.Client.ContextOutcome.Mismatch">
+            <summary>
+            At least one factor did not match, and
+            <see cref="P:FiftyOne.Did.Client.RedeemResult.Factors"/> says which. An identifier
+            whose signature verifies is still genuine, so this reports a
+            moved identifier rather than a bad one.
+            </summary>
+        </member>
+        <member name="F:FiftyOne.Did.Client.ContextOutcome.NoContext">
+            <summary>
+            The identifier carries no creator context at all, for example
+            because a self-hosted service was configured not to add one.
+            </summary>
+        </member>
+        <member name="F:FiftyOne.Did.Client.ContextOutcome.NotCheckable">
+            <summary>
+            No longer reported by the service, and kept only because it has
+            been public since this enumeration was added. What used to give
+            this answer now gives <see cref="F:FiftyOne.Did.Client.ContextOutcome.Misconfigured"/> where the
+            service is at fault, or <see cref="F:FiftyOne.Did.Client.ContextOutcome.InvalidDate"/> where the
+            identifier could not have been created.
+            </summary>
+        </member>
+        <member name="F:FiftyOne.Did.Client.ContextOutcome.Expired">
+            <summary>
+            The sealed result was presented after the service's freshness
+            window closed. <see cref="P:FiftyOne.Did.Client.RedeemResult.VerifiedAt"/> says when
+            the verification happened.
+            </summary>
+        </member>
+        <member name="F:FiftyOne.Did.Client.ContextOutcome.Replayed">
+            <summary>
+            The sealed result had already been redeemed on this service
+            instance.
+            </summary>
+        </member>
+        <member name="F:FiftyOne.Did.Client.ContextOutcome.Unreadable">
+            <summary>
+            The sealed result could not be read. Every cryptographic failure
+            (tampered, made for another identifier, sealed under a key the
+            service does not hold, or presented without a licence key the
+            account requires) gives this one answer by design, so nothing
+            finer is available. A <c>context</c> string this client does not
+            recognise also maps here, with the raw string kept in
+            <see cref="P:FiftyOne.Did.Client.RedeemResult.ContextValue"/>.
+            </summary>
+        </member>
+        <member name="F:FiftyOne.Did.Client.ContextOutcome.Unconfirmed">
+            <summary>
+            The service could not confirm first use of the sealed result and
+            answered 503. Not a verdict. The caller may retry.
+            </summary>
+        </member>
+        <member name="F:FiftyOne.Did.Client.ContextOutcome.Misconfigured">
+            <summary>
+            The service that checked the identifier could not complete the
+            check, and the reason is that service rather than the identifier.
+            Either it compared nothing, because it holds no context key for a
+            creation time inside the scheme or runs a build too old for the
+            version it was given, or it compared some factors and
+            <see cref="P:FiftyOne.Did.Client.RedeemResult.Factors"/> reports at least one as
+            <see cref="F:FiftyOne.Did.Client.FactorOutcome.Misconfigured"/>.
+            <para>
+            Nothing a caller sends can produce this, so it is a signal about
+            the deployment. Against 51Degrees public cloud it should not
+            occur. Against a self-hosted service it means that service is not
+            configured to read the client's own connection, or is missing an
+            engine it needs, and its own logs name the setting to change.
+            </para>
+            </summary>
+        </member>
+        <member name="F:FiftyOne.Did.Client.ContextOutcome.InvalidDate">
+            <summary>
+            The identifier's creation date is one the scheme could not have
+            produced, being in the future or before the creator context
+            scheme began. Nothing can be created in the future and nothing
+            existed before the first key, so this says the identifier is
+            fabricated rather than that anything is wrong with the service.
+            </summary>
+        </member>
+        <member name="T:FiftyOne.Did.Client.DidClient">
+            <summary>
+            Everything a server does with a 51Did against the 51Degrees cloud:
+            fetch and cache the signing public keys, verify a signature offline
+            against the key in force when the identifier was created, verify a
+            signature through the cloud, and redeem a sealed creator context
+            result with the account's licence key.
+            <para>
+            Creating a 51Did is not part of this client. Creation is the cloud
+            <c>json</c> endpoint through the cloud request engine and pipeline,
+            and a page creates from the browser because the identifier describes
+            the browser's own connection. The <c>verify-context</c> and
+            <c>verify-full</c> endpoints are browser calls for the same reason,
+            so they are not here either. This client is the server side, which
+            holds the licence key the browser never sees.
+            </para>
+            <para>
+            Credentials never travel in a URL. The resource key is part of the
+            route, as the endpoints accept, and the licence key travels only in
+            a POST form body, because a query string is written to access logs.
+            </para>
+            <para>
+            The key cache is per instance and safe to share across threads, so
+            create one client for the process and reuse it.
+            </para>
+            </summary>
+        </member>
+        <member name="F:FiftyOne.Did.Client.DidClient.DefaultEndpoint">
+            <summary>
+            The public cloud API base, used when no endpoint is given and
+            <see cref="F:FiftyOne.Did.Client.DidClient.EndpointEnvironmentVariable"/> is not set.
+            </summary>
+        </member>
+        <member name="F:FiftyOne.Did.Client.DidClient.EndpointEnvironmentVariable">
+            <summary>
+            The environment variable read for the API base when the
+            constructor is given none, the same variable the cloud request
+            engine honours. A host other than the public cloud is used for
+            a privately hosted copy of the same service.
+            </summary>
+        </member>
+        <member name="F:FiftyOne.Did.Client.DidClient.KeyCacheLifetime">
+            <summary>
+            How old the cached key list may be before a lookup fetches it
+            again. Keys are published up to three months ahead of their
+            start, so a day is far inside that margin.
+            </summary>
+        </member>
+        <member name="P:FiftyOne.Did.Client.DidClient.UserAgent">
+            <summary>
+            The <c>User-Agent</c> every request carries, naming this package
+            and its version.
+            </summary>
+        </member>
+        <member name="M:FiftyOne.Did.Client.DidClient.#ctor(System.String,System.String,System.String,System.Net.Http.HttpClient,System.TimeProvider)">
+            <summary>
+            Creates a client.
+            </summary>
+            <param name="resourceKey">
+            The resource key, which is public by nature.
+            </param>
+            <param name="licenceKey">
+            A licence key of the same account, server side only. Needed to
+            redeem where the account holds licence keys, and sent only in
+            the redeem form body.
+            </param>
+            <param name="endpoint">
+            The API base including <c>/api/v4/</c>. When null the
+            <see cref="F:FiftyOne.Did.Client.DidClient.EndpointEnvironmentVariable"/> is read, and when that
+            is unset too <see cref="F:FiftyOne.Did.Client.DidClient.DefaultEndpoint"/> is used. A value with
+            or without a trailing slash is accepted, and is normalised to
+            end in exactly one.
+            </param>
+            <param name="httpClient">
+            The transport to use, so a test can inject one. When null the
+            client creates and owns one.
+            </param>
+            <param name="timeProvider">
+            The clock the key cache ages against, so a test can inject one.
+            When null the system clock is used.
+            </param>
+            <exception cref="T:System.ArgumentException">
+            Thrown when <paramref name="resourceKey"/> is empty or the
+            endpoint is not an absolute URL.
+            </exception>
+        </member>
+        <member name="P:FiftyOne.Did.Client.DidClient.ResourceKey">
+            <summary>The resource key the client sends.</summary>
+        </member>
+        <member name="P:FiftyOne.Did.Client.DidClient.Endpoint">
+            <summary>
+            The API base every request is built on, ending in one slash.
+            </summary>
+        </member>
+        <member name="P:FiftyOne.Did.Client.DidClient.HasLicenceKey">
+            <summary>
+            Whether a licence key was given. The key itself is not exposed.
+            </summary>
+        </member>
+        <member name="M:FiftyOne.Did.Client.DidClient.PublicKeysAsync(System.Threading.CancellationToken)">
+            <summary>
+            The signing public keys the cloud publishes, fetched on first use
+            and then answered from the cache. Use
+            <see cref="M:FiftyOne.Did.Client.DidClient.PublicKeyForAsync(FiftyOne.Did.Model.FodId,System.Threading.CancellationToken)"/> to pick the key for one
+            identifier, which also refreshes the cache when it is stale.
+            </summary>
+            <param name="cancellationToken">Cancels the fetch.</param>
+            <returns>The keys in start order.</returns>
+            <exception cref="T:System.Net.Http.HttpRequestException">
+            Thrown when the cloud cannot be reached or answers with a status
+            other than 200.
+            </exception>
+        </member>
+        <member name="M:FiftyOne.Did.Client.DidClient.PublicKeyForAsync(FiftyOne.Did.Model.FodId,System.Threading.CancellationToken)">
+            <summary>
+            The key in force when the identifier was created, being the
+            entry whose start is latest on or before the identifier's date.
+            The cache is fetched again, once, before answering when it holds
+            no entry on or before the date, when the date is later than the
+            newest start held, or when the cache is older than
+            <see cref="F:FiftyOne.Did.Client.DidClient.KeyCacheLifetime"/>.
+            </summary>
+            <param name="fodId">The identifier.</param>
+            <param name="cancellationToken">Cancels a fetch.</param>
+            <returns>
+            The key, or null when the date precedes the whole schedule.
+            </returns>
+            <exception cref="T:System.ArgumentNullException">
+            Thrown when <paramref name="fodId"/> is null.
+            </exception>
+            <exception cref="T:System.Net.Http.HttpRequestException">
+            Thrown when a fetch was needed and the cloud could not be
+            reached or answered with a status other than 200.
+            </exception>
+        </member>
+        <member name="M:FiftyOne.Did.Client.DidClient.VerifySignatureAsync(FiftyOne.Did.Model.FodId,System.Threading.CancellationToken)">
+            <summary>
+            Verifies the identifier's signature offline against the
+            published keys, without a cloud call once the keys are cached.
+            </summary>
+            <param name="fodId">The identifier.</param>
+            <param name="cancellationToken">Cancels a key fetch.</param>
+            <returns>
+            True only when the signature verifies under a key in force at
+            the identifier's date. See
+            <see cref="M:FiftyOne.Did.Client.DidClient.VerifySignatureDetailedAsync(FiftyOne.Did.Model.FodId,System.Threading.CancellationToken)"/> for why a check did
+            not pass.
+            </returns>
+        </member>
+        <member name="M:FiftyOne.Did.Client.DidClient.VerifySignatureDetailedAsync(FiftyOne.Did.Model.FodId,System.Threading.CancellationToken)">
+            <summary>
+            Verifies the identifier's signature offline and says why when
+            the check did not pass. The envelope must be OWID version 3 and
+            the payload at least the base length for its type, being the
+            five header bytes plus a 32 byte value, or a 16 byte value for a
+            Random identifier. A longer payload carries a creator context
+            section and is accepted, because the signature covers the whole
+            payload. The keys tried are the one in force at the identifier's
+            date and, near a boundary in the schedule, the neighbouring key
+            where the two differ, best first.
+            </summary>
+            <param name="fodId">The identifier.</param>
+            <param name="cancellationToken">Cancels a key fetch.</param>
+            <returns>The outcome.</returns>
+            <exception cref="T:System.ArgumentNullException">
+            Thrown when <paramref name="fodId"/> is null.
+            </exception>
+            <exception cref="T:System.Net.Http.HttpRequestException">
+            Thrown when a key fetch was needed and the cloud could not be
+            reached or answered with a status other than 200.
+            </exception>
+        </member>
+        <member name="M:FiftyOne.Did.Client.DidClient.VerifyAsync(FiftyOne.Did.Model.FodId,System.Threading.CancellationToken)">
+            <summary>
+            Verifies the identifier's signature through the cloud's verify
+            endpoint, which needs no licence key and counts as one use.
+            </summary>
+            <param name="fodId">The identifier.</param>
+            <param name="cancellationToken">Cancels the call.</param>
+            <returns>Whether the cloud found the signature valid.</returns>
+            <exception cref="T:System.ArgumentNullException">
+            Thrown when <paramref name="fodId"/> is null.
+            </exception>
+            <exception cref="T:System.Net.Http.HttpRequestException">
+            Thrown when the cloud cannot be reached or answers with an
+            unexpected status.
+            </exception>
+        </member>
+        <member name="M:FiftyOne.Did.Client.DidClient.VerifyAsync(System.String,System.Threading.CancellationToken)">
+            <summary>
+            Verifies a 51Did string's signature through the cloud's verify
+            endpoint, which needs no licence key and counts as one use.
+            Either base64 alphabet is accepted. The identifier is sent as
+            <c>51did</c> and again as <c>owid</c>, the name the endpoint
+            first went live under, so a service of either age answers.
+            </summary>
+            <param name="fodId">The identifier as base64.</param>
+            <param name="cancellationToken">Cancels the call.</param>
+            <returns>Whether the cloud found the signature valid.</returns>
+            <exception cref="T:System.ArgumentException">
+            Thrown when the value is not a 51Did. A value that does not
+            parse is refused here, naming the
+            <see cref="T:FiftyOne.Did.Model.FodIdParseStatus"/>, before any call is made. A
+            value the cloud refuses is reported with the cloud's message.
+            </exception>
+            <exception cref="T:System.Net.Http.HttpRequestException">
+            Thrown when the cloud cannot be reached or answers with an
+            unexpected status.
+            </exception>
+        </member>
+        <member name="M:FiftyOne.Did.Client.DidClient.RedeemAsync(FiftyOne.Did.Model.FodId,System.String,System.String,System.Threading.CancellationToken)">
+            <summary>
+            Redeems a sealed creator context result against the identifier
+            it was made for, sending the licence key where one was given.
+            Counts as one use, the second of the two a browser-based context
+            check costs.
+            </summary>
+            <param name="fodId">The identifier the caller knows independently.</param>
+            <param name="result">The sealed result the browser relayed.</param>
+            <param name="challenge">
+            The single-use challenge given to the verify call, or null where
+            none was.
+            </param>
+            <param name="cancellationToken">Cancels the call.</param>
+            <returns>The typed verdict.</returns>
+            <exception cref="T:System.ArgumentNullException">
+            Thrown when <paramref name="fodId"/> is null.
+            </exception>
+            <exception cref="T:System.ArgumentException">
+            Thrown, with the cloud's message, when the cloud answered 400
+            because the identifier was malformed.
+            </exception>
+            <exception cref="T:System.NotSupportedException">
+            Thrown when the host answered 404, meaning it does not offer the
+            creator context.
+            </exception>
+            <exception cref="T:System.Net.Http.HttpRequestException">
+            Thrown when the cloud cannot be reached or answers with any
+            other unexpected status.
+            </exception>
+        </member>
+        <member name="M:FiftyOne.Did.Client.DidClient.RedeemAsync(System.String,System.String,System.String,System.Threading.CancellationToken)">
+            <summary>
+            Redeems a sealed creator context result against a 51Did string,
+            in either base64 alphabet. See
+            <see cref="M:FiftyOne.Did.Client.DidClient.RedeemAsync(FiftyOne.Did.Model.FodId,System.String,System.String,System.Threading.CancellationToken)"/>.
+            </summary>
+            <param name="fodId">The identifier as base64.</param>
+            <param name="result">The sealed result the browser relayed.</param>
+            <param name="challenge">
+            The single-use challenge given to the verify call, or null where
+            none was.
+            </param>
+            <param name="cancellationToken">Cancels the call.</param>
+            <returns>The typed verdict.</returns>
+            <exception cref="T:System.ArgumentException">
+            Thrown when <paramref name="fodId"/> is empty or does not parse
+            as a 51Did, naming the <see cref="T:FiftyOne.Did.Model.FodIdParseStatus"/>, before
+            any call is made, or with the cloud's message when the cloud
+            answered 400.
+            </exception>
+            <exception cref="T:System.NotSupportedException">
+            Thrown when the host answered 404, meaning it does not offer the
+            creator context.
+            </exception>
+            <exception cref="T:System.Net.Http.HttpRequestException">
+            Thrown when the cloud cannot be reached or answers with any
+            other unexpected status.
+            </exception>
+        </member>
+        <member name="M:FiftyOne.Did.Client.DidClient.Dispose">
+            <summary>
+            Releases the transport when this client created it.
+            </summary>
+        </member>
+        <member name="M:FiftyOne.Did.Client.DidClient.InForceAt(System.Collections.Generic.IReadOnlyList{FiftyOne.Did.Client.DidPublicKey},System.DateTime)">
+            <summary>
+            The entry in force at the moment, being the one whose start is
+            latest on or before it, or null when the moment precedes every
+            entry.
+            </summary>
+            <param name="keys">The schedule, in any order.</param>
+            <param name="at">The moment.</param>
+            <returns>The entry in force, or null.</returns>
+        </member>
+        <member name="M:FiftyOne.Did.Client.DidClient.CandidatesForDate(System.Collections.Generic.IReadOnlyList{FiftyOne.Did.Client.DidPublicKey},System.DateTime)">
+            <summary>
+            The keys that may have signed something created at the moment,
+            best first, being the entry in force and, near a boundary in the
+            schedule, the neighbouring entries where those differ. Empty
+            when the moment precedes the whole schedule.
+            </summary>
+            <param name="keys">The schedule, in any order.</param>
+            <param name="at">The creation moment.</param>
+            <returns>The keys to try.</returns>
+        </member>
+        <member name="M:FiftyOne.Did.Client.DidClient.ParseKeys(System.String)">
+            <summary>
+            Reads the key endpoint's answer, a JSON array of objects each
+            carrying <c>startsAt</c> (or <c>created</c> on a service that
+            predates <c>startsAt</c>) and <c>publicKey</c>. Other fields are
+            ignored.
+            </summary>
+            <param name="json">The response body.</param>
+            <returns>The keys in start order.</returns>
+            <exception cref="T:System.FormatException">
+            Thrown when the body is not an array of such objects.
+            </exception>
+            <exception cref="T:System.Text.Json.JsonException">
+            Thrown when the body is not JSON.
+            </exception>
+        </member>
+        <member name="M:FiftyOne.Did.Client.DidClient.ValidateEncodedValue(System.String,System.String)">
+            <summary>
+            Refuses a string that cannot be a 51Did before any key is
+            fetched or any call is made. The length guard comes first, so
+            that nothing is parsed for a value far larger than any
+            identifier, then the value is parsed, so that a malformed one
+            is named for what it is here rather than sent to the cloud to
+            be refused there. The parse says nothing about the signature,
+            which is the question the call is being made to answer.
+            </summary>
+        </member>
+        <member name="M:FiftyOne.Did.Client.DidClient.ReadErrors(System.String)">
+            <summary>
+            The cloud's <c>errors</c> array joined into one message, or null
+            when the body carries none.
+            </summary>
+        </member>
+        <member name="T:FiftyOne.Did.Client.DidPublicKey">
+            <summary>
+            One entry of the 51Did signing key schedule as the cloud publishes
+            it. A key is in force from <see cref="P:FiftyOne.Did.Client.DidPublicKey.StartsAt"/> until the next
+            entry starts, so the entry whose start is latest on or before an
+            identifier's creation time is the one that signed it.
+            </summary>
+        </member>
+        <member name="M:FiftyOne.Did.Client.DidPublicKey.#ctor(System.DateTime,System.String)">
+            <summary>
+            Creates an entry.
+            </summary>
+            <param name="startsAt">When the key comes into force, UTC.</param>
+            <param name="publicKeyPem">The public key as SPKI PEM.</param>
+            <exception cref="T:System.ArgumentNullException">
+            Thrown when <paramref name="publicKeyPem"/> is null.
+            </exception>
+        </member>
+        <member name="P:FiftyOne.Did.Client.DidPublicKey.StartsAt">
+            <summary>
+            When the key comes into force, UTC. Keys are published up to
+            three months ahead of their start, so an entry may be in the
+            future.
+            </summary>
+        </member>
+        <member name="P:FiftyOne.Did.Client.DidPublicKey.PublicKeyPem">
+            <summary>
+            The public key in SPKI PEM form, as accepted by
+            <c>ECDsa.ImportFromPem</c>.
+            </summary>
+        </member>
+        <member name="T:FiftyOne.Did.Client.FactorOutcome">
+            <summary>
+            The outcome of one creator context factor, reported when the context
+            is <see cref="F:FiftyOne.Did.Client.ContextOutcome.Mismatch"/> or
+            <see cref="F:FiftyOne.Did.Client.ContextOutcome.Misconfigured"/>.
+            </summary>
+        </member>
+        <member name="F:FiftyOne.Did.Client.FactorOutcome.Verified">
+            <summary>The factor matched the verifying connection.</summary>
+        </member>
+        <member name="F:FiftyOne.Did.Client.FactorOutcome.Mismatch">
+            <summary>The factor did not match the verifying connection.</summary>
+        </member>
+        <member name="F:FiftyOne.Did.Client.FactorOutcome.Misconfigured">
+            <summary>
+            The service that checked the identifier is not configured to
+            determine this factor, so it could not have checked it for any
+            request. This is not a mismatch and must not be read as one, since
+            the identifier says nothing about it either way. Nothing a caller
+            sends can produce it.
+            </summary>
+        </member>
+        <member name="T:FiftyOne.Did.Client.RedeemResult">
+            <summary>
+            The typed answer from the cloud's redeem endpoint, built by
+            <see cref="M:FiftyOne.Did.Client.DidClient.RedeemAsync(System.String,System.String,System.String,System.Threading.CancellationToken)"/>
+            from the JSON body. <see cref="P:FiftyOne.Did.Client.RedeemResult.Raw"/> keeps the body as received and
+            <see cref="P:FiftyOne.Did.Client.RedeemResult.StatusCode"/> the HTTP status, so nothing the cloud said
+            is lost in the mapping.
+            </summary>
+        </member>
+        <member name="F:FiftyOne.Did.Client.RedeemResult.VerifiedAtFormat">
+            <summary>
+            The format the cloud writes <c>verifiedAt</c> in, ISO 8601 UTC to
+            the second.
+            </summary>
+        </member>
+        <member name="M:FiftyOne.Did.Client.RedeemResult.#ctor(FiftyOne.Did.Client.ContextOutcome,System.String,FiftyOne.Did.Client.SignatureOutcome,System.Collections.Generic.IReadOnlyDictionary{System.String,FiftyOne.Did.Client.FactorOutcome},System.Nullable{System.DateTime},System.Nullable{System.Int32},System.Int32,System.String)">
+            <summary>
+            Creates a result from its parts. Callers normally get one from
+            <see cref="M:FiftyOne.Did.Client.RedeemResult.FromResponse(System.Int32,System.String)"/> rather than building one.
+            </summary>
+            <param name="context">The mapped context verdict.</param>
+            <param name="contextValue">The raw <c>context</c> string.</param>
+            <param name="signature">The mapped signature outcome.</param>
+            <param name="factors">The per-factor outcomes, or null.</param>
+            <param name="verifiedAt">When the result was sealed, or null.</param>
+            <param name="secondsSinceVerified">The result's age, or null.</param>
+            <param name="statusCode">The HTTP status.</param>
+            <param name="raw">The response body.</param>
+        </member>
+        <member name="P:FiftyOne.Did.Client.RedeemResult.Context">
+            <summary>
+            The creator context verdict, mapped from the <c>context</c>
+            string. A string this client does not recognise maps to
+            <see cref="F:FiftyOne.Did.Client.ContextOutcome.Unreadable"/>, so an unexpected answer
+            never reads as a pass.
+            </summary>
+        </member>
+        <member name="P:FiftyOne.Did.Client.RedeemResult.ContextValue">
+            <summary>
+            The <c>context</c> string exactly as the cloud sent it, or null
+            when the body carried none.
+            </summary>
+        </member>
+        <member name="P:FiftyOne.Did.Client.RedeemResult.Signature">
+            <summary>
+            The signature outcome, mapped from the <c>signature</c> string.
+            <see cref="F:FiftyOne.Did.Client.SignatureOutcome.Unknown"/> when the field is absent,
+            which it is on every outcome other than a redeemed verdict.
+            </summary>
+        </member>
+        <member name="P:FiftyOne.Did.Client.RedeemResult.Factors">
+            <summary>
+            The outcome of each creator context factor by name
+            (<c>transport</c>, <c>device</c>, <c>browserip</c>,
+            <c>connectionip</c>, <c>asn</c>, <c>browser</c>), present only
+            when the cloud sent <c>factors</c>, which it does for a
+            <see cref="F:FiftyOne.Did.Client.ContextOutcome.Mismatch"/>.
+            </summary>
+        </member>
+        <member name="P:FiftyOne.Did.Client.RedeemResult.VerifiedAt">
+            <summary>
+            When the verify endpoint checked the context and sealed the
+            result, UTC. Present on the redeemed and expired outcomes.
+            </summary>
+        </member>
+        <member name="P:FiftyOne.Did.Client.RedeemResult.SecondsSinceVerified">
+            <summary>
+            How long before this redemption the verification happened, in
+            whole seconds by the cloud's clock. Present on the redeemed and
+            expired outcomes.
+            </summary>
+        </member>
+        <member name="P:FiftyOne.Did.Client.RedeemResult.StatusCode">
+            <summary>
+            The HTTP status the cloud answered with, 200 for every verdict
+            and 503 for <see cref="F:FiftyOne.Did.Client.ContextOutcome.Unconfirmed"/>.
+            </summary>
+        </member>
+        <member name="P:FiftyOne.Did.Client.RedeemResult.Raw">
+            <summary>The response body as received.</summary>
+        </member>
+        <member name="M:FiftyOne.Did.Client.RedeemResult.FromResponse(System.Int32,System.String)">
+            <summary>
+            Builds a result from a redeem response. A body that is not a
+            JSON object, or carries no <c>context</c>, gives
+            <see cref="F:FiftyOne.Did.Client.ContextOutcome.Unreadable"/> with the body kept in
+            <see cref="P:FiftyOne.Did.Client.RedeemResult.Raw"/>.
+            </summary>
+            <param name="statusCode">The HTTP status.</param>
+            <param name="body">The response body.</param>
+            <returns>The typed result.</returns>
+        </member>
+        <member name="M:FiftyOne.Did.Client.RedeemResult.ParseContext(System.String)">
+            <summary>
+            Maps a <c>context</c> string to its outcome. Anything not
+            recognised, including null, is
+            <see cref="F:FiftyOne.Did.Client.ContextOutcome.Unreadable"/>.
+            </summary>
+            <param name="value">The <c>context</c> string.</param>
+            <returns>The outcome.</returns>
+        </member>
+        <member name="M:FiftyOne.Did.Client.RedeemResult.ToContextValue(FiftyOne.Did.Client.ContextOutcome)">
+            <summary>
+            The <c>context</c> string the cloud uses for an outcome, the
+            inverse of <see cref="M:FiftyOne.Did.Client.RedeemResult.ParseContext(System.String)"/>.
+            </summary>
+            <param name="outcome">The outcome.</param>
+            <returns>The cloud's word for it.</returns>
+        </member>
+        <member name="M:FiftyOne.Did.Client.RedeemResult.ParseSignature(System.String)">
+            <summary>
+            Maps a <c>signature</c> string to its outcome. Anything not
+            recognised, including null, is
+            <see cref="F:FiftyOne.Did.Client.SignatureOutcome.Unknown"/>.
+            </summary>
+            <param name="value">The <c>signature</c> string.</param>
+            <returns>The outcome.</returns>
+        </member>
+        <member name="T:FiftyOne.Did.Client.SignatureCheck">
+            <summary>
+            The outcome of an offline signature check by
+            <see cref="M:FiftyOne.Did.Client.DidClient.VerifySignatureDetailedAsync(FiftyOne.Did.Model.FodId,System.Threading.CancellationToken)"/>. Only
+            <see cref="F:FiftyOne.Did.Client.SignatureCheck.Verified"/> means the identifier is genuine. The other
+            values say why the check did not pass, for diagnosis.
+            </summary>
+        </member>
+        <member name="F:FiftyOne.Did.Client.SignatureCheck.Verified">
+            <summary>
+            The signature verifies under a signing key in force at the
+            identifier's creation time.
+            </summary>
+        </member>
+        <member name="F:FiftyOne.Did.Client.SignatureCheck.Invalid">
+            <summary>
+            The signature does not verify under any key in force at the
+            identifier's creation time.
+            </summary>
+        </member>
+        <member name="F:FiftyOne.Did.Client.SignatureCheck.NoKeyForDate">
+            <summary>
+            No published signing key covers the identifier's creation time,
+            which happens when the date precedes the whole schedule.
+            </summary>
+        </member>
+        <member name="F:FiftyOne.Did.Client.SignatureCheck.UnsupportedVersion">
+            <summary>The envelope is not OWID version 3.</summary>
+        </member>
+        <member name="F:FiftyOne.Did.Client.SignatureCheck.InvalidLength">
+            <summary>
+            The payload is shorter than the base length for the identifier
+            type.
+            </summary>
+        </member>
+        <member name="T:FiftyOne.Did.Client.SignatureOutcome">
+            <summary>
+            The signature outcome the cloud's redeem endpoint reports, mapped
+            from the <c>signature</c> string in its answer.
+            </summary>
+        </member>
+        <member name="F:FiftyOne.Did.Client.SignatureOutcome.Verified">
+            <summary>
+            The identifier was signed by a 51Degrees signing key.
+            </summary>
+        </member>
+        <member name="F:FiftyOne.Did.Client.SignatureOutcome.Invalid">
+            <summary>
+            The identifier was not signed by a 51Degrees signing key.
+            </summary>
+        </member>
+        <member name="F:FiftyOne.Did.Client.SignatureOutcome.Unknown">
+            <summary>
+            The answer carried no signature outcome. The redeem endpoint
+            only reports one on the redeemed outcome, so every other
+            <see cref="T:FiftyOne.Did.Client.ContextOutcome"/> comes with this value.
+            </summary>
+        </member>
         <member name="T:FiftyOne.Did.Model.FodId">
             <summary>
-            An OWID whose payload encodes the three fields of a 51Did: a 1-byte
-            flags bitmask (usage tier and identifier type), a 4-byte
-            little-endian License Id, and the identifier value.
+            An OWID whose payload encodes the four fields of a 51Did, being a
+            1-byte flags bitmask (usage, payload version and identifier type),
+            a 4-byte little-endian License Id, the match key, and the Terms
+            byte naming the terms document the identifier was created under.
             </summary>
             <remarks>
             <para>
@@ -16,40 +670,72 @@
             the identifier as a whole, meaning the concept and its rules. The
             envelope is the data model that carries it, this OWID, holding the
             version, domain, date, payload and signature, re-issued fresh on
-            every call. The value is the part of the envelope that is stable
+            every call. The match key is the part of the envelope that is stable
             and comparable, the payload bytes after Flags and LicenseId,
-            exposed as <see cref="P:FiftyOne.Did.Model.FodId.Hash"/>. Two responses for the same inputs
-            share the same value but differ at the byte level because the
+            exposed as <see cref="P:FiftyOne.Did.Model.FodId.MatchKey"/>. Two responses for the same inputs
+            share the same match key but differ at the byte level because the
             envelope embeds a fresh date and signature on each call. Compare
-            values, never envelopes.
+            match keys, never envelopes.
             </para>
             <para>
             Payload layout. The header (offsets 0-4) is shared by every
-            identifier type; bits 6-7 of Flags select the type and the length
-            of the value that follows:
-            </para>
-            <list type="table">
-              <listheader><term>Offset</term><term>Length</term><term>Field</term></listheader>
-              <item><term>0</term><term>1</term><term>Flags (bits 0-2 usage, bits 6-7 type)</term></item>
-              <item><term>1</term><term>4</term><term>LicenseId (uint32 LE)</term></item>
-              <item><term>5</term><term>32</term><term>Value: SHA-256 (Probabilistic, HashedEmail)</term></item>
-              <item><term>5</term><term>16</term><term>Value: GUID (Random)</term></item>
-            </list>
-            <para>
-            Inherits <see cref="N:Owid"/> so callers can use OWID-level features
-            (signature verification, base64 round-tripping) directly on a
-            <see cref="T:FiftyOne.Did.Model.FodId"/> instance.
+            identifier type, and bits 6-7 of the flags byte select the type
+            and the length of the match key that follows. The byte structure
+            is specified once for all six languages at
+            https://github.com/51Degrees/specifications/blob/main/did-specification/identifier-layout.md
+            and is not repeated here. What this package exposes, and what it
+            deliberately does not, is at
+            https://github.com/51Degrees/specifications/blob/main/did-specification/package-surface.md
             </para>
             <para>
-            This class does NOT verify the OWID signature on construction. Callers
-            wanting cryptographic verification should call the extension methods on
-            <see cref="N:Owid"/> on this instance after construction.
+            Only a lower bound is applied to the payload. The byte after the
+            match key is the Terms, and anything after that is a creator
+            context section whose lengths belong to the cloud, so a longer
+            payload is accepted here and the same four fields are read. A
+            payload that ends at the match key carries no Terms byte and reads
+            as a Terms of zero, which is the same answer a Terms byte holding
+            zero gives, so nothing has to tell the two apart.
+            </para>
+            <para>
+            Bits 4 and 5 of the flags byte say which payload layout the
+            identifier follows, and this package reads version 0. A payload
+            naming any other version is refused with
+            <see cref="F:FiftyOne.Did.Model.FodIdParseStatus.UnsupportedPayloadVersion"/> rather
+            than read under the layout this package knows, because a later
+            version exists precisely because a field moved, so reading it here
+            would answer with values that are wrong rather than absent. The
+            version is not exposed, because a caller has nothing to decide
+            with it, since either the package read the layout or there is no
+            identifier to read fields from.
+            </para>
+            <para>
+            How an instance comes to exist. An OWID cannot be assembled by a
+            caller, because an unsigned one would be indistinguishable from a
+            signed one downstream. A <see cref="T:FiftyOne.Did.Model.FodId"/> therefore reaches
+            calling code only by parsing bytes that were already a complete,
+            signed envelope, through
+            <see cref="M:FiftyOne.Did.Model.FodId.TryParse(System.String,FiftyOne.Did.Model.FodId@,FiftyOne.Did.Model.FodIdParseStatus@)"/>,
+            <see cref="M:FiftyOne.Did.Model.FodId.TryParse(System.Byte[],FiftyOne.Did.Model.FodId@,FiftyOne.Did.Model.FodIdParseStatus@)"/>,
+            or the throwing constructors and <see cref="M:FiftyOne.Did.Model.FodId.FromBase64(System.String)"/> built on
+            them. Every route runs the same walk, so the rules cannot drift.
+            </para>
+            <para>
+            Parsing is not verification. A parsed <see cref="T:FiftyOne.Did.Model.FodId"/> is
+            structurally a 51Did and nothing more. Whether the signature is
+            genuine is a separate question, answered by
+            <c>SignatureStatus</c> from the OWID library on this instance, or
+            by <c>DidClient.VerifySignatureDetailedAsync</c>, which also picks
+            the signing key in force at the identifier's date.
             </para>
             </remarks>
         </member>
         <member name="F:FiftyOne.Did.Model.FodId.FlagsOffset">
             <summary>
-            Byte offset of the Flags field within the payload.
+            Byte offset of the Flags field within the payload. The byte
+            layout is deliberately not public, because the only reason to
+            want an offset is to read the payload by hand, and the only
+            reason to do that is to read a field that already has a name.
+            See the package surface specification linked above.
             </summary>
         </member>
         <member name="F:FiftyOne.Did.Model.FodId.LicenseIdOffset">
@@ -62,14 +748,14 @@
             Byte length of the License Id field.
             </summary>
         </member>
-        <member name="F:FiftyOne.Did.Model.FodId.HashOffset">
+        <member name="F:FiftyOne.Did.Model.FodId.MatchKeyOffset">
             <summary>
-            Byte offset of the Hash field within the payload.
+            Byte offset of the match key field within the payload.
             </summary>
         </member>
-        <member name="F:FiftyOne.Did.Model.FodId.HashLength">
+        <member name="F:FiftyOne.Did.Model.FodId.MatchKeyLength">
             <summary>
-            Byte length of the Hash field (SHA-256).
+            Byte length of the match key field (SHA-256).
             </summary>
         </member>
         <member name="F:FiftyOne.Did.Model.FodId.HeaderLength">
@@ -80,97 +766,362 @@
         </member>
         <member name="F:FiftyOne.Did.Model.FodId.GuidLength">
             <summary>
-            Byte length of the GUID value carried by Random identifiers.
+            Byte length of the GUID match key carried by Random identifiers.
             </summary>
         </member>
-        <member name="F:FiftyOne.Did.Model.FodId.RandomPayloadLength">
+        <member name="F:FiftyOne.Did.Model.FodId.MinimumRandomPayloadLength">
             <summary>
-            Minimum byte length of a Random 51Did payload
+            Least byte length of a Random 51Did payload
             (Flags + LicenseId + GUID).
             </summary>
         </member>
-        <member name="F:FiftyOne.Did.Model.FodId.PayloadLength">
+        <member name="F:FiftyOne.Did.Model.FodId.MinimumPayloadLength">
             <summary>
-            Minimum byte length of a Probabilistic or HashedEmail 51Did
-            payload (Flags + LicenseId + Hash). Random payloads are
-            shorter - see <see cref="F:FiftyOne.Did.Model.FodId.RandomPayloadLength"/>.
+            Least byte length of a Probabilistic or HashedEmail 51Did
+            payload (Flags + LicenseId + MatchKey). Random payloads are
+            shorter, see <see cref="F:FiftyOne.Did.Model.FodId.MinimumRandomPayloadLength"/>. The
+            length of a particular payload is <c>Payload.Length</c>.
+            </summary>
+        </member>
+        <member name="F:FiftyOne.Did.Model.FodId.SupportedPayloadVersion">
+            <summary>
+            The payload layout version this package reads, carried in bits
+            4 and 5 of the flags byte. Any other version is refused rather
+            than read under this layout.
             </summary>
         </member>
         <member name="P:FiftyOne.Did.Model.FodId.Flags">
             <summary>
-            The 1-byte usage flags bit-mask from the payload.
+            The 1-byte flags bit-mask from the payload, kept for the typed
+            accessors built on it and for the package's own tests. It is
+            not public, because a caller masking the byte for the
+            non-marketing bit would read every marketing identifier as
+            non-marketing. Read <see cref="P:FiftyOne.Did.Model.FodId.Usage"/>,
+            <see cref="P:FiftyOne.Did.Model.FodId.UsageFromConsent"/> and <see cref="P:FiftyOne.Did.Model.FodId.Type"/> instead.
             </summary>
         </member>
         <member name="P:FiftyOne.Did.Model.FodId.Type">
             <summary>
-            The identifier type carried in bits 6-7 of <see cref="P:FiftyOne.Did.Model.FodId.Flags"/>.
+            The identifier type carried in bits 6-7 of the flags byte.
+            </summary>
+        </member>
+        <member name="P:FiftyOne.Did.Model.FodId.Usage">
+            <summary>
+            The usage carried in bits 0-2 of the flags byte, as the
+            highest usage granted. See <see cref="T:FiftyOne.Did.Model.Usage"/> for why
+            it is read that way.
+            </summary>
+        </member>
+        <member name="P:FiftyOne.Did.Model.FodId.UsageFromConsent">
+            <summary>
+            Whether the usage was derived from an IAB consent string the
+            caller sent, rather than stated by the caller directly. Bit 3
+            of the flags byte. Both are legitimate ways to arrive at a
+            usage, and this says nothing about which usage it is.
             </summary>
         </member>
         <member name="P:FiftyOne.Did.Model.FodId.LicenseId">
             <summary>
-            The 4-byte little-endian License Id from the payload.
+            The 4-byte little-endian License Id from the payload, as the
+            raw value of the field. On an identifier carrying a creator
+            context these four bytes hold an encrypted value that only
+            51Degrees can turn back into a licence identifier, so the
+            property identifies nothing outside 51Degrees and two
+            identifiers for the same licence need not share it.
             </summary>
         </member>
-        <member name="P:FiftyOne.Did.Model.FodId.Hash">
+        <member name="P:FiftyOne.Did.Model.FodId.MatchKey">
             <summary>
-            The value bytes from the payload, a 32-byte SHA-256 for
+            The match key from the payload, a 32-byte SHA-256 for
             Probabilistic and HashedEmail identifiers, or 16 GUID bytes for
             Random ones. This is the stable, comparable part of the
-            envelope. Two 51Dids for the same inputs share the same value
-            even though their envelopes (date, signature) differ on every
-            issue. Treat it as the cache / dedup key. SHA-256 is the
-            underlying hash function for the probabilistic and hashed-email
-            types, and the property is named Hash to reflect that.
+            envelope. Two 51Dids for the same inputs share the same match
+            key even though their envelopes (date, signature) differ on
+            every issue. Treat it as the cache / dedup key.
             </summary>
+        </member>
+        <member name="P:FiftyOne.Did.Model.FodId.Terms">
+            <summary>
+            The address of the terms document the identifier was created
+            under, read from the byte after the match key, or <c>null</c>
+            where the identifier names no document this package knows.
+            </summary>
+            <remarks>
+            <para>
+            The byte is an index into a table in the specification and
+            this package turns the index into the address, so a caller
+            never handles the byte. The address is answered and never
+            fetched, so what to do with the document is the caller's
+            decision. It is never an empty string and never an address
+            built from the index.
+            </para>
+            <para>
+            <c>null</c> covers both an index of zero, which says the terms
+            are not stated in the identifier, and an index added to the
+            table after this package was released, which this package
+            cannot name. A caller cannot tell those two apart, which is
+            deliberate, because both lead to the same place, being that
+            the identifier does not say which terms it was created under
+            and the answer has to come from somewhere else. What no
+            package may do is build an address from an index it does not
+            know, since that would name a document nobody wrote.
+            </para>
+            <para>
+            No address does not mean the identifier is unrestricted. Where
+            an identifier may go is a separate question <see cref="P:FiftyOne.Did.Model.FodId.Usage"/>
+            answers, which still bars a non-marketing identifier from a
+            demand source.
+            </para>
+            </remarks>
+        </member>
+        <member name="F:FiftyOne.Did.Model.FodId.DateBase">
+            <summary>
+            The moment the envelope's date field counts minutes from,
+            2020-01-01T00:00:00Z. This is part of the wire encoding rather
+            than of the surface a caller reads, so it is not public.
+            Callers comparing creation times compare
+            <see cref="P:Owid.Client.Model.Owid.Date"/>.
+            </summary>
+        </member>
+        <member name="M:FiftyOne.Did.Model.FodId.TryParse(System.String,FiftyOne.Did.Model.FodId@,FiftyOne.Did.Model.FodIdParseStatus@)">
+            <summary>
+            Reads a 51Did from its base64 form, in either alphabet, saying
+            why rather than throwing when the value is not one.
+            </summary>
+            <param name="value">
+            The encoded envelope, which may be anything at all. The standard
+            alphabet with padding, as the cloud issues it, and the URL-safe
+            alphabet with or without padding, as a page puts it in a link,
+            are both accepted, and surrounding whitespace is ignored. See
+            <see cref="M:FiftyOne.Did.Model.FodId.NormaliseBase64(System.String)"/>.
+            </param>
+            <param name="fodId">
+            The 51Did when this returns true, otherwise null. A value is
+            never handed back for a failure, however far the read got.
+            </param>
+            <param name="status">
+            <see cref="F:FiftyOne.Did.Model.FodIdParseStatus.Parsed"/> when this returns true,
+            otherwise why the value is not a 51Did. A failure the OWID
+            reader found carries the OWID status unchanged.
+            </param>
+            <returns>
+            True when the value is a complete, structurally valid 51Did
+            whose payload meets the minimum for its type. This says nothing
+            about whether the signature is genuine, which is a separate
+            question with its own answer.
+            </returns>
+        </member>
+        <member name="M:FiftyOne.Did.Model.FodId.TryParse(System.Byte[],FiftyOne.Did.Model.FodId@,FiftyOne.Did.Model.FodIdParseStatus@)">
+            <summary>
+            Reads a 51Did from the raw bytes of an envelope, saying why
+            rather than throwing when the bytes are not one.
+            </summary>
+            <param name="buffer">
+            The bytes, which must be one whole envelope and nothing else.
+            </param>
+            <param name="fodId">
+            The 51Did when this returns true, otherwise null.
+            </param>
+            <param name="status">
+            <see cref="F:FiftyOne.Did.Model.FodIdParseStatus.Parsed"/> when this returns true,
+            otherwise why the bytes are not a 51Did. A failure the OWID
+            reader found carries the OWID status unchanged.
+            </param>
+            <returns>
+            True when the bytes are a complete, structurally valid 51Did
+            whose payload meets the minimum for its type. The signature has
+            not been checked.
+            </returns>
         </member>
         <member name="M:FiftyOne.Did.Model.FodId.#ctor(System.String)">
             <summary>
-            Parse a 51Did from its base64-encoded OWID string.
+            Parse a 51Did from its base64-encoded OWID string, in either
+            base64 alphabet. The throwing form of
+            <see cref="M:FiftyOne.Did.Model.FodId.TryParse(System.String,FiftyOne.Did.Model.FodId@,FiftyOne.Did.Model.FodIdParseStatus@)"/>,
+            which runs the same walk and turns a failure into the exception
+            documented below.
             </summary>
             <param name="base64">
             Base64 of the full OWID envelope (version + domain + date +
             length-prefixed payload + 64-byte signature) as produced by the
-            51Degrees cloud service.
+            51Degrees cloud service. The standard alphabet with padding, as
+            the cloud issues it, and the URL-safe alphabet with or without
+            padding, as a page puts it in a link, are both accepted. See
+            <see cref="M:FiftyOne.Did.Model.FodId.NormaliseBase64(System.String)"/>.
             </param>
             <exception cref="T:System.ArgumentNullException">
             Thrown when <paramref name="base64"/> is <c>null</c>.
             </exception>
+            <exception cref="T:System.ArgumentException">
+            Thrown when <paramref name="base64"/> is empty, or when the
+            decoded payload is shorter than the minimum for its identifier
+            type. Anything beyond that minimum is a creator context section,
+            whose exact lengths belong to the cloud, so any longer payload
+            is accepted here.
+            </exception>
             <exception cref="T:System.FormatException">
-            Thrown by the underlying OWID parser when <paramref name="base64"/>
-            is not valid Base64.
+            Thrown when <paramref name="base64"/> is not valid Base64 in
+            either alphabet, or decodes to bytes that are not an OWID
+            envelope. The message names the
+            <see cref="T:FiftyOne.Did.Model.FodIdParseStatus"/> found.
+            </exception>
+        </member>
+        <member name="M:FiftyOne.Did.Model.FodId.FromBase64(System.String)">
+            <summary>
+            Parse a 51Did from its base64-encoded OWID string, in either
+            base64 alphabet. The same as the string constructor, named so
+            the parse reads as one call.
+            </summary>
+            <param name="base64">The envelope as base64.</param>
+            <returns>The parsed 51Did, its signature not yet checked.</returns>
+            <exception cref="T:System.ArgumentNullException">
+            Thrown when <paramref name="base64"/> is <c>null</c>.
             </exception>
             <exception cref="T:System.ArgumentException">
-            Thrown when the decoded payload is shorter than the minimum
-            for its identifier type.
+            Thrown when <paramref name="base64"/> is empty, or when the
+            decoded payload is shorter than the minimum for its identifier
+            type. Any longer payload is accepted.
+            </exception>
+            <exception cref="T:System.FormatException">
+            Thrown when <paramref name="base64"/> is not valid Base64 in
+            either alphabet, or decodes to bytes that are not an OWID
+            envelope.
+            </exception>
+        </member>
+        <member name="M:FiftyOne.Did.Model.FodId.AsBase64Url">
+            <summary>
+            The envelope in the URL-safe base64 alphabet without padding,
+            so it can be put in a URL without further conversion. The
+            inverse of <see cref="M:FiftyOne.Did.Model.FodId.NormaliseBase64(System.String)"/>, and accepted back by
+            <see cref="M:FiftyOne.Did.Model.FodId.FromBase64(System.String)"/> and every cloud endpoint.
+            </summary>
+            <returns>The URL-safe form.</returns>
+        </member>
+        <member name="M:FiftyOne.Did.Model.FodId.NormaliseBase64(System.String)">
+            <summary>
+            Restores a base64 string in either alphabet to the standard
+            alphabet with padding, as <c>Convert.FromBase64String</c>
+            expects. Leading and trailing whitespace is removed first, so a
+            value read from a file or a header with a trailing newline
+            behaves as the clean value does, then <c>-</c> becomes
+            <c>+</c>, <c>_</c> becomes <c>/</c>, and padding is added when
+            the trimmed length modulo 4 is 2 or 3. A value already in the
+            standard form is returned unchanged apart from that trim.
+            </summary>
+            <param name="value">The base64 in either alphabet.</param>
+            <returns>
+            The standard form, or <c>null</c> when <paramref name="value"/>
+            is <c>null</c>.
+            </returns>
+        </member>
+        <member name="M:FiftyOne.Did.Model.FodId.ToBase64Url(System.String)">
+            <summary>
+            Converts standard base64 to the URL-safe alphabet without
+            padding: <c>+</c> becomes <c>-</c>, <c>/</c> becomes <c>_</c>,
+            and trailing <c>=</c> is removed.
+            </summary>
+            <param name="base64">The standard base64.</param>
+            <returns>The URL-safe form.</returns>
+            <exception cref="T:System.ArgumentNullException">
+            Thrown when <paramref name="base64"/> is <c>null</c>.
             </exception>
         </member>
         <member name="M:FiftyOne.Did.Model.FodId.#ctor(System.Byte[])">
             <summary>
-            Parse a 51Did from the raw bytes of an OWID envelope.
+            Parse a 51Did from the raw bytes of an OWID envelope. The
+            throwing form of
+            <see cref="M:FiftyOne.Did.Model.FodId.TryParse(System.Byte[],FiftyOne.Did.Model.FodId@,FiftyOne.Did.Model.FodIdParseStatus@)"/>.
             </summary>
             <param name="buffer">The OWID envelope bytes.</param>
             <exception cref="T:System.ArgumentNullException">
             Thrown when <paramref name="buffer"/> is <c>null</c>.
             </exception>
             <exception cref="T:System.ArgumentException">
-            Thrown when the payload is shorter than the minimum for its
-            identifier type.
+            Thrown when <paramref name="buffer"/> is empty, or when the
+            payload is shorter than the minimum for its identifier type.
+            Any longer payload is accepted.
+            </exception>
+            <exception cref="T:System.FormatException">
+            Thrown when the bytes are not an OWID envelope. The message
+            names the <see cref="T:FiftyOne.Did.Model.FodIdParseStatus"/> found.
             </exception>
         </member>
         <member name="M:FiftyOne.Did.Model.FodId.#ctor(Owid.Client.Model.Owid)">
             <summary>
             Promote an already-parsed OWID into a 51Did by unpacking its
             payload fields. The OWID's Version, Domain, Date, Payload and
-            Signature are copied by reference onto the new instance.
+            Signature are carried onto the new instance. An OWID only
+            exists as the result of a successful parse or of a creator
+            signing one, so the envelope is complete and signed by the time
+            the payload rules run here.
             </summary>
             <param name="owid">The already-parsed OWID envelope.</param>
             <exception cref="T:System.ArgumentNullException">
             Thrown when <paramref name="owid"/> is <c>null</c>.
             </exception>
             <exception cref="T:System.ArgumentException">
-            Thrown when <paramref name="owid"/>'s payload is shorter than
-            the minimum for its identifier type.
+            Thrown when the payload of <paramref name="owid"/> is shorter
+            than the minimum for its identifier type. Any longer payload is
+            accepted.
             </exception>
+        </member>
+        <member name="M:FiftyOne.Did.Model.FodId.#ctor(FiftyOne.Did.Model.FodId.Unpacked@)">
+            <summary>
+            The one constructor that sets state, reached only with fields
+            that <see cref="M:FiftyOne.Did.Model.FodId.TryUnpack(Owid.Client.Model.Owid,FiftyOne.Did.Model.FodId@,FiftyOne.Did.Model.FodIdParseStatus@)"/> has already accepted. The envelope
+            fields are carried by reference from the parsed OWID, which is
+            safe because the OWID library never exposes those arrays
+            without copying.
+            </summary>
+        </member>
+        <member name="F:FiftyOne.Did.Model.FodId._termsIndex">
+            <summary>
+            The Terms byte itself, being the index into the terms table in
+            the specification, and zero where the payload ends at the match
+            key. It is not public, because the package turns the index into
+            the address that <see cref="P:FiftyOne.Did.Model.FodId.Terms"/> answers with and a caller
+            never handles the byte.
+            </summary>
+        </member>
+        <member name="T:FiftyOne.Did.Model.FodId.Unpacked">
+            <summary>
+            The fields of a 51Did once the payload rules have accepted the
+            envelope, so that the constructor that sets state cannot be
+            reached with anything unchecked.
+            </summary>
+        </member>
+        <member name="M:FiftyOne.Did.Model.FodId.TryUnpack(Owid.Client.Model.Owid,FiftyOne.Did.Model.FodId@,FiftyOne.Did.Model.FodIdParseStatus@)">
+            <summary>
+            Builds the instance once <see cref="M:FiftyOne.Did.Model.FodId.Unpack(Owid.Client.Model.Owid,FiftyOne.Did.Model.FodId.Unpacked@)"/> has accepted the
+            envelope, or reports why the envelope is not a 51Did.
+            </summary>
+        </member>
+        <member name="M:FiftyOne.Did.Model.FodId.Unpack(Owid.Client.Model.Owid,FiftyOne.Did.Model.FodId.Unpacked@)">
+            <summary>
+            The 51Did payload rules, applied to an OWID the OWID reader has
+            already accepted. Every route into a <see cref="T:FiftyOne.Did.Model.FodId"/> passes
+            through here, so there is one walk and not two.
+            </summary>
+            <returns>
+            <see cref="F:FiftyOne.Did.Model.FodIdParseStatus.Parsed"/> with
+            <paramref name="unpacked"/> filled, or the reason the payload
+            is not a 51Did with <paramref name="unpacked"/> at its default.
+            </returns>
+        </member>
+        <member name="M:FiftyOne.Did.Model.FodId.Promote(Owid.Client.Model.Owid,System.String)">
+            <summary>
+            Runs the payload rules for the throwing surface, so that the
+            throwing constructors and the non-throwing parse share one
+            walk.
+            </summary>
+        </member>
+        <member name="M:FiftyOne.Did.Model.FodId.ExceptionFor(FiftyOne.Did.Model.FodIdParseStatus,System.String,System.Byte)">
+            <summary>
+            The exception the throwing surface documents for each failure.
+            Nothing supplied and a payload that breaks the 51Did rules are
+            argument problems. A value that is not an envelope at all,
+            whether the base64 or the bytes under it, is a format problem.
+            </summary>
         </member>
         <member name="T:FiftyOne.Did.Model.FodIdExtensions">
             <summary>
@@ -182,10 +1133,12 @@
             This overload turns that string into a parsed <see cref="T:FiftyOne.Did.Model.FodId"/> so a
             consumer can write, for example, <c>idString.As51Did()</c>.
             <para>
-            Error handling is delegated to the existing types rather than reinvented:
-            a value that is not a valid 51Did surfaces the <see cref="T:FiftyOne.Did.Model.FodId"/>
-            constructor's own exceptions. See the per-method remarks for the exact
-            types.
+            Error handling is delegated to the existing types rather than
+            reinvented. A value that is not a valid 51Did surfaces the
+            <see cref="T:FiftyOne.Did.Model.FodId"/> constructor's own exceptions, and code that
+            would rather have a reason than an exception uses
+            <see cref="M:FiftyOne.Did.Model.FodId.TryParse(System.String,FiftyOne.Did.Model.FodId@,FiftyOne.Did.Model.FodIdParseStatus@)"/>
+            directly. See the per-method remarks for the exact types.
             </para>
             <para>
             Note this type intentionally takes no dependency on the pipeline: a
@@ -209,12 +1162,134 @@
             </exception>
             <exception cref="T:System.FormatException">
             Thrown (by the <see cref="T:FiftyOne.Did.Model.FodId"/> constructor) when
-            <paramref name="value"/> is not valid Base64.
+            <paramref name="value"/> is not valid Base64 in either alphabet
+            or does not decode to an OWID envelope.
             </exception>
             <exception cref="T:System.ArgumentException">
-            Thrown (by the <see cref="T:FiftyOne.Did.Model.FodId"/> constructor) when the decoded
-            payload is shorter than the minimum for its identifier type.
+            Thrown (by the <see cref="T:FiftyOne.Did.Model.FodId"/> constructor) when
+            <paramref name="value"/> is empty or the decoded payload is
+            shorter than the minimum for its identifier type.
             </exception>
+        </member>
+        <member name="T:FiftyOne.Did.Model.FodIdParseStatus">
+            <summary>
+            Why a parse of a 51Did succeeded or failed.
+            </summary>
+            <remarks>
+            <para>
+            A 51Did is read from whatever a caller was given, which on a public
+            endpoint means anything at all, so every one of these outcomes is an
+            ordinary result rather than a fault. The vocabulary is the OWID one,
+            <see cref="T:Owid.Client.Model.OwidParseStatus"/>, carried through unchanged with the
+            same names and values, plus the two outcomes that belong to the
+            51Did payload rules. A failure the OWID reader found is reported
+            exactly as the OWID reader named it and is never collapsed into a
+            more general one.
+            </para>
+            <para>
+            <see cref="F:FiftyOne.Did.Model.FodIdParseStatus.Parsed"/> says the bytes form a 51Did. It says nothing
+            about the signature, which is a separate question answered by
+            <c>SignatureStatus</c> on the parsed value or by
+            <c>DidClient.VerifySignatureDetailedAsync</c>.
+            </para>
+            </remarks>
+        </member>
+        <member name="F:FiftyOne.Did.Model.FodIdParseStatus.Parsed">
+            <summary>
+            The bytes form a structurally valid 51Did whose payload meets the
+            minimum for its identifier type. The signature has not been
+            checked.
+            </summary>
+        </member>
+        <member name="F:FiftyOne.Did.Model.FodIdParseStatus.MissingInput">
+            <summary>
+            Nothing was supplied to parse.
+            </summary>
+        </member>
+        <member name="F:FiftyOne.Did.Model.FodIdParseStatus.InvalidInputType">
+            <summary>
+            The input was supplied in a form the surface cannot read.
+            </summary>
+        </member>
+        <member name="F:FiftyOne.Did.Model.FodIdParseStatus.InvalidBase64">
+            <summary>
+            The string is not valid base64 in either alphabet, so there are
+            no bytes to read.
+            </summary>
+        </member>
+        <member name="F:FiftyOne.Did.Model.FodIdParseStatus.UnsupportedVersion">
+            <summary>
+            The first byte names an OWID version this implementation does
+            not know.
+            </summary>
+        </member>
+        <member name="F:FiftyOne.Did.Model.FodIdParseStatus.UnexpectedEnd">
+            <summary>
+            The data stopped in the middle of an envelope field.
+            </summary>
+        </member>
+        <member name="F:FiftyOne.Did.Model.FodIdParseStatus.InvalidDomainEncoding">
+            <summary>
+            The creator domain is not terminated, or is longer than the
+            published maximum.
+            </summary>
+        </member>
+        <member name="F:FiftyOne.Did.Model.FodIdParseStatus.ByteCountMismatch">
+            <summary>
+            The declared payload byte count disagrees with the bytes
+            actually present.
+            </summary>
+        </member>
+        <member name="F:FiftyOne.Did.Model.FodIdParseStatus.ImplementationCapacityExceeded">
+            <summary>
+            The envelope is structurally consistent but larger than this
+            runtime can hold, or dated past the end of the year 9999 where
+            <see cref="T:System.DateTime"/> stops.
+            </summary>
+            <remarks>
+            The four byte minute count of OWID versions 2 and 3 runs to 15
+            February 10186. A count past the end of 9999 is one the wire
+            format allows and this runtime cannot represent, so the OWID
+            reader judges the count before the arithmetic and answers with
+            this status rather than throwing. The same bytes read fine
+            where the date type is wider, so the status is not a fault in
+            the data.
+            </remarks>
+        </member>
+        <member name="F:FiftyOne.Did.Model.FodIdParseStatus.MalformedEnvelope">
+            <summary>
+            The envelope is malformed in a way no other status describes.
+            </summary>
+        </member>
+        <member name="F:FiftyOne.Did.Model.FodIdParseStatus.AbsentNode">
+            <summary>
+            The OWID version 0 marker, which stands for an absent node and
+            is never a 51Did.
+            </summary>
+        </member>
+        <member name="F:FiftyOne.Did.Model.FodIdParseStatus.PayloadTooShort">
+            <summary>
+            The envelope is a valid OWID but its payload is shorter than the
+            five byte 51Did header (one byte of flags and a four byte
+            licence id), so the identifier type cannot be read.
+            </summary>
+        </member>
+        <member name="F:FiftyOne.Did.Model.FodIdParseStatus.InvalidTypePayloadLength">
+            <summary>
+            The payload holds the header but is shorter than the minimum for
+            the identifier type the header names, being the header plus 16
+            GUID bytes for Random and the header plus 32 hash bytes for
+            Probabilistic and HashedEmail.
+            </summary>
+        </member>
+        <member name="F:FiftyOne.Did.Model.FodIdParseStatus.UnsupportedPayloadVersion">
+            <summary>
+            Bits 4 and 5 of the flags byte name a payload layout version
+            this package does not know, so the fields are not read. A later
+            version exists precisely because a field moved, so reading the
+            payload under the layout this package knows would answer with
+            values that are wrong rather than absent.
+            </summary>
         </member>
         <member name="T:FiftyOne.Did.Model.IdType">
             <summary>
@@ -246,15 +1321,226 @@
             unpacked and the remaining payload bytes are exposed as-is.
             </summary>
         </member>
+        <member name="T:FiftyOne.Did.Model.Terms">
+            <summary>
+            The terms document a 51Did was created under, carried in the byte
+            after the match key so that the terms travel with the identifier
+            rather than beside it. A receiver may only use an identifier
+            created for marketing where it has accepted the terms that
+            identifier was created under, and an identifier passed on its own,
+            as a query string parameter for instance, arrives with nowhere to
+            put a separate answer.
+            <para>
+            The byte is an index into a table in the specification and is not
+            a version number, so that a later document can live at any address
+            rather than only at one a number could be composed into. An index
+            is never reused or repointed once published, because repointing
+            one rewrites what an identifier already issued says it agreed to.
+            The table is the whole of the definition, at
+            https://github.com/51Degrees/specifications/blob/main/did-specification/identifier-layout.md#terms
+            and every package has to be released to know a new row in it.
+            </para>
+            <para>
+            The named value is deliberately not the index. Every one of the
+            256 byte values is a possible index, so no byte could stand for
+            <see cref="F:FiftyOne.Did.Model.Terms.Unknown"/>, which is why this is not a byte-backed
+            enumeration as <see cref="T:FiftyOne.Did.Model.Usage"/> and <see cref="T:FiftyOne.Did.Model.IdType"/> are.
+            </para>
+            <para>
+            It is not public, and neither is the index behind it. The package
+            turns the index into the address that <see cref="P:FiftyOne.Did.Model.FodId.Terms"/>
+            answers with, so a caller never handles the byte, and the names
+            here are the ones the specification gives so that every package
+            describes one document the same way.
+            </para>
+            <para>
+            The usage says where an identifier may go and the terms say which
+            document it was created under, so they answer different questions
+            and a receiver needs both. See <see cref="T:FiftyOne.Did.Model.Usage"/>.
+            </para>
+            </summary>
+        </member>
+        <member name="F:FiftyOne.Did.Model.Terms.NotStated">
+            <summary>
+            The terms are not stated in the identifier. This is what an
+            identifier whose payload ends at the match key reads as, and
+            what a non-marketing identifier carries, because the Model
+            Terms govern marketing and a non-marketing identifier is not
+            created under them.
+            <para>
+            It does not mean the identifier is unrestricted. It means only
+            that the identifier does not carry the answer, so the answer
+            has to come from somewhere else, being the Terms Document
+            Locator in an OpenRTB request or whatever the surrounding
+            protocol provides. Where an identifier may go is a separate
+            question answered by <see cref="T:FiftyOne.Did.Model.Usage"/>, which still bars a
+            non-marketing identifier from a demand source.
+            </para>
+            </summary>
+        </member>
+        <member name="F:FiftyOne.Did.Model.Terms.ModelTermsForMarketing2">
+            <summary>
+            The Model Terms for Marketing, version 2, whose address
+            <see cref="P:FiftyOne.Did.Model.FodId.Terms"/> gives.
+            </summary>
+        </member>
+        <member name="F:FiftyOne.Did.Model.Terms.Unknown">
+            <summary>
+            An index added to the table after this package was released,
+            so this package cannot name the document. It is not
+            <see cref="F:FiftyOne.Did.Model.Terms.NotStated"/>, because <see cref="F:FiftyOne.Did.Model.Terms.NotStated"/> says
+            no terms are stated whilst this says terms are stated that
+            this package cannot name, and a receiver confusing the two
+            would read an identifier created under terms as one created
+            under none. A caller meeting this should treat the identifier
+            as covered by terms it cannot yet read, and either take a
+            newer package or refuse the identifier. It answers with no
+            address, as <see cref="F:FiftyOne.Did.Model.Terms.NotStated"/> does, because no package
+            may build an address from an index it does not know.
+            </summary>
+        </member>
+        <member name="T:FiftyOne.Did.Model.TermsTable">
+            <summary>
+            The terms table from the specification, which is the whole of the
+            definition of which index is which document. It is at
+            https://github.com/51Degrees/specifications/blob/main/did-specification/identifier-layout.md#terms
+            and this class is the only place in the shipped code that carries
+            it. The tests write the address out again on purpose, so that a test
+            never compares the reader with itself.
+            <para>
+            A new terms document is a new row in <see cref="F:FiftyOne.Did.Model.TermsTable.Addresses"/> and a
+            new member of <see cref="T:FiftyOne.Did.Model.Terms"/> holding its index, and nothing
+            else in the package changes. That is the point of the index being
+            an index rather than a version number, so the cost of a new
+            document is one row and not a search for every place a number was
+            written down.
+            </para>
+            </summary>
+        </member>
+        <member name="F:FiftyOne.Did.Model.TermsTable.Addresses">
+            <summary>
+            The address of each terms document this package knows, keyed by
+            the named value whose own value is the index carried in the
+            payload. An index absent from here is one this package cannot
+            name, and it answers with no address rather than an address
+            composed from the number, since composing one would name a
+            document nobody wrote.
+            <para>
+            Each address names an exact version rather than a landing page,
+            because a document at an unversioned address can be edited
+            afterwards and a receiver has to know the document that was in
+            force when the identifier was made.
+            </para>
+            </summary>
+        </member>
+        <member name="P:FiftyOne.Did.Model.TermsTable.NotStatedIndex">
+            <summary>
+            The index that says the terms are not stated in the identifier.
+            A payload ending at the match key reads as this, so absence and
+            a zero byte mean the same thing and nothing has to tell them
+            apart.
+            </summary>
+        </member>
+        <member name="M:FiftyOne.Did.Model.TermsTable.Named(System.Byte)">
+            <summary>
+            The named value for a Terms index, being
+            <see cref="F:FiftyOne.Did.Model.Terms.NotStated"/> for zero, the member for an index
+            in the table, and <see cref="F:FiftyOne.Did.Model.Terms.Unknown"/> for anything
+            else.
+            </summary>
+        </member>
+        <member name="M:FiftyOne.Did.Model.TermsTable.AddressFor(System.Byte)">
+            <summary>
+            The address for a Terms index, and <c>null</c> where there is
+            none to give, being index zero and an index this package cannot
+            name. Neither is in <see cref="F:FiftyOne.Did.Model.TermsTable.Addresses"/>, so one lookup
+            answers both.
+            </summary>
+        </member>
+        <member name="T:FiftyOne.Did.Model.Usage">
+            <summary>
+            The usage a 51Did was created for, carried in bits 0-2 of
+            the 51Did flags byte. It decides where the identifier may
+            go: one created for <see cref="F:FiftyOne.Did.Model.Usage.NonMarketing"/> must never be
+            passed to a demand source, and one created for
+            <see cref="F:FiftyOne.Did.Model.Usage.Standard"/> or <see cref="F:FiftyOne.Did.Model.Usage.Personalized"/> may be
+            passed only to a recipient that has accepted the applicable terms.
+            <para>
+            The three usages are cumulative rather than exclusive in the byte.
+            Non-marketing sets bit 0, standard sets bits 0 and 1, and
+            personalized sets bits 0, 1 and 2, so every marketing identifier
+            also carries the non-marketing bit. A caller who masked the byte
+            for that bit alone would read every marketing identifier as
+            non-marketing, which is the wrong way round for a data protection
+            decision. <see cref="P:FiftyOne.Did.Model.FodId.Usage"/> answers with the highest
+            usage granted, so that mistake cannot be made.
+            </para>
+            <para>
+            The names match the cloud's <c>id.usage</c> values,
+            <c>non-marketing</c>, <c>standard</c> and <c>personalized</c>, and
+            are the same in every 51Did package.
+            </para>
+            </summary>
+        </member>
+        <member name="F:FiftyOne.Did.Model.Usage.None">
+            <summary>
+            No usage bit is set. The cloud never issues such an identifier,
+            so this is an identifier from somewhere else or a damaged one,
+            and it should be treated as though it may not be passed on.
+            </summary>
+        </member>
+        <member name="F:FiftyOne.Did.Model.Usage.NonMarketing">
+            <summary>
+            Created for use that is not marketing. Must not be passed to a
+            demand source.
+            </summary>
+        </member>
+        <member name="F:FiftyOne.Did.Model.Usage.Standard">
+            <summary>
+            Created for standard marketing, being targeting unrelated to
+            the person's browsing history or interactions.
+            </summary>
+        </member>
+        <member name="F:FiftyOne.Did.Model.Usage.Personalized">
+            <summary>
+            Created for personalized marketing, being targeting related to
+            the person's browsing history or interactions.
+            </summary>
+        </member>
         <member name="F:Owid.Client.Constants.BaseDate">
             <summary>
             The base data for OWIDs. The date and time information is stored
             in hours or minutes after this date.
             </summary>
         </member>
+        <member name="F:Owid.Client.Constants.MaximumMinutes">
+            <summary>
+            The largest count of minutes after <see cref="F:Owid.Client.Constants.BaseDate"/> that a
+            <see cref="T:System.DateTime"/> can hold, which is 4,197,074,399 and lands
+            on 9999-12-31 23:59. The four byte count in versions 2 and 3 runs
+            to 4,294,967,295, which is 15 February 10186, so a count above
+            this is one the wire format allows and this runtime cannot
+            represent. Derived from <see cref="F:System.DateTime.MaxValue"/> rather
+            than written as a number so it cannot drift from the runtime.
+            </summary>
+        </member>
         <member name="F:Owid.Client.Constants.SignatureLength">
             <summary>
             The length of an OWID signature in bytes. 
+            </summary>
+        </member>
+        <member name="F:Owid.Client.Constants.MaximumDomainLength">
+            <summary>
+            The greatest number of characters a creator domain can have.
+            RFC 1035 section 2.3.4 "Size limits" says that "the total length
+            of a domain name (i.e., label octets and label length octets) is
+            restricted to 255 octets or less". Those 255 octets are the wire
+            format, which spends one length octet on every label and one zero
+            octet on the root, whereas an OWID stores the presentation form,
+            the text "example.com", where a dot stands in for every label
+            length octet apart from the first, which has no dot in front of
+            it, and the root octet has no text form at all, so the same limit
+            is 253 characters once those two octets are taken away.
             </summary>
         </member>
         <member name="F:Owid.Client.Constants.Empty">
@@ -287,8 +1573,11 @@
             <param name="configuration">
             Configuration to use.
             </param>
-            <exception cref="T:System.ArithmeticException">
+            <exception cref="T:System.ArgumentException">
             <paramref name="configuration"/>.<see cref="P:Owid.Client.Model.Configuration.OwidConfiguration.Domain"/> is empty or whitespace.
+            </exception>
+            <exception cref="T:System.ArgumentException">
+            <paramref name="configuration"/>.<see cref="P:Owid.Client.Model.Configuration.OwidConfiguration.Domain"/> is longer than a domain can be.
             </exception>
         </member>
         <member name="M:Owid.Client.Creator.#ctor(System.String,System.Security.Cryptography.ECDsa)">
@@ -307,45 +1596,88 @@
             <exception cref="T:System.ArgumentNullException">
               <paramref name="crypto" />'s <see cref="P:System.Security.Cryptography.HashAlgorithmName.Name" /> is <see langword="null" />.
             </exception>
+            <exception cref="T:System.ArgumentException">
+              <paramref name="domain" /> is longer than a domain can be.
+            </exception>
+        </member>
+        <member name="M:Owid.Client.Creator.Create(System.String)">
+            <summary>
+            Create a new OWID for the creator containing the value as the 
+            payload.
+            </summary>
+            <param name="value">Payload value</param>
+            <returns>Signed OWID with payload provided.</returns>
+        </member>
+        <member name="M:Owid.Client.Creator.Create(System.Byte[])">
+            <summary>
+            Create a new OWID for the creator containing the value as the 
+            payload.
+            </summary>
+            <param name="value">Payload value</param>
+            <returns>Signed OWID with payload provided.</returns>
         </member>
         <member name="M:Owid.Client.Creator.Sign(Owid.Client.Model.Owid)">
             <summary>
-            Sign the OWID provided.
+            Sign the OWID provided, stamping it with the moment of signing.
             </summary>
-            <param name="owid"></param>
-            <returns></returns>
         </member>
-        <member name="M:Owid.Client.Creator.Sign(Owid.Client.Model.Owid,Owid.Client.Model.Owid[])">
+        <member name="M:Owid.Client.Creator.Sign(Owid.Client.Model.Owid,System.DateTime)">
             <summary>
-            Sign the OWID provided AND the other OWIDs provided.
+            Sign the OWID provided, stamping it with the date given rather
+            than the moment of signing. The signature covers the OWID's own
+            bytes without the signature field and nothing else.
             </summary>
-            <param name="owid"></param>
-            <param name="others"></param>
-            <returns></returns>
         </member>
-        <member name="M:Owid.Client.Creator.SignWithOthers(Owid.Client.Model.Owid,Owid.Client.Model.Owid[])">
+        <member name="M:Owid.Client.Creator.Create(System.Byte[],System.DateTime)">
             <summary>
-            Sign the OWID provided AND the other OWIDs provided.
-            </summary>
-            <param name="owid"></param>
-            <param name="others"></param>
-            <returns></returns>
-        </member>
-        <member name="M:Owid.Client.Creator.Sign(System.String)">
-            <summary>
-            Create a new OWID for the creator containing the value as the 
-            payload.
+            Creates and signs an OWID carrying the value and the date.
             </summary>
             <param name="value">Payload value</param>
-            <returns>Signed OWID with payload provided.</returns>
+            <param name="date">
+            The date the OWID states. A caller that wants an OWID to say less
+            than the moment it was made - the day rather than the minute, say,
+            so that two identifiers issued to the same person an hour apart
+            cannot be told apart by their dates - supplies that date here.
+            Converted to UTC, and truncated to the whole minute the wire
+            format carries, so the OWID in hand states exactly what its bytes
+            state.
+            </param>
+            <returns>Signed OWID with the payload and date provided.</returns>
+            <exception cref="T:System.ArgumentOutOfRangeException">
+            <paramref name="date"/> is before the base date the format counts
+            minutes from. That date cannot be written, and casting it into the
+            count would silently record a far later one.
+            </exception>
         </member>
-        <member name="M:Owid.Client.Creator.Sign(System.Byte[])">
+        <member name="M:Owid.Client.Creator.ToStampedDate(System.DateTime)">
             <summary>
-            Create a new OWID for the creator containing the value as the 
-            payload.
+            The date as the OWID will state it: UTC, and whole minutes,
+            because versions 2 and 3 count minutes since
+            <see cref="F:Owid.Client.Constants.BaseDate"/> and anything finer is dropped on
+            the way to the bytes. Doing it here means the OWID a caller holds
+            says the same thing as the OWID it hands on, which matters because
+            the signature covers the bytes.
             </summary>
-            <param name="value">Payload value</param>
-            <returns>Signed OWID with payload provided.</returns>
+            <remarks>
+            A date of <see cref="F:System.DateTimeKind.Unspecified"/> is taken as UTC.
+            The alternative, reading it as local time, would silently move an
+            identifier by the machine's offset and make the same call produce
+            different OWIDs on different servers.
+            </remarks>
+        </member>
+        <member name="M:Owid.Client.Creator.ValidateDomain(System.String,System.String)">
+            <summary>
+            Refuses a creator domain longer than the maximum a domain can
+            have, being the same maximum the envelope read uses, at the
+            point the caller supplies the domain. Taking the domain here
+            means the caller is told where they gave the value, before any
+            key is used and before anything is signed or serialised, rather
+            than at the consumer that later cannot parse the result. The
+            serialisation of the domain refuses the same value again, so a
+            domain that arrives by some other route is still refused. A
+            domain at or under the maximum, and an absent domain, behave
+            exactly as they did before.
+            </summary>
         </member>
         <member name="T:Owid.Client.CryptoExtensions">
             <summary>
@@ -359,16 +1691,158 @@
             compressed data streams.
             </summary>
         </member>
-        <member name="F:Owid.Client.CryptoExtensions._publicKeyCache">
+        <member name="F:Owid.Client.CryptoExtensions.MaximumCachedKeys">
             <summary>
-            Cache used to avoid repeat requests for the same public keys.
+            The most public keys held at once, across every creator. The
+            cache is emptied rather than trimmed when it reaches this, which
+            costs the keys still in use one request each as they are asked
+            for again and keeps the bookkeeping to a count. The other ports
+            hold the same number the same way.
             </summary>
         </member>
-        <member name="M:Owid.Client.CryptoExtensions.VerifyAsync(Owid.Client.Model.Owid)">
+        <member name="F:Owid.Client.CryptoExtensions.ClockDriftAllowanceMinutes">
             <summary>
-            Verify that <see cref="N:Owid"/> signature is correct.
+            How far a creator's clock may run ahead of or behind this one's,
+            in minutes.
+            </summary>
+            <remarks>
+            It is used in two places. A creator that does not state the end
+            of the span of the key it answers with reads a date later than
+            its own now as now, so within this window of now this process
+            cannot tell whether the creator read the minute as its past or
+            as its present, and nothing learned from such an answer is held
+            or served. And a creator's signing machines may not agree with
+            the creator's own schedule to the minute, so an identifier dated
+            within this window of an edge of the span the creator stated for
+            a key that does not verify under that key is checked against the
+            key for the minute just beyond that edge before it is reported as
+            not matching.
+            </remarks>
+        </member>
+        <member name="T:Owid.Client.CryptoExtensions.HeldKey">
+            <summary>
+            One key a creator has answered with, and the span of minutes the
+            key is known to cover.
+            </summary>
+            <remarks>
+            A creator's key is in force from the start of its period until
+            the next key starts, so a key the creator confirms at two minutes
+            was in force at every minute between them. Where the creator
+            stated the span in its answer the span is explicit and complete,
+            and an identifier dated anywhere inside it is verified without a
+            request. Otherwise the span grows as the creator confirms the same
+            key for more minutes.
+            </remarks>
+        </member>
+        <member name="P:Owid.Client.CryptoExtensions.HeldKey.Pem">
+            <summary>
+            The key in PEM form, as the creator served it.
+            </summary>
+        </member>
+        <member name="P:Owid.Client.CryptoExtensions.HeldKey.First">
+            <summary>
+            The earliest minute the key is known to cover.
+            </summary>
+        </member>
+        <member name="P:Owid.Client.CryptoExtensions.HeldKey.Last">
+            <summary>
+            The latest minute the key is known to cover.
+            </summary>
+        </member>
+        <member name="P:Owid.Client.CryptoExtensions.HeldKey.Explicit">
+            <summary>
+            Whether the creator stated the whole span itself.
+            </summary>
+        </member>
+        <member name="P:Owid.Client.CryptoExtensions.HeldKey.OpenEnded">
+            <summary>
+            Whether the creator stated the start of the span and no end,
+            so that as far as the creator has said the key is in force
+            until further notice, whatever this cache holds it for.
+            </summary>
+        </member>
+        <member name="M:Owid.Client.CryptoExtensions.HeldKey.Covers(System.UInt32)">
+            <summary>
+            Whether the minute lies within the known span.
+            </summary>
+        </member>
+        <member name="T:Owid.Client.CryptoExtensions.KeyAnswer">
+            <summary>
+            What the cache or a fetch answers with. The key, and where it is
+            stated one, the span of minutes the creator says the key covers,
+            so that a caller can tell whether the identifier it is checking
+            sits near an edge of the span, or outside it altogether. A span
+            stated with a start and no end runs to the last minute there is.
+            </summary>
+        </member>
+        <member name="P:Owid.Client.CryptoExtensions.KeyAnswer.Pem">
+            <summary>The key in PEM form.</summary>
+        </member>
+        <member name="P:Owid.Client.CryptoExtensions.KeyAnswer.First">
+            <summary>The first minute the creator says the key covers.</summary>
+        </member>
+        <member name="P:Owid.Client.CryptoExtensions.KeyAnswer.Last">
+            <summary>The last minute the creator says the key covers.</summary>
+        </member>
+        <member name="P:Owid.Client.CryptoExtensions.KeyAnswer.Known">
+            <summary>Whether the creator stated a span at all.</summary>
+        </member>
+        <member name="M:Owid.Client.CryptoExtensions.KeyAnswer.Covers(System.UInt32)">
+            <summary>Whether the minute lies within the stated span.</summary>
+        </member>
+        <member name="F:Owid.Client.CryptoExtensions._cacheLock">
+            <summary>
+            Guards <see cref="F:Owid.Client.CryptoExtensions._publicKeyCache"/>, <see cref="F:Owid.Client.CryptoExtensions._heldKeys"/>
+            and <see cref="F:Owid.Client.CryptoExtensions._inFlight"/>. Held across a few dictionary and
+            list operations only, never across a request.
+            </summary>
+        </member>
+        <member name="F:Owid.Client.CryptoExtensions._publicKeyCache">
+            <summary>
+            Keys already fetched, by the creator's key end point, which is
+            the key URL without its date. Each end point holds the keys the
+            creator has answered with, each with the span of minutes it is
+            known to cover.
+            </summary>
+            <remarks>
+            The key URL carries the date of the OWID being verified, in
+            minutes, and a creator's key changes on the order of a week.
+            Keyed by end point and span rather than by the whole URL, an identifier dated inside
+            a span the creator has stated or confirmed is verified without a
+            request. The domain and the date come from the OWIDs presented to
+            this process rather than from the process itself, so the number
+            of keys held is bounded by <see cref="F:Owid.Client.CryptoExtensions.MaximumCachedKeys"/>.
+            </remarks>
+        </member>
+        <member name="F:Owid.Client.CryptoExtensions._heldKeys">
+            <summary>
+            How many keys are held across every end point.
+            </summary>
+        </member>
+        <member name="F:Owid.Client.CryptoExtensions._inFlight">
+            <summary>
+            Requests under way, by the dated URL asked for, so that callers
+            arriving together share one request rather than each making
+            their own. An entry is removed when its request ends, whatever
+            the outcome, so a failure is never handed to a later caller.
+            </summary>
+        </member>
+        <member name="P:Owid.Client.CryptoExtensions.CachedKeyCount">
+            <summary>
+            How many keys the cache holds, for the tests.
+            </summary>
+        </member>
+        <member name="M:Owid.Client.CryptoExtensions.VerifyAsync(Owid.Client.Model.Owid,System.Threading.CancellationToken)">
+            <summary>
+            Verify that <see cref="N:Owid"/> signature is correct, fetching the
+            public key from the creator's domain over HTTPS.
             </summary>
             <param name="owid"></param>
+            <param name="cancellationToken">
+            Ends this caller's wait for the key. See
+            <see cref="M:Owid.Client.CryptoExtensions.GetPublicKeyAsync(System.Uri,System.Threading.CancellationToken)"/> for what
+            that does and does not cancel.
+            </param>
             <returns></returns>
         </member>
         <member name="M:Owid.Client.CryptoExtensions.VerifyAsync(Owid.Client.Model.Owid,System.Security.Cryptography.ECDsa)">
@@ -379,56 +1853,294 @@
             <param name="crypto"></param>
             <returns></returns>
         </member>
-        <member name="M:Owid.Client.CryptoExtensions.VerifyAsync(Owid.Client.Model.Owid,Owid.Client.Model.Owid[])">
+        <member name="M:Owid.Client.CryptoExtensions.SignatureStatus(Owid.Client.Model.Owid,System.Security.Cryptography.ECDsa)">
             <summary>
-            Verify that <see cref="N:Owid"/> signature is correct.
+            Says whether the signature is genuine, or why that could not be
+            decided.
             </summary>
-            <param name="owid"></param>
-            <param name="others"></param>
-            <returns></returns>
+            <remarks>
+            Only two of the answers are about the signature. The rest say the
+            question could not be answered, which is a different thing and must
+            never be reported as a forgery. A key that cannot be decoded leaves
+            the signature unjudged, and a caller acting on "invalid" would
+            reject good identifiers during an outage. 
+            </remarks>
         </member>
-        <member name="M:Owid.Client.CryptoExtensions.VerifyAsync(Owid.Client.Model.Owid,System.Security.Cryptography.ECDsa,Owid.Client.Model.Owid[])">
+        <member name="M:Owid.Client.CryptoExtensions.SignatureStatus(Owid.Client.Model.Owid,System.String)">
             <summary>
-            Verify that <see cref="N:Owid"/> signature is correct.
+            Says whether the signature is genuine using the public key in PEM
+            form, or why that could not be decided.
+            </summary>
+        </member>
+        <member name="M:Owid.Client.CryptoExtensions.Verify(Owid.Client.Model.Owid,System.Security.Cryptography.ECDsa)">
+            <summary>
+            Verify that <see cref="N:Owid"/> signature is correct without any
+            asynchronous machinery. Verification is a short CPU-bound
+            operation, so callers on a request path should prefer this over
+            the asynchronous methods, which remain for compatibility.
             </summary>
             <param name="owid"></param>
             <param name="crypto"></param>
-            <param name="others"></param>
             <returns></returns>
         </member>
-        <member name="M:Owid.Client.CryptoExtensions.VerifyAsyncWithOthers(Owid.Client.Model.Owid,System.Security.Cryptography.ECDsa,Owid.Client.Model.Owid[])">
+        <member name="M:Owid.Client.CryptoExtensions.KeyEndPointFor(Owid.Client.Model.Owid,System.String)">
             <summary>
-            Verify that <see cref="N:Owid"/> signature is correct.
+            The creator's key end point for the OWID over the scheme given,
+            being the key URL without its query.
             </summary>
-            <param name="owid"></param>
-            <param name="crypto"></param>
-            <param name="others"></param>
-            <returns></returns>
         </member>
-        <member name="M:Owid.Client.CryptoExtensions.GetDataForCrypto(Owid.Client.Model.Owid,Owid.Client.Model.Owid[])">
+        <member name="M:Owid.Client.CryptoExtensions.KeyUriFor(System.String,System.Nullable{System.UInt32})">
             <summary>
-            Adds the fields from this OWID to the byte buffer without the 
-            signature. Adds all the bytes of the others to the data.
+            The key URL asking the end point for the key in force at the
+            minute, or for the key in force now where there is no minute.
             </summary>
-            <param name="owid"></param>
-            <param name="others"></param>
-            <returns></returns>
+            <remarks>
+            Sending the OWID's own date lets a creator that rotates keys
+            return the key that was current when the OWID was signed, so
+            OWIDs created before a rotation still verify. Creators that do not
+            support dated lookup ignore it and return the current key.
+            </remarks>
         </member>
-        <member name="M:Owid.Client.CryptoExtensions.GetPublicKey(Owid.Client.Model.Owid,System.String)">
+        <member name="M:Owid.Client.CryptoExtensions.MinuteOf(Owid.Client.Model.Owid)">
             <summary>
-            Gets the public key for the owid.
+            The OWID's date as minutes since the base date, or null where it
+            is before the base date and cannot be counted.
             </summary>
-            <param name="owid"></param>
-            <param name="scheme"></param>
-            <returns></returns>
         </member>
-        <member name="M:Owid.Client.CryptoExtensions.GetPublicKey(System.Uri)">
+        <member name="M:Owid.Client.CryptoExtensions.ImportKey(System.String)">
             <summary>
-            Get the public key from the domain contained in the OWID if it is 
-            not already contained in the cache.
+            The ECDsa provider for the key in PEM form.
+            </summary>
+        </member>
+        <member name="M:Owid.Client.CryptoExtensions.SignatureStatusAsync(Owid.Client.Model.Owid,System.Threading.CancellationToken)">
+            <summary>
+            Says whether the signature is genuine using the key the creator's
+            domain serves for the OWID's own date, or why that could not be
+            decided.
+            </summary>
+            <remarks>
+            A creator that cannot be reached, or that answers with something
+            other than a key, or whose own statement of the span puts the
+            OWID's date outside the key it answered with, leaves the
+            signature unjudged and is reported as such rather than as a
+            forgery. See <see cref="M:Owid.Client.CryptoExtensions.SignatureStatus(Owid.Client.Model.Owid,System.Security.Cryptography.ECDsa)"/>
+            for the answers about the signature itself.
+            </remarks>
+            <param name="owid"></param>
+            <param name="cancellationToken">
+            Ends this caller's wait for the key. See
+            <see cref="M:Owid.Client.CryptoExtensions.GetPublicKeyAsync(System.Uri,System.Threading.CancellationToken)"/> for what
+            that does and does not cancel.
+            </param>
+        </member>
+        <member name="M:Owid.Client.CryptoExtensions.VerifyAtAsync(Owid.Client.Model.Owid,System.String,System.Threading.CancellationToken)">
+            <summary>
+            Verify the OWID against the key its creator's end point serves
+            for the OWID's own date, trying the neighbouring key where the
+            signature fails within the clock drift allowance of an edge of
+            the span the creator stated for the key.
+            </summary>
+            <remarks>
+            Internal rather than private so the test project can point it at
+            a stand in end point by URL, since the domain an OWID carries
+            cannot name a port.
+            </remarks>
+            <exception cref="T:System.InvalidOperationException">
+            The creator's own statement of the span puts the OWID's date
+            outside the key it answered with, so the signature could not be
+            checked and false would have read as a forgery.
+            </exception>
+        </member>
+        <member name="M:Owid.Client.CryptoExtensions.SignatureStatusAtAsync(Owid.Client.Model.Owid,System.String,System.Threading.CancellationToken)">
+            <summary>
+            The status of the signature under the key the end point serves
+            for the OWID's own date, or under the neighbouring key where the
+            date is within the clock drift allowance of an edge of the span
+            the creator stated. A key the creator says was not in force at
+            the OWID's date proves nothing about the identifier, so where
+            nothing verifies under such a key the answer is that the key is
+            unavailable and not that the signature does not match.
+            </summary>
+        </member>
+        <member name="M:Owid.Client.CryptoExtensions.NeighbourVerifiesAsync(Owid.Client.Model.Owid,System.UInt32,System.String,Owid.Client.CryptoExtensions.KeyAnswer,System.Threading.CancellationToken)">
+            <summary>
+            Whether a key neighbouring the one the OWID's own minute selected
+            verifies the signature instead.
+            </summary>
+            <remarks>
+            A creator's signing machines may not agree with its own schedule
+            to the minute, so an identifier dated just after a key started
+            may have been signed with the key before it, and one dated just
+            before may have been signed with the key after. Where the
+            signature does not verify under the key selected and the OWID's
+            minute is within the clock drift allowance of an edge of the span
+            the creator stated for that key, the key for the minute just
+            beyond that edge is asked for and tried. A key already held for
+            that minute is not asked for again, and a neighbour that turns
+            out to be the same key is not tried again. A creator that stated
+            no span has one key and no schedule, so there is no neighbour to
+            try. This costs at most two more requests, and only for a
+            signature that has already failed.
+            </remarks>
+        </member>
+        <member name="M:Owid.Client.CryptoExtensions.NearEdge(System.UInt32,System.UInt32)">
+            <summary>
+            Whether the minute is no further from the edge minute than the
+            clocks of a creator's signing machines are allowed to differ
+            from its schedule.
+            </summary>
+        </member>
+        <member name="M:Owid.Client.CryptoExtensions.GetPublicKeyAsync(System.Uri,System.Threading.CancellationToken)">
+            <summary>
+            Get the public key PEM for the key URL. See
+            <see cref="M:Owid.Client.CryptoExtensions.GetKeyAsync(System.Uri,System.Threading.CancellationToken)"/>.
             </summary>
             <param name="u"></param>
+            <param name="cancellationToken"></param>
             <returns></returns>
+        </member>
+        <member name="M:Owid.Client.CryptoExtensions.GetKeyAsync(System.Uri,System.Threading.CancellationToken)">
+            <summary>
+            Get the key for the key URL, with the span it is known to cover.
+            Answered from the cache where a held key is known to cover the
+            minute the URL names, from a request already under way for the
+            same URL where there is one, and otherwise by asking the creator.
+            </summary>
+            <remarks>
+            The token ends this caller's wait, not the shared request. A
+            request one caller started is usually the request every other
+            caller for the same key is waiting on, so letting one caller
+            abandon the request for all of them would turn one timeout into
+            many. The request runs to completion and the next caller finds
+            the key in the cache.
+            </remarks>
+        </member>
+        <member name="M:Owid.Client.CryptoExtensions.FetchIntoAsync(System.Uri,System.String,System.Threading.Tasks.TaskCompletionSource{Owid.Client.CryptoExtensions.KeyAnswer})">
+            <summary>
+            Perform the request for <paramref name="u"/> and put its outcome
+            into <paramref name="source"/>, which is the task every caller
+            for that URL is waiting on.
+            </summary>
+            <remarks>
+            The answer is the JSON form, which carries the moments the key is
+            valid from and to as well as the key, so the whole span is held
+            from that one answer. An answer in any other form, the PEM alone
+            among them, is refused. A key that arrives is held before the request
+            is forgotten, so a caller arriving between the two finds the key
+            rather than starting a request of its own. A fetch that fails is
+            only forgotten, so the next caller makes a fresh request rather
+            than being handed the old failure.
+            </remarks>
+        </member>
+        <member name="M:Owid.Client.CryptoExtensions.ReadKeyBody(System.String)">
+            <summary>
+            Reads a public key answer, returning the PEM and the span in
+            minutes since the base date. The end is the minute the next key
+            starts. Either is null where the answer does not state it.
+            </summary>
+            <exception cref="T:System.ArgumentException">
+            The answer is not the JSON form the specification requires, the
+            PEM alone among the other forms, or fails the checks a creator
+            applies before sending it.
+            </exception>
+        </member>
+        <member name="M:Owid.Client.CryptoExtensions.MinutesOf(System.Nullable{System.DateTime})">
+            <summary>
+            The moment as minutes since the base date, or null where there is
+            no moment or it is before the count begins.
+            </summary>
+        </member>
+        <member name="M:Owid.Client.CryptoExtensions.Forget(System.Uri,System.Threading.Tasks.Task{Owid.Client.CryptoExtensions.KeyAnswer})">
+            <summary>
+            Removes the request from those under way. The entry is matched
+            on identity as well as URL, so a request that ends after the
+            cache was emptied and a fresh request started for the same URL
+            removes only itself and never the one that replaced it.
+            </summary>
+        </member>
+        <member name="M:Owid.Client.CryptoExtensions.EndPointOf(System.Uri)">
+            <summary>
+            The key URL without its query, which names the scheme, the
+            creator and the version, and so the key end point being asked.
+            </summary>
+        </member>
+        <member name="M:Owid.Client.CryptoExtensions.TryMinuteOf(System.Uri,System.UInt32@,System.Boolean@)">
+            <summary>
+            The minute the URL asks about, and whether it lies within the
+            clock drift allowance of now or later, which is a minute a creator
+            that does not state its spans may have read as its present rather
+            than as the minute named. Returns false where the URL names no
+            minute.
+            </summary>
+        </member>
+        <member name="M:Owid.Client.CryptoExtensions.HeldFor(System.String,System.Uri)">
+            <summary>
+            The key held for the end point that is known to cover the minute
+            the URL asks about, or null where none is. Called under the lock.
+            </summary>
+            <remarks>
+            A minute within the drift allowance of now is only served where
+            the creator itself stated the span, because a span confirmed
+            minute by minute says nothing certain about such a minute.
+            </remarks>
+        </member>
+        <member name="M:Owid.Client.CryptoExtensions.StatedFor(Owid.Client.CryptoExtensions.HeldKey)">
+            <summary>
+            The span the creator stated for a held key, which is the whole
+            held span where the creator stated it, runs to the last minute
+            there is where the creator stated a start and no end, and is
+            nothing where the creator stated no span.
+            </summary>
+        </member>
+        <member name="M:Owid.Client.CryptoExtensions.Stated(System.String,System.Nullable{System.UInt32},System.Nullable{System.UInt32})">
+            <summary>
+            The span the creator stated in its answer. See
+            <see cref="M:Owid.Client.CryptoExtensions.StatedFor(Owid.Client.CryptoExtensions.HeldKey)"/>.
+            </summary>
+        </member>
+        <member name="M:Owid.Client.CryptoExtensions.Hold(System.String,System.Uri,System.String,System.Nullable{System.UInt32},System.Nullable{System.UInt32})">
+            <summary>
+            Records the creator's answer to the URL, being the key and, where
+            the creator stated it, the span the key covers as the minute it
+            came into force and the minute the next key starts. Returns the
+            key with the span the creator stated for it. Called under the
+            lock.
+            </summary>
+            <remarks>
+            With both the start and the end the whole span is held as the
+            creator's own statement. With the start alone the key is held
+            from the start up to the drift allowance behind now, because no
+            later key can have started before then. With neither the minute
+            asked about is held on its own, as long as it is not within the
+            drift allowance of now. A key already held for the end point has
+            its span widened to take in the new one. A key not held before is
+            added, emptying the cache first when it is full, because the
+            cache must not grow on the input of whoever presents the OWIDs.
+            </remarks>
+        </member>
+        <member name="M:Owid.Client.CryptoExtensions.Widen(System.Collections.Generic.List{Owid.Client.CryptoExtensions.HeldKey},Owid.Client.CryptoExtensions.HeldKey,System.UInt32,System.UInt32)">
+            <summary>
+            Widens the span of a held key to take in the span given, and says
+            whether it did.
+            </summary>
+            <remarks>
+            The span is not widened across a minute the creator has answered
+            with another key for, because that would mean the creator had
+            gone back to a key it had left, and the minutes between the two
+            spans are then not this key's to claim.
+            </remarks>
+        </member>
+        <member name="M:Owid.Client.CryptoExtensions.ClearPublicKeyCache">
+            <summary>
+            Empty the public key cache, so that the next verification of any
+            OWID fetches the creator's key again, and forget the requests
+            under way so that the next caller for any key starts a request
+            of its own. A request already under way is not stopped, and the
+            callers waiting on it still receive its answer. This is how a
+            long running process drops a key it has learned it should no
+            longer trust, after a creator rotates its key following a
+            compromise. The other ports offer the same.
+            </summary>
         </member>
         <member name="T:Owid.Client.Extensions">
             <summary>
@@ -441,6 +2153,45 @@
             </summary>
             <param name="owid"></param>
             <returns></returns>
+        </member>
+        <member name="M:Owid.Client.Extensions.GetByteCount(Owid.Client.Model.Owid)">
+            <summary>
+            The number of bytes <see cref="M:Owid.Client.Extensions.AsByteArray(Owid.Client.Model.Owid)"/> returns for the
+            OWID in its current state, being the version byte, the domain
+            with its terminator, the date, the length-prefixed payload and
+            the signature.
+            </summary>
+            <param name="owid"></param>
+            <returns></returns>
+        </member>
+        <member name="M:Owid.Client.Extensions.GetSignedBytes(Owid.Client.Model.Owid)">
+            <summary>
+            The bytes the signature covers, being the version, domain, date
+            and payload. A caller that checks one OWID against several
+            candidate public keys can build these bytes once and run the
+            signature check per key, rather than rebuilding the same bytes
+            for every attempt.
+            </summary>
+            <param name="owid"></param>
+            <returns></returns>
+        </member>
+        <member name="M:Owid.Client.Extensions.GetSignedByteCount(Owid.Client.Model.Owid)">
+            <summary>
+            The number of bytes the signature covers, being everything
+            <see cref="M:Owid.Client.Extensions.GetByteCount(Owid.Client.Model.Owid)"/> counts except the signature itself.
+            </summary>
+            <param name="owid"></param>
+            <returns></returns>
+        </member>
+        <member name="M:Owid.Client.Extensions.ToExactBuffer``1(System.Int32,``0,System.Action{System.IO.BinaryWriter,``0})">
+            <summary>
+            Writes into a buffer of exactly the given size through a
+            BinaryWriter, so every serialization shares one sizing and
+            wrapping implementation. The buffer never grows and is returned
+            without a final copy, and a wrong size fails loudly rather than
+            truncating. The state parameter with static callers keeps the
+            sharing free of closure allocations.
+            </summary>
         </member>
         <member name="M:Owid.Client.Extensions.AsBase64(Owid.Client.Model.Owid)">
             <summary>
@@ -464,12 +2215,85 @@
         </member>
         <member name="M:Owid.Client.Extensions.FromBuffer(Owid.Client.Model.Owid,System.IO.BinaryReader)">
             <summary>
-            Reads <see cref="N:Owid"/> data
-            from <paramref name="reader"/>.
+            Reads <see cref="N:Owid"/> data from <paramref name="reader"/> into
+            an existing instance, throwing on malformed data.
             </summary>
+            <remarks>
+            Internal because it writes into an instance the caller already
+            holds, which would let external code alter an OWID whose signature
+            was computed over the original bytes, the exact thing closing
+            construction is meant to prevent. External callers read with
+            <see cref="M:Owid.Client.Model.Owid.TryRead(System.IO.Stream,Owid.Client.Model.Owid@,Owid.Client.Model.OwidParseStatus@)"/>. This remains for the tests that
+            pin the legacy throwing behaviour.
+            </remarks>
             <param name="owid"></param>
             <param name="reader"></param>
             <exception cref="T:System.Exception"></exception>
+        </member>
+        <member name="M:Owid.Client.Extensions.ReadByteArray(System.IO.BinaryReader)">
+            <summary>
+            Reads the length-prefixed payload. The count is whatever the
+            sender declared, so it is checked against the bytes actually
+            present before anything is sized by it. The count must leave at
+            least the fixed signature after the payload. A public stream reader
+            consumes exactly one OWID and leaves any framed data after it for
+            its caller; top-level byte-array parsing separately requires EOF.
+            Until 27 August
+            2026 the count went straight to ReadBytes, which allocates the
+            whole count before reading, so a 22 character identifier that
+            declared 64 MiB cost 64 MiB of allocation per request before
+            failing on its missing signature.
+            </summary>
+        </member>
+        <member name="M:Owid.Client.Extensions.ReadCounted(System.IO.BinaryReader,System.UInt32)">
+            <summary>
+            The payload from a stream whose length cannot be asked for,
+            read in bounded pieces so nothing is allocated from the
+            declared count alone. The result is exactly the declared count
+            or the read is refused, and the signature check that follows
+            refuses a stream that then ends short.
+            </summary>
+        </member>
+        <member name="M:Owid.Client.Extensions.ReadString(System.IO.BinaryReader)">
+            <summary>
+            Reads the creator domain, being the ASCII bytes up to the zero
+            terminator. The terminator is whatever the sender put there, so
+            the walk stops at Constants.MaximumDomainLength rather than at
+            the end of the buffer, and a domain that is longer than that, or
+            that has no terminator inside it, is refused without reading any
+            further. Until 30 August 2026 a missing or corrupted terminator
+            sent the walk to the end of the buffer and collected every byte
+            it passed, so the work a hostile envelope could ask for grew
+            with the bytes it sent rather than being fixed by the published
+            maximum for a domain.
+            </summary>
+        </member>
+        <member name="M:Owid.Client.Extensions.WriteString(System.IO.BinaryWriter,System.String)">
+            <summary>
+            Writes the creator domain as ASCII text followed by the zero
+            terminator the read stops at. A domain longer than the maximum
+            the read accepts is refused here, so the library cannot write an
+            OWID that this same library would then refuse to parse. Until 30
+            August 2026 only the read was bounded, so a creator configured
+            with a longer domain produced an OWID whose fault surfaced at
+            the consumer rather than at the creator that made it.
+            </summary>
+        </member>
+        <member name="T:Owid.Client.Model.ConfigurationPublicKeyStore">
+            <summary>
+            Default <see cref="T:Owid.Client.Model.IPublicKeyStore"/> backed by the single key in
+            <see cref="T:Owid.Client.Model.Configuration.OwidConfiguration"/>. A creator with one long-lived key has
+            no key history, so the date is ignored.
+            </summary>
+        </member>
+        <member name="M:Owid.Client.Model.ConfigurationPublicKeyStore.#ctor(Owid.Client.Model.Configuration.OwidConfiguration)">
+            <summary>
+            Designated constructor.
+            </summary>
+            <param name="configuration">The OWID creator configuration.</param>
+        </member>
+        <member name="M:Owid.Client.Model.ConfigurationPublicKeyStore.GetPublicKey(System.Nullable{System.UInt32})">
+            <inheritdoc/>
         </member>
         <member name="T:Owid.Client.Model.Configuration.OwidConfiguration">
             <summary>
@@ -494,10 +2318,124 @@
             The PEM format public key for the OWID creator.
             </summary>
         </member>
-        <member name="T:Owid.Client.Model.Owid">
+        <member name="T:Owid.Client.Model.DatedPublicKey">
             <summary>
-            OWID structure which can be used as a node in a tree.
+            A signing public key together with the moment it comes into force.
             </summary>
+        </member>
+        <member name="P:Owid.Client.Model.DatedPublicKey.StartsAt">
+            <summary>
+            The UTC moment from which this key signs. It stays in force until
+            the next key starts, so the last key of a schedule covers every
+            date after it.
+            </summary>
+            <remarks>
+            This is the schedule position, not the moment the key material
+            was generated. The two are not the same, because a creator may
+            generate many weeks of keys in one run, and selecting on the
+            moment of generation then picks a key whose period has not
+            started. See <see cref="T:Owid.Client.Model.DatedKeyStore"/> for what that did.
+            </remarks>
+        </member>
+        <member name="P:Owid.Client.Model.DatedPublicKey.PublicKey">
+            <summary>
+            The public key in PEM form.
+            </summary>
+        </member>
+        <member name="T:Owid.Client.Model.DatedKeyStore">
+            <summary>
+            <see cref="T:Owid.Client.Model.IPublicKeyStore"/> over a set of scheduled keys. Returns
+            the key that was in force at the requested date, being the latest key
+            whose <see cref="P:Owid.Client.Model.DatedPublicKey.StartsAt"/> is at or before it. A date
+            that precedes every key yields null.
+            </summary>
+            <remarks>
+            Selection runs on the schedule position of each key and not on the
+            moment its material was generated. A creator may write many weeks of
+            keys in one run, so the moment of generation says nothing about which
+            key signed an identifier, and selecting on it picks a key whose period
+            has not started and reports genuine identifiers as forged. The published
+            schedule and an identifier signed under it are the fixture behind
+            PublishedScheduleTests.
+            </remarks>
+        </member>
+        <member name="M:Owid.Client.Model.DatedKeyStore.#ctor(System.Collections.Generic.IEnumerable{Owid.Client.Model.DatedPublicKey})">
+            <summary>
+            Designated constructor.
+            </summary>
+            <param name="keys">The known keys, in any order.</param>
+        </member>
+        <member name="M:Owid.Client.Model.DatedKeyStore.GetPublicKey(System.Nullable{System.UInt32})">
+            <inheritdoc/>
+        </member>
+        <member name="M:Owid.Client.Model.DatedKeyStore.GetPublicKeyPeriod(System.Nullable{System.UInt32})">
+            <inheritdoc/>
+        </member>
+        <member name="M:Owid.Client.Model.DatedKeyStore.Minutes(System.DateTime)">
+            <summary>
+            The moment as minutes since the base date, clamped to the count
+            the OWID date can hold.
+            </summary>
+        </member>
+        <member name="T:Owid.Client.Model.IPublicKeyStore">
+            <summary>
+            Source of the OWID creator's signing public keys for the public-key
+            end point. Implement this to serve historical keys for a creator that
+            rotates its signing key.
+            </summary>
+        </member>
+        <member name="M:Owid.Client.Model.IPublicKeyStore.GetPublicKey(System.Nullable{System.UInt32})">
+            <summary>
+            The public key (PEM) that was in force at the given date,
+            expressed as minutes since 2020-01-01 UTC (the OWID date
+            encoding). When the date is null the key in force now is
+            returned. Returns null when the date precedes the oldest known
+            key.
+            </summary>
+            <remarks>
+            In force means the key the creator was signing with at that date,
+            which for a creator that publishes its schedule ahead of time is
+            not the newest key it holds. An implementation that returns a key
+            whose period has not begun makes every genuine identifier of that
+            date read as forged.
+            </remarks>
+            <param name="dateMinutes">
+            Minutes since 2020-01-01 UTC, or null for the current key.
+            </param>
+        </member>
+        <member name="M:Owid.Client.Model.IPublicKeyStore.GetPublicKeyPeriod(System.Nullable{System.UInt32})">
+            <summary>
+            The key in force at the given date together with the span it
+            covers, or null where the store does not know the span. The
+            public key end point states the span in its JSON answer where
+            the store can supply it, so a client holds the key for the whole
+            span from one answer rather than asking again for every minute.
+            A store that knows only the key leaves this as it is.
+            </summary>
+            <param name="dateMinutes">
+            Minutes since 2020-01-01 UTC, or null for the current key.
+            </param>
+        </member>
+        <member name="T:Owid.Client.Model.Owid">
+             <summary>
+             OWID structure which can be used as a node in a tree.
+             </summary>
+             <remarks>
+             An OWID is a claim about who created some data and when, and it is only
+             worth anything because it is signed. A caller therefore cannot build
+             one. An instance reaches calling code by one of two routes: parsing
+             bytes that were already a complete OWID, or asking a
+             <see cref="T:Owid.Client.Creator"/> to sign one into existence. There is deliberately
+             no way to assemble a half-made one, because an unsigned OWID is
+             indistinguishable from a signed one to the code downstream of it, and
+             the difference only surfaces later when a verification fails somewhere
+             nobody is watching.
+            
+             The state is read-only for the same reason. A parsed OWID's signature
+             covers its fields as they arrived, so a caller changing a field
+             afterwards would be holding something whose signature no longer
+             describes it.
+             </remarks>
         </member>
         <member name="P:Owid.Client.Model.Owid.Version">
             <summary>
@@ -518,6 +2456,20 @@
             <summary>
             Array of bytes that form the payload.
             </summary>
+            <remarks>
+            A copy, so that writing into the returned array cannot alter an
+            OWID whose signature was computed over the original bytes.
+            </remarks>
+        </member>
+        <member name="P:Owid.Client.Model.Owid.PayloadLength">
+            <summary>
+            How many bytes the payload holds, without copying it.
+            </summary>
+            <remarks>
+            <see cref="P:Owid.Client.Model.Owid.Payload"/> hands out a copy, so an application applying
+            a size limit to a large payload would pay for the copy it is about
+            to reject. This answers the size question on its own.
+            </remarks>
         </member>
         <member name="P:Owid.Client.Model.Owid.PayloadAsString">
             <summary>
@@ -526,27 +2478,280 @@
         </member>
         <member name="P:Owid.Client.Model.Owid.Signature">
             <summary>
-            Signature for this OWID and it's ancestor. Generated by the 
+            Signature for this OWID and it's ancestor. Generated by the
             <see cref="T:Owid.Client.Creator"/> instance.
+            </summary>
+            <remarks>
+            A copy, for the same reason as <see cref="P:Owid.Client.Model.Owid.Payload"/>.
+            </remarks>
+        </member>
+        <member name="P:Owid.Client.Model.Owid.PayloadInternal">
+            <summary>
+            The payload without copying, for use inside this library where the
+            bytes are only read or are being set by a parser or the creator.
+            </summary>
+        </member>
+        <member name="P:Owid.Client.Model.Owid.SignatureInternal">
+            <summary>
+            The signature without copying, for use inside this library.
             </summary>
         </member>
         <member name="M:Owid.Client.Model.Owid.#ctor">
             <summary>
-            Make empty <see cref="T:Owid.Client.Model.Owid"/>
+            Not public. See the note on the class for why an OWID cannot be
+            assembled by a caller.
             </summary>
         </member>
-        <member name="M:Owid.Client.Model.Owid.#ctor(System.String)">
+        <member name="M:Owid.Client.Model.Owid.CreateForParser(Owid.Client.Model.OwidVersion,System.String,System.DateTime,System.Byte[],System.Byte[])">
             <summary>
-            Make <see cref="T:Owid.Client.Model.Owid"/> from Base64-encoded string.
+            Builds an instance from fields a parser has already validated.
             </summary>
         </member>
-        <member name="M:Owid.Client.Model.Owid.#ctor(System.Byte[])">
+        <member name="M:Owid.Client.Model.Owid.TryParse(System.String,Owid.Client.Model.Owid@,Owid.Client.Model.OwidParseStatus@)">
             <summary>
-            Make <see cref="T:Owid.Client.Model.Owid"/> from binary data.
+            Reads a complete OWID from its Base64 form.
             </summary>
+            <param name="value">
+            The encoded OWID, which may be anything at all. This is external
+            data, so failing to be an OWID is an ordinary outcome rather than
+            an error.
+            </param>
+            <param name="owid">
+            The OWID when this returns true, otherwise null.
+            </param>
+            <param name="status">
+            <see cref="F:Owid.Client.Model.OwidParseStatus.Parsed"/> when this returns true,
+            otherwise why the value is not an OWID.
+            </param>
+            <returns>
+            True when the value is a complete, structurally valid OWID. This
+            says nothing about whether the signature is genuine, which is a
+            separate question with its own answer.
+            </returns>
+        </member>
+        <member name="M:Owid.Client.Model.Owid.TryParse(System.Byte[],Owid.Client.Model.Owid@,Owid.Client.Model.OwidParseStatus@)">
+            <summary>
+            Reads a complete OWID from a buffer holding exactly one.
+            </summary>
+            <param name="buffer">
+            The bytes, which must be one whole OWID and nothing else. Data
+            after the envelope is rejected, because on this surface there is
+            nothing else it could belong to. A stream that carries several
+            envelopes is read with the reader in
+            <see cref="T:Owid.Client.Extensions"/> instead.
+            </param>
+            <param name="owid">
+            The OWID when this returns true, otherwise null.
+            </param>
+            <param name="status">
+            <see cref="F:Owid.Client.Model.OwidParseStatus.Parsed"/> when this returns true,
+            otherwise why the bytes are not an OWID.
+            </param>
+            <returns>
+            True when the bytes are a complete, structurally valid OWID.
+            </returns>
+        </member>
+        <member name="M:Owid.Client.Model.Owid.TryRead(System.IO.Stream,Owid.Client.Model.Owid@,Owid.Client.Model.OwidParseStatus@)">
+            <summary>
+            Reads one OWID from a stream that may carry more after it.
+            </summary>
+            <param name="stream">
+            The source, read forward only. Its length is never asked for, so a
+            stream that cannot answer that still works.
+            </param>
+            <param name="owid">
+            The OWID when this returns true, otherwise null.
+            </param>
+            <param name="status">
+            <see cref="F:Owid.Client.Model.OwidParseStatus.Parsed"/> when this returns true,
+            otherwise why the bytes are not an OWID.
+            <see cref="F:Owid.Client.Model.OwidParseStatus.MissingInput"/> means the stream had
+            nothing left, which is how a caller reading a sequence finds out it
+            has reached the end.
+            </param>
+            <returns>
+            True when one complete OWID was read. Bytes after it are left where
+            they are, because in a stream they may be the next envelope rather
+            than rubbish, which is the one way this differs from
+            <see cref="M:Owid.Client.Model.Owid.TryParse(System.Byte[],Owid.Client.Model.Owid@,Owid.Client.Model.OwidParseStatus@)"/>.
+            </returns>
+            <remarks>
+            Nothing is consumed when an envelope is refused beyond what had
+            already been read to discover the fault, so a caller that hits a
+            bad envelope should stop rather than expect the position to be
+            usable.
+            </remarks>
         </member>
         <member name="M:Owid.Client.Model.Owid.ToString">
             <inheritdoc/>
+        </member>
+        <member name="T:Owid.Client.Model.OwidParseStatus">
+             <summary>
+             Why a parse of external data succeeded or failed.
+             </summary>
+             <remarks>
+             Malformed data arriving from outside is expected, not exceptional. An
+             OWID is read from whatever a caller was given, which on a public
+             endpoint means anything at all, so every one of these outcomes is a
+             normal result rather than a fault. Reporting them as exceptions costs
+             the construction and unwinding of an exception per bad input, which is
+             a cost an attacker chooses the size of.
+            
+             These names are the cross-language vocabulary. Each implementation
+             spells the surface in its own idiom, but the set of facts reported is
+             the same everywhere, so a failure means the same thing whichever
+             language read the bytes.
+             </remarks>
+        </member>
+        <member name="F:Owid.Client.Model.OwidParseStatus.Parsed">
+            <summary>
+            The bytes form a structurally valid OWID. This says nothing about
+            the signature, which is a separate question answered separately.
+            </summary>
+        </member>
+        <member name="F:Owid.Client.Model.OwidParseStatus.MissingInput">
+            <summary>
+            Nothing was supplied to parse.
+            </summary>
+        </member>
+        <member name="F:Owid.Client.Model.OwidParseStatus.InvalidInputType">
+            <summary>
+            The input was supplied in a form this surface cannot read.
+            </summary>
+        </member>
+        <member name="F:Owid.Client.Model.OwidParseStatus.InvalidBase64">
+            <summary>
+            The string is not valid Base64, so there are no bytes to read.
+            </summary>
+        </member>
+        <member name="F:Owid.Client.Model.OwidParseStatus.UnsupportedVersion">
+            <summary>
+            The first byte names a version this implementation does not know.
+            </summary>
+        </member>
+        <member name="F:Owid.Client.Model.OwidParseStatus.UnexpectedEnd">
+            <summary>
+            The data stopped in the middle of a field. Distinct from
+            <see cref="F:Owid.Client.Model.OwidParseStatus.ByteCountMismatch"/>, which is a declaration that
+            disagrees with data that is all present.
+            </summary>
+        </member>
+        <member name="F:Owid.Client.Model.OwidParseStatus.InvalidDomainEncoding">
+            <summary>
+            The creator domain is not terminated, or is longer than the
+            published maximum.
+            </summary>
+        </member>
+        <member name="F:Owid.Client.Model.OwidParseStatus.ByteCountMismatch">
+            <summary>
+            The declared payload byte count disagrees with the bytes actually
+            present. Checked before anything is sized by the declaration, so a
+            sender cannot make a reader allocate by claiming a large payload it
+            did not send.
+            </summary>
+        </member>
+        <member name="F:Owid.Client.Model.OwidParseStatus.ImplementationCapacityExceeded">
+            <summary>
+            The envelope is structurally consistent but larger than this
+            runtime can represent or hold. Not a fault in the data, and
+            deliberately distinct from the data being wrong, because the same
+            bytes may be readable elsewhere.
+            </summary>
+            <remarks>
+            Produced by a declared payload larger than an array can hold, and
+            by a date past the end of the year 9999, where
+            <see cref="T:System.DateTime"/> stops while the four byte minute
+            count of versions 2 and 3 runs to 15 February 10186. The date is
+            judged before the arithmetic, so a read never throws on it.
+            </remarks>
+        </member>
+        <member name="F:Owid.Client.Model.OwidParseStatus.MalformedEnvelope">
+            <summary>
+            The envelope is malformed in a way none of the above describes.
+            A fallback for the genuinely unclassified, not a substitute for
+            naming a failure that is already understood.
+            </summary>
+        </member>
+        <member name="F:Owid.Client.Model.OwidParseStatus.AbsentNode">
+            <summary>
+            The version 0 marker, which stands for an absent node inside a
+            stream.
+            </summary>
+            <remarks>
+            It is not an OWID and never produces one, because it carries no
+            signature and so can never verify. A framed read reports it and
+            moves past its one byte, so a caller walking a run of frames can
+            tell an absent node from a malformed one, which is the distinction
+            the marker exists for. The whole buffer read reports it too,
+            because the byte means the same thing wherever it appears. Calling
+            it an unsupported version was inaccurate, since version 0 is
+            supported and meaningful, it simply is not an OWID.
+            </remarks>
+        </member>
+        <member name="T:Owid.Client.Model.OwidSignatureStatus">
+             <summary>
+             The outcome of asking whether an OWID's signature is genuine.
+             </summary>
+             <remarks>
+             Only two of these say anything about the signature itself. The rest say
+             the question could not be answered, which is a different thing and must
+             never be reported as a forgery. A key that cannot be fetched, a key
+             that cannot be decoded, or a provider that fails leaves the signature
+             unjudged. Collapsing those into "invalid" tells a caller that data was
+             tampered with when all that happened is that we could not check, and a
+             caller acting on that would reject good identifiers during an outage.
+            
+             This is not hypothetical. On 30 August 2026 the key endpoints published
+             PEM wrapped at 76 characters, which a strict parser rejects, and every
+             offline verification against them failed. The keys were fine and the
+             identifiers were fine. Reported as InvalidKey that reads as the
+             operational fault it was; reported as SignatureInvalid it would have
+             read as an attack.
+             </remarks>
+        </member>
+        <member name="F:Owid.Client.Model.OwidSignatureStatus.SignatureValid">
+            <summary>
+            The signature is genuine for this data and this key.
+            </summary>
+        </member>
+        <member name="F:Owid.Client.Model.OwidSignatureStatus.SignatureInvalid">
+            <summary>
+            The signature is well formed and does not match. The data does not
+            belong to the key it claims. This is the only status that means the
+            identifier should be distrusted.
+            </summary>
+        </member>
+        <member name="F:Owid.Client.Model.OwidSignatureStatus.InvalidSignatureLength">
+            <summary>
+            A signature field of the wrong length reached a verification
+            surface directly. Truncation in raw external input is a parse
+            <see cref="F:Owid.Client.Model.OwidParseStatus.UnexpectedEnd"/> instead, because there
+            the envelope never formed.
+            </summary>
+        </member>
+        <member name="F:Owid.Client.Model.OwidSignatureStatus.KeyUnavailable">
+            <summary>
+            No key could be obtained, or none covers the identifier's date.
+            The signature was never examined.
+            </summary>
+        </member>
+        <member name="F:Owid.Client.Model.OwidSignatureStatus.InvalidKey">
+            <summary>
+            Key material arrived but cannot be decoded, imported, or used as
+            the required type. The fault is in the key, not the identifier.
+            </summary>
+        </member>
+        <member name="F:Owid.Client.Model.OwidSignatureStatus.ImplementationCapacityExceeded">
+            <summary>
+            The work required exceeds what this runtime can represent or hold.
+            </summary>
+        </member>
+        <member name="F:Owid.Client.Model.OwidSignatureStatus.VerificationError">
+            <summary>
+            The check could not be completed for a reason that is not the
+            identifier's fault, such as a malformed key-list response or a
+            cryptographic provider failing on valid inputs.
+            </summary>
         </member>
         <member name="T:Owid.Client.Model.OwidVersion">
             <summary>
@@ -571,6 +2776,227 @@
         <member name="F:Owid.Client.Model.OwidVersion.Version3">
             <summary>
             Version 3.
+            </summary>
+        </member>
+        <member name="T:Owid.Client.Model.PublicKeyPeriod">
+            <summary>
+            A signing public key together with the span it covers, as minutes
+            since 2020-01-01 UTC, the count the OWID date and the public key end
+            point's <c>date</c> parameter use.
+            </summary>
+        </member>
+        <member name="M:Owid.Client.Model.PublicKeyPeriod.#ctor(System.String,System.UInt32,System.Nullable{System.UInt32})">
+            <summary>
+            Designated constructor.
+            </summary>
+            <param name="publicKey">The key in PEM form.</param>
+            <param name="startsAt">
+            The minute the key came into force.
+            </param>
+            <param name="endsAt">
+            The minute the next key starts, or null when no later key has
+            been scheduled and the key is in force until further notice.
+            </param>
+        </member>
+        <member name="P:Owid.Client.Model.PublicKeyPeriod.PublicKey">
+            <summary>
+            The key in PEM form.
+            </summary>
+        </member>
+        <member name="P:Owid.Client.Model.PublicKeyPeriod.StartsAt">
+            <summary>
+            The minute the key came into force.
+            </summary>
+        </member>
+        <member name="P:Owid.Client.Model.PublicKeyPeriod.EndsAt">
+            <summary>
+            The minute the next key starts, or null when none is scheduled.
+            </summary>
+        </member>
+        <member name="T:Owid.Client.Model.PublicKeyResponse">
+            <summary>
+            The JSON body of the public key end point. It carries the key, the
+            encoding the key is in, and the moments it is valid from and to, in
+            UTC, so a client holds the key for the whole span from one answer
+            rather than asking again for every minute. The PEM alone as text is
+            not a valid answer.
+            </summary>
+        </member>
+        <member name="F:Owid.Client.Model.PublicKeyResponse.SpkiFormat">
+            <summary>
+            The one encoding of the key this library reads and writes, a
+            Subject Public Key Info PEM.
+            </summary>
+        </member>
+        <member name="P:Owid.Client.Model.PublicKeyResponse.Format">
+            <summary>
+            The encoding of <see cref="P:Owid.Client.Model.PublicKeyResponse.PublicKey"/>, which is the value the
+            request asked for. A request that asks for no format is answered
+            in this one.
+            </summary>
+        </member>
+        <member name="P:Owid.Client.Model.PublicKeyResponse.PublicKey">
+            <summary>
+            The public key in the encoding <see cref="P:Owid.Client.Model.PublicKeyResponse.Format"/> names.
+            </summary>
+        </member>
+        <member name="P:Owid.Client.Model.PublicKeyResponse.ValidFrom">
+            <summary>
+            The UTC moment the key came into force, or null where the creator
+            does not know when it started.
+            </summary>
+        </member>
+        <member name="P:Owid.Client.Model.PublicKeyResponse.ValidTo">
+            <summary>
+            The UTC moment the next key starts, or null where no later key has
+            been scheduled and the key is in force until further notice.
+            </summary>
+        </member>
+        <member name="M:Owid.Client.Model.PublicKeyResponse.For(System.String,Owid.Client.Model.PublicKeyPeriod,System.UInt32)">
+            <summary>
+            The answer for the key in force at the moment asked about, with
+            the span where the store knows it, checked before it is returned
+            so that a creator never sends an answer it would itself refuse.
+            </summary>
+            <param name="publicKey">The key in PEM form.</param>
+            <param name="period">The span, or null where it is not known.</param>
+            <param name="askedMinutes">
+            The moment asked about as minutes since 2020-01-01 UTC, after a
+            date later than now has been read as now.
+            </param>
+            <exception cref="T:System.InvalidOperationException">
+            The answer fails <see cref="M:Owid.Client.Model.PublicKeyResponse.Validate(System.Nullable{System.DateTime})"/>.
+            </exception>
+        </member>
+        <member name="M:Owid.Client.Model.PublicKeyResponse.Validate(System.Nullable{System.DateTime})">
+            <summary>
+            Checks the answer the way both the creator that sends it and the
+            client that reads it must. The format must be the one this
+            library reads and the key must be a public key in it, a key valid
+            to a moment must be valid from an
+            earlier one, and where the moment asked about is known the key
+            must have come into force by then and, if it has an end, not have
+            ended. A creator that fails this check has a fault in its schedule
+            or its store, and answering with a server error shows it up rather
+            than passing it on.
+            </summary>
+            <param name="asked">The moment asked about, or null.</param>
+            <exception cref="T:System.InvalidOperationException">
+            The answer is not valid.
+            </exception>
+        </member>
+        <member name="T:Owid.Client.OwidCapacityException">
+            <summary>
+            The OWID can be structurally valid, but the requested operation needs
+            a single byte array larger than this .NET implementation can provide.
+            This is an implementation-capacity failure, not a malformed OWID.
+            </summary>
+        </member>
+        <member name="P:Owid.Client.OwidCapacityException.RequiredBytes">
+            <summary>
+            The number of bytes the operation would need in one array.
+            </summary>
+        </member>
+        <member name="M:Owid.Client.OwidCapacityException.#ctor(System.Int64)">
+            <summary>
+            Creates an exception for the required byte count.
+            </summary>
+            <param name="requiredBytes">
+            The number of bytes the operation would need in one array.
+            </param>
+        </member>
+        <member name="T:Owid.Client.OwidReader">
+             <summary>
+             Reads a complete OWID from a buffer, reporting why rather than
+             throwing when the bytes are not one.
+             </summary>
+             <remarks>
+             This walks the buffer by index and checks every read against what is
+             left, so a malformed envelope is a comparison that fails rather than an
+             exception that unwinds. That matters because the data comes from
+             outside: an attacker chooses how often this fails and how large the
+             input is, and an exception per attempt is a cost they control.
+            
+             It deliberately does not call the throwing parser and catch. The
+             exception would still be constructed and unwound, so the cost would
+             remain and only the surface would look different.
+            
+             This is the exact-buffer contract: the envelope must end where the
+             buffer does. Framed reading, where an envelope may be followed by more
+             data, is <see cref="T:Owid.Client.OwidStreamReader"/>, which must not require the
+             end of the stream because what follows may be the next envelope
+             rather than rubbish.
+             </remarks>
+        </member>
+        <member name="M:Owid.Client.OwidReader.TryRead(System.Byte[],Owid.Client.Model.Owid@)">
+            <summary>
+            Reads one complete OWID occupying the whole of
+            <paramref name="buffer"/>.
+            </summary>
+            <returns>
+            <see cref="F:Owid.Client.Model.OwidParseStatus.Parsed"/> with
+            <paramref name="owid"/> set, or the reason it is not an OWID with
+            <paramref name="owid"/> null. Both outputs are always assigned.
+            </returns>
+        </member>
+        <member name="M:Owid.Client.OwidReader.ReadDomain(System.Byte[],System.Int32@,System.String@)">
+            <summary>
+            The creator domain, terminated by a zero byte and no longer than
+            the published maximum.
+            </summary>
+        </member>
+        <member name="M:Owid.Client.OwidReader.ReadDate(System.Byte[],System.Int32@,Owid.Client.Model.OwidVersion,System.DateTime@)">
+            <summary>
+            The creation date, whose width depends on the version.
+            </summary>
+        </member>
+        <member name="T:Owid.Client.OwidStreamReader">
+             <summary>
+             Reads one OWID from a stream that may carry more after it.
+             </summary>
+             <remarks>
+             This is the framed contract, and it differs from reading a whole buffer
+             in exactly one place. A whole buffer knows where the envelope ends, so
+             the declared payload must leave exactly the signature and nothing else.
+             A stream does not: what follows may be the next envelope rather than
+             rubbish, so this needs the declared payload and the signature to be
+             present and says nothing at all about the rest.
+            
+             It reads forward only and never asks the stream for its length, so it
+             works on a source that cannot answer that, and it reads the payload in
+             fixed pieces rather than allocating from the declared count. A sender
+             choosing that count must not be able to choose how much memory a reader
+             takes before it has seen the bytes to justify it.
+            
+             Every read goes through the stream's own end of data signal rather than
+             the helpers that throw at the end, because a stream ending early is an
+             ordinary outcome here and not a fault.
+             </remarks>
+        </member>
+        <member name="F:Owid.Client.OwidStreamReader.PieceLength">
+            <summary>
+            Bytes read at a time when collecting a payload, so that a declared
+            count cannot decide the allocation before the data is there.
+            </summary>
+        </member>
+        <member name="M:Owid.Client.OwidStreamReader.ReadDomain(System.IO.Stream,System.String@)">
+            <summary>
+            The creator domain, terminated by a zero byte and no longer than
+            the published maximum.
+            </summary>
+        </member>
+        <member name="M:Owid.Client.OwidStreamReader.ReadCounted(System.IO.Stream,System.UInt32,System.Byte[]@)">
+            <summary>
+            The payload, collected in fixed pieces so that nothing is sized by
+            the declared count before the bytes to justify it have arrived.
+            </summary>
+        </member>
+        <member name="M:Owid.Client.OwidStreamReader.ReadExactly(System.IO.Stream,System.Byte[],System.Int32)">
+            <summary>
+            Fills the first <paramref name="count"/> bytes of the buffer, or
+            reports that the stream ended first. A stream may hand back fewer
+            bytes than asked for without being at its end, so this loops rather
+            than treating a short read as the end.
             </summary>
         </member>
     </members>

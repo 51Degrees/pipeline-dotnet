@@ -20,6 +20,7 @@
  * such notice(s) shall fulfill the requirements of that article.
  * ********************************************************************* */
 
+using FiftyOne.Common.TestHelpers;
 using FiftyOne.Pipeline.Core.Data;
 using FiftyOne.Pipeline.Core.Exceptions;
 using FiftyOne.Pipeline.Core.FlowElements;
@@ -29,6 +30,8 @@ using Microsoft.VisualStudio.TestTools.UnitTesting;
 using Moq;
 using System;
 using System.Collections.Generic;
+using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace FiftyOne.Pipeline.Core.Tests.FlowElements
@@ -48,6 +51,64 @@ namespace FiftyOne.Pipeline.Core.Tests.FlowElements
             element.SetupGet(e => e.ElementDataKey).Returns("test");
             element.Setup(e => e.Properties).Returns(new List<IElementPropertyMetaData>());
             return element;
+        }
+
+        /// <summary>
+        /// Test that the pipeline copes with a flow data whose stop token is
+        /// not configured (an unconfigured mock).
+        /// </summary>
+        [TestMethod]
+        public void Pipeline_Process_FlowDataWithUnconfiguredStopToken_RecordsNoError()
+        {
+            var element = GetMockFlowElement();
+            var data = new Mock<IFlowData>();
+            var pipeline = CreatePipeline(false, true, element.Object);
+
+            pipeline.Process(data.Object);
+
+            data.Verify(d => d.AddError(It.IsAny<Exception>(), It.IsAny<IFlowElement>()), Times.Never());
+        }
+
+        /// <summary>
+        /// Test that a flow element copes with a flow data whose stop token is
+        /// not configured (an unconfigured mock).
+        /// </summary>
+        [TestMethod]
+        public void FlowElementBase_Process_FlowDataWithUnconfiguredStopToken_DoesNotThrow()
+        {
+            var data = new Mock<IFlowData>();
+            var element = new StopElement();
+
+            element.Process(data.Object);
+        }
+
+        /// <summary>
+        /// Check that a token passed to CreateFlowData stops the created
+        /// flow data when cancelled.
+        /// </summary>
+        [TestMethod]
+        public void Pipeline_CreateFlowData_WithToken_LinksCancellation()
+        {
+            Func<IPipelineInternal, CancellationToken, IFlowData> factory =
+                (p, ct) => new FlowData(
+                    new Mock<ILogger<FlowData>>().Object,
+                    p,
+                    new Evidence(new Mock<ILogger<Evidence>>().Object),
+                    ct);
+
+            using var pipeline = new Core.FlowElements.Pipeline(
+                _logger.Object,
+                factory,
+                new List<IFlowElement>(),
+                false,
+                false);
+            using var cts = new CancellationTokenSource();
+
+            using var data = pipeline.CreateFlowData(cts.Token);
+
+            Assert.IsFalse(data.GetStopToken().IsCancellationRequested);
+            cts.Cancel();
+            Assert.IsTrue(data.GetStopToken().IsCancellationRequested);
         }
 
         /// <summary>
@@ -297,6 +358,8 @@ namespace FiftyOne.Pipeline.Core.Tests.FlowElements
         /// Check that an exception being thrown by a flow element will 
         /// result in the AddError method being called on FlowData and that
         /// the exception is suppressed.
+        /// As exceptions are suppressed, the error must not be flagged for
+        /// error level logging (issue #280).
         /// </summary>
         public void Pipeline_ExceptionDuringProcessingAdd()
         {
@@ -322,8 +385,104 @@ namespace FiftyOne.Pipeline.Core.Tests.FlowElements
             // and flow element.
             data.Verify(d => d.AddError(
                 It.Is<Exception>(ex => ex.Message == "TEST"),
-                element2.Object),
+                element2.Object,
+                true,
+                false),
                 Times.Once());
+        }
+
+        [TestMethod]
+        /// <summary>
+        /// Check that an exception being thrown by a flow element is flagged
+        /// for error level logging when exceptions are not suppressed
+        /// (issue #280).
+        /// </summary>
+        public void Pipeline_ExceptionDuringProcessingLogged()
+        {
+            var element1 = GetMockFlowElement();
+            var element2 = GetMockFlowElement();
+            var data = new Mock<IFlowData>();
+
+            // Configure element 2 to throw an exception.
+            element2.Setup(e => e.Process(It.IsAny<IFlowData>()))
+                .Throws(new Exception("TEST"));
+
+            // Create the pipeline with exceptions not suppressed.
+            var pipeline = CreatePipeline(
+                false,
+                false,
+                element1.Object,
+                element2.Object);
+
+            // Start processing. The mock flow data returns no errors, so no
+            // aggregate exception is thrown here.
+            pipeline.Process(data.Object);
+
+            // Check that add error was called requesting that the error
+            // is logged.
+            data.Verify(d => d.AddError(
+                It.Is<Exception>(ex => ex.Message == "TEST"),
+                element2.Object,
+                true,
+                true),
+                Times.Once());
+        }
+
+        [TestMethod]
+        /// <summary>
+        /// End to end check that a real pipeline and flow data log nothing
+        /// at error level when exceptions are suppressed, and that the error
+        /// is still available through IFlowData.Errors (issue #280).
+        /// </summary>
+        public void Pipeline_ExceptionDuringProcessing_Suppressed_NotLoggedAsError()
+        {
+            var loggerFactory = new TestLoggerFactory();
+            var element = GetMockFlowElement();
+            element.Setup(e => e.Process(It.IsAny<IFlowData>()))
+                .Throws(new Exception("TEST"));
+
+            using (var pipeline = new PipelineBuilder(loggerFactory)
+                .AddFlowElement(element.Object)
+                .SetSuppressProcessExceptions(true)
+                .Build())
+            using (var data = pipeline.CreateFlowData())
+            {
+                data.Process();
+
+                Assert.HasCount(1, data.Errors,
+                    "The error should still be recorded in FlowData.Errors.");
+            }
+
+            // Nothing must have been logged at error level.
+            loggerFactory.AssertMaxErrors(0);
+        }
+
+        [TestMethod]
+        /// <summary>
+        /// End to end check that a real pipeline and flow data do log at
+        /// error level when exceptions are not suppressed (issue #280).
+        /// </summary>
+        public void Pipeline_ExceptionDuringProcessing_NotSuppressed_LoggedAsError()
+        {
+            var loggerFactory = new TestLoggerFactory();
+            var element = GetMockFlowElement();
+            element.Setup(e => e.Process(It.IsAny<IFlowData>()))
+                .Throws(new Exception("TEST"));
+
+            using (var pipeline = new PipelineBuilder(loggerFactory)
+                .AddFlowElement(element.Object)
+                .SetSuppressProcessExceptions(false)
+                .Build())
+            using (var data = pipeline.CreateFlowData())
+            {
+                Assert.ThrowsExactly<AggregateException>(() => data.Process());
+            }
+
+            var errorEntries = loggerFactory.Loggers
+                .SelectMany(l => l.ErrorEntries)
+                .ToList();
+            Assert.HasCount(1, errorEntries,
+                "The error should have been logged at error level.");
         }
 
         /// <summary>

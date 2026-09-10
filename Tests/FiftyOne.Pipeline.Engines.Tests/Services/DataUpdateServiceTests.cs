@@ -53,7 +53,12 @@ namespace FiftyOne.Pipeline.Engines.Tests.Services
 
         private int _ignoreWranings = 0;
         private int _ignoreErrors = 0;
-        private const int TEST_TIMEOUT_MS = 3000;
+        // The update callback fires on a threadpool thread. When the CI runner
+        // runs many test assemblies in parallel the threadpool can be starved,
+        // delaying the callback well past a few seconds. The wait short-circuits
+        // as soon as the event fires, so a generous ceiling costs passing runs
+        // nothing and only avoids spurious timeouts under load.
+        private const int TEST_TIMEOUT_MS = 30000;
         private const int LOGGER_UNLOCK_TIMEOUT_MS = 5000;
 
         private bool _didDumpLogs;
@@ -361,7 +366,10 @@ namespace FiftyOne.Pipeline.Engines.Tests.Services
 
         /// <summary>
         /// Check that enabling the FileSystemWatcher will create a watcher
-        /// and assign it to the configuration object as expected.
+        /// and assign it to the configuration object as expected, but only
+        /// when automatic updates are enabled. AutomaticUpdatesEnabled is the
+        /// master switch for all automatic update activity, so with it disabled
+        /// no watcher is created even if FileSystemWatcherEnabled is true.
         /// </summary>
         [TestMethod]
         [DataRow(true)]
@@ -389,7 +397,18 @@ namespace FiftyOne.Pipeline.Engines.Tests.Services
                 _dataUpdate.RegisterDataFile(file);
 
                 // Assert
-                Assert.IsNotNull(file.FileWatcher);
+                if (autoUpdateEnabled)
+                {
+                    Assert.IsNotNull(file.FileWatcher,
+                        "A file system watcher should be created when automatic " +
+                        "updates are enabled.");
+                }
+                else
+                {
+                    Assert.IsNull(file.FileWatcher,
+                        "No file system watcher should be created when automatic " +
+                        "updates are disabled, as AutoUpdate is the master switch.");
+                }
             }
             finally
             {

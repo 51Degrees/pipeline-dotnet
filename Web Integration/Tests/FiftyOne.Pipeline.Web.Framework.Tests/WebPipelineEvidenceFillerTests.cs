@@ -214,5 +214,58 @@ namespace FiftyOne.Pipeline.Web.Framework.Tests
             fakeData.Received(1).AddEvidence("sleepy", "beetle");
             fakeData.Received(1).AddEvidence("fishy", "cat");
         }
+
+        /// <summary>
+        /// The method, the path and the whole query string are added where
+        /// an element asks for them, and the path and the query keep their
+        /// percent escapes. A 'Uri' would decode them, and these values
+        /// rebuild the text an HTTP message signature was made over, where
+        /// one changed byte makes a valid signature read as invalid.
+        /// </summary>
+        [TestMethod]
+        public void RequestLine_KeepsEscapes()
+        {
+            var filter = Substitute.For<IEvidenceKeyFilter>();
+            filter.Include(Arg.Any<string>()).Returns(true);
+            var fakeData = Substitute.For<IFlowData>();
+            fakeData.EvidenceKeyFilter.Returns(filter);
+            var request = new System.Web.HttpRequest(
+                string.Empty,
+                "http://example.com/a%2Fb/c%20d",
+                "q=%2Fx%20y&r=1");
+
+            var filler = new WebPipeline.EvidenceFiller(fakeData);
+            filler.AddRequestLineToEvidence(request);
+
+            fakeData.Received(1).AddEvidence(
+                Core.Constants.EVIDENCE_REQUEST_METHOD_KEY, "GET");
+            fakeData.Received(1).AddEvidence(
+                Core.Constants.EVIDENCE_REQUEST_PATH_KEY, "/a%2Fb/c%20d");
+            fakeData.Received(1).AddEvidence(
+                Core.Constants.EVIDENCE_REQUEST_QUERY_KEY,
+                "q=%2Fx%20y&r=1");
+        }
+
+        /// <summary>
+        /// Where no element asks for the request line, none of it is added
+        /// and none of it is worked out. This is what keeps the values out
+        /// of every pipeline that holds no element needing them.
+        /// </summary>
+        [TestMethod]
+        public void RequestLine_NotAddedWhenNotRequired()
+        {
+            var filter = Substitute.For<IEvidenceKeyFilter>();
+            filter.Include(Arg.Any<string>()).Returns(false);
+            var fakeData = Substitute.For<IFlowData>();
+            fakeData.EvidenceKeyFilter.Returns(filter);
+            var request = new System.Web.HttpRequest(
+                string.Empty, "http://example.com/a", "q=1");
+
+            var filler = new WebPipeline.EvidenceFiller(fakeData);
+            filler.AddRequestLineToEvidence(request);
+
+            fakeData.DidNotReceive().AddEvidence(
+                Arg.Any<string>(), Arg.Any<object>());
+        }
     }
 }

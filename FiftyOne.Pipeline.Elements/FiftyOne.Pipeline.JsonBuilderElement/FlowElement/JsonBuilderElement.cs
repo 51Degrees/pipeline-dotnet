@@ -322,6 +322,7 @@ namespace FiftyOne.Pipeline.JsonBuilder.FlowElement
             }
 
             AddErrors(data, allProperties);
+            AddWarnings(data, allProperties);
 
             try
             {
@@ -414,7 +415,25 @@ namespace FiftyOne.Pipeline.JsonBuilder.FlowElement
         }
 
         /// <summary>
-        /// Build the JSON 
+        /// Shared contract resolver. A single instance is used because
+        /// Json.NET caches the contracts it builds inside the resolver, so
+        /// creating one per request would force it to re-reflect over every
+        /// type on every request. The resolver is thread-safe.
+        /// </summary>
+        private static readonly LowercaseContractResolver CONTRACT_RESOLVER =
+            new LowercaseContractResolver();
+
+        /// <summary>
+        /// Cache for the serializer settings. Item1 is the converter array
+        /// the settings were built from, Item2 the settings. Rebuilt if the
+        /// converter array is replaced (which happens when a new element
+        /// instance is constructed with extra converters).
+        /// </summary>
+        private Tuple<JsonConverter[], JsonSerializerSettings>
+            _serializerSettings;
+
+        /// <summary>
+        /// Build the JSON
         /// </summary>
         /// <param name="allProperties">
         /// A dictionary containing the data to convert to JSON.
@@ -425,16 +444,25 @@ namespace FiftyOne.Pipeline.JsonBuilder.FlowElement
         /// <returns></returns>
         protected virtual string BuildJson(Dictionary<string, object> allProperties)
         {
-            // Build the JSON object from the property list containing property 
+            var converters = JSON_CONVERTERS;
+            var cached = _serializerSettings;
+            if (cached == null ||
+                ReferenceEquals(cached.Item1, converters) == false)
+            {
+                cached = Tuple.Create(converters,
+                    new JsonSerializerSettings
+                    {
+                        ReferenceLoopHandling = ReferenceLoopHandling.Ignore,
+                        Converters = converters,
+                        ContractResolver = CONTRACT_RESOLVER
+                    });
+                _serializerSettings = cached;
+            }
+            // Build the JSON object from the property list containing property
             // values and errors.
             return JsonConvert.SerializeObject(allProperties,
                 Formatting.Indented,
-                new JsonSerializerSettings
-                {
-                    ReferenceLoopHandling = ReferenceLoopHandling.Ignore,
-                    Converters = JSON_CONVERTERS,
-                    ContractResolver = new LowercaseContractResolver()
-                });
+                cached.Item2);
         }
 
         /// <summary>
@@ -476,6 +504,41 @@ namespace FiftyOne.Pipeline.JsonBuilder.FlowElement
 
                 allProperties.Add("errors", errors);
             }
+        }
+
+        /// <summary>
+        /// Add any warnings in the flow data object to the dictionary. These
+        /// tell the caller about something wrong with the request, such as
+        /// an evidence value that could not be used, whilst still returning
+        /// the rest of the data.
+        /// </summary>
+        /// <param name="data"></param>
+        /// <param name="allProperties"></param>
+        /// <exception cref="ArgumentNullException">
+        /// Thrown if one of the supplied parameters is null
+        /// </exception>
+        protected virtual void AddWarnings(IFlowData data,
+            Dictionary<string, object> allProperties)
+        {
+            if (data == null) throw new ArgumentNullException(nameof(data));
+            if (allProperties == null) throw new ArgumentNullException(nameof(allProperties));
+
+            var warnings = data.GetWarnings();
+            if (warnings.Count == 0)
+            {
+                return;
+            }
+
+            var messages = warnings.Select(w => w.Message);
+            // A subclass may already have written warnings of its own. Add
+            // to them rather than replacing them or throwing on the
+            // duplicate key.
+            if (allProperties.TryGetValue("warnings", out var existing)
+                && existing is IEnumerable<string> existingMessages)
+            {
+                messages = existingMessages.Concat(messages);
+            }
+            allProperties["warnings"] = messages.ToArray();
         }
 
         /// <summary>
@@ -525,16 +588,23 @@ namespace FiftyOne.Pipeline.JsonBuilder.FlowElement
 
             Dictionary<string, object> allProperties = new Dictionary<string, object>();
 
-            foreach (var element in data.ElementDataAsDictionary().Where(elementData => 
-                _elementExclusionList.Contains(elementData.Key) == false))
+            foreach (var element in data.ElementDataAsDictionary())
             {
-                if (allProperties.ContainsKey(element.Key.ToLowerInvariant()) == false)
+                if (_elementExclusionList.Contains(element.Key))
+                {
+                    continue;
+                }
+#pragma warning disable CA1308 // Normalize strings to uppercase
+                // Pipeline specification is for keys to be lower-case.
+                var elementKey = element.Key.ToLowerInvariant();
+#pragma warning restore CA1308 // Normalize strings to uppercase
+                if (allProperties.ContainsKey(elementKey) == false)
                 {
                     var values = GetValues(data,
-                        element.Key.ToLowerInvariant(),
+                        elementKey,
                         (element.Value as IElementData).AsDictionary(),
                         config);
-                    allProperties.Add(element.Key.ToLowerInvariant(), values);
+                    allProperties.Add(elementKey, values);
                 }
             }
 
@@ -636,7 +706,7 @@ namespace FiftyOne.Pipeline.JsonBuilder.FlowElement
         /// </exception>
         protected virtual void AddJsonValuesForProperty(
             IFlowData flowData,
-            Dictionary<string, object> jsonValues, 
+            IDictionary<string, object> jsonValues, 
             string dataPath, 
             string name, 
             object value, 

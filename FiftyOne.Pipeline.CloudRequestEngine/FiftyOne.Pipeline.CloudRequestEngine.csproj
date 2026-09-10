@@ -36,6 +36,15 @@
     <ProjectReference Include="..\FiftyOne.Pipeline.Engines\FiftyOne.Pipeline.Engines.csproj" />
   </ItemGroup>
 
+  <!-- This engine uses Newtonsoft.Json directly (CloudJsonConverter is part of the
+       cross-package public contract). Declare it explicitly so it is available to
+       net8.0 consumers too: Engines only ships Newtonsoft on its netstandard2.0
+       build (net8.0 uses System.Text.Json), so the transitive path does not reach
+       net8.0 callers. -->
+  <ItemGroup>
+    <PackageReference Include="Newtonsoft.Json" Version="13.0.4" />
+  </ItemGroup>
+
   <ItemGroup>
     <None Include="..\README.md">
       <Pack>True</Pack>

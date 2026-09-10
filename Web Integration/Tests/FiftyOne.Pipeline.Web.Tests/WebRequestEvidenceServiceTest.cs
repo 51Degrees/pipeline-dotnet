@@ -23,6 +23,7 @@
 using FiftyOne.Pipeline.Core.Data;
 using FiftyOne.Pipeline.Web.Services;
 using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Http.Features;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Primitives;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
@@ -186,6 +187,221 @@ namespace FiftyOne.Pipeline.Web.Tests
             _flowData.Verify(f => f.AddEvidence(
                 Core.Constants.EVIDENCE_PROTOCOL, "https"),
                 Times.Once);
+        }
+
+        /// <summary>
+        /// The method, the path and the whole query string are added where
+        /// an element asks for them, exactly as the request carried them.
+        /// The values rebuild the text an HTTP message signature was made
+        /// over, so a changed byte here makes a valid signature read as
+        /// invalid.
+        /// </summary>
+        [TestMethod]
+        public void WebRequestEvidenceService_RequestLine()
+        {
+            _request.SetupGet(r => r.Method).Returns("GET");
+            _request.SetupGet(r => r.Path)
+                .Returns(new PathString("/products/compare"));
+            _request.SetupGet(r => r.QueryString)
+                .Returns(new QueryString("?id=7&sort=name"));
+
+            SetRequiredKeys(new List<string>()
+            {
+                Core.Constants.EVIDENCE_REQUEST_METHOD_KEY,
+                Core.Constants.EVIDENCE_REQUEST_PATH_KEY,
+                Core.Constants.EVIDENCE_REQUEST_QUERY_KEY,
+            });
+            _service.AddEvidenceFromRequest(_flowData.Object, _request.Object);
+
+            _flowData.Verify(f => f.AddEvidence(
+                Core.Constants.EVIDENCE_REQUEST_METHOD_KEY, "GET"),
+                Times.Once);
+            _flowData.Verify(f => f.AddEvidence(
+                Core.Constants.EVIDENCE_REQUEST_PATH_KEY,
+                "/products/compare"),
+                Times.Once);
+            // The query string goes into evidence without its leading
+            // question mark, which whatever needs it puts back.
+            _flowData.Verify(f => f.AddEvidence(
+                Core.Constants.EVIDENCE_REQUEST_QUERY_KEY, "id=7&sort=name"),
+                Times.Once);
+        }
+
+        /// <summary>
+        /// The path and the query are taken from the raw request target,
+        /// so percent escapes survive. 'Path' and 'QueryString' hand back
+        /// the decoded forms, where '/a%2Fb' reads as '/a/b', and these
+        /// values rebuild the text an HTTP message signature was made
+        /// over, so a decoded byte makes a valid signature read as
+        /// invalid.
+        /// </summary>
+        [TestMethod]
+        public void WebRequestEvidenceService_RequestLineKeepsEscapes()
+        {
+            const string rawTarget = "/a%2Fb/c%20d?q=%2Fx%20y&r=1";
+            var features = new FeatureCollection();
+            features.Set<IHttpRequestFeature>(new HttpRequestFeature()
+            {
+                RawTarget = rawTarget,
+            });
+            _request.SetupGet(r => r.Method).Returns("GET");
+            _request.SetupGet(r => r.HttpContext.Features).Returns(features);
+            // The decoded forms the framework would otherwise be read
+            // from, which the assertions below must not see.
+            _request.SetupGet(r => r.Path)
+                .Returns(new PathString("/a/b/c d"));
+            _request.SetupGet(r => r.QueryString)
+                .Returns(new QueryString("?q=/x y&r=1"));
+
+            SetRequiredKeys(new List<string>()
+            {
+                Core.Constants.EVIDENCE_REQUEST_PATH_KEY,
+                Core.Constants.EVIDENCE_REQUEST_QUERY_KEY,
+            });
+            _service.AddEvidenceFromRequest(_flowData.Object, _request.Object);
+
+            _flowData.Verify(f => f.AddEvidence(
+                Core.Constants.EVIDENCE_REQUEST_PATH_KEY, "/a%2Fb/c%20d"),
+                Times.Once);
+            _flowData.Verify(f => f.AddEvidence(
+                Core.Constants.EVIDENCE_REQUEST_QUERY_KEY,
+                "q=%2Fx%20y&r=1"),
+                Times.Once);
+        }
+
+        /// <summary>
+        /// Where the raw request target cannot be read, the escaped forms
+        /// of the framework's own path and query are used, which are as
+        /// close to the request line as it can give. A raw target in the
+        /// absolute form a proxy may send, or the asterisk form of an
+        /// OPTIONS request, takes the same route.
+        /// </summary>
+        [TestMethod]
+        public void WebRequestEvidenceService_RequestLineWithoutARawTarget()
+        {
+            _request.SetupGet(r => r.Method).Returns("GET");
+            _request.SetupGet(r => r.HttpContext.Features)
+                .Returns(new FeatureCollection());
+            _request.SetupGet(r => r.Path)
+                .Returns(new PathString("/a b"));
+            _request.SetupGet(r => r.QueryString)
+                .Returns(new QueryString("?q=1"));
+
+            SetRequiredKeys(new List<string>()
+            {
+                Core.Constants.EVIDENCE_REQUEST_PATH_KEY,
+                Core.Constants.EVIDENCE_REQUEST_QUERY_KEY,
+            });
+            _service.AddEvidenceFromRequest(_flowData.Object, _request.Object);
+
+            _flowData.Verify(f => f.AddEvidence(
+                Core.Constants.EVIDENCE_REQUEST_PATH_KEY, "/a%20b"),
+                Times.Once);
+            _flowData.Verify(f => f.AddEvidence(
+                Core.Constants.EVIDENCE_REQUEST_QUERY_KEY, "q=1"),
+                Times.Once);
+        }
+
+        /// <summary>
+        /// An application mounted under a path base signs the whole path,
+        /// because that is what the request line carried, so the base goes
+        /// back on the front of the framework's own path.
+        /// </summary>
+        /// <remarks>
+        /// 'UsePathBase' takes the mounted part off 'Path' before the
+        /// application sees it, so reading 'Path' alone builds a path
+        /// shorter than the one that was signed. A signature covering
+        /// '@path' or '@target-uri' would then read as a mismatch, which
+        /// says the agent was lying, rather than as a value this
+        /// integration could not supply. This only arises where the raw
+        /// target cannot be read, because the raw target already carries
+        /// the whole path.
+        /// </remarks>
+        [TestMethod]
+        public void WebRequestEvidenceService_RequestLineKeepsThePathBase()
+        {
+            _request.SetupGet(r => r.Method).Returns("GET");
+            _request.SetupGet(r => r.HttpContext.Features)
+                .Returns(new FeatureCollection());
+            _request.SetupGet(r => r.PathBase)
+                .Returns(new PathString("/app"));
+            _request.SetupGet(r => r.Path)
+                .Returns(new PathString("/search"));
+            _request.SetupGet(r => r.QueryString)
+                .Returns(new QueryString("?q=1"));
+
+            SetRequiredKeys(new List<string>()
+            {
+                Core.Constants.EVIDENCE_REQUEST_PATH_KEY,
+                Core.Constants.EVIDENCE_REQUEST_QUERY_KEY,
+            });
+            _service.AddEvidenceFromRequest(_flowData.Object, _request.Object);
+
+            _flowData.Verify(f => f.AddEvidence(
+                Core.Constants.EVIDENCE_REQUEST_PATH_KEY, "/app/search"),
+                Times.Once);
+        }
+
+        /// <summary>
+        /// A request with no query string still adds the query key, empty,
+        /// so that a missing key always means this integration does not
+        /// supply the request line rather than that the request carried no
+        /// query.
+        /// </summary>
+        [TestMethod]
+        public void WebRequestEvidenceService_RequestLineEmptyQuery()
+        {
+            _request.SetupGet(r => r.Method).Returns("GET");
+            _request.SetupGet(r => r.Path).Returns(new PathString("/"));
+            _request.SetupGet(r => r.QueryString).Returns(new QueryString());
+
+            SetRequiredKey(Core.Constants.EVIDENCE_REQUEST_QUERY_KEY);
+            _service.AddEvidenceFromRequest(_flowData.Object, _request.Object);
+
+            _flowData.Verify(f => f.AddEvidence(
+                Core.Constants.EVIDENCE_REQUEST_QUERY_KEY, ""),
+                Times.Once);
+        }
+
+        /// <summary>
+        /// Where no element asks for the request line, none of it is added.
+        /// This is what keeps the new values out of every pipeline that
+        /// holds no element needing them, which is nearly all of them.
+        /// </summary>
+        [TestMethod]
+        public void WebRequestEvidenceService_RequestLineNotRequired()
+        {
+            _request.SetupGet(r => r.Method).Returns("GET");
+            _request.SetupGet(r => r.Path)
+                .Returns(new PathString("/products/compare"));
+            _request.SetupGet(r => r.QueryString)
+                .Returns(new QueryString("?id=7"));
+
+            SetRequiredKey(Core.Constants.EVIDENCE_CLIENTIP_KEY);
+            _service.AddEvidenceFromRequest(_flowData.Object, _request.Object);
+
+            _flowData.Verify(f => f.AddEvidence(
+                Core.Constants.EVIDENCE_REQUEST_METHOD_KEY,
+                It.IsAny<object>()),
+                Times.Never);
+            _flowData.Verify(f => f.AddEvidence(
+                Core.Constants.EVIDENCE_REQUEST_PATH_KEY,
+                It.IsAny<object>()),
+                Times.Never);
+            _flowData.Verify(f => f.AddEvidence(
+                Core.Constants.EVIDENCE_REQUEST_QUERY_KEY,
+                It.IsAny<object>()),
+                Times.Never);
+        }
+
+        /// <summary>
+        /// Set several required keys in the flow data.
+        /// </summary>
+        /// <param name="keys">the required keys</param>
+        private void SetRequiredKeys(List<string> keys)
+        {
+            _flowData.SetupGet(f => f.EvidenceKeyFilter)
+                .Returns(new EvidenceKeyFilterWhitelist(keys));
         }
 
         /// <summary>

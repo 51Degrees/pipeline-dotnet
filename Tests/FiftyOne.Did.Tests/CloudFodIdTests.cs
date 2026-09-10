@@ -37,14 +37,14 @@ namespace FiftyOne.Did.Tests
     /// <remarks>
     /// <para>
     /// The test uses a single resource key from the environment. Set
-    /// <c>51DEGREES_RESOURCE_KEY</c> (or the legacy <c>SUPER_RESOURCE_KEY</c>)
+    /// <c>_51DEGREES_RESOURCE_KEY</c> (or the legacy <c>SUPER_RESOURCE_KEY</c>)
     /// to a key whose properties include <c>fodid.*</c>. With no key set the
     /// test is inconclusive.
     /// </para>
     /// <para>
     /// To exercise more than one key (for example a free key and a paid key),
     /// the CI workflow runs this test once per <c>_51DEGREES_RESOURCE_KEY*</c>
-    /// secret, setting <c>51DEGREES_RESOURCE_KEY</c> to each in turn. The test
+    /// secret, setting <c>_51DEGREES_RESOURCE_KEY</c> to each in turn. The test
     /// itself only ever reads the single variable.
     /// </para>
     /// <para>
@@ -68,7 +68,7 @@ namespace FiftyOne.Did.Tests
         /// The aligned environment variable name used to supply the resource
         /// key. Checked before the legacy name.
         /// </summary>
-        private const string ResourceKeyEnvVar = "51DEGREES_RESOURCE_KEY";
+        private const string ResourceKeyEnvVar = "_51DEGREES_RESOURCE_KEY";
 
         /// <summary>
         /// The legacy environment variable name, checked when
@@ -242,34 +242,34 @@ namespace FiftyOne.Did.Tests
         /// <summary>
         /// Asserts that <paramref name="base64"/> is a real 51Did: a signed
         /// OWID envelope whose payload carries the three 51Did fields,
-        /// including the 32-byte probabilistic hash.
+        /// including the 32-byte probabilistic match key.
         /// </summary>
         private static void AssertValid51Did(string label, string base64)
         {
             var fodId = new FodId(base64);
 
             // A 51Did wraps a payload of at least PayloadLength bytes carrying
-            // a HashLength byte probabilistic value, inside a domain bearing
-            // envelope.
-            Assert.AreEqual(FodId.HashLength, fodId.Hash.Length,
-                $"{label}: hash length");
-            Assert.IsTrue(fodId.Payload.Length >= FodId.PayloadLength,
+            // a MatchKeyLength byte probabilistic match key, inside a domain
+            // bearing envelope.
+            Assert.AreEqual(FodId.MatchKeyLength, fodId.MatchKey.Length,
+                $"{label}: match key length");
+            Assert.IsTrue(fodId.Payload.Length >= FodId.MinimumPayloadLength,
                 $"{label}: payload length {fodId.Payload.Length} is below " +
-                $"the {FodId.PayloadLength} byte minimum");
+                $"the {FodId.MinimumPayloadLength} byte minimum");
             Assert.IsFalse(string.IsNullOrEmpty(fodId.Domain),
                 $"{label}: domain should not be empty");
 
             // The identifier round trips byte for byte and re-parses to the
             // same probabilistic value.
             var reparsed = new FodId(fodId.AsBase64());
-            CollectionAssert.AreEqual(fodId.Hash, reparsed.Hash,
-                $"{label}: hash should survive a base64 round trip");
+            CollectionAssert.AreEqual(fodId.MatchKey, reparsed.MatchKey,
+                $"{label}: match key should survive a base64 round trip");
 
             Console.WriteLine(
                 $"{label}: domain={fodId.Domain} " +
                 $"flags=0x{fodId.Flags:X2} " +
                 $"licenseId=0x{fodId.LicenseId:X8} " +
-                $"hash={Convert.ToHexString(fodId.Hash)}");
+                $"matchKey={Convert.ToHexString(fodId.MatchKey)}");
         }
     }
 }

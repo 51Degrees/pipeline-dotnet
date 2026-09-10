@@ -484,10 +484,6 @@ namespace FiftyOne.Pipeline.JavaScriptBuilder.FlowElement
                     return WebUtility.UrlEncode(k.Key.Remove(0, dotPos + 1));
                 }, v => WebUtility.UrlEncode(v.Value.ToString()));
 
-            // Serialise the parameters
-            var paramsObject =
-                JsonConvert.SerializeObject(parameters, Formatting.Indented);
-
             return parameters;
         }
 

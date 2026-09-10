@@ -94,30 +94,51 @@ namespace FiftyOne.Pipeline.CloudRequestEngine
         public const string CLOUD_REQUEST_ORIGIN_DEFAULT = null;
 
         /// <summary>
-        /// Default timeout when calling cloud service with CloudRequestEngine.
+        /// Default timeout in seconds for a request to the cloud service.
+        /// This bounds how long a caller thread blocks on a slow or
+        /// unreachable cloud, so it is kept low. Because an occasional
+        /// slow request that hits this timeout is counted as a failure,
+        /// the recovery circuit breaker is deliberately insensitive
+        /// (see <c>CLOUD_REQUEST_FAILURES_TO_ENTER_RECOVERY_DEFAULT</c>
+        /// and <c>CLOUD_REQUEST_FAILURES_WINDOW_SECONDS_DEFAULT</c>) so
+        /// that stray timeouts on a healthy cloud do not trip it; only a
+        /// sustained high failure rate, which signals a real outage, does.
         /// </summary>
         public const int CLOUD_REQUEST_TIMEOUT_DEFAULT_SECONDS = 2;
 
         /// <summary>
-        /// Default recovery period for CloudRequestEngine
-        /// once enough requests to server fail in short time.
+        /// Default recovery period in seconds for CloudRequestEngine once
+        /// the failure threshold trips the breaker. Kept short so that a
+        /// trip suppresses requests only briefly before probing the cloud
+        /// again, which bounds both the blackout and the exception volume
+        /// emitted while the breaker is open.
         /// </summary>
-        public const double CLOUD_REQUEST_RECOVERY_SECONDS_DEFAULT = 60.0;
+        public const double CLOUD_REQUEST_RECOVERY_SECONDS_DEFAULT = 10.0;
 
         /// <summary>
-        /// Whether exponential backoff is enabled by default.
+        /// Whether exponential backoff is enabled by default. Enabled so
+        /// that after a trip the breaker probes the cloud again quickly
+        /// (see the initial delay below) rather than sitting in a fixed
+        /// <see cref="CLOUD_REQUEST_RECOVERY_SECONDS_DEFAULT"/> blackout,
+        /// backing off further only if the outage persists. When this is
+        /// true the simple <see cref="CLOUD_REQUEST_RECOVERY_SECONDS_DEFAULT"/>
+        /// period is not used.
         /// </summary>
-        public const bool CLOUD_REQUEST_EXPONENTIAL_BACKOFF_ENABLED_DEFAULT = false;
+        public const bool CLOUD_REQUEST_EXPONENTIAL_BACKOFF_ENABLED_DEFAULT = true;
 
         /// <summary>
         /// Default initial delay in seconds for exponential backoff recovery.
+        /// The first recovery probe after a trip happens this soon, so a
+        /// brief cloud blip clears quickly.
         /// </summary>
         public const double CLOUD_REQUEST_EXPONENTIAL_BACKOFF_INITIAL_DELAY_SECONDS_DEFAULT = 2.0;
 
         /// <summary>
         /// Default maximum delay in seconds for exponential backoff recovery.
+        /// Caps how long the breaker stays suppressed between probes so a
+        /// prolonged outage never parks recovery for long.
         /// </summary>
-        public const double CLOUD_REQUEST_EXPONENTIAL_BACKOFF_MAX_DELAY_SECONDS_DEFAULT = 300.0;
+        public const double CLOUD_REQUEST_EXPONENTIAL_BACKOFF_MAX_DELAY_SECONDS_DEFAULT = 10.0;
 
         /// <summary>
         /// Default multiplier for exponential backoff recovery.
@@ -134,20 +155,28 @@ namespace FiftyOne.Pipeline.CloudRequestEngine
         /// Maximal number of failures to occur within some time
         /// for CloudRequestEngine to temporarily stop sending requests.
         /// </summary>
-        public const int CLOUD_REQUEST_FAILURES_TO_ENTER_RECOVERY_MAX = 100;
+        public const int CLOUD_REQUEST_FAILURES_TO_ENTER_RECOVERY_MAX = 1000;
 
         /// <summary>
-        /// Minimal number of failures to occur within some time
-        /// for CloudRequestEngine to temporarily stop sending requests.
+        /// Default number of failures that must occur within
+        /// <see cref="CLOUD_REQUEST_FAILURES_WINDOW_SECONDS_DEFAULT"/>
+        /// for CloudRequestEngine to enter its recovery period. Set high
+        /// so that stray request timeouts on an otherwise healthy cloud
+        /// do not trip the breaker; reaching this many failures in the
+        /// window signals that the cloud is genuinely unavailable rather
+        /// than occasionally slow.
         /// </summary>
-        public const int CLOUD_REQUEST_FAILURES_TO_ENTER_RECOVERY_DEFAULT = 10;
+        public const int CLOUD_REQUEST_FAILURES_TO_ENTER_RECOVERY_DEFAULT = 100;
 
         /// <summary>
-        /// Default time period in seconds within which a number of
-        /// failed requests should reach `FailuresToEnterRecovery`
-        /// for CloudRequestEngine to enter "recovery period"
+        /// Default time period in seconds within which
+        /// <see cref="CLOUD_REQUEST_FAILURES_TO_ENTER_RECOVERY_DEFAULT"/>
+        /// failed requests must occur for CloudRequestEngine to enter its
+        /// recovery period. A short window means the threshold reflects a
+        /// failure rate (a burst of failures signalling an outage) rather
+        /// than failures accumulated slowly over a long period.
         /// </summary>
-        public const int CLOUD_REQUEST_FAILURES_WINDOW_SECONDS_DEFAULT = 100;
+        public const int CLOUD_REQUEST_FAILURES_WINDOW_SECONDS_DEFAULT = 10;
 
     }
 }

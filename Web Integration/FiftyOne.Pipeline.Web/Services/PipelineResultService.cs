@@ -80,7 +80,7 @@ namespace FiftyOne.Pipeline.Web.Services
             }
 
             // Create the flowData
-            var flowData = _pipeline.CreateFlowData();
+            var flowData = _pipeline.CreateFlowData(context.RequestAborted);
             context.Response.RegisterForDispose(flowData);
 
             // Store the FlowData in the HttpContext

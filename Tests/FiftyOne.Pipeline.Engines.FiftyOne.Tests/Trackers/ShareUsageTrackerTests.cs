@@ -192,7 +192,7 @@ namespace FiftyOne.Pipeline.Engines.FiftyOne.Tests.Trackers
 			Assert.AreEqual(1, trackedEvents);
 		}
 
-		public DataKey GenerateKey(IEvidenceKeyFilter filter, Dictionary<string, object> evidence)
+        public DataKey GenerateKey(IEvidenceKeyFilter filter, Dictionary<string, object> evidence)
 		{
 			DataKeyBuilder result = new DataKeyBuilder();
 			foreach (var entry in evidence)

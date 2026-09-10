@@ -1,0 +1,63 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+
+    <IsPackable>false</IsPackable>
+
+    <Platforms>AnyCPU</Platforms>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.10.0" />
+    <PackageReference Include="MSTest.TestAdapter" Version="3.9.3" />
+    <PackageReference Include="MSTest.TestFramework" Version="3.9.3" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- The netstandard2.0 build of the element is the one a .NET
+         Framework consumer loads, and it reads JSON with Newtonsoft
+         rather than System.Text.Json. Naming the target framework here
+         makes this test project run that build, where every other test
+         project runs the net8.0 build. -->
+    <ProjectReference
+        Include="..\FiftyOne.Pipeline.AgentSignature\FiftyOne.Pipeline.AgentSignature.csproj"
+        SetTargetFramework="TargetFramework=netstandard2.0" />
+    <!-- Without this, the engines project arrives transitively and
+         resolves to its net8.0 build, leaving the element's dependencies
+         mixed. Naming it directly keeps the whole set of pipeline
+         assemblies on the builds a .NET Framework consumer loads. -->
+    <ProjectReference
+        Include="..\..\FiftyOne.Pipeline.Engines\FiftyOne.Pipeline.Engines.csproj"
+        SetTargetFramework="TargetFramework=netstandard2.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- These helpers belong to the main test project and compile
+         against the element's public surface alone, so they are shared
+         by link rather than copied. The main project's ElementHarness is
+         not linked, because it reaches internal members that only the
+         main test assembly is granted access to. -->
+    <Compile
+        Include="..\FiftyOne.Pipeline.AgentSignatureTests\Helpers\FakeHttpHandler.cs"
+        Link="Helpers\FakeHttpHandler.cs" />
+    <Compile
+        Include="..\FiftyOne.Pipeline.AgentSignatureTests\Helpers\RequestSigner.cs"
+        Link="Helpers\RequestSigner.cs" />
+    <Compile
+        Include="..\FiftyOne.Pipeline.AgentSignatureTests\Helpers\Fixtures.cs"
+        Link="Helpers\Fixtures.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- The signing helper reads the RFC 9421 Ed25519 test key from the
+         main test project's fixture folder, so the file travels to the
+         output by link rather than by copy. -->
+    <None
+        Include="..\FiftyOne.Pipeline.AgentSignatureTests\Fixtures\ed25519.json"
+        Link="Fixtures\ed25519.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+  </ItemGroup>
+
+</Project>

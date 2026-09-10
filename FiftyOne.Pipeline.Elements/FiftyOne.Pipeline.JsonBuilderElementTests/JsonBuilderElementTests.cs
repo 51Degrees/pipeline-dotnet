@@ -439,6 +439,117 @@ namespace FiftyOne.Pipeline.JsonBuilderElementTests
         }
 
         /// <summary>
+        /// A message recorded with AddWarning must reach the caller in the
+        /// top level warnings array, with the rest of the data alongside it.
+        /// </summary>
+        [TestMethod]
+        public void JsonBuilder_Warnings_InJson()
+        {
+            const string message = "evidence value 'n2' could not be used";
+
+            var json = ProcessWithWarnings(
+                new JsonBuilderElementBuilder(_loggerFactory).Build(),
+                message);
+
+            var warnings = JObject.Parse(json)["warnings"];
+            Assert.IsNotNull(warnings, "expected a warnings array");
+            CollectionAssert.AreEqual(
+                new[] { message },
+                warnings.Select(w => w.ToString()).ToArray());
+            // The data must still be there. A warning is not an error.
+            Assert.IsNotNull(JObject.Parse(json)["empty-aspect"]);
+        }
+
+        /// <summary>
+        /// With nothing to report there must be no warnings entry, so the
+        /// response shape does not change for the normal case.
+        /// </summary>
+        [TestMethod]
+        public void JsonBuilder_NoWarnings_NoEntryInJson()
+        {
+            var json = ProcessWithWarnings(
+                new JsonBuilderElementBuilder(_loggerFactory).Build());
+
+            Assert.IsNull(JObject.Parse(json)["warnings"]);
+        }
+
+        /// <summary>
+        /// A subclass that already writes warnings of its own keeps them:
+        /// the flow data warnings are added to that entry rather than
+        /// replacing it or throwing on the duplicate key.
+        /// </summary>
+        [TestMethod]
+        public void JsonBuilder_Warnings_MergedWithSubclassEntry()
+        {
+            var json = ProcessWithWarnings(
+                new SubclassWarningJsonBuilderElement(_loggerFactory),
+                "from the flow data");
+
+            var warnings = JObject.Parse(json)["warnings"]
+                .Select(w => w.ToString())
+                .ToArray();
+            CollectionAssert.AreEqual(
+                new[]
+                {
+                    SubclassWarningJsonBuilderElement.Warning,
+                    "from the flow data"
+                },
+                warnings);
+        }
+
+        /// <summary>
+        /// Run a real pipeline built around the supplied JSON builder,
+        /// recording the supplied warnings on the flow data first.
+        /// </summary>
+        /// <param name="jsonBuilder">The JSON builder to use.</param>
+        /// <param name="warnings">The warnings to record.</param>
+        /// <returns>The JSON the builder produced.</returns>
+        private string ProcessWithWarnings(
+            IJsonBuilderElement jsonBuilder,
+            params string[] warnings)
+        {
+            var engine = new EmptyEngineBuilder(_loggerFactory).Build();
+            var sequenceElement = new SequenceElementBuilder(_loggerFactory)
+                .Build();
+            var pipeline = new PipelineBuilder(_loggerFactory)
+                .AddFlowElement(sequenceElement)
+                .AddFlowElement(engine)
+                .AddFlowElement(jsonBuilder)
+                .Build();
+
+            using (var flowData = pipeline.CreateFlowData())
+            {
+                foreach (var warning in warnings)
+                {
+                    flowData.AddWarning(warning, engine);
+                }
+                flowData.Process();
+                return flowData.Get<IJsonBuilderElementData>().Json;
+            }
+        }
+
+        /// <summary>
+        /// Inner class standing in for a builder that already produces its
+        /// own warnings entry, as a subclass in another repository does.
+        /// </summary>
+        private class SubclassWarningJsonBuilderElement : TestJsonBuilderElement
+        {
+            public const string Warning = "from the subclass";
+
+            public SubclassWarningJsonBuilderElement(
+                ILoggerFactory loggerFactory)
+                : base(loggerFactory)
+            { }
+
+            protected override void AddErrors(IFlowData data,
+                Dictionary<string, object> allProperties)
+            {
+                base.AddErrors(data, allProperties);
+                allProperties["warnings"] = new string[] { Warning };
+            }
+        }
+
+        /// <summary>
         /// Inner class used to test serialization of values in 
         /// isolation
         /// </summary>
@@ -487,6 +598,54 @@ namespace FiftyOne.Pipeline.JsonBuilderElementTests
         }
 
         /// <summary>
+        /// Inner class used to verify that AddJsonValuesForProperty
+        /// can be overridden using the IDictionary parameter and that
+        /// entries added through the interface reach the JSON output.
+        /// </summary>
+        private class OverridingJsonBuilderElement : TestJsonBuilderElement
+        {
+            public OverridingJsonBuilderElement(ILoggerFactory loggerFactory)
+                : base(loggerFactory)
+            { }
+
+            protected override void AddJsonValuesForProperty(
+                IFlowData flowData,
+                IDictionary<string, object> jsonValues,
+                string dataPath,
+                string name,
+                object value,
+                PipelineConfig config,
+                bool includeValueDataOnly)
+            {
+                base.AddJsonValuesForProperty(flowData, jsonValues,
+                    dataPath, name, value, config, includeValueDataOnly);
+                jsonValues[name.ToLowerInvariant() + "overridden"] = true;
+            }
+        }
+
+        /// <summary>
+        /// Check that AddJsonValuesForProperty can be overridden via its
+        /// IDictionary parameter and that entries added by the override
+        /// appear in the JSON alongside the standard values.
+        /// </summary>
+        [TestMethod]
+        public void JsonBuilder_AddJsonValuesForProperty_Override()
+        {
+            _jsonBuilderElement = new OverridingJsonBuilderElement(_loggerFactory);
+
+            var json = TestIteration(1);
+
+            Assert.IsTrue(IsExpectedJson(json),
+                "The standard property values should still be present. " +
+                "Complete JSON: " + Environment.NewLine + json);
+            JObject obj = JObject.Parse(json);
+            Assert.IsNotNull(obj["test"]["propertyoverridden"],
+                "The entry added by the override through the IDictionary " +
+                "parameter is missing from the JSON. " +
+                "Complete JSON: " + Environment.NewLine + json);
+        }
+
+        /// <summary>
         /// Used by the serialization tests below
         /// </summary>
         public enum TypeToBeTested
@@ -526,9 +685,10 @@ namespace FiftyOne.Pipeline.JsonBuilderElementTests
                 "& ampersand &",
                 "\\ backslash \\",
                 "   tabs  ",
-                @"
-carriage return and new line  
-",
+                // Explicit escapes (not a verbatim multi-line literal) so the value
+                // is LF regardless of this file's line endings, keeping expected and
+                // actual JSON in agreement on both LF and CRLF checkouts.
+                "\ncarriage return and new line  \n",
                 "{ \"json\": [ \"text\", \"abc\" ] }"
             };
             List<string> ipPropertyValues = new() {
@@ -584,8 +744,7 @@ carriage return and new line
             string expectedValue = (valueOfProperty ?? "null").Replace(@"\", @"\\");
             expectedValue = expectedValue.Replace(@"""", @"\""");
             expectedValue = expectedValue.Replace(@"    ", @"\  ");
-            expectedValue = expectedValue.Replace(@"
-", @"\r\n");
+            expectedValue = expectedValue.Replace("\n", @"\r\n");
 
             // Replacing as there is no carriage return in Linux format.
             expectedValue = expectedValue.Replace(@"\r", @"");

@@ -8,3 +8,6 @@
 [submodule "owid-dotnet"]
 	path = owid-dotnet
 	url = https://github.com/SWAN-community/owid-dotnet.git
+[submodule "FiftyOne.Pipeline.Elements/FiftyOne.Pipeline.DerivedProperty/Scripts"]
+	path = FiftyOne.Pipeline.Elements/FiftyOne.Pipeline.DerivedProperty/Scripts
+	url = ../derived-properties

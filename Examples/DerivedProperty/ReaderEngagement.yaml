@@ -1,0 +1,51 @@
+# An example derived property script, written for this example alone.
+#
+# The scripts 51Degrees ships inside the FiftyOne.Pipeline.DerivedProperty
+# package come from the derived-properties repository at
+# https://github.com/51Degrees/derived-properties, and are selected by the
+# Scripts build parameter. This file is not one of them, so the example
+# runs the same whether or not that repository is present.
+#
+# The reference for everything below is docs/format-1.md in that same
+# repository.
+
+Format: 1
+Name: ReaderEngagement
+Version: "1.0.0"
+Output:
+  Name: ReaderEngagement
+  Description: How far the visitor appears to have engaged with the page, judged only from properties another element has already produced. Returns one of High, Medium or Low.
+  ValueType: string
+  DefaultValue: Low
+  IsList: false
+  IsMandatory: true
+  IsObsolete: false
+  Category: Example
+  IsPopular: false
+  ExportValues: true
+  Values:
+    - Name: High
+      Description: Every test went in favour of engagement.
+    - Name: Medium
+      Description: One test went against engagement.
+    - Name: Low
+      Description: More than one test went against engagement.
+
+# A property named here is a property the script needs. Where any one of
+# the three is missing from a request, the script produces no value and
+# says which property was missing and what the element that supplies it
+# said, rather than answering on part of the evidence.
+Checks:
+  SeveralPages: { Property: session.PagesViewed, Ge: 3 }
+  LongEnough:   { Property: session.SecondsSincePageLoad, Ge: 30 }
+  PointerMoved: { Property: session.PointerMoved, Eq: true }
+
+# Rules are read in order and the first one whose When is true wins. The
+# last rule is an Else, which every script ends in, so a script always
+# chooses a value once its source properties have been read.
+Rules:
+  - When: { Failed: Checks, Eq: 0 }
+    Then: High
+  - When: { Failed: Checks, Eq: 1 }
+    Then: Medium
+  - Else: Low

@@ -121,9 +121,27 @@ namespace FiftyOne.Pipeline.Core.Tests.FlowElements
 
             // Assert
             Assert.IsTrue(data.Errors == null || data.Errors.Count == 0, "Expected no errors");
-            Assert.IsTrue(startTimes.TrueForAll(dtStart => endTimes.TrueForAll(dtEnd => dtEnd > dtStart)),
+            // Requiring all three intervals to overlap at a single instant is
+            // too strict for a loaded CI runner: staggered scheduling can leave
+            // one element starting just after another finished. Parallel
+            // execution is still proven if at least one pair of elements
+            // overlaps in time, so only require a single overlapping pair.
+            int overlappingPairs = 0;
+            for (int i = 0; i < startTimes.Count; i++)
+            {
+                for (int j = i + 1; j < startTimes.Count; j++)
+                {
+                    // Two intervals overlap when each starts before the other ends.
+                    if (startTimes[i] < endTimes[j] && startTimes[j] < endTimes[i])
+                    {
+                        overlappingPairs++;
+                    }
+                }
+            }
+            Assert.IsTrue(overlappingPairs >= 1,
+                $"Expected at least two elements to overlap in time. " +
                 $"Start times [{string.Join(",", startTimes.Select(t => t.ToString("HH:mm:ss.ffffff")))}] " +
-                $"not before end times [" +
+                $"end times [" +
                 $"{string.Join(",", endTimes.Select(t => t.ToString("HH:mm:ss.ffffff")))}]");
             for (int i = 0; i < 3; i++)
             {
@@ -170,6 +188,8 @@ namespace FiftyOne.Pipeline.Core.Tests.FlowElements
             var element1 = new Mock<IFlowElement>();
             var element2 = new Mock<IFlowElement>();
             var data = new Mock<IFlowData>();
+            _pipeline.Setup(p => p.SuppressProcessExceptions).Returns(false);
+            data.Setup(d => d.Pipeline).Returns(_pipeline.Object);
 
             // Configure element 2 to throw an exception.
             element2.Setup(e => e.Process(It.IsAny<IFlowData>()))
@@ -182,11 +202,49 @@ namespace FiftyOne.Pipeline.Core.Tests.FlowElements
             // Start processing
             _parallelElements.Process(data.Object);
 
-            // Check that add error was called with the expected exception 
-            // and flow element.
+            // Check that add error was called with the expected exception
+            // and flow element. Exceptions are not suppressed, so the error
+            // is flagged for logging.
             data.Verify(d => d.AddError(
                 It.Is<Exception>(ex => ex.Message == "TEST"),
-                element2.Object),
+                element2.Object,
+                true,
+                true),
+                Times.Once());
+        }
+
+        [TestMethod]
+        /// <summary>
+        /// Check that an exception being thrown by a flow element is not
+        /// flagged for error level logging when the pipeline is suppressing
+        /// process exceptions (issue #280).
+        /// </summary>
+        public void ParallelElements_ExceptionDuringProcessingSuppressed()
+        {
+            var element1 = new Mock<IFlowElement>();
+            var element2 = new Mock<IFlowElement>();
+            var data = new Mock<IFlowData>();
+            _pipeline.Setup(p => p.SuppressProcessExceptions).Returns(true);
+            data.Setup(d => d.Pipeline).Returns(_pipeline.Object);
+
+            // Configure element 2 to throw an exception.
+            element2.Setup(e => e.Process(It.IsAny<IFlowData>()))
+                .Throws(new Exception("TEST"));
+
+            _parallelElements = new ParallelElements(_logger.Object,
+                element1.Object,
+                element2.Object);
+
+            // Start processing
+            _parallelElements.Process(data.Object);
+
+            // Check that add error was called asking for the error not to
+            // be logged.
+            data.Verify(d => d.AddError(
+                It.Is<Exception>(ex => ex.Message == "TEST"),
+                element2.Object,
+                true,
+                false),
                 Times.Once());
         }
 

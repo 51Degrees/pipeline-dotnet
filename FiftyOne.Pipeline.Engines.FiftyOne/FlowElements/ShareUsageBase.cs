@@ -563,9 +563,9 @@ namespace FiftyOne.Pipeline.Engines.FiftyOne.FlowElements
         /// <see cref="IFlowData"/> instance should be shared or not.
         /// </param>
         /// <param name="shareAllEvidence">
-        /// If true, all evidence will be shared and  
-        /// the blockedHttpHeaders, includedQueryStringParameters and
-        /// ignoreDataEvidenceFilter parameters will be ignored.
+        /// If true, all evidence will be shared and
+        /// the blockedHttpHeaders and includedQueryStringParameters
+        /// parameters will be ignored.
         /// </param>
         /// <param name="failHandler">
         /// Obsolete. This parameter is no longer used.
@@ -650,8 +650,6 @@ namespace FiftyOne.Pipeline.Engines.FiftyOne.FlowElements
                     blockedHttpHeaders, includedQueryStringParameters, false,
                     aspSessionCookieName);
 
-                _ignoreDataEvidenceFilter = ignoreDataEvidenceFilter;
-
                  trackerEvidenceFiler = new EvidenceKeyFilterShareUsageTracker(
                      blockedHttpHeaders, 
                      includedQueryStringParameters, 
@@ -666,6 +664,8 @@ namespace FiftyOne.Pipeline.Engines.FiftyOne.FlowElements
                 _evidenceKeyFilterExclSession = new EvidenceKeyFilterShareUsage();
                 trackerEvidenceFiler = new EvidenceKeyFilterShareUsageTracker();
             }
+
+            _ignoreDataEvidenceFilter = ignoreDataEvidenceFilter;
 
             _tracker = tracker;
             // If no tracker was supplied then create the default one.

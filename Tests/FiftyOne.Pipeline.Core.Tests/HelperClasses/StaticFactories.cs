@@ -24,17 +24,20 @@ using FiftyOne.Pipeline.Core.Data;
 using FiftyOne.Pipeline.Core.FlowElements;
 using Microsoft.Extensions.Logging;
 using Moq;
+using System.Threading;
 
 namespace FiftyOne.Pipeline.Core.Tests.HelperClasses
 {
     internal class StaticFactories
     {
-        public static IFlowData CreateFlowData(IPipelineInternal pipeline)
+        public static IFlowData CreateFlowData(
+            IPipelineInternal pipeline,
+            CancellationToken cancellationToken = default)
         {
             var logger = new Mock<ILogger<FlowData>>();
             var evidenceLogger = new Mock<ILogger<Evidence>>();
             var evidence = new Evidence(evidenceLogger.Object);
-            return new FlowData(logger.Object, pipeline, evidence);
+            return new FlowData(logger.Object, pipeline, evidence, cancellationToken);
         }
     }
 }

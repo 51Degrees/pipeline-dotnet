@@ -301,7 +301,8 @@ namespace FiftyOne.Pipeline.Engines.FiftyOne.FlowElements
 
         /// <summary>
         /// Configure the usage sharing element to share all evidence.
-        /// This will override all the other evidence filtering settings.
+        /// This will override the blocked header and included query
+        /// string parameter settings.
         /// </summary>
         /// <param name="shareAll">
         /// If set to true then all evidence will be shared
@@ -354,10 +355,13 @@ namespace FiftyOne.Pipeline.Engines.FiftyOne.FlowElements
         /// set this to "header.user-agent:ABC"
         /// </summary>
         /// <param name="evidenceFilter">
-        /// Comma separated string containing entries in the format 
+        /// Comma separated string containing entries in the format
         /// <code>[evidenceKey]:[evidenceValue]</code>.
         /// Any requests with evidence matching these entries will
         /// not be shared.
+        /// Whitespace around an entry and around a key is ignored.
+        /// The value is taken verbatim from the first colon onwards,
+        /// so it can itself contain colons.
         /// </param>
         /// <returns></returns>
         [DefaultValue("All values are shared")]
@@ -367,10 +371,18 @@ namespace FiftyOne.Pipeline.Engines.FiftyOne.FlowElements
             {
                 foreach (var kvpString in evidenceFilter.Split(','))
                 {
-                    if (kvpString.Contains(":"))
+                    // Entries are trimmed because a filter is normally
+                    // written with spaces after the separating commas. An
+                    // untrimmed key never matches any evidence and fails
+                    // silently.
+                    var entry = kvpString.Trim();
+                    int separatorIndex = entry.IndexOf(':');
+                    if (separatorIndex >= 0)
                     {
                         KeyValuePair<string, string> kvp =
-                            new KeyValuePair<string, string>(kvpString.Split(':')[0], kvpString.Split(':')[1]);
+                            new KeyValuePair<string, string>(
+                                entry.Substring(0, separatorIndex).Trim(),
+                                entry.Substring(separatorIndex + 1));
                         IgnoreDataEvidenceFilter.Add(kvp);
                     }
                     else
@@ -378,7 +390,7 @@ namespace FiftyOne.Pipeline.Engines.FiftyOne.FlowElements
                         string msg = string.Format(CultureInfo.InvariantCulture,
                             Messages.MessageShareUsageInvalidConfig,
                             "IgnoreFlowDataEvidenceFilter",
-                            kvpString);
+                            entry);
                         Logger.LogWarning(msg);
                     }
                 }

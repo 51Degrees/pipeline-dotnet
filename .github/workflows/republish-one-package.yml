@@ -1,0 +1,177 @@
+# Rebuilds and republishes ONE NuGet package at a version that already has a
+# tag, for the case where a release published every package but one.
+#
+# WHY THIS EXISTS. On 3 September 2026 the 4.5.90 release built
+# FiftyOne.Pipeline.Engines.FiftyOne corrupt. It was signed and then modified,
+# so it failed its own integrity check (NU3008). NuGet accepted the push,
+# dropped it during validation, and never published it. Nothing in the
+# workflow noticed, because from its point of view the push succeeded. Two
+# packages that depend on it, FiftyOne.Did.Core and FiftyOne.Did.Cloud 4.5.90,
+# have been uninstallable ever since. See #388.
+#
+# Publish Main cannot fix that. The version comes from the git history, so
+# with the tag already present it recomputes the same version, decides no
+# update is needed, and skips packaging entirely. The nightly does the same.
+#
+# WHAT THIS DOES DIFFERENTLY. It takes the version as an input rather than
+# computing it, packs ONE project into an empty folder, signs that one file,
+# and VERIFIES the result before pushing. It refuses to push a package that
+# does not verify, which is the check the normal publish does not make and
+# the reason a corrupt package reached nuget.org unnoticed.
+#
+# It creates no tag and no release, and touches no other package.
+#
+# WHY ONE PROJECT INTO AN EMPTY FOLDER. The normal build packs three
+# solutions into one shared folder and, after each, signs it with a wildcard
+# over every file in it. A package therefore gets signed once per solution
+# that follows it, which is why packages in the 3 September run were signed
+# between two and eight times. Signing a package that is already signed is
+# the most likely origin of the corruption. This avoids the situation rather
+# than relying on it being safe.
+
+name: Republish One Package
+
+on:
+  workflow_dispatch:
+    inputs:
+      package:
+        description: "Package id, for example FiftyOne.Pipeline.Engines.FiftyOne"
+        required: true
+        type: string
+      project:
+        description: "Path to its csproj, relative to the repository root"
+        required: true
+        type: string
+      version:
+        description: "Version to build, for example 4.5.90"
+        required: true
+        type: string
+      ref:
+        description: "Tag or commit to build from, for example 4.5.90"
+        required: true
+        type: string
+      dryrun:
+        description: "Build, sign and verify, but do not push"
+        type: boolean
+        default: true
+
+jobs:
+  Republish:
+    # Windows to match the platform the release builds on, so the assembly
+    # this produces is built the same way as the one it replaces.
+    runs-on: windows-latest
+    steps:
+      - name: Checkout at the released commit
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.ref }}
+          submodules: recursive
+
+      - name: Confirm what was checked out
+        shell: pwsh
+        run: |
+          Write-Host "HEAD is $(git rev-parse HEAD)"
+          if (-not (Test-Path "${{ inputs.project }}")) {
+            throw "no project at '${{ inputs.project }}' in ${{ inputs.ref }}"
+          }
+
+      # Directory.Build.props sets AssemblyOriginatorKeyFile to
+      # 51Degrees.snk at the repository root when BuiltOnCI is true, so the
+      # assembly is strong named exactly as the release built it. Without
+      # this the build either fails or produces a differently named assembly.
+      - name: Write the strong name key
+        shell: pwsh
+        env:
+          SNK: ${{ secrets.STRONG_NAME_KEY_BASE64 }}
+        run: |
+          if ([string]::IsNullOrWhiteSpace($env:SNK)) {
+            throw "STRONG_NAME_KEY_BASE64 is not available to this workflow"
+          }
+          [IO.File]::WriteAllBytes(
+            "$PWD/51Degrees.snk", [Convert]::FromBase64String($env:SNK))
+          Write-Host "wrote 51Degrees.snk"
+
+      - name: Pack the one project
+        shell: pwsh
+        env:
+          Version: ${{ inputs.version }}
+        run: |
+          New-Item -ItemType Directory -Force package | Out-Null
+          dotnet pack "${{ inputs.project }}" `
+            --output "$PWD/package" `
+            --configuration Release `
+            /p:PackageVersion=${{ inputs.version }} `
+            /p:Version=${{ inputs.version }} `
+            /p:BuiltOnCI=true `
+            /p:ContinuousIntegrationBuild=true
+
+          # Nothing else may be in the folder, because the push at the end
+          # takes what is there and this must touch one package only.
+          $built = Get-ChildItem "$PWD/package" -Filter *.nupkg
+          if ($built.Count -ne 1) {
+            throw "expected one package, found $($built.Count): $($built.Name -join ', ')"
+          }
+          $expected = "${{ inputs.package }}.${{ inputs.version }}.nupkg"
+          if ($built[0].Name -ne $expected) {
+            throw "packed '$($built[0].Name)', expected '$expected'"
+          }
+          Write-Host "packed $expected"
+
+      - name: Sign it
+        shell: pwsh
+        run: |
+          dotnet tool install -g NuGetKeyVaultSignTool
+          $nupkg = "$PWD/package/${{ inputs.package }}.${{ inputs.version }}.nupkg"
+          NuGetKeyVaultSignTool sign -f $nupkg `
+            --file-digest sha256 `
+            --timestamp-digest sha256 `
+            --timestamp-rfc3161 http://rfc3161timestamp.globalsign.com/advanced `
+            --azure-key-vault-url "${{ secrets.CODE_SIGNING_KEY_VAULT_URL }}" `
+            --azure-key-vault-client-id "${{ secrets.CODE_SIGNING_KEY_VAULT_CLIENT_ID }}" `
+            --azure-key-vault-tenant-id "${{ secrets.CODE_SIGNING_KEY_VAULT_TENANT_ID }}" `
+            --azure-key-vault-client-secret "${{ secrets.CODE_SIGNING_KEY_VAULT_CLIENT_SECRET }}" `
+            --azure-key-vault-certificate "${{ secrets.CODE_SIGNING_KEY_VAULT_CERTIFICATE_NAME }}"
+
+      # The step the normal publish does not have. A package whose content
+      # does not match its signature is accepted by the push and then dropped
+      # in validation, so without this the run reports success and nothing
+      # is published. That is exactly what happened on 3 September.
+      - name: Verify before pushing
+        shell: pwsh
+        run: |
+          $nupkg = "$PWD/package/${{ inputs.package }}.${{ inputs.version }}.nupkg"
+          dotnet nuget verify $nupkg
+          if ($LASTEXITCODE -ne 0) {
+            throw "verification failed, so NuGet would drop this package in validation exactly as it dropped the last one. Not pushing."
+          }
+          Write-Host "verification passed"
+
+      - name: Push
+        if: ${{ !inputs.dryrun }}
+        shell: pwsh
+        run: |
+          $nupkg = "$PWD/package/${{ inputs.package }}.${{ inputs.version }}.nupkg"
+          dotnet nuget push $nupkg `
+            --source "https://api.nuget.org/v3/index.json" `
+            --api-key "${{ secrets.NUGET_API_KEY }}" `
+            --skip-duplicate
+
+      - name: What to check next
+        if: ${{ !inputs.dryrun }}
+        shell: pwsh
+        run: |
+          Write-Host "Pushed. NuGet validates asynchronously, so a successful"
+          Write-Host "push is not yet a published package. In a few minutes,"
+          Write-Host "confirm ${{ inputs.version }} is the newest listed at:"
+          Write-Host "  https://api.nuget.org/v3-flatcontainer/$( '${{ inputs.package }}'.ToLower() )/index.json"
+          Write-Host "and that a clean project can restore it."
+
+      # Kept whatever happens, so a failed verification can be inspected
+      # rather than rebuilt to be looked at.
+      - name: Keep the package
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: republished-package
+          path: package/*.nupkg
+          if-no-files-found: warn

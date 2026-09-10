@@ -27,8 +27,10 @@ using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
+using System.Diagnostics;
 using System.Globalization;
 using System.Linq;
+using System.Threading;
 
 namespace FiftyOne.Pipeline.Core.FlowElements
 {
@@ -64,7 +66,7 @@ namespace FiftyOne.Pipeline.Core.FlowElements
         /// A factory method that is used to create new 
         /// <see cref="IFlowData"/> instances.
         /// </summary>
-        private Func<IPipelineInternal, IFlowData> _flowDataFactory;
+        private Func<IPipelineInternal, CancellationToken, IFlowData> _flowDataFactory;
 
         /// <summary>
         /// The <see cref="IFlowElement"/>s that make up this pipeline.
@@ -179,6 +181,13 @@ namespace FiftyOne.Pipeline.Core.FlowElements
         /// Control field that indicates if the Pipeline will throw an
         /// aggregate exception during processing or suppress it and ignore the
         /// exceptions added to <see cref="IFlowData.Errors"/>.
+        /// When true, exceptions thrown by flow elements are also not logged
+        /// at error level. They are logged at debug level instead and remain
+        /// available through <see cref="IFlowData.Errors"/>.
+        /// This applies to exceptions that a flow element allows to escape
+        /// its Process method. Errors that an element records itself by
+        /// calling AddError on the flow data are logged as that element
+        /// requests, regardless of this setting.
         /// </summary>
         public bool SuppressProcessExceptions => _suppressProcessExceptions;
 
@@ -317,7 +326,7 @@ namespace FiftyOne.Pipeline.Core.FlowElements
         /// </exception>
         internal Pipeline(
             ILogger<Pipeline> logger,
-            Func<IPipelineInternal, IFlowData> flowDataFactory,
+            Func<IPipelineInternal, CancellationToken, IFlowData> flowDataFactory,
             List<IFlowElement> flowElements,
             bool autoDisposeElements,
             bool suppressProcessExceptions)
@@ -333,6 +342,14 @@ namespace FiftyOne.Pipeline.Core.FlowElements
 
             _ = ElementAvailableProperties; // perform caching attempt (default happy path)
 
+            foreach (var unresolved in
+                ((IPipeline)this).UnresolvedUpstreamDependencies())
+            {
+                _logger.LogWarning(
+                    "Declared upstream dependency '{Key}' is not provided " +
+                    "by any element in the pipeline.", unresolved);
+            }
+
             _logger.LogInformation($"Pipeline '{GetHashCode()}' created.");
         }
 
@@ -343,7 +360,19 @@ namespace FiftyOne.Pipeline.Core.FlowElements
         /// <returns></returns>
         public IFlowData CreateFlowData()
         {
-            return _flowDataFactory(this);
+            return _flowDataFactory(this, CancellationToken.None);
+        }
+
+        /// <summary>
+        /// Create a new flow data that stops processing when the supplied
+        /// token is cancelled.
+        /// </summary>
+        /// <param name="cancellationToken">
+        /// Token that cancels processing of the created flow data.
+        /// </param>
+        public IFlowData CreateFlowData(CancellationToken cancellationToken)
+        {
+            return _flowDataFactory(this, cancellationToken);
         }
 
         /// <summary>
@@ -361,6 +390,13 @@ namespace FiftyOne.Pipeline.Core.FlowElements
         /// Thrown if an error occurred during processing, 
         /// unless <see ref="SuppressProcessExceptions"/> is true.
         /// </exception>
+        /// <remarks>
+        /// If <see ref="SuppressProcessExceptions"/> is true then exceptions
+        /// thrown by elements are logged at debug rather than error level.
+        /// They are always added to <see cref="IFlowData.Errors"/>.
+        /// Errors that an element records itself by calling AddError on the
+        /// flow data are not affected by this setting.
+        /// </remarks>
         public void Process(IFlowData data)
         {
             if(data == null)
@@ -375,14 +411,19 @@ namespace FiftyOne.Pipeline.Core.FlowElements
 
             foreach (var element in _flowElements)
             {
+                Activity activity = null;
                 try
                 {
-                    element.Process(data);
 #pragma warning disable CS0618 // Type or member is obsolete
-                    // This usage will be replaced once the Cancellation Token
-                    // mechanism is available.
-                    if (data.Stop) break;
+                    // Stop is the interface-level stop signal; its getter
+                    // reflects cancellation of the flow data's stop token.
+                    // Checked before each element so a token that is already
+                    // cancelled skips every remaining element, including the
+                    // first (e.g. a client that disconnected before processing).
+                    if (data.Stop) { break; }
 #pragma warning restore CS0618 // Type or member is obsolete
+                    activity = ElementTracing.StartElement(element);
+                    element.Process(data);
                 }
 #pragma warning disable CA1031 // Do not catch general exception types
                 // We want to catch any exception here so that the
@@ -390,9 +431,27 @@ namespace FiftyOne.Pipeline.Core.FlowElements
                 catch (Exception ex)
 #pragma warning restore CA1031 // Do not catch general exception types
                 {
+                    activity?.SetStatus(
+                        ActivityStatusCode.Error, ex.Message);
                     // If an error occurs then store it in the 
                     // FlowData object.
-                    data.AddError(ex, element);
+                    // When exceptions are suppressed, the caller has stated
+                    // that these failures are expected, so do not log at
+                    // error level. The error is still added to
+                    // IFlowData.Errors and is repeated below at debug level
+                    // so the detail is not lost.
+                    data.AddError(ex, element, true, !SuppressProcessExceptions);
+                    if (SuppressProcessExceptions &&
+                        _logger.IsEnabled(LogLevel.Debug))
+                    {
+                        _logger.LogDebug(ex,
+                            "Suppressed error during processing of " +
+                            $"'{element?.GetType().Name}'.");
+                    }
+                }
+                finally
+                {
+                    activity?.Dispose();
                 }
             }
 
