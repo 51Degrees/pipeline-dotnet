@@ -176,6 +176,14 @@ namespace FiftyOne.Did.Tests
                 return;
             }
 
+            // Counts the identifiers whose terms were actually read
+            // and matched. A key carrying no marketing usage skips
+            // those rows entirely, and a run that skipped them has
+            // not proven the Terms byte however green it looks, so
+            // the count is checked after the loop rather than left
+            // implied.
+            var termsChecked = 0;
+
             foreach (var (usage, required, terms) in Usages)
             {
                 var body = await RequestUsageAsync(resourceKey, usage);
@@ -206,7 +214,12 @@ namespace FiftyOne.Did.Tests
                 var idProbGlobal = StringProperty(fodidElement, "idprobglobal");
                 if (string.IsNullOrEmpty(idProbGlobal) == false)
                 {
-                    AssertValid51Did($"{usage}/idprobglobal", idProbGlobal!, terms);
+                    AssertValid51Did(
+                        $"{usage}/idprobglobal", idProbGlobal!, terms);
+                    if (terms != null)
+                    {
+                        termsChecked++;
+                    }
                 }
                 else if (required)
                 {
@@ -227,9 +240,35 @@ namespace FiftyOne.Did.Tests
                 var idProbLic = StringProperty(fodidElement, "idproblic");
                 if (string.IsNullOrEmpty(idProbLic) == false)
                 {
-                    AssertValid51Did($"{usage}/idproblic", idProbLic!, terms);
+                    AssertValid51Did(
+                        $"{usage}/idproblic", idProbLic!, terms);
+                    if (terms != null)
+                    {
+                        termsChecked++;
+                    }
                 }
             }
+
+            // Only a marketing usage carries a terms address, so only
+            // a marketing identifier can show that the service wrote
+            // the byte. Where this key returned none, say so rather
+            // than reporting a pass that proved nothing. The
+            // non-marketing identifier states no terms either way,
+            // which is the same answer a cloud predating the Terms
+            // release would give, so it cannot tell them apart.
+            if (termsChecked == 0)
+            {
+                Assert.Inconclusive(
+                    "This resource key returned no marketing 51Did, " +
+                    "so nothing carried a terms address and this run " +
+                    "did not prove the Terms byte. Use a key entitled " +
+                    "to the standard or personalized usage to prove " +
+                    "it.");
+            }
+
+            Console.WriteLine(
+                $"Terms checked on {termsChecked} marketing " +
+                $"identifier(s).");
         }
 
         /// <summary>
