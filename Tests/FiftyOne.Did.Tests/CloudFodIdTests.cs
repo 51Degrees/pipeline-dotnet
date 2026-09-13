@@ -98,17 +98,63 @@ namespace FiftyOne.Did.Tests
         private const string ClientIp = "203.0.113.42";
 
         /// <summary>
-        /// The cloud <c>id.usage</c> levels checked for the resource key, with
-        /// whether a 51Did is required for that usage. <c>non-marketing</c> is
+        /// The versioned Model Terms for Marketing document a marketing
+        /// 51Did is created under.
+        /// </summary>
+        /// <remarks>
+        /// Written out here rather than read from the package, because a
+        /// test that asked the package what it expects would agree with
+        /// itself whatever the package said. The literal is what a
+        /// receiver has to be able to fetch, so a table change that moved
+        /// it has to fail here and be looked at.
+        /// </remarks>
+        private const string ModelTermsForMarketing2 =
+            "https://m4ow.uk/mtm/2.txt";
+
+        /// <summary>
+        /// The cloud <c>id.usage</c> levels checked for the resource key,
+        /// with whether a 51Did is required for that usage and the terms
+        /// address the identifier must carry. <c>non-marketing</c> is
         /// available on any key that includes <c>fodid.*</c>, so it is
         /// required. <c>standard</c> and <c>personalized</c> are marketing
         /// usages that are validated when returned and reported when not.
         /// </summary>
-        private static readonly (string Usage, bool Required)[] Usages = new[]
+        /// <remarks>
+        /// A non-marketing identifier states no terms, because it may not
+        /// reach a demand source at all, so there is nothing for a
+        /// receiver to agree to. The two marketing usages both carry the
+        /// Model Terms for Marketing. This is the check that proves the
+        /// cloud on the other end of the request writes the Terms byte:
+        /// an identifier from a cloud that predates it ends at the match
+        /// key and reads as no terms, so the two marketing rows fail.
+        /// </remarks>
+        private static readonly
+            (string Usage, bool Required, string? Terms, Usage Expected)[]
+            Usages = new[]
         {
-            ("non-marketing", true),
-            ("standard", false),
-            ("personalized", false),
+            ("non-marketing", true, (string?)null, Usage.NonMarketing),
+            ("standard", false, ModelTermsForMarketing2, Usage.Standard),
+            ("personalized", false, ModelTermsForMarketing2,
+                Usage.Personalized),
+        };
+
+        /// <summary>
+        /// IAB TCF v2 consent strings, and the usage the service must derive
+        /// from each without the caller stating one.
+        /// </summary>
+        /// <remarks>
+        /// The first sets all twelve purposes, which is personalized. The
+        /// second sets the Appendix 1 standard set, being purposes 1, 2, 7,
+        /// 8 and 11, which is standard. Both are the strings the cloud's own
+        /// IabTcfElement tests use, repeated here rather than shared,
+        /// because a package test that took them from the service would
+        /// agree with the service whatever either of them said.
+        /// </remarks>
+        private static readonly (string TcString, Usage Expected)[]
+            ConsentStrings = new[]
+        {
+            ("AAAAAAAAAAAAAAAAAAAAAAAAAP_w", Usage.Personalized),
+            ("AAAAAAAAAAAAAAAAAAAAAAAAAMMg", Usage.Standard),
         };
 
         private static readonly HttpClient Http = new HttpClient
@@ -151,7 +197,15 @@ namespace FiftyOne.Did.Tests
                 return;
             }
 
-            foreach (var (usage, required) in Usages)
+            // Counts the identifiers whose terms were actually read
+            // and matched. A key carrying no marketing usage skips
+            // those rows entirely, and a run that skipped them has
+            // not proven the Terms byte however green it looks, so
+            // the count is checked after the loop rather than left
+            // implied.
+            var termsChecked = 0;
+
+            foreach (var (usage, required, terms, expected) in Usages)
             {
                 var body = await RequestUsageAsync(resourceKey, usage);
                 using var document = JsonDocument.Parse(body);
@@ -181,7 +235,13 @@ namespace FiftyOne.Did.Tests
                 var idProbGlobal = StringProperty(fodidElement, "idprobglobal");
                 if (string.IsNullOrEmpty(idProbGlobal) == false)
                 {
-                    AssertValid51Did($"{usage}/idprobglobal", idProbGlobal!);
+                    AssertValid51Did(
+                        $"{usage}/idprobglobal", idProbGlobal!, terms,
+                        expected, fromConsent: false);
+                    if (terms != null)
+                    {
+                        termsChecked++;
+                    }
                 }
                 else if (required)
                 {
@@ -202,27 +262,154 @@ namespace FiftyOne.Did.Tests
                 var idProbLic = StringProperty(fodidElement, "idproblic");
                 if (string.IsNullOrEmpty(idProbLic) == false)
                 {
-                    AssertValid51Did($"{usage}/idproblic", idProbLic!);
+                    AssertValid51Did(
+                        $"{usage}/idproblic", idProbLic!, terms,
+                        expected, fromConsent: false);
+                    if (terms != null)
+                    {
+                        termsChecked++;
+                    }
                 }
             }
+
+            // Only a marketing usage carries a terms address, so only
+            // a marketing identifier can show that the service wrote
+            // the byte. Where this key returned none, say so rather
+            // than reporting a pass that proved nothing. The
+            // non-marketing identifier states no terms either way,
+            // which is the same answer a cloud predating the Terms
+            // release would give, so it cannot tell them apart.
+            if (termsChecked == 0)
+            {
+                Assert.Inconclusive(
+                    "This resource key returned no marketing 51Did, " +
+                    "so nothing carried a terms address and this run " +
+                    "did not prove the Terms byte. Use a key entitled " +
+                    "to the standard or personalized usage to prove " +
+                    "it.");
+            }
+
+            Console.WriteLine(
+                $"Terms checked on {termsChecked} marketing " +
+                $"identifier(s).");
+        }
+
+        /// <summary>
+        /// A consent management platform sends an IAB TCF consent string and
+        /// no usage of its own. The service decodes the string, decides the
+        /// usage from the purposes it grants, and records in the identifier
+        /// that it did so, which is bit 3 of the flags byte.
+        /// </summary>
+        /// <remarks>
+        /// This is the half a caller cannot state for itself. An identifier
+        /// whose usage was stated in the request and one whose usage was
+        /// decoded from a consent string are both legitimate, and they are
+        /// different assertions about how the permission was obtained, so a
+        /// receiver has to be able to tell them apart. The service signs the
+        /// answer, and this proves the two ends agree about which bit it is
+        /// and which way round it reads.
+        /// </remarks>
+        [TestMethod]
+        public async Task ConsentStringSetsTheUsageFromConsentBit()
+        {
+            var resourceKey = ResourceKey();
+            if (resourceKey == null)
+            {
+                Assert.Inconclusive(
+                    "No resource key supplied for the live cloud 51Did " +
+                    "test. See the message on " +
+                    nameof(ResourceKeyReturns51DidForSupportedUsages) +
+                    " for how to set one.");
+                return;
+            }
+
+            var proven = 0;
+            foreach (var (tcString, expected) in ConsentStrings)
+            {
+                // No id.usage is sent. A stated usage wins over a consent
+                // string, so sending one would leave the bit clear and the
+                // test would prove the opposite of what it says.
+                var body = await RequestAsync(
+                    resourceKey,
+                    $"tcstring={Uri.EscapeDataString(tcString)}",
+                    $"a consent string granting {expected}");
+                using var document = JsonDocument.Parse(body);
+
+                if (document.RootElement.TryGetProperty(
+                        "fodid", out var fodidElement) == false)
+                {
+                    Console.WriteLine(
+                        $"consent string for {expected}: no 'fodid' " +
+                        $"element returned, so this key is not entitled to " +
+                        $"the marketing usage it grants.");
+                    continue;
+                }
+
+                foreach (var name in new[] { "idprobglobal", "idproblic" })
+                {
+                    var value = StringProperty(fodidElement, name);
+                    if (string.IsNullOrEmpty(value))
+                    {
+                        continue;
+                    }
+                    // A consent string granting a marketing usage produces a
+                    // marketing identifier, so the terms travel with it too.
+                    AssertValid51Did(
+                        $"consent/{expected}/{name}",
+                        value!,
+                        ModelTermsForMarketing2,
+                        expected,
+                        fromConsent: true);
+                    proven++;
+                }
+            }
+
+            // Same reasoning as the usage test. A key not entitled to the
+            // marketing usages returns no identifier to read the bit from,
+            // and a run that read none has not proven anything.
+            if (proven == 0)
+            {
+                Assert.Inconclusive(
+                    "This resource key returned no identifier for either " +
+                    "consent string, so the usage-from-consent bit was not " +
+                    "read and this run did not prove it. Use a key " +
+                    "entitled to the standard or personalized usage.");
+            }
+
+            Console.WriteLine(
+                $"Usage-from-consent read on {proven} identifier(s).");
         }
 
         /// <summary>
         /// Calls the cloud JSON endpoint for the given <c>id.usage</c> and
         /// returns the response body, asserting the request succeeded.
         /// </summary>
-        private static async Task<string> RequestUsageAsync(string resourceKey, string usage)
+        private static Task<string> RequestUsageAsync(
+            string resourceKey, string usage)
+        {
+            return RequestAsync(
+                resourceKey,
+                $"id.usage={Uri.EscapeDataString(usage)}",
+                $"id.usage={usage}");
+        }
+
+        /// <summary>
+        /// Calls the cloud JSON endpoint with the given query fragment and
+        /// returns the response body, asserting the request succeeded.
+        /// </summary>
+        private static async Task<string> RequestAsync(
+            string resourceKey, string queryFragment, string label)
         {
             var url =
                 $"{CloudJsonUrl}?resource={Uri.EscapeDataString(resourceKey)}" +
                 $"&user-agent={Uri.EscapeDataString(UserAgent)}" +
                 $"&client-ip={Uri.EscapeDataString(ClientIp)}" +
-                $"&id.usage={Uri.EscapeDataString(usage)}";
+                $"&{queryFragment}";
 
             using var response = await Http.GetAsync(url);
             var body = await response.Content.ReadAsStringAsync();
             Assert.IsTrue(response.IsSuccessStatusCode,
-                $"Cloud request for id.usage={usage} failed " +
+                $"Cloud request for {label} failed " +
                 $"({(int)response.StatusCode} {response.StatusCode}): {body}");
             return body;
         }
@@ -240,11 +427,30 @@ namespace FiftyOne.Did.Tests
         }
 
         /// <summary>
-        /// Asserts that <paramref name="base64"/> is a real 51Did: a signed
-        /// OWID envelope whose payload carries the three 51Did fields,
-        /// including the 32-byte probabilistic match key.
+        /// Asserts that <paramref name="base64"/> is a real 51Did, being a
+        /// signed OWID envelope whose payload carries the 51Did fields,
+        /// including the 32-byte probabilistic match key and the terms the
+        /// identifier was created under.
         /// </summary>
-        private static void AssertValid51Did(string label, string base64)
+        /// <param name="label">Names the identifier in a failure.</param>
+        /// <param name="base64">The identifier as the cloud returned it.</param>
+        /// <param name="expectedTerms">
+        /// The terms address the identifier must carry, or <c>null</c> where
+        /// it must state none.
+        /// </param>
+        /// <param name="expectedUsage">
+        /// The usage the reader must answer with for this identifier.
+        /// </param>
+        /// <param name="fromConsent">
+        /// Whether the service must record that it derived the usage from a
+        /// consent string rather than the caller stating it.
+        /// </param>
+        private static void AssertValid51Did(
+            string label,
+            string base64,
+            string? expectedTerms,
+            Usage expectedUsage,
+            bool fromConsent)
         {
             var fodId = new FodId(base64);
 
@@ -265,10 +471,46 @@ namespace FiftyOne.Did.Tests
             CollectionAssert.AreEqual(fodId.MatchKey, reparsed.MatchKey,
                 $"{label}: match key should survive a base64 round trip");
 
+            // The terms travel with the identifier, so a receiver can read
+            // what it was created under without asking anyone. A payload
+            // that stops at the match key reads as no terms, which is why
+            // this is the assertion that fails where the cloud has not
+            // been updated to write the byte.
+            Assert.AreEqual(expectedTerms, fodId.Terms,
+                $"{label}: expected the terms to be " +
+                $"'{expectedTerms ?? "none"}' but the identifier carries " +
+                $"'{fodId.Terms ?? "none"}'. Where this reads none for a " +
+                $"marketing usage the cloud that answered is older than " +
+                $"the release that writes the Terms byte.");
+            Assert.AreEqual(expectedTerms, reparsed.Terms,
+                $"{label}: terms should survive a base64 round trip");
+
+            // The flags byte, read through the accessors rather than by
+            // masking. The usage values are cumulative, being 001, 011 and
+            // 111, so a caller masking the byte for the non-marketing bit
+            // reads every marketing identifier as non-marketing. These
+            // assertions are the alignment between what the service wrote
+            // and what this package answers.
+            Assert.AreEqual(expectedUsage, fodId.Usage,
+                $"{label}: the service was asked for a " +
+                $"{expectedUsage} identifier and this reads as " +
+                $"{fodId.Usage}.");
+            Assert.AreEqual(fromConsent, fodId.UsageFromConsent,
+                $"{label}: expected the usage to be recorded as " +
+                $"{(fromConsent ? "derived from a consent string" : "stated by the caller")} " +
+                $"and it reads as " +
+                $"{(fodId.UsageFromConsent ? "derived from a consent string" : "stated by the caller")}.");
+            Assert.AreEqual(IdType.Probabilistic, fodId.Type,
+                $"{label}: an idprob* value must be a probabilistic " +
+                $"identifier and this reads as {fodId.Type}.");
+
             Console.WriteLine(
                 $"{label}: domain={fodId.Domain} " +
-                $"flags=0x{fodId.Flags:X2} " +
+                $"usage={fodId.Usage} " +
+                $"fromConsent={fodId.UsageFromConsent} " +
+                $"type={fodId.Type} " +
                 $"licenseId=0x{fodId.LicenseId:X8} " +
+                $"terms={fodId.Terms ?? "none"} " +
                 $"matchKey={Convert.ToHexString(fodId.MatchKey)}");
         }
     }
