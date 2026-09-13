@@ -98,17 +98,42 @@ namespace FiftyOne.Did.Tests
         private const string ClientIp = "203.0.113.42";
 
         /// <summary>
-        /// The cloud <c>id.usage</c> levels checked for the resource key, with
-        /// whether a 51Did is required for that usage. <c>non-marketing</c> is
+        /// The versioned Model Terms for Marketing document a marketing
+        /// 51Did is created under.
+        /// </summary>
+        /// <remarks>
+        /// Written out here rather than read from the package, because a
+        /// test that asked the package what it expects would agree with
+        /// itself whatever the package said. The literal is what a
+        /// receiver has to be able to fetch, so a table change that moved
+        /// it has to fail here and be looked at.
+        /// </remarks>
+        private const string ModelTermsForMarketing2 =
+            "https://m4ow.uk/mtm/2.txt";
+
+        /// <summary>
+        /// The cloud <c>id.usage</c> levels checked for the resource key,
+        /// with whether a 51Did is required for that usage and the terms
+        /// address the identifier must carry. <c>non-marketing</c> is
         /// available on any key that includes <c>fodid.*</c>, so it is
         /// required. <c>standard</c> and <c>personalized</c> are marketing
         /// usages that are validated when returned and reported when not.
         /// </summary>
-        private static readonly (string Usage, bool Required)[] Usages = new[]
+        /// <remarks>
+        /// A non-marketing identifier states no terms, because it may not
+        /// reach a demand source at all, so there is nothing for a
+        /// receiver to agree to. The two marketing usages both carry the
+        /// Model Terms for Marketing. This is the check that proves the
+        /// cloud on the other end of the request writes the Terms byte:
+        /// an identifier from a cloud that predates it ends at the match
+        /// key and reads as no terms, so the two marketing rows fail.
+        /// </remarks>
+        private static readonly (string Usage, bool Required, string? Terms)[]
+            Usages = new[]
         {
-            ("non-marketing", true),
-            ("standard", false),
-            ("personalized", false),
+            ("non-marketing", true, (string?)null),
+            ("standard", false, ModelTermsForMarketing2),
+            ("personalized", false, ModelTermsForMarketing2),
         };
 
         private static readonly HttpClient Http = new HttpClient
@@ -151,7 +176,7 @@ namespace FiftyOne.Did.Tests
                 return;
             }
 
-            foreach (var (usage, required) in Usages)
+            foreach (var (usage, required, terms) in Usages)
             {
                 var body = await RequestUsageAsync(resourceKey, usage);
                 using var document = JsonDocument.Parse(body);
@@ -181,7 +206,7 @@ namespace FiftyOne.Did.Tests
                 var idProbGlobal = StringProperty(fodidElement, "idprobglobal");
                 if (string.IsNullOrEmpty(idProbGlobal) == false)
                 {
-                    AssertValid51Did($"{usage}/idprobglobal", idProbGlobal!);
+                    AssertValid51Did($"{usage}/idprobglobal", idProbGlobal!, terms);
                 }
                 else if (required)
                 {
@@ -202,7 +227,7 @@ namespace FiftyOne.Did.Tests
                 var idProbLic = StringProperty(fodidElement, "idproblic");
                 if (string.IsNullOrEmpty(idProbLic) == false)
                 {
-                    AssertValid51Did($"{usage}/idproblic", idProbLic!);
+                    AssertValid51Did($"{usage}/idproblic", idProbLic!, terms);
                 }
             }
         }
@@ -240,11 +265,21 @@ namespace FiftyOne.Did.Tests
         }
 
         /// <summary>
-        /// Asserts that <paramref name="base64"/> is a real 51Did: a signed
-        /// OWID envelope whose payload carries the three 51Did fields,
-        /// including the 32-byte probabilistic match key.
+        /// Asserts that <paramref name="base64"/> is a real 51Did, being a
+        /// signed OWID envelope whose payload carries the 51Did fields,
+        /// including the 32-byte probabilistic match key and the terms the
+        /// identifier was created under.
         /// </summary>
-        private static void AssertValid51Did(string label, string base64)
+        /// <param name="label">Names the identifier in a failure.</param>
+        /// <param name="base64">The identifier as the cloud returned it.</param>
+        /// <param name="expectedTerms">
+        /// The terms address the identifier must carry, or <c>null</c> where
+        /// it must state none.
+        /// </param>
+        private static void AssertValid51Did(
+            string label,
+            string base64,
+            string? expectedTerms)
         {
             var fodId = new FodId(base64);
 
@@ -265,10 +300,25 @@ namespace FiftyOne.Did.Tests
             CollectionAssert.AreEqual(fodId.MatchKey, reparsed.MatchKey,
                 $"{label}: match key should survive a base64 round trip");
 
+            // The terms travel with the identifier, so a receiver can read
+            // what it was created under without asking anyone. A payload
+            // that stops at the match key reads as no terms, which is why
+            // this is the assertion that fails where the cloud has not
+            // been updated to write the byte.
+            Assert.AreEqual(expectedTerms, fodId.Terms,
+                $"{label}: expected the terms to be " +
+                $"'{expectedTerms ?? "none"}' but the identifier carries " +
+                $"'{fodId.Terms ?? "none"}'. Where this reads none for a " +
+                $"marketing usage the cloud that answered is older than " +
+                $"the release that writes the Terms byte.");
+            Assert.AreEqual(expectedTerms, reparsed.Terms,
+                $"{label}: terms should survive a base64 round trip");
+
             Console.WriteLine(
                 $"{label}: domain={fodId.Domain} " +
                 $"flags=0x{fodId.Flags:X2} " +
                 $"licenseId=0x{fodId.LicenseId:X8} " +
+                $"terms={fodId.Terms ?? "none"} " +
                 $"matchKey={Convert.ToHexString(fodId.MatchKey)}");
         }
     }
