@@ -30,7 +30,7 @@ namespace FiftyOne.Pipeline.JavaScript.Tests
 {
     /// <summary>
     /// What refresh() does and does not do, what the record holds, and the
-    /// two changes of answer James Rosewell asked to see. Tests 3, 11 to
+    /// two changes of answer, on one page and across two. Tests 3, 11 to
     /// 13, 15 to 18 and 22 to 23 of pipeline-dotnet#414.
     /// </summary>
     public partial class UserPromptBrowserTests
@@ -57,7 +57,7 @@ namespace FiftyOne.Pipeline.JavaScript.Tests
         }
 
         /// <summary>
-        /// Test 22, which is James Rosewell's check. A change of answer on
+        /// Test 22. A change of answer on
         /// one page instance produces a new identifier, the sequence
         /// increases and onChange is called, with every other input the
         /// same.
@@ -276,7 +276,7 @@ namespace FiftyOne.Pipeline.JavaScript.Tests
 
                 var before = recorder.Count;
                 js.ExecuteScript("fod.refresh(); fod.refresh(); fod.refresh()");
-                // A positive observation that nothing was sent: the page is
+                // A positive observation that nothing was sent. The page is
                 // still reporting the identifier it already had, and three
                 // calls have been made and returned.
                 WaitForScript(js,

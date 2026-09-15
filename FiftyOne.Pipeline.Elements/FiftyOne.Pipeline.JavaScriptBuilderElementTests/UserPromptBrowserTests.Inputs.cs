@@ -204,7 +204,7 @@ namespace FiftyOne.Pipeline.JavaScript.Tests
                 }
                 else
                 {
-                    // A positive observation that nothing was sent: the
+                    // A positive observation that nothing was sent. The
                     // delivery has been taken, which the page shows by
                     // still holding its values, and the count has not
                     // moved.

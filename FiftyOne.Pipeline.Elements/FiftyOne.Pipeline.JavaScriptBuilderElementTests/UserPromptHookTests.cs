@@ -31,8 +31,9 @@ namespace FiftyOne.Pipeline.JavaScript.Tests
 {
     /// <summary>
     /// Unit tests for the builder's decision to render the user prompt
-    /// block, which is test 20 of pipeline-dotnet#414. The browser side of
-    /// the same decision is in SessionStorageCacheTests.
+    /// block, which is test 20 of pipeline-dotnet#414. The rendered script
+    /// is checked in UserPromptRenderTests and the browser side in
+    /// UserPromptBrowserTests.
     /// </summary>
     [TestClass]
     public class UserPromptHookTests
