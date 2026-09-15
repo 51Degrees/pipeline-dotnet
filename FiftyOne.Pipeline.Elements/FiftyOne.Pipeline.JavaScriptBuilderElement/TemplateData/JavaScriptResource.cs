@@ -44,6 +44,19 @@ namespace FiftyOne.Pipeline.JavaScriptBuilder.TemplateData
         private bool _hasDelayedProperties;
 
         /// <summary>
+        /// True to include the block that asks the visitor's preference
+        /// platform for the answer that a 51Did is created from, false to
+        /// leave that block out of the rendered script.
+        /// </summary>
+        /// <remarks>
+        /// This is settable rather than a constructor argument because the
+        /// decision belongs to the element and is taken per request, so
+        /// neither of the two constructors changes shape for the callers
+        /// that already use them.
+        /// </remarks>
+        public bool UserPrompt { get; set; }
+
+        /// <summary>
         /// Constructor
         /// </summary>
         /// <remarks>
@@ -232,7 +245,7 @@ namespace FiftyOne.Pipeline.JavaScriptBuilder.TemplateData
             hash.Add("_enableCookies", _enableCookies);
             hash.Add("_updateEnabled", _updateEnabled);
             hash.Add("_hasDelayedProperties", _hasDelayedProperties);
-            
+            hash.Add("_userPrompt", UserPrompt);
 
             return hash;
         }

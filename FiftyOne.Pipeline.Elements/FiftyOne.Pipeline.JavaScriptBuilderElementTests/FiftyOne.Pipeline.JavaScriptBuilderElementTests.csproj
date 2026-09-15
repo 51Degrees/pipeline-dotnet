@@ -21,6 +21,10 @@
   <ItemGroup>
     <ProjectReference Include="..\..\FiftyOne.Pipeline.Engines.TestHelpers\FiftyOne.Pipeline.Engines.TestHelpers.csproj" />
     <ProjectReference Include="..\FiftyOne.Pipeline.JavaScriptBuilderElement\FiftyOne.Pipeline.JavaScriptBuilder.csproj" />
+    <!-- Referenced so that UserPromptHookTests can assert the builder's
+         copy of the 51Did element data key still equals the one the two
+         51Did engines return. -->
+    <ProjectReference Include="..\..\FiftyOne.Did.Core\FiftyOne.Did.Core.csproj" />
   </ItemGroup>
 
 </Project>

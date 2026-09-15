@@ -50,17 +50,26 @@ namespace FiftyOne.Did.Cloud.FlowElements
         public override IEvidenceKeyFilter EvidenceKeyFilter { get; } =
             new EvidenceKeyFilterWhitelist(new List<string>());
 
-        /// <inheritdoc/>
-        public override IList<IAspectPropertyMetaData> Properties => _properties;
-
-        private readonly List<IAspectPropertyMetaData> _properties;
-
         /// <summary>
-        /// Indicates that properties have been loaded.
-        /// Always returns true since this engine uses locally defined properties
-        /// rather than cloud metadata.
+        /// The 51Did properties described locally, used only to give the
+        /// values in a cloud response their types when the response is
+        /// read in <see cref="ProcessCloudEngine"/>.
         /// </summary>
-        public override bool HasLoadedProperties => true;
+        /// <remarks>
+        /// This is deliberately not what <c>Properties</c> returns. Until
+        /// September 2026 it was, and every property in it is marked
+        /// available, so a pipeline holding this engine advertised every
+        /// 51Did property whatever the resource key was entitled to, and
+        /// a caller whose key lacks the product was told the identifier
+        /// was available and then never got one. Property availability
+        /// now comes from the cloud through
+        /// <c>CloudAspectEngineBase.Properties</c>, which is the mechanism
+        /// every other cloud engine already uses, and a failure to fetch
+        /// it surfaces as <c>PropertiesNotYetLoadedException</c> rather
+        /// than as a quiet "unavailable" that the pipeline would remember
+        /// for the life of the process.
+        /// </remarks>
+        private readonly List<IAspectPropertyMetaData> _propertyTypes;
 
         private static readonly JsonConverter[] JsonConverters = {
             new CloudJsonConverter()
@@ -88,7 +97,7 @@ namespace FiftyOne.Did.Cloud.FlowElements
         {
             _componentMetaData = DidBaseEnginePropertiesBuilder
                 .BuildComponentMetaData(this, withAspectValueTypes: true);
-            _properties = _componentMetaData.GetProperties()
+            _propertyTypes = _componentMetaData.GetProperties()
                 .Cast<IAspectPropertyMetaData>()
                 .ToList();
         }
@@ -119,7 +128,7 @@ namespace FiftyOne.Did.Cloud.FlowElements
                     Converters = JsonConverters,
                 });
 
-            var device = CreateAPVDictionary(propertyValues, _properties);
+            var device = CreateAPVDictionary(propertyValues, _propertyTypes);
             aspectData.PopulateFrom(device);
         }
 

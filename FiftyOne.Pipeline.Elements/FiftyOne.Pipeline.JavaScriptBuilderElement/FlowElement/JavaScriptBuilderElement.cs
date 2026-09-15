@@ -28,6 +28,7 @@ using FiftyOne.Pipeline.Core.FlowElements;
 using Microsoft.Extensions.Logging;
 using NUglify;
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Text;
 using System.Net;
@@ -125,7 +126,41 @@ namespace FiftyOne.Pipeline.JavaScriptBuilder.FlowElement
         /// </summary>
 #pragma warning disable CA1707 // Identifiers should not contain underscores
         public const string DEFAULT_ELEMENT_DATA_KEY = "javascriptbuilderelement";
+
+        /// <summary>
+        /// The element data key that both 51Did engines return. It mirrors
+        /// DidBaseEnginePropertiesBuilder.ComponentName in
+        /// FiftyOne.Did.Core, which the cloud engine returns from
+        /// ElementDataKey (FiftyOne.Did.Cloud/FlowElements/DidCloudEngine.cs
+        /// lines 46 to 47) and the on premise engine returns as well. The
+        /// value is copied here because this package must not take a
+        /// dependency on the 51Did packages, and a unit test asserts that
+        /// the two are still equal.
+        /// </summary>
+        /// <remarks>
+        /// This is an element data key and not a property component, so
+        /// the section a page sees in the JSON payload is this value lower
+        /// cased, which is "fodid". The identifier that the id endpoints
+        /// take is called "51did" and is a different thing.
+        /// </remarks>
+        public const string FODID_ELEMENT_DATA_KEY = "FODid";
 #pragma warning restore CA1707 // Identifiers should not contain underscores
+
+        /// <summary>
+        /// Remembers, per pipeline, that the pipeline offers at least one
+        /// available 51Did property, so that RenderUserPrompt does not have
+        /// to ask the pipeline again once the answer is known. Only a
+        /// positive answer is stored, because a negative one can mean that
+        /// an element's properties have not loaded yet, which the pipeline
+        /// itself refuses to remember for the same reason
+        /// (FiftyOne.Pipeline.Core/FlowElements/Pipeline.cs lines 285 to
+        /// 291), and storing it would switch the block off for the life of
+        /// the process. One element can sit in several pipelines, so the
+        /// key is the pipeline the request came through and never
+        /// Pipelines[0].
+        /// </summary>
+        private readonly ConcurrentDictionary<IPipeline, bool>
+            _userPromptByPipeline = new ConcurrentDictionary<IPipeline, bool>();
 
         /// <summary>
         /// Key to identify engine.
@@ -536,6 +571,65 @@ namespace FiftyOne.Pipeline.JavaScriptBuilder.FlowElement
         }
 
         /// <summary>
+        /// Decide whether the rendered script carries the block that asks
+        /// the visitor's preference platform for an answer, which is what a
+        /// 51Did is created from.
+        /// </summary>
+        /// <remarks>
+        /// The base renders the block when the pipeline holds a 51Did
+        /// element offering at least one available property, because a
+        /// pipeline that cannot return a 51Did has no use for the answer.
+        /// A host that serves many callers from one pipeline, the cloud
+        /// being the one that does, overrides this and tests the caller's
+        /// entitlement per request instead.
+        /// </remarks>
+        /// <param name="data">
+        /// The <see cref="IFlowData"/> for the request being served.
+        /// </param>
+        /// <returns>
+        /// True to render the block, false to leave it out.
+        /// </returns>
+        protected virtual bool RenderUserPrompt(IFlowData data)
+        {
+            if (data == null)
+            {
+                throw new ArgumentException(Messages.ExceptionFlowDataIsNull);
+            }
+
+            // A caller can build a script without a pipeline behind it, and
+            // the mocked tests in this repository do exactly that, so a
+            // missing pipeline means the block is left out rather than an
+            // exception.
+            var pipeline = data.Pipeline;
+            if (pipeline == null)
+            {
+                return false;
+            }
+
+            if (_userPromptByPipeline.TryGetValue(pipeline, out bool remembered))
+            {
+                return remembered;
+            }
+
+            // The outer entry is created before the properties are
+            // filtered, so an element offering nothing still has a key and
+            // the inner dictionary has to be non empty as well.
+            var available = pipeline.ElementAvailableProperties;
+            var render = available != null &&
+                available.TryGetValue(
+                    FODID_ELEMENT_DATA_KEY,
+                    out var properties) &&
+                properties != null &&
+                properties.Count > 0;
+
+            if (render)
+            {
+                _userPromptByPipeline.GetOrAdd(pipeline, true);
+            }
+            return render;
+        }
+
+        /// <summary>
         /// Build the JavaScript content and add it to the supplied
         /// <see cref="IFlowData"/> instance.
         /// </summary>
@@ -577,6 +671,8 @@ namespace FiftyOne.Pipeline.JavaScriptBuilder.FlowElement
         /// <exception cref="ArgumentNullException">
         /// Thrown if the supplied flow data is null.
         /// </exception>
+        [Obsolete("Nothing calls this overload. Use the overload that takes " +
+            "a Uri, which is the one every path in this element reaches.")]
         protected void BuildJavaScript(
             IFlowData data,
             Func<IJavaScriptBuilderElementData> javascriptBuilderElementDataProvider,
@@ -687,6 +783,8 @@ namespace FiftyOne.Pipeline.JavaScriptBuilder.FlowElement
             var hasDelayedProperties = jsonObject != null && 
                 jsonObject.Contains("delayexecution");
 
+            var userPrompt = RenderUserPrompt(data);
+
             JavaScriptResource javaScriptObj = new JavaScriptResource(
                 objectName,
                 jsonObject,
@@ -698,7 +796,10 @@ namespace FiftyOne.Pipeline.JavaScriptBuilder.FlowElement
                 parameters,
                 enableCookies,
                 updateEnabled,
-                hasDelayedProperties);
+                hasDelayedProperties)
+            {
+                UserPrompt = userPrompt,
+            };
 
             string content = _stubble.Render(_template, javaScriptObj.AsDictionary());
 
