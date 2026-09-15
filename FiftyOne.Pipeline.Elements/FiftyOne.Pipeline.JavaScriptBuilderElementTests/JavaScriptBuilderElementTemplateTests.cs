@@ -165,6 +165,35 @@ namespace FiftyOne.Pipeline.JavaScript.Tests
             return result.JavaScript;
         }
 
+        /// <summary>
+        /// Waits until the script reports that processing has finished,
+        /// through fod.complete(), and leaves the data it delivered in
+        /// window.fodCompleteData for the test to read.
+        /// </summary>
+        /// <remarks>
+        /// The tests below were first written against fod.isComplete and
+        /// fod.data. Both were taken out of the template before it merged,
+        /// in javascript-templates commit 4a388ee, because their semantics
+        /// were unsettled. Completion is read here through complete()
+        /// instead, which fires on the same condition, completed or failed,
+        /// and hands over the same object fod.data held. A complete()
+        /// registered after processing has finished is called at once, so
+        /// it does not matter whether the page or the test gets here first.
+        /// </remarks>
+        private void WaitForComplete(IJavaScriptExecutor js, string description)
+        {
+            WaitUntil(
+                () => js.ExecuteScript("return typeof window.fod === 'object';") is bool b && b,
+                "window.fod to exist");
+            js.ExecuteScript(
+                "window.fodCompleted = false; window.fodCompleteData = null;" +
+                "window.fod.complete(function (data) {" +
+                " window.fodCompleteData = data; window.fodCompleted = true; });");
+            WaitUntil(
+                () => js.ExecuteScript("return window.fodCompleted === true;") is bool b && b,
+                description);
+        }
+
         [TestMethod]
         [Timeout(300_000)]
         public void JavaScriptBuilderTemplate_PageContract_StaticJson()
@@ -179,10 +208,11 @@ namespace FiftyOne.Pipeline.JavaScript.Tests
             Driver.Navigate().GoToUrl(ClientServerUrl);
 
             IJavaScriptExecutor js = Driver;
-            WaitUntil(
-                () => js.ExecuteScript("return window.fod && window.fod.isComplete === true;") is bool b && b,
-                "fod.isComplete === true");
-            Assert.AreEqual("True", (string)js.ExecuteScript("return window.fod.data.device.ismobile;"));
+            WaitForComplete(js, "fod.complete() to fire");
+            Assert.AreEqual("True", (string)js.ExecuteScript("return window.fodCompleteData.device.ismobile;"),
+                "complete() must deliver the embedded JSON");
+            Assert.AreEqual("True", (string)js.ExecuteScript("return window.fod.device.ismobile;"),
+                "and the object itself must read the same value");
             Assert.IsNull(capturedPostData);
         }
 
@@ -205,15 +235,16 @@ namespace FiftyOne.Pipeline.JavaScript.Tests
             Driver.Navigate().GoToUrl(ClientServerUrl);
 
             IJavaScriptExecutor js = Driver;
-            WaitUntil(
-                () => js.ExecuteScript("return window.fod && window.fod.isComplete === true;") is bool b && b,
-                "fod.isComplete === true after refresh");
-            Assert.AreEqual("refreshed", (string)js.ExecuteScript("return window.fod.data.device.marker;"));
+            WaitForComplete(js, "fod.complete() to fire after refresh");
+            Assert.AreEqual("refreshed", (string)js.ExecuteScript("return window.fodCompleteData.device.marker;"),
+                "complete() must deliver the refreshed JSON, not the embedded one");
+            Assert.AreEqual("refreshed", (string)js.ExecuteScript("return window.fod.device.marker;"),
+                "and the object itself must read the refreshed value");
         }
 
         [TestMethod]
         [Timeout(300_000)]
-        public void JavaScriptBuilderTemplate_EvidenceBox_RidesPostBodyOnly()
+        public void JavaScriptBuilderTemplate_EvidenceBox_RidesPostBodyAndInputsRecordOnly()
         {
             var embeddedJson = new JObject {
                 { "device", new JObject { { "snippetjavascript", "window.snippet_ran_51d = true;" } } },
@@ -236,16 +267,35 @@ namespace FiftyOne.Pipeline.JavaScript.Tests
                 $"[{capturedPostData}] does not contain the url-encoded email");
 
             IJavaScriptExecutor js = Driver;
-            WaitUntil(
-                () => js.ExecuteScript("return window.fod && window.fod.isComplete === true;") is bool b && b,
-                "fod.isComplete === true");
+            WaitForComplete(js, "fod.complete() to fire");
 
-            Assert.IsFalse((bool)js.ExecuteScript(
+            // The record of the request's inputs is kept in session storage
+            // under fod_inputs as the plain string, id.email included where
+            // the page supplied it, so that a stored answer is never reused
+            // for different inputs. It is not hashed, because session storage
+            // on the publisher's origin is reachable only by the joint
+            // controllers, being the publisher and 51Degrees. That record is
+            // the one place the email may be stored. Any other entry is still
+            // a leak, and so is the unencoded email in any entry at all.
+            var rawEmailKeys = ((IReadOnlyCollection<object>)js.ExecuteScript(
+                "var found = [];" +
                 "for (var i = 0; i < sessionStorage.length; i++) {" +
-                " var v = sessionStorage.getItem(sessionStorage.key(i));" +
-                " if (v && v.indexOf('user@example.com') !== -1) return true;" +
-                " if (v && v.indexOf('user%40example.com') !== -1) return true; }" +
-                "return false;"), "email leaked to sessionStorage");
+                " var k = sessionStorage.key(i); var v = sessionStorage.getItem(k);" +
+                " if (v && v.indexOf('user@example.com') !== -1) found.push(k); }" +
+                "return found;")).Select(k => (string)k).ToList();
+            Assert.AreEqual(0, rawEmailKeys.Count,
+                "email leaked to sessionStorage unencoded, in: " +
+                string.Join(", ", rawEmailKeys));
+            var encodedEmailKeys = ((IReadOnlyCollection<object>)js.ExecuteScript(
+                "var found = [];" +
+                "for (var i = 0; i < sessionStorage.length; i++) {" +
+                " var k = sessionStorage.key(i); var v = sessionStorage.getItem(k);" +
+                " if (v && v.indexOf('user%40example.com') !== -1) found.push(k); }" +
+                "return found;")).Select(k => (string)k).ToList();
+            CollectionAssert.AreEqual(new[] { "fod_inputs" }, encodedEmailKeys,
+                "email leaked to sessionStorage outside the record of the " +
+                "request's inputs, or the record no longer holds it as the " +
+                "plain string, found in: " + string.Join(", ", encodedEmailKeys));
             Assert.IsFalse((bool)js.ExecuteScript(
                 "return document.cookie.indexOf('user') !== -1;"), "email leaked to cookies");
             Assert.IsFalse((bool)js.ExecuteScript(
