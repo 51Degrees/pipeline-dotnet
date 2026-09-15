@@ -112,11 +112,18 @@ namespace FiftyOne.Pipeline.JavaScript.Tests
         [TestMethod]
         public void MirroredKeyMatchesTheEnginesElementDataKey()
         {
+            // The analyzer reports this condition as always true because both
+            // sides are constants the compiler folds. That is the point. Both
+            // are compiled from source in the same build, through project
+            // references, so a change to either constant fails this test the
+            // next time it is built and run.
+#pragma warning disable MSTEST0032
             Assert.AreEqual(
                 DidBaseEnginePropertiesBuilder.ComponentName,
                 JavaScriptBuilderElement.FODID_ELEMENT_DATA_KEY,
                 "the builder's copy of the 51Did element data key has " +
                 "drifted from the one the engines return");
+#pragma warning restore MSTEST0032
         }
 
         /// <summary>
