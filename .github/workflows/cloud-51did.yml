@@ -1,11 +1,19 @@
 name: Cloud 51Did Tests
 
-# Runs the live cloud 51Did integration test (Tests/FiftyOne.Did.Tests,
-# CloudFodIdTests) once for every resource key the central common-ci script
-# exports from the _51DEGREES_RESOURCE_KEY* secrets (free, paid and any added
-# later). Each run sets the single _51DEGREES_RESOURCE_KEY the test reads. New
-# resource keys are added once at the organisation level; this workflow needs
-# no change.
+# Runs the live cloud 51Did tests once for every resource key the central
+# common-ci script exports from the _51DEGREES_RESOURCE_KEY* secrets (free,
+# paid and any added later). Each run sets two names to that key, being
+# 51DEGREES_RESOURCE_KEY, which DidCloudEngineLiveEntitlementTests reads, and
+# _51DEGREES_RESOURCE_KEY, which CloudFodIdTests reads. New resource keys are
+# added once at the organisation level and this workflow needs no change.
+#
+# Two projects run. Tests/FiftyOne.Did.Tests, CloudFodIdTests, obtains a real
+# 51Did and parses it. Tests/FiftyOne.Did.Cloud.Tests,
+# DidCloudEngineLiveEntitlementTests, builds a customer style pipeline against
+# the live cloud and checks that the outcome matches what the key is actually
+# entitled to, which is a build that reports what the cloud lists for an
+# entitled key and a build that fails naming the element for one that carries
+# no 51Did product.
 
 on:
   workflow_dispatch:
@@ -21,7 +29,10 @@ on:
     branches: [main]
     paths:
       - 'FiftyOne.Did/**'
+      - 'FiftyOne.Did.Cloud/**'
+      - 'FiftyOne.Did.Core/**'
       - 'Tests/FiftyOne.Did.Tests/**'
+      - 'Tests/FiftyOne.Did.Cloud.Tests/**'
       - 'owid-dotnet/**'
       - '.github/workflows/cloud-51did.yml'
 
@@ -51,23 +62,34 @@ jobs:
           SECRETS: ${{ toJSON(secrets) }}
         run: |
           ./common-ci/steps/set-resource-keys.ps1 -Keys (ConvertFrom-Json -AsHashtable $env:SECRETS)
-          $project = 'Tests/FiftyOne.Did.Tests/FiftyOne.Did.Tests.csproj'
+          $runs = @(
+            @{ Project = 'Tests/FiftyOne.Did.Tests/FiftyOne.Did.Tests.csproj'
+               Filter  = 'FullyQualifiedName~CloudFodIdTests' },
+            @{ Project = 'Tests/FiftyOne.Did.Cloud.Tests/FiftyOne.Did.Cloud.Tests.csproj'
+               Filter  = 'FullyQualifiedName~DidCloudEngineLiveEntitlementTests' }
+          )
           $keys = Get-ChildItem env: |
             Where-Object { $_.Name -like '_51DEGREES_RESOURCE_KEY*' -and $_.Value }
           if (-not $keys) {
             Write-Host 'No _51DEGREES_RESOURCE_KEY* secrets available; skipping.'
             exit 0
           }
-          dotnet build $project -c Release --nologo
-          if ($LASTEXITCODE -ne 0) { exit 1 }
+          foreach ($run in $runs) {
+            dotnet build $run.Project -c Release --nologo
+            if ($LASTEXITCODE -ne 0) { exit 1 }
+          }
           $failed = $false
           foreach ($k in $keys) {
-            Write-Host "::group::CloudFodIdTests with $($k.Name)"
             $env:_51DEGREES_RESOURCE_KEY = $k.Value
-            dotnet test $project -c Release --no-build --nologo `
-              --filter 'FullyQualifiedName~CloudFodIdTests' `
-              --logger 'console;verbosity=normal'
-            if ($LASTEXITCODE -ne 0) { $failed = $true }
-            Write-Host '::endgroup::'
+            ${env:51DEGREES_RESOURCE_KEY} = $k.Value
+            foreach ($run in $runs) {
+              $name = Split-Path $run.Project -Leaf
+              Write-Host "::group::$name with $($k.Name)"
+              dotnet test $run.Project -c Release --no-build --nologo `
+                --filter $run.Filter `
+                --logger 'console;verbosity=normal'
+              if ($LASTEXITCODE -ne 0) { $failed = $true }
+              Write-Host '::endgroup::'
+            }
           }
           if ($failed) { exit 1 }

@@ -65,9 +65,16 @@ namespace FiftyOne.Did.Cloud.FlowElements
         /// <summary>
         /// Create a new <see cref="DidCloudEngine"/> instance. Called by
         /// <see cref="AspectEngineBuilderBase{TBuilder, TEngine}.BuildEngine"/>.
-        /// The requested properties are ignored as this engine exposes a
-        /// fixed, locally-defined set of properties.
         /// </summary>
+        /// <remarks>
+        /// The requested properties are not passed to the engine, because
+        /// the engine takes what it can return from the cloud, like every
+        /// other cloud engine, and the cloud already answers for the
+        /// resource key in use. A resource key that does not carry the
+        /// 51Did product fails the pipeline build with a message naming
+        /// the element, rather than building a pipeline that runs and
+        /// never creates an identifier.
+        /// </remarks>
         /// <param name="properties">
         /// The set of properties that the engine should populate. Unused.
         /// </param>

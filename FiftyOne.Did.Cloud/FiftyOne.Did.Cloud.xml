@@ -54,15 +54,26 @@
         <member name="P:FiftyOne.Did.Cloud.FlowElements.DidCloudEngine.EvidenceKeyFilter">
             <inheritdoc/>
         </member>
-        <member name="P:FiftyOne.Did.Cloud.FlowElements.DidCloudEngine.Properties">
-            <inheritdoc/>
-        </member>
-        <member name="P:FiftyOne.Did.Cloud.FlowElements.DidCloudEngine.HasLoadedProperties">
+        <member name="F:FiftyOne.Did.Cloud.FlowElements.DidCloudEngine._propertyTypes">
             <summary>
-            Indicates that properties have been loaded.
-            Always returns true since this engine uses locally defined properties
-            rather than cloud metadata.
+            The 51Did properties described locally, used only to give the
+            values in a cloud response their types when the response is
+            read in <see cref="M:FiftyOne.Did.Cloud.FlowElements.DidCloudEngine.ProcessCloudEngine(FiftyOne.Pipeline.Core.Data.IFlowData,FiftyOne.Did.Core.Data.I51DidData,System.String)"/>.
             </summary>
+            <remarks>
+            This is deliberately not what <c>Properties</c> returns. Until
+            September 2026 it was, and every property in it is marked
+            available, so a pipeline holding this engine advertised every
+            51Did property whatever the resource key was entitled to, and
+            a caller whose key lacks the product was told the identifier
+            was available and then never got one. Property availability
+            now comes from the cloud through
+            <c>CloudAspectEngineBase.Properties</c>, which is the mechanism
+            every other cloud engine already uses, and a failure to fetch
+            it surfaces as <c>PropertiesNotYetLoadedException</c> rather
+            than as a quiet "unavailable" that the pipeline would remember
+            for the life of the process.
+            </remarks>
         </member>
         <member name="M:FiftyOne.Did.Cloud.FlowElements.DidCloudEngine.#ctor(Microsoft.Extensions.Logging.ILogger{FiftyOne.Pipeline.Engines.FlowElements.AspectEngineBase{FiftyOne.Did.Core.Data.I51DidData,FiftyOne.Pipeline.Engines.Data.IAspectPropertyMetaData}},System.Func{FiftyOne.Pipeline.Core.FlowElements.IPipeline,FiftyOne.Pipeline.Core.FlowElements.FlowElementBase{FiftyOne.Did.Core.Data.I51DidData,FiftyOne.Pipeline.Engines.Data.IAspectPropertyMetaData},FiftyOne.Did.Core.Data.I51DidData})">
             <summary>
@@ -112,9 +123,16 @@
             <summary>
             Create a new <see cref="T:FiftyOne.Did.Cloud.FlowElements.DidCloudEngine"/> instance. Called by
             <see cref="M:FiftyOne.Pipeline.Engines.FlowElements.AspectEngineBuilderBase`2.BuildEngine"/>.
-            The requested properties are ignored as this engine exposes a
-            fixed, locally-defined set of properties.
             </summary>
+            <remarks>
+            The requested properties are not passed to the engine, because
+            the engine takes what it can return from the cloud, like every
+            other cloud engine, and the cloud already answers for the
+            resource key in use. A resource key that does not carry the
+            51Did product fails the pipeline build with a message naming
+            the element, rather than building a pipeline that runs and
+            never creates an identifier.
+            </remarks>
             <param name="properties">
             The set of properties that the engine should populate. Unused.
             </param>
