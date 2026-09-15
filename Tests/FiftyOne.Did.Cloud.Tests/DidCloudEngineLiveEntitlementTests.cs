@@ -44,11 +44,13 @@ namespace FiftyOne.Did.Cloud.Tests;
 /// </summary>
 /// <remarks>
 /// <para>
-/// The test reads one resource key from <c>_51DEGREES_RESOURCE_KEY</c>, the
-/// same variable the workflow that runs the live 51Did tests sets once per
-/// key secret, so running it for both an entitled key and an unentitled one
-/// is a matter of the workflow looping rather than of this test naming two
-/// keys. With no key set it is inconclusive.
+/// The test reads one resource key from <c>51DEGREES_RESOURCE_KEY</c>, which
+/// the workflow that runs the live 51Did tests sets once per key secret, or
+/// where that is unset from <c>_51DEGREES_RESOURCE_KEY_51DID</c>, the name
+/// continuous integration gives a resource key carrying the 51Did product.
+/// Running it for both an entitled key and an unentitled one is therefore a
+/// matter of the workflow looping rather than of this test naming two keys.
+/// With neither name set it is inconclusive.
 /// </para>
 /// <para>
 /// Whether the key carries the product is not taken from the engine under
@@ -70,18 +72,18 @@ public class DidCloudEngineLiveEntitlementTests
     /// </summary>
     public TestContext TestContext { get; set; } = null!;
 
-    private const string ResourceKeyEnvVar = "_51DEGREES_RESOURCE_KEY";
+    /// <summary>
+    /// Read first. The runtime name a developer sets.
+    /// </summary>
+    private const string ResourceKeyEnvVar = "51DEGREES_RESOURCE_KEY";
 
     /// <summary>
-    /// Checked when the aligned name is not set, which is how the test
-    /// runs on a developer machine that has the older names.
+    /// Read where <see cref="ResourceKeyEnvVar"/> is unset. The name
+    /// continuous integration sets for a resource key carrying the 51Did
+    /// product. It starts with an underscore because a shell cannot export
+    /// a name starting with a digit.
     /// </summary>
-    private static readonly string[] FallbackEnvVars =
-    {
-        "_51DEGREES_RESOURCE_KEY_PAID",
-        "_51DEGREES_RESOURCE_KEY_FREE",
-        "SUPER_RESOURCE_KEY",
-    };
+    private const string CiResourceKeyEnvVar = "_51DEGREES_RESOURCE_KEY_51DID";
 
     private const string AccessiblePropertiesUrl =
         "https://cloud.51degrees.com/api/v4/accessibleproperties";
@@ -93,13 +95,10 @@ public class DidCloudEngineLiveEntitlementTests
         {
             return key;
         }
-        foreach (var name in FallbackEnvVars)
+        key = Environment.GetEnvironmentVariable(CiResourceKeyEnvVar);
+        if (string.IsNullOrWhiteSpace(key) == false)
         {
-            key = Environment.GetEnvironmentVariable(name);
-            if (string.IsNullOrWhiteSpace(key) == false)
-            {
-                return key;
-            }
+            return key;
         }
         return null;
     }
@@ -162,8 +161,9 @@ public class DidCloudEngineLiveEntitlementTests
         if (key == null)
         {
             Assert.Inconclusive(
-                $"No resource key in the environment. Set {ResourceKeyEnvVar} " +
-                "to run this against the live cloud.");
+                "No resource key in the environment. Set " +
+                $"{ResourceKeyEnvVar}, or {CiResourceKeyEnvVar} in CI, to " +
+                "run this against the live cloud.");
         }
 
         var listed = await ListedPropertiesAsync(key);

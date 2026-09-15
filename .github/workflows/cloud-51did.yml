@@ -2,9 +2,10 @@ name: Cloud 51Did Tests
 
 # Runs the live cloud 51Did tests once for every resource key the central
 # common-ci script exports from the _51DEGREES_RESOURCE_KEY* secrets (free,
-# paid and any added later). Each run sets the single _51DEGREES_RESOURCE_KEY
-# the tests read. New resource keys are added once at the organisation level
-# and this workflow needs no change.
+# paid and any added later). Each run sets two names to that key, being
+# 51DEGREES_RESOURCE_KEY, which DidCloudEngineLiveEntitlementTests reads, and
+# _51DEGREES_RESOURCE_KEY, which CloudFodIdTests reads. New resource keys are
+# added once at the organisation level and this workflow needs no change.
 #
 # Two projects run. Tests/FiftyOne.Did.Tests, CloudFodIdTests, obtains a real
 # 51Did and parses it. Tests/FiftyOne.Did.Cloud.Tests,
@@ -72,6 +73,7 @@ jobs:
           $failed = $false
           foreach ($k in $keys) {
             $env:_51DEGREES_RESOURCE_KEY = $k.Value
+            ${env:51DEGREES_RESOURCE_KEY} = $k.Value
             foreach ($run in $runs) {
               $name = Split-Path $run.Project -Leaf
               Write-Host "::group::$name with $($k.Name)"

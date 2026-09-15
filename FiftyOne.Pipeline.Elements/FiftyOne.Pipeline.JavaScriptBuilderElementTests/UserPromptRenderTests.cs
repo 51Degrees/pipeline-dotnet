@@ -41,13 +41,13 @@ namespace FiftyOne.Pipeline.JavaScript.Tests
     public class UserPromptRenderTests
     {
         /// <summary>
-        /// The text agent A's template prints when refresh() is called at
-        /// the server's iteration cap. It exists only in the template as
-        /// changed on javascript-templates feature/create-last-a, so a
-        /// script that does not carry it was rendered from the old
+        /// The text the template prints when refresh() is called at the
+        /// server's iteration cap, from JavaScriptResource.mustache in the
+        /// Templates submodule. It exists only in the template as changed
+        /// by https://github.com/51Degrees/javascript-templates/pull/23, so
+        /// a script that does not carry it was rendered from the old
         /// template and every test in this project would be proving
-        /// nothing. Recorded in D:\Workspace\create-last\reports\A.md
-        /// under "GUARD STRING".
+        /// nothing.
         /// </summary>
         private const string GuardString = "51Degrees: the maximum of";
 
@@ -55,8 +55,7 @@ namespace FiftyOne.Pipeline.JavaScript.Tests
         /// Two names that appear only inside the template's user prompt
         /// section, so they say whether the block itself was rendered.
         /// The guard string above sits outside the section and is present
-        /// whenever updates are enabled, which agent A's report states and
-        /// this class pins.
+        /// whenever updates are enabled, which this class pins.
         /// </summary>
         private static readonly string[] BlockOnlyNames =
         {
@@ -204,7 +203,7 @@ namespace FiftyOne.Pipeline.JavaScript.Tests
         /// <summary>
         /// Standing instruction 3 of the create last programme. The script
         /// rendered with the block on has to carry text that exists only
-        /// in agent A's template, or the build picked up the old one and
+        /// in the changed template, or the build picked up the old one and
         /// nothing else in this project is proving what it claims.
         /// </summary>
         [TestMethod]
@@ -247,10 +246,10 @@ namespace FiftyOne.Pipeline.JavaScript.Tests
                 withDid.Contains(GuardString, StringComparison.Ordinal) &&
                 withoutDid.Contains(GuardString, StringComparison.Ordinal),
                 "the guard string sits outside the section, so it is in " +
-                "both scripts whenever updates are enabled. Agent A's " +
-                "report states this and it is pinned here so that a later " +
-                "template change that moves it inside the section is " +
-                "noticed rather than silently weakening the guard.");
+                "both scripts whenever updates are enabled. It is pinned " +
+                "here so that a later template change that moves it inside " +
+                "the section is noticed rather than silently weakening the " +
+                "guard.");
         }
 
         /// <summary>
