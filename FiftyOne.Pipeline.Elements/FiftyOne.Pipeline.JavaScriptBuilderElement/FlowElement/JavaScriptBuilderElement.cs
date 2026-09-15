@@ -28,7 +28,6 @@ using FiftyOne.Pipeline.Core.FlowElements;
 using Microsoft.Extensions.Logging;
 using NUglify;
 using System;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Text;
 using System.Net;
@@ -38,6 +37,7 @@ using Stubble.Core.Builders;
 using Stubble.Core;
 using System.IO;
 using System.Reflection;
+using System.Runtime.CompilerServices;
 using Stubble.Core.Settings;
 using FiftyOne.Pipeline.Engines.Data;
 using FiftyOne.Pipeline.Engines;
@@ -156,10 +156,18 @@ namespace FiftyOne.Pipeline.JavaScriptBuilder.FlowElement
         /// and storing it here would switch the block off for the life of
         /// the process. One element can sit in several pipelines, so the
         /// key is the pipeline the request came through and never
-        /// Pipelines[0].
+        /// Pipelines[0]. The table refers to each pipeline weakly, so
+        /// remembering an answer never keeps a pipeline alive.
         /// </summary>
-        private readonly ConcurrentDictionary<IPipeline, bool>
-            _userPromptByPipeline = new ConcurrentDictionary<IPipeline, bool>();
+        private readonly ConditionalWeakTable<IPipeline, object>
+            _userPromptByPipeline = new ConditionalWeakTable<IPipeline, object>();
+
+        /// <summary>
+        /// The value stored against a pipeline in _userPromptByPipeline.
+        /// Only a positive answer is ever stored, so what matters is that
+        /// an entry exists and not what it holds.
+        /// </summary>
+        private static readonly object _userPromptRemembered = new object();
 
         /// <summary>
         /// Key to identify engine.
@@ -605,9 +613,9 @@ namespace FiftyOne.Pipeline.JavaScriptBuilder.FlowElement
                 return false;
             }
 
-            if (_userPromptByPipeline.TryGetValue(pipeline, out bool remembered))
+            if (_userPromptByPipeline.TryGetValue(pipeline, out _))
             {
-                return remembered;
+                return true;
             }
 
             // The outer entry is created before the properties are
@@ -623,7 +631,11 @@ namespace FiftyOne.Pipeline.JavaScriptBuilder.FlowElement
 
             if (render)
             {
-                _userPromptByPipeline.GetOrAdd(pipeline, true);
+                // GetValue rather than Add, because two requests can reach
+                // this line for the same pipeline at once and Add throws
+                // when the pipeline is already in the table.
+                _userPromptByPipeline.GetValue(
+                    pipeline, _ => _userPromptRemembered);
             }
             return render;
         }

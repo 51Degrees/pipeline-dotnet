@@ -26,6 +26,7 @@ using FiftyOne.Pipeline.Core.FlowElements;
 using FiftyOne.Pipeline.JavaScriptBuilder.Data;
 using FiftyOne.Pipeline.JavaScriptBuilder.FlowElement;
 using Moq;
+using System.Runtime.CompilerServices;
 
 namespace FiftyOne.Pipeline.JavaScript.Tests
 {
@@ -269,6 +270,49 @@ namespace FiftyOne.Pipeline.JavaScript.Tests
                 builder.CallRenderUserPrompt(FlowDataFor(Nothing())),
                 "the pipeline that does not offer it must not inherit the " +
                 "other pipeline's answer");
+        }
+
+        /// <summary>
+        /// Remembering a positive answer must not keep the pipeline alive.
+        /// The pipeline here is a mock the element was never added to, so
+        /// once the request is over the remembered answer is the only
+        /// thing that could still refer to it, and the garbage collector
+        /// has to be able to take it.
+        /// </summary>
+        [TestMethod]
+        public void RememberedAnswerDoesNotKeepThePipelineAlive()
+        {
+            var builder = new ExposedBuilder();
+            var pipeline = RenderThroughAPipelineOnlyThisMethodHolds(builder);
+
+            GC.Collect();
+            GC.WaitForPendingFinalizers();
+            GC.Collect();
+
+            Assert.IsFalse(pipeline.IsAlive,
+                "the remembered answer kept alive a pipeline that nothing " +
+                "else refers to");
+
+            // The element has to outlive the check, or its memory of the
+            // answer would be collected with it and the test would pass
+            // whatever that memory held.
+            GC.KeepAlive(builder);
+        }
+
+        /// <summary>
+        /// Renders once through a pipeline that only this method refers to
+        /// and returns a weak reference to it. Not inlined, so no reference
+        /// to the pipeline is left in the caller's frame.
+        /// </summary>
+        [MethodImpl(MethodImplOptions.NoInlining)]
+        private static WeakReference RenderThroughAPipelineOnlyThisMethodHolds(
+            ExposedBuilder builder)
+        {
+            var data = FlowDataFor(Available("FODid", "IdProbGlobal"));
+            Assert.IsTrue(builder.CallRenderUserPrompt(data),
+                "only a positive answer is remembered, so the answer here " +
+                "has to be positive");
+            return new WeakReference(data.Pipeline);
         }
     }
 }
