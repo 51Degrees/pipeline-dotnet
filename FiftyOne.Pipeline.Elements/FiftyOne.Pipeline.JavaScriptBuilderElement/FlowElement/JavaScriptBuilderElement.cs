@@ -130,12 +130,11 @@ namespace FiftyOne.Pipeline.JavaScriptBuilder.FlowElement
         /// <summary>
         /// The element data key that both 51Did engines return. It mirrors
         /// DidBaseEnginePropertiesBuilder.ComponentName in
-        /// FiftyOne.Did.Core, which the cloud engine returns from
-        /// ElementDataKey (FiftyOne.Did.Cloud/FlowElements/DidCloudEngine.cs
-        /// lines 46 to 47) and the on premise engine returns as well. The
-        /// value is copied here because this package must not take a
-        /// dependency on the 51Did packages, and a unit test asserts that
-        /// the two are still equal.
+        /// FiftyOne.Did.Core, which DidCloudEngine returns from its
+        /// ElementDataKey and the on premise engine in the cloud
+        /// repository returns as well. The value is copied here because
+        /// this package must not take a dependency on the 51Did packages,
+        /// and UserPromptHookTests asserts that the two are still equal.
         /// </summary>
         /// <remarks>
         /// This is an element data key and not a property component, so
@@ -151,10 +150,10 @@ namespace FiftyOne.Pipeline.JavaScriptBuilder.FlowElement
         /// available 51Did property, so that RenderUserPrompt does not have
         /// to ask the pipeline again once the answer is known. Only a
         /// positive answer is stored, because a negative one can mean that
-        /// an element's properties have not loaded yet, which the pipeline
-        /// itself refuses to remember for the same reason
-        /// (FiftyOne.Pipeline.Core/FlowElements/Pipeline.cs lines 285 to
-        /// 291), and storing it would switch the block off for the life of
+        /// an element's properties have not loaded yet, which is why
+        /// Pipeline.ElementAvailableProperties refuses to remember its own
+        /// answer whilst any element threw PropertiesNotYetLoadedException,
+        /// and storing it here would switch the block off for the life of
         /// the process. One element can sit in several pipelines, so the
         /// key is the pipeline the request came through and never
         /// Pipelines[0].
