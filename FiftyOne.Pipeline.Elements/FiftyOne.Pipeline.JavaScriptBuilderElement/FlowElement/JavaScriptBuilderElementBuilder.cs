@@ -24,7 +24,6 @@ using FiftyOne.Pipeline.JavaScriptBuilder.Data;
 using FiftyOne.Pipeline.Core.FlowElements;
 using Microsoft.Extensions.Logging;
 using System;
-using System.Text.RegularExpressions;
 using FiftyOne.Pipeline.Core.Exceptions;
 using FiftyOne.Pipeline.Core.Data;
 using System.Globalization;
@@ -164,9 +163,7 @@ namespace FiftyOne.Pipeline.JavaScriptBuilder.FlowElement
         [DefaultValue(Constants.BUILDER_DEFAULT_OBJECT_NAME)]
         public JavaScriptBuilderElementBuilder SetObjectName(string objName)
         {
-            var match = Regex.Match(objName, @"[a-zA-Z_$][0-9a-zA-Z_$]*");
-
-            if (match.Value == objName)
+            if (JavaScriptBuilderElement.IsValidObjectName(objName))
             {
                 ObjName = objName;
             }
