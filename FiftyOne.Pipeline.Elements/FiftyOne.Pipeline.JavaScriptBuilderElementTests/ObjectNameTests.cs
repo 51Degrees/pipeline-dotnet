@@ -281,7 +281,6 @@ console.log(JSON.stringify(result));
         [DataRow("var")]
         [DataRow("NaN")]
         [DataRow("fiftyoneDegreesManager")]
-        [DataRow(null)]
         public void ObjectName_FromConfiguration_Invalid_Refused(
             string configured)
         {
@@ -289,6 +288,31 @@ console.log(JSON.stringify(result));
                 new JavaScriptBuilderElementBuilder(_loggerFactory)
                     .SetObjectName(configured)
                     .Build());
+        }
+
+        /// <summary>
+        /// No name configured at all means the default name, whether the
+        /// builder is never asked for a name or is given null. The empty
+        /// string is a name that was configured and is refused above, so
+        /// the two are not the same.
+        /// </summary>
+        [DataTestMethod]
+        [DataRow(false)]
+        [DataRow(true)]
+        public void ObjectName_NotConfigured_IsDefault(bool passNull)
+        {
+            var builder = new JavaScriptBuilderElementBuilder(_loggerFactory)
+                .SetEndpoint("/json")
+                .SetMinify(false);
+            if (passNull)
+            {
+                builder.SetObjectName(null);
+            }
+
+            var script = Render(builder.Build(), null);
+
+            AssertUsesName(script, DEFAULT_NAME, null);
+            AssertRuns(script, DEFAULT_NAME);
         }
 
         /// <summary>
