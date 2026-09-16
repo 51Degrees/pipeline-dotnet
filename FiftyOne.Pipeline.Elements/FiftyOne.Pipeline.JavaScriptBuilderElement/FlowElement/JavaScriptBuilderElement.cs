@@ -532,8 +532,15 @@ namespace FiftyOne.Pipeline.JavaScriptBuilder.FlowElement
         /// <summary>
         /// Get the sequence evidence if it exists.
         /// </summary>
+        /// <remarks>
+        /// The sequence is written into the script as a number, so anything
+        /// other than a positive 32 bit integer, written as an integer or
+        /// as a string of digits, gives 1. With no Sequence Element in the
+        /// pipeline there is usually no sequence evidence, which also
+        /// gives 1.
+        /// </remarks>
         /// <param name="data"></param>
-        /// <returns></returns>
+        /// <returns>The sequence, which is always at least 1.</returns>
         protected virtual int GetSequence(IFlowData data)
         {
             if(data == null)
@@ -546,8 +553,14 @@ namespace FiftyOne.Pipeline.JavaScriptBuilder.FlowElement
             if (data.TryGetEvidence(Engines.FiftyOne.Constants.EVIDENCE_SEQUENCE,
                 out object sequenceObject))
             {
-                if (sequenceObject is int sequenceValue ||
-                    (sequenceObject is string seq && int.TryParse(seq, out sequenceValue)))
+                if ((sequenceObject is int sequenceValue ||
+                    (sequenceObject is string seq &&
+                        int.TryParse(
+                            seq,
+                            NumberStyles.None,
+                            CultureInfo.InvariantCulture,
+                            out sequenceValue))) &&
+                    sequenceValue > 0)
                 {
                     sequence = sequenceValue;
                 }
@@ -558,8 +571,15 @@ namespace FiftyOne.Pipeline.JavaScriptBuilder.FlowElement
         /// <summary>
         /// Get the session-id evidence if it exists.
         /// </summary>
+        /// <remarks>
+        /// The session id is written into the script inside quotes, so a
+        /// session id that fails
+        /// <see cref="JavaScriptResource.IsValidSessionId(string)"/> gives
+        /// an empty string. This applies whether the Sequence Element
+        /// created the session id or the request carried it.
+        /// </remarks>
         /// <param name="data"></param>
-        /// <returns></returns>
+        /// <returns>The session id, or an empty string.</returns>
         protected virtual string GetSessionId(IFlowData data)
         {
             if (data == null)
@@ -572,7 +592,11 @@ namespace FiftyOne.Pipeline.JavaScriptBuilder.FlowElement
             if (data.TryGetEvidence(Engines.FiftyOne.Constants.EVIDENCE_SESSIONID,
                 out object objSessionId))
             {
-                sessionId = objSessionId?.ToString() ?? string.Empty;
+                sessionId = objSessionId?.ToString();
+                if (JavaScriptResource.IsValidSessionId(sessionId) == false)
+                {
+                    sessionId = string.Empty;
+                }
             }
             return sessionId;
         }
