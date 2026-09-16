@@ -222,6 +222,7 @@ console.log(JSON.stringify(result));
         [DataRow("var")]
         [DataRow("class")]
         [DataRow("undefined")]
+        [DataRow("fiftyoneDegreesManager")]
         public void ObjectName_FromEvidence_Invalid_UsesDefault(
             string requested)
         {
@@ -278,6 +279,8 @@ console.log(JSON.stringify(result));
         [DataRow("")]
         [DataRow("fod\n")]
         [DataRow("var")]
+        [DataRow("NaN")]
+        [DataRow("fiftyoneDegreesManager")]
         [DataRow(null)]
         public void ObjectName_FromConfiguration_Invalid_Refused(
             string configured)
@@ -297,6 +300,7 @@ console.log(JSON.stringify(result));
         [DataRow("9bad")]
         [DataRow("")]
         [DataRow("this")]
+        [DataRow("fiftyoneDegreesManager")]
         public void ObjectName_FromConstructor_Invalid_Refused(
             string configured)
         {
@@ -328,6 +332,12 @@ console.log(JSON.stringify(result));
         [DataRow("let", false)]
         [DataRow("null", false)]
         [DataRow("await", false)]
+        [DataRow("Infinity", false)]
+        [DataRow("NaN", false)]
+        [DataRow("undefined", false)]
+        [DataRow("fiftyoneDegreesManager", false)]
+        [DataRow("eval", true)]
+        [DataRow("arguments", true)]
         public void ObjectName_IsValidObjectName(string name, bool expected)
         {
             Assert.AreEqual(

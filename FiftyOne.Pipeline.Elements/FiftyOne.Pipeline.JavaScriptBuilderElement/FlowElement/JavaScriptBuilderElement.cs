@@ -131,23 +131,27 @@ namespace FiftyOne.Pipeline.JavaScriptBuilder.FlowElement
             RegexOptions.CultureInvariant);
 
         /// <summary>
-        /// Words that match the identifier pattern but cannot be used as
-        /// the name of a variable, or that can be declared but leave the
-        /// variable without the object (undefined, NaN and Infinity cannot
-        /// be written to).
+        /// Words that match the identifier pattern but cannot be the name
+        /// of the object. These are the reserved words of the language,
+        /// including those reserved only in strict mode, and the three
+        /// global values a top level var cannot replace (undefined, NaN and
+        /// Infinity), where the object would never be created. The last
+        /// entry is the constructor the script defines and calls to create
+        /// the object, so that name would clash with it. The other language
+        /// builders use the same list.
         /// </summary>
         private static readonly HashSet<string> _objectNameReserved =
             new HashSet<string>(StringComparer.Ordinal)
         {
-            "arguments", "await", "break", "case", "catch", "class",
-            "const", "continue", "debugger", "default", "delete", "do",
-            "else", "enum", "eval", "export", "extends", "false",
-            "finally", "for", "function", "if", "implements", "import",
-            "in", "Infinity", "instanceof", "interface", "let", "NaN",
-            "new", "null", "package", "private", "protected", "public",
-            "return", "static", "super", "switch", "this", "throw",
-            "true", "try", "typeof", "undefined", "var", "void", "while",
-            "with", "yield",
+            "await", "break", "case", "catch", "class", "const",
+            "continue", "debugger", "default", "delete", "do", "else",
+            "enum", "export", "extends", "false", "finally", "for",
+            "function", "if", "implements", "import", "in", "instanceof",
+            "interface", "let", "new", "null", "package", "private",
+            "protected", "public", "return", "static", "super", "switch",
+            "this", "throw", "true", "try", "typeof", "var", "void",
+            "while", "with", "yield", "Infinity", "NaN", "undefined",
+            "fiftyoneDegreesManager",
         };
 
         /// <summary>
