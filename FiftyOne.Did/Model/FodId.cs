@@ -76,6 +76,13 @@ namespace FiftyOne.Did.Model
     /// identifier to read fields from.
     /// </para>
     /// <para>
+    /// A payload whose usage bits, bits 0 to 2 of the flags byte, are all
+    /// clear is refused with <see cref="FodIdParseStatus.NoUsage"/>. The
+    /// cloud never writes such a byte, and <see cref="Usage"/> has no
+    /// value for it, so there is nothing a caller could do with the
+    /// identifier other than not pass it on.
+    /// </para>
+    /// <para>
     /// How an instance comes to exist. An OWID cannot be assembled by a
     /// caller, because an unsigned one would be indistinguishable from a
     /// signed one downstream. A <see cref="FodId"/> therefore reaches
@@ -166,7 +173,7 @@ namespace FiftyOne.Did.Model
         /// not public, because a caller masking the byte for the
         /// non-marketing bit would read every marketing identifier as
         /// non-marketing. Read <see cref="Usage"/>,
-        /// <see cref="UsageFromConsent"/> and <see cref="Type"/> instead.
+        /// <see cref="UsageIsIndirect"/> and <see cref="Type"/> instead.
         /// </summary>
         internal byte Flags { get; }
 
@@ -181,12 +188,16 @@ namespace FiftyOne.Did.Model
         /// </summary>
         public Usage Usage => UsageOf(Flags);
         /// <summary>
-        /// Whether the usage was derived from an IAB consent string the
-        /// caller sent, rather than stated by the caller directly. Bit 3
-        /// of the flags byte. Both are legitimate ways to arrive at a
-        /// usage, and this says nothing about which usage it is.
+        /// Whether the usage is indirect, being worked out by the issuer
+        /// from a signal the caller sent other than the usage itself,
+        /// rather than direct, being stated by the caller. Bit 3 of the
+        /// flags byte. A consent string is the only such signal today, so
+        /// today this is true only where the usage was derived from one,
+        /// but a later signal of another kind sets the same bit. Both are
+        /// legitimate ways to arrive at a usage, and this says nothing
+        /// about which usage it is.
         /// </summary>
-        public bool UsageFromConsent => (Flags & 0b1000) != 0;
+        public bool UsageIsIndirect => (Flags & 0b1000) != 0;
 
         /// <summary>
         /// The 4-byte little-endian License Id from the payload, as the
@@ -559,12 +570,17 @@ namespace FiftyOne.Did.Model
 
         // The highest usage granted. The bits are cumulative, so the
         // highest set bit names the usage and the lower bits say nothing
-        // more. See Usage.
+        // more. See Usage. A flags byte with no usage bit set never
+        // reaches here, because Unpack refuses it, so the last branch is
+        // non-marketing, being the most restrictive answer.
         private static Usage UsageOf(byte flags) =>
             (flags & 0b100) != 0 ? Usage.Personalized
             : (flags & 0b010) != 0 ? Usage.Standard
-            : (flags & 0b001) != 0 ? Usage.NonMarketing
-            : Usage.None;
+            : Usage.NonMarketing;
+
+        // True where bits 0 to 2 of the flags byte are all clear, which
+        // names no usage at all.
+        private static bool HasNoUsage(byte flags) => (flags & 0b111) == 0;
 
         // Bits 4 and 5 of the flags byte, being the version of the payload
         // layout the identifier follows. The envelope carries a version of
@@ -622,6 +638,15 @@ namespace FiftyOne.Did.Model
             if (PayloadVersionOf(flags) != SupportedPayloadVersion)
             {
                 return FodIdParseStatus.UnsupportedPayloadVersion;
+            }
+            // A payload that names no usage is refused rather than read.
+            // The cloud never writes one, so it is damaged or forged, and
+            // there is no Usage value to answer with. The version is
+            // checked first, because a later layout may place the usage
+            // somewhere else.
+            if (HasNoUsage(flags))
+            {
+                return FodIdParseStatus.NoUsage;
             }
             // Only a lower bound is applied. Anything beyond the base
             // length for the type is a creator context section, whose
@@ -755,6 +780,11 @@ namespace FiftyOne.Did.Model
                     return new ArgumentException(
                         $"51Did payload version {payloadVersion} is not one "
                         + $"this package can read ({status}).",
+                        paramName);
+                case FodIdParseStatus.NoUsage:
+                    return new ArgumentException(
+                        "51Did payload has usage bits 000, which name no "
+                        + $"usage ({status}).",
                         paramName);
                 default:
                     return new FormatException(

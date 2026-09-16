@@ -168,14 +168,16 @@ namespace FiftyOne.Did.Tests
         }
 
         [TestMethod]
-        public void Flags_ZeroValue_Exposed()
+        public void Flags_LowestReadableValue_Exposed()
         {
+            // Zero names no usage and is refused, so the lowest flags byte
+            // that reads is the non-marketing bit alone.
             var payload = CanonicalPayload();
-            payload[FodId.FlagsOffset] = 0x00;
+            payload[FodId.FlagsOffset] = 0x01;
 
             var fodId = new FodId(_factory.SignedOwidBase64(payload));
 
-            Assert.AreEqual(0x00, fodId.Flags);
+            Assert.AreEqual(0x01, fodId.Flags);
         }
 
         [TestMethod]
@@ -327,7 +329,7 @@ namespace FiftyOne.Did.Tests
             // is accepted at any length, so an older reader keeps working
             // when a newer version ships.
             var payload = new byte[FodId.MatchKeyOffset + 500];
-            payload[FodId.FlagsOffset] = 0b1100_0000;
+            payload[FodId.FlagsOffset] = 0b1100_0001;
 
             var fodId = new FodId(_factory.SignedOwidBase64(payload));
 
@@ -378,7 +380,6 @@ namespace FiftyOne.Did.Tests
         /// data protection decision.
         /// </summary>
         [TestMethod]
-        [DataRow((byte)0b0100_0000, Usage.None)]
         [DataRow((byte)0b0100_0001, Usage.NonMarketing)]
         [DataRow((byte)0b0100_0011, Usage.Standard)]
         [DataRow((byte)0b0100_0111, Usage.Personalized)]
@@ -391,19 +392,76 @@ namespace FiftyOne.Did.Tests
 
             Assert.AreEqual(expected, fodId.Usage);
             Assert.AreEqual(IdType.Random, fodId.Type, "the type bits are untouched");
-            Assert.IsFalse(fodId.UsageFromConsent);
+            Assert.IsFalse(fodId.UsageIsIndirect);
         }
 
+        /// <summary>
+        /// Usage is indirect reads bit 3 and nothing else, so it is true
+        /// where the bit is set and false where it is clear, whatever the
+        /// usage bits say.
+        /// </summary>
         [TestMethod]
-        public void UsageFromConsent_IsBitThree()
+        [DataRow((byte)0b0100_1011, true, Usage.Standard)]
+        [DataRow((byte)0b0100_0011, false, Usage.Standard)]
+        [DataRow((byte)0b0100_1111, true, Usage.Personalized)]
+        [DataRow((byte)0b0100_0111, false, Usage.Personalized)]
+        [DataRow((byte)0b0100_1001, true, Usage.NonMarketing)]
+        [DataRow((byte)0b0100_0001, false, Usage.NonMarketing)]
+        public void UsageIsIndirect_IsBitThree(
+            byte flags, bool expected, Usage expectedUsage)
         {
             var payload = CanonicalRandomPayload();
-            payload[FodId.FlagsOffset] = 0b0100_1011;
+            payload[FodId.FlagsOffset] = flags;
 
             var fodId = new FodId(_factory.SignedOwidBase64(payload));
 
-            Assert.IsTrue(fodId.UsageFromConsent);
-            Assert.AreEqual(Usage.Standard, fodId.Usage);
+            Assert.AreEqual(expected, fodId.UsageIsIndirect);
+            Assert.AreEqual(expectedUsage, fodId.Usage);
+        }
+
+        /// <summary>
+        /// A payload whose usage bits are all clear names no usage. The
+        /// cloud never writes one, so it is refused rather than offered as
+        /// a fourth usage, whatever the type and bit 3 say.
+        /// </summary>
+        [TestMethod]
+        [DataRow((byte)0b0000_0000)]
+        [DataRow((byte)0b0000_1000)]
+        [DataRow((byte)0b0100_0000)]
+        [DataRow((byte)0b1000_1000)]
+        [DataRow((byte)0b1100_0000)]
+        public void Usage_BitsAllClear_IsRefused(byte flags)
+        {
+            var payload = flags >> 6 == 1
+                ? CanonicalRandomPayload()
+                : CanonicalPayload();
+            payload[FodId.FlagsOffset] = flags;
+
+            var parsed = FodId.TryParse(
+                _factory.SignedOwidBase64(payload),
+                out var fodId,
+                out var status);
+
+            Assert.IsFalse(parsed);
+            Assert.AreEqual(FodIdParseStatus.NoUsage, status);
+            Assert.IsNull(fodId);
+        }
+
+        /// <summary>
+        /// The throwing surface refuses the same payload, and its message
+        /// names what it found, being usage bits 000 and the status.
+        /// </summary>
+        [TestMethod]
+        public void Usage_BitsAllClear_MessageNamesIt()
+        {
+            var payload = CanonicalPayload();
+            payload[FodId.FlagsOffset] = 0b1000_0000;
+
+            var thrown = Assert.ThrowsExactly<ArgumentException>(
+                () => new FodId(_factory.SignedOwidBase64(payload)));
+
+            StringAssert.Contains(thrown.Message, "usage bits 000");
+            StringAssert.Contains(thrown.Message, "NoUsage");
         }
 
         [TestMethod]
@@ -470,7 +528,7 @@ namespace FiftyOne.Did.Tests
         public void Constructor_ReservedHeaderOnly_Parses()
         {
             var payload = new byte[FodId.MatchKeyOffset];
-            payload[FodId.FlagsOffset] = 0b1100_0000;
+            payload[FodId.FlagsOffset] = 0b1100_0001;
 
             var fodId = new FodId(_factory.SignedOwidBase64(payload));
 

@@ -237,7 +237,7 @@ namespace FiftyOne.Did.Tests
                 {
                     AssertValid51Did(
                         $"{usage}/idprobglobal", idProbGlobal!, terms,
-                        expected, fromConsent: false);
+                        expected, indirect: false);
                     if (terms != null)
                     {
                         termsChecked++;
@@ -264,7 +264,7 @@ namespace FiftyOne.Did.Tests
                 {
                     AssertValid51Did(
                         $"{usage}/idproblic", idProbLic!, terms,
-                        expected, fromConsent: false);
+                        expected, indirect: false);
                     if (terms != null)
                     {
                         termsChecked++;
@@ -310,7 +310,7 @@ namespace FiftyOne.Did.Tests
         /// and which way round it reads.
         /// </remarks>
         [TestMethod]
-        public async Task ConsentStringSetsTheUsageFromConsentBit()
+        public async Task ConsentStringSetsTheUsageIsIndirectBit()
         {
             var resourceKey = ResourceKey();
             if (resourceKey == null)
@@ -359,7 +359,7 @@ namespace FiftyOne.Did.Tests
                         value!,
                         ModelTermsForMarketing2,
                         expected,
-                        fromConsent: true);
+                        indirect: true);
                     proven++;
                 }
             }
@@ -377,7 +377,7 @@ namespace FiftyOne.Did.Tests
             }
 
             Console.WriteLine(
-                $"Usage-from-consent read on {proven} identifier(s).");
+                $"Usage is indirect read on {proven} identifier(s).");
         }
 
         /// <summary>
@@ -441,16 +441,16 @@ namespace FiftyOne.Did.Tests
         /// <param name="expectedUsage">
         /// The usage the reader must answer with for this identifier.
         /// </param>
-        /// <param name="fromConsent">
-        /// Whether the service must record that it derived the usage from a
-        /// consent string rather than the caller stating it.
+        /// <param name="indirect">
+        /// Whether the service must record that the usage is indirect, being
+        /// derived from a consent string rather than stated by the caller.
         /// </param>
         private static void AssertValid51Did(
             string label,
             string base64,
             string? expectedTerms,
             Usage expectedUsage,
-            bool fromConsent)
+            bool indirect)
         {
             var fodId = new FodId(base64);
 
@@ -495,11 +495,11 @@ namespace FiftyOne.Did.Tests
                 $"{label}: the service was asked for a " +
                 $"{expectedUsage} identifier and this reads as " +
                 $"{fodId.Usage}.");
-            Assert.AreEqual(fromConsent, fodId.UsageFromConsent,
+            Assert.AreEqual(indirect, fodId.UsageIsIndirect,
                 $"{label}: expected the usage to be recorded as " +
-                $"{(fromConsent ? "derived from a consent string" : "stated by the caller")} " +
+                $"{(indirect ? "indirect" : "direct")} " +
                 $"and it reads as " +
-                $"{(fodId.UsageFromConsent ? "derived from a consent string" : "stated by the caller")}.");
+                $"{(fodId.UsageIsIndirect ? "indirect" : "direct")}.");
             Assert.AreEqual(IdType.Probabilistic, fodId.Type,
                 $"{label}: an idprob* value must be a probabilistic " +
                 $"identifier and this reads as {fodId.Type}.");
@@ -507,7 +507,7 @@ namespace FiftyOne.Did.Tests
             Console.WriteLine(
                 $"{label}: domain={fodId.Domain} " +
                 $"usage={fodId.Usage} " +
-                $"fromConsent={fodId.UsageFromConsent} " +
+                $"usageIsIndirect={fodId.UsageIsIndirect} " +
                 $"type={fodId.Type} " +
                 $"licenseId=0x{fodId.LicenseId:X8} " +
                 $"terms={fodId.Terms ?? "none"} " +

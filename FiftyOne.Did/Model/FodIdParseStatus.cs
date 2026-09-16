@@ -33,8 +33,8 @@ namespace FiftyOne.Did.Model
     /// endpoint means anything at all, so every one of these outcomes is an
     /// ordinary result rather than a fault. The vocabulary is the OWID one,
     /// <see cref="OwidParseStatus"/>, carried through unchanged with the
-    /// same names and values, plus the two outcomes that belong to the
-    /// 51Did payload rules. A failure the OWID reader found is reported
+    /// same names and values, plus the outcomes that belong to the 51Did
+    /// payload rules. A failure the OWID reader found is reported
     /// exactly as the OWID reader named it and is never collapsed into a
     /// more general one.
     /// </para>
@@ -144,5 +144,16 @@ namespace FiftyOne.Did.Model
         /// values that are wrong rather than absent.
         /// </summary>
         UnsupportedPayloadVersion = 102,
+
+        /// <summary>
+        /// Bits 0 to 2 of the flags byte are all clear, so the payload
+        /// names no usage. Every usage the cloud accepts sets bit 0, and
+        /// the cloud writes no flags byte without it, so such a payload
+        /// did not come from the cloud and is damaged or forged. It is
+        /// refused rather than read, because the only safe answer to an
+        /// identifier with no usage is not to pass it on, which is what
+        /// a refusal already gives.
+        /// </summary>
+        NoUsage = 103,
     }
 }

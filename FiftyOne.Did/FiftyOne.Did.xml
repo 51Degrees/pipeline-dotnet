@@ -459,6 +459,71 @@
             <c>ECDsa.ImportFromPem</c>.
             </summary>
         </member>
+        <member name="T:FiftyOne.Did.Client.FactorName">
+            <summary>
+            The names of the creator context factors, as the cloud writes them
+            in the <c>factors</c> object of a verify or redeem answer and as
+            they appear as keys of <see cref="P:FiftyOne.Did.Client.RedeemResult.Factors"/>.
+            </summary>
+            <remarks>
+            <para>
+            The browser used to be reported as one factor named
+            <c>browser</c>. Cloud release 4.4.38 reports it as four, being the
+            operating system name and version and the browser name and
+            version, and <c>browser</c> is no longer sent. A version mismatch
+            beside a verified name means an upgrade, whilst a mismatched name
+            means a different operating system or browser.
+            </para>
+            <para>
+            <see cref="P:FiftyOne.Did.Client.RedeemResult.Factors"/> keeps every name the cloud sent,
+            including any this package does not list here, so a factor added
+            by a later cloud is still reported.
+            </para>
+            </remarks>
+        </member>
+        <member name="F:FiftyOne.Did.Client.FactorName.Transport">
+            <summary>The browser's connection characteristics.</summary>
+        </member>
+        <member name="F:FiftyOne.Did.Client.FactorName.Device">
+            <summary>The device hardware.</summary>
+        </member>
+        <member name="F:FiftyOne.Did.Client.FactorName.BrowserIp">
+            <summary>
+            The network of the public address the browser presents through
+            the request chain.
+            </summary>
+        </member>
+        <member name="F:FiftyOne.Did.Client.FactorName.ConnectionIp">
+            <summary>
+            The network of the address the connection actually arrived
+            from.
+            </summary>
+        </member>
+        <member name="F:FiftyOne.Did.Client.FactorName.Asn">
+            <summary>
+            The autonomous system number, being the number identifying
+            which operator announces the visitor's IP address to the
+            internet.
+            </summary>
+        </member>
+        <member name="F:FiftyOne.Did.Client.FactorName.PlatformName">
+            <summary>The operating system name.</summary>
+        </member>
+        <member name="F:FiftyOne.Did.Client.FactorName.PlatformVersion">
+            <summary>The operating system version.</summary>
+        </member>
+        <member name="F:FiftyOne.Did.Client.FactorName.BrowserName">
+            <summary>The browser name.</summary>
+        </member>
+        <member name="F:FiftyOne.Did.Client.FactorName.BrowserVersion">
+            <summary>The browser version.</summary>
+        </member>
+        <member name="P:FiftyOne.Did.Client.FactorName.All">
+            <summary>
+            Every factor name this package knows, in the order the cloud
+            lists them.
+            </summary>
+        </member>
         <member name="T:FiftyOne.Did.Client.FactorOutcome">
             <summary>
             The outcome of one creator context factor, reported when the context
@@ -535,9 +600,13 @@
             <summary>
             The outcome of each creator context factor by name
             (<c>transport</c>, <c>device</c>, <c>browserip</c>,
-            <c>connectionip</c>, <c>asn</c>, <c>browser</c>), present only
-            when the cloud sent <c>factors</c>, which it does for a
-            <see cref="F:FiftyOne.Did.Client.ContextOutcome.Mismatch"/>.
+            <c>connectionip</c>, <c>asn</c>, <c>platformname</c>,
+            <c>platformversion</c>, <c>browsername</c>,
+            <c>browserversion</c>, see <see cref="T:FiftyOne.Did.Client.FactorName"/>), present
+            only when the cloud sent <c>factors</c>, which it does where
+            there is something to diagnose, such as a
+            <see cref="F:FiftyOne.Did.Client.ContextOutcome.Mismatch"/>. Every name the cloud sent
+            is kept, so a name this package does not list still appears.
             </summary>
         </member>
         <member name="P:FiftyOne.Did.Client.RedeemResult.VerifiedAt">
@@ -709,6 +778,13 @@
             identifier to read fields from.
             </para>
             <para>
+            A payload whose usage bits, bits 0 to 2 of the flags byte, are all
+            clear is refused with <see cref="F:FiftyOne.Did.Model.FodIdParseStatus.NoUsage"/>. The
+            cloud never writes such a byte, and <see cref="P:FiftyOne.Did.Model.FodId.Usage"/> has no
+            value for it, so there is nothing a caller could do with the
+            identifier other than not pass it on.
+            </para>
+            <para>
             How an instance comes to exist. An OWID cannot be assembled by a
             caller, because an unsigned one would be indistinguishable from a
             signed one downstream. A <see cref="T:FiftyOne.Did.Model.FodId"/> therefore reaches
@@ -797,7 +873,7 @@
             not public, because a caller masking the byte for the
             non-marketing bit would read every marketing identifier as
             non-marketing. Read <see cref="P:FiftyOne.Did.Model.FodId.Usage"/>,
-            <see cref="P:FiftyOne.Did.Model.FodId.UsageFromConsent"/> and <see cref="P:FiftyOne.Did.Model.FodId.Type"/> instead.
+            <see cref="P:FiftyOne.Did.Model.FodId.UsageIsIndirect"/> and <see cref="P:FiftyOne.Did.Model.FodId.Type"/> instead.
             </summary>
         </member>
         <member name="P:FiftyOne.Did.Model.FodId.Type">
@@ -812,12 +888,16 @@
             it is read that way.
             </summary>
         </member>
-        <member name="P:FiftyOne.Did.Model.FodId.UsageFromConsent">
+        <member name="P:FiftyOne.Did.Model.FodId.UsageIsIndirect">
             <summary>
-            Whether the usage was derived from an IAB consent string the
-            caller sent, rather than stated by the caller directly. Bit 3
-            of the flags byte. Both are legitimate ways to arrive at a
-            usage, and this says nothing about which usage it is.
+            Whether the usage is indirect, being worked out by the issuer
+            from a signal the caller sent other than the usage itself,
+            rather than direct, being stated by the caller. Bit 3 of the
+            flags byte. A consent string is the only such signal today, so
+            today this is true only where the usage was derived from one,
+            but a later signal of another kind sets the same bit. Both are
+            legitimate ways to arrive at a usage, and this says nothing
+            about which usage it is.
             </summary>
         </member>
         <member name="P:FiftyOne.Did.Model.FodId.LicenseId">
@@ -1181,8 +1261,8 @@
             endpoint means anything at all, so every one of these outcomes is an
             ordinary result rather than a fault. The vocabulary is the OWID one,
             <see cref="T:Owid.Client.Model.OwidParseStatus"/>, carried through unchanged with the
-            same names and values, plus the two outcomes that belong to the
-            51Did payload rules. A failure the OWID reader found is reported
+            same names and values, plus the outcomes that belong to the 51Did
+            payload rules. A failure the OWID reader found is reported
             exactly as the OWID reader named it and is never collapsed into a
             more general one.
             </para>
@@ -1289,6 +1369,17 @@
             version exists precisely because a field moved, so reading the
             payload under the layout this package knows would answer with
             values that are wrong rather than absent.
+            </summary>
+        </member>
+        <member name="F:FiftyOne.Did.Model.FodIdParseStatus.NoUsage">
+            <summary>
+            Bits 0 to 2 of the flags byte are all clear, so the payload
+            names no usage. Every usage the cloud accepts sets bit 0, and
+            the cloud writes no flags byte without it, so such a payload
+            did not come from the cloud and is damaged or forged. It is
+            refused rather than read, because the only safe answer to an
+            identifier with no usage is not to pass it on, which is what
+            a refusal already gives.
             </summary>
         </member>
         <member name="T:FiftyOne.Did.Model.IdType">
@@ -1480,13 +1571,13 @@
             <c>non-marketing</c>, <c>standard</c> and <c>personalized</c>, and
             are the same in every 51Did package.
             </para>
-            </summary>
-        </member>
-        <member name="F:FiftyOne.Did.Model.Usage.None">
-            <summary>
-            No usage bit is set. The cloud never issues such an identifier,
-            so this is an identifier from somewhere else or a damaged one,
-            and it should be treated as though it may not be passed on.
+            <para>
+            There are exactly three values. A payload with all three usage
+            bits clear is not an identifier the cloud issues, so it is refused
+            at parse with <see cref="F:FiftyOne.Did.Model.FodIdParseStatus.NoUsage"/> rather than
+            offered as a fourth value every caller would have to remember to
+            handle.
+            </para>
             </summary>
         </member>
         <member name="F:FiftyOne.Did.Model.Usage.NonMarketing">

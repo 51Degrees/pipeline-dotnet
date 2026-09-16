@@ -40,7 +40,7 @@ select the type and the length of the match key that follows.
 
 | Offset | Length | Field      | Type                                            |
 |-------:|-------:|------------|-------------------------------------------------|
-|      0 |      1 | Flags      | uint8: bits 0-2 usage, bits 4-5 payload version, bits 6-7 identifier type |
+|      0 |      1 | Flags      | uint8: bits 0-2 usage, bit 3 usage is indirect, bits 4-5 payload version, bits 6-7 identifier type |
 |      1 |      4 | LicenseId  | uint32 (little-endian)                          |
 |      5 |  16/32 | Match key  | SHA-256 (Probabilistic, HashedEmail) or GUID bytes (Random) |
 |  21/37 |      1 | Terms      | uint8, an index into the terms table below      |
@@ -54,6 +54,21 @@ select the type and the length of the match key that follows.
 
 Identifiers issued before the type tag existed have bits 6-7 zeroed
 and decode as `Probabilistic`.
+
+### Usage
+
+`FodId.Usage` is one of `NonMarketing`, `Standard` or `Personalized`,
+read as the highest usage granted because the three usage bits are
+cumulative. There is no fourth value. A payload whose usage bits are all
+clear is refused with `FodIdParseStatus.NoUsage`, because the cloud never
+writes such a byte, so the identifier is damaged or forged and the only
+safe answer is not to pass it on.
+
+`FodId.UsageIsIndirect` reads bit 3. It is false where the caller stated
+the usage directly, and true where the issuer worked the usage out from
+another signal the caller sent. A consent string is the only such signal
+today. The member was called `UsageFromConsent` in earlier releases and
+the old name has been removed.
 
 ### Payload version
 
@@ -178,8 +193,8 @@ success and `null` on failure, never a partly built one. The status is
 `Parsed` on success and the reason on failure.
 
 `FodIdParseStatus` is the OWID vocabulary, carried through with the same
-names and values, plus the two outcomes that belong to the 51Did
-payload rules. A failure the OWID reader found is reported exactly as
+names and values, plus the outcomes that belong to the 51Did payload
+rules. A failure the OWID reader found is reported exactly as
 the OWID reader named it.
 
 | Status | Meaning |
@@ -197,13 +212,16 @@ the OWID reader named it.
 | `AbsentNode` | The OWID version 0 marker, which stands for an absent node and is never a 51Did. |
 | `PayloadTooShort` | A valid OWID whose payload is shorter than the five byte 51Did header, so the type cannot be read. |
 | `InvalidTypePayloadLength` | The header is present but the payload is shorter than the minimum for the type it names. |
+| `UnsupportedPayloadVersion` | Bits 4 and 5 of the flags byte name a payload version other than 0, so the fields are not read. |
+| `NoUsage` | Bits 0 to 2 of the flags byte are all clear, so the payload names no usage. |
 
 The throwing surface, `new FodId(string)`, `FodId.FromBase64`,
 `new FodId(byte[])` and the `As51Did()` extension, runs the same walk
 and turns a failure into an exception, so the two never disagree about
 an input. `ArgumentNullException` is thrown for a null value,
 `ArgumentException` for an empty value or for a payload that breaks the
-51Did rules (`PayloadTooShort` and `InvalidTypePayloadLength`), and
+51Did rules (`PayloadTooShort`, `InvalidTypePayloadLength`,
+`UnsupportedPayloadVersion` and `NoUsage`), and
 `FormatException` for a value that is not an envelope at all, whether
 the base64 or the bytes under it. The message names the status. Use
 the throwing form where a bad value is a programming error in your own
@@ -218,7 +236,9 @@ using FiftyOne.Did.Model;
 var fodId = FodId.FromBase64(base64FromCloudService);
 
 Usage   usage     = fodId.Usage;       // the highest usage granted
-bool    fromConsent = fodId.UsageFromConsent;
+bool    indirect  = fodId.UsageIsIndirect; // true where the usage was
+                                       // worked out, today from a
+                                       // consent string
 IdType  type      = fodId.Type;        // Probabilistic / Random / HashedEmail
 uint    licenseId = fodId.LicenseId;
 byte[]  matchKey  = fodId.MatchKey;    // SHA-256 or GUID bytes, see Type
@@ -368,7 +388,8 @@ The four steps, in the order a server takes them.
    ```
 
    `Context` is one of `Verified`, `Mismatch`, `NoContext`,
-   `NotCheckable`, `Expired`, `Replayed`, `Unreadable` or `Unconfirmed`,
+   `Misconfigured`, `InvalidDate`, `NotCheckable`, `Expired`, `Replayed`,
+   `Unreadable` or `Unconfirmed`,
    `Signature` is `Verified`, `Invalid` or `Unknown`, and `VerifiedAt`
    and `SecondsSinceVerified` say when the verification happened.
    `Unconfirmed` arrives with status 503 and may be retried. A host that
@@ -377,6 +398,16 @@ The four steps, in the order a server takes them.
    `ArgumentException` with the cloud's message. Every cryptographic
    failure is reported as the one word `Unreadable` by design, so the
    client does not try to tell them apart either.
+
+   `Factors` maps each creator context factor to `Verified`, `Mismatch`
+   or `Misconfigured`, and is present only where there is something to
+   diagnose. The names are in `FactorName`, in the order `transport`,
+   `device`, `browserip`, `connectionip`, `asn`, `platformname`,
+   `platformversion`, `browsername` and `browserversion`. Cloud release
+   4.4.38 replaced the single `browser` factor with the last four, which
+   the cloud no longer sends. `Misconfigured` is never a mismatch. A
+   version mismatch beside a verified name means an upgrade, whilst a
+   mismatched name means a different operating system or browser.
 
 The string overloads of `VerifyAsync` and `RedeemAsync` also refuse a
 value longer than 4096 characters before parsing it. That figure is
