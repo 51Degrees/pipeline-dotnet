@@ -431,6 +431,22 @@ against the cloud. Use `DidClient` instead. The `Verify(ECDsa)`,
 you already hold, still work, and `Verify(ECDsa)` is the check
 `DidClient` makes underneath with the key it picked.
 
+## Moving to 4.6.0
+
+This release takes two public members away with no alias and no
+forwarder, so it is published as `4.6.0` rather than as the next patch.
+
+- `FodId.UsageFromConsent` is now `FodId.UsageIsIndirect`, because bit 3
+  says whether the issuer worked the usage out rather than where it
+  worked it out from, and a consent string is only today's example.
+- `Usage.None` is gone, because a payload whose usage bits are all clear
+  is refused while it is being read and so can never reach a `Usage`.
+
+Code compiled against 4.5.x that reads either member fails to compile
+against 4.6.0 with `CS1061` for the first and `CS0117` for the second.
+Both are a rename at the call site. Nothing else in the surface moved,
+and a 51Did created by an earlier release still reads.
+
 ## Migrating from the OWID constructors
 
 Earlier versions of the OWID library let calling code build an OWID
