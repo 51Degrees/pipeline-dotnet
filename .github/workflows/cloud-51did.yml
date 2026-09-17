@@ -20,8 +20,8 @@ on:
   # Nightly as well, because a pull_request run only ever checks the package
   # against the cloud as it stood that day. A released package is not checked
   # again, so a field the cloud starts writing, stops writing or changes goes
-  # unnoticed until a customer finds it. That is what happened with the Terms
-  # byte, recorded in 51Degrees/cloud#363. The six 51Did packages are
+  # unnoticed until a customer finds it. That is what happened when the cloud service began
+  # writing the Terms byte. The six 51Did packages are
   # staggered ten minutes apart so they do not all ask production at once.
   schedule:
     - cron: '0 5 * * *'
