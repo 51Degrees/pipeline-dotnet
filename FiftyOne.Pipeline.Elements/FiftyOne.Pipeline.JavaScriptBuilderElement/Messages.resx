@@ -124,7 +124,10 @@
     <value>JsonBuilderElement must run before JavaScriptBuilderElement. Please check your pipeline configuration.</value>
   </data>
   <data name="ExceptionObjectNameInvalid" xml:space="preserve">
-    <value>JavaScriptBuilder ObjectName '{0}' is invalid. This must be a valid JavaScript type identifier.</value>
+    <value>JavaScriptBuilder ObjectName '{0}' is invalid. This must be a valid JavaScript identifier that is not a reserved word.</value>
+  </data>
+  <data name="WarningObjectNameInvalid" xml:space="preserve">
+    <value>The object name in the request is not a valid JavaScript identifier, so the configured name '{0}' is used instead.</value>
   </data>
   <data name="ExceptionUriInvalid" xml:space="preserve">
     <value>The generated Uri '{0}' is invalid. Please check your JavaScriptBuilderElement protocol, host and endpoint configuration.</value>

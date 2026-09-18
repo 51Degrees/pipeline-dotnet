@@ -24,7 +24,6 @@ using FiftyOne.Pipeline.JavaScriptBuilder.Data;
 using FiftyOne.Pipeline.Core.FlowElements;
 using Microsoft.Extensions.Logging;
 using System;
-using System.Text.RegularExpressions;
 using FiftyOne.Pipeline.Core.Exceptions;
 using FiftyOne.Pipeline.Core.Data;
 using System.Globalization;
@@ -159,14 +158,29 @@ namespace FiftyOne.Pipeline.JavaScriptBuilder.FlowElement
         /// The default name of the object instantiated by the client 
         /// JavaScript.
         /// </summary>
-        /// <param name="objName"></param>
-        /// <returns></returns>
+        /// <remarks>
+        /// Null means that no name is configured, so the default name,
+        /// fod, is used. The element's constructor reads null the same
+        /// way. Every other name has to be a valid identifier, the empty
+        /// string included, because the name is written into the script as
+        /// it is.
+        /// </remarks>
+        /// <param name="objName">
+        /// The name of the object, or null for the default name.
+        /// </param>
+        /// <returns>This builder.</returns>
+        /// <exception cref="PipelineConfigurationException">
+        /// Thrown if <paramref name="objName"/> is not null and is not a
+        /// valid JavaScript identifier.
+        /// </exception>
         [DefaultValue(Constants.BUILDER_DEFAULT_OBJECT_NAME)]
         public JavaScriptBuilderElementBuilder SetObjectName(string objName)
         {
-            var match = Regex.Match(objName, @"[a-zA-Z_$][0-9a-zA-Z_$]*");
-
-            if (match.Value == objName)
+            if (objName == null)
+            {
+                ObjName = Constants.BUILDER_DEFAULT_OBJECT_NAME;
+            }
+            else if (JavaScriptBuilderElement.IsValidObjectName(objName))
             {
                 ObjName = objName;
             }

@@ -23,4 +23,11 @@
     <ProjectReference Include="..\..\Examples\Did\CreatorContextWeb\Examples.Did.CreatorContextWeb.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <!-- Run beside the test assembly, which is also where page.html
+         arrives from the example project. -->
+    <None Include="CreatorContextPageHarness.js"
+          CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
 </Project>
