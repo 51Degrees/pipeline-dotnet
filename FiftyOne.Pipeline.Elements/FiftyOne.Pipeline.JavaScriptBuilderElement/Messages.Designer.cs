@@ -79,7 +79,7 @@ namespace FiftyOne.Pipeline.JavaScriptBuilder {
         }
         
         /// <summary>
-        ///   Looks up a localized string similar to JavaScriptBuilder ObjectName &apos;{0}&apos; is invalid. This must be a valid JavaScript type identifier..
+        ///   Looks up a localized string similar to JavaScriptBuilder ObjectName &apos;{0}&apos; is invalid. This must be a valid JavaScript identifier that is not a reserved word..
         /// </summary>
         internal static string ExceptionObjectNameInvalid {
             get {
@@ -93,6 +93,15 @@ namespace FiftyOne.Pipeline.JavaScriptBuilder {
         internal static string ExceptionUriInvalid {
             get {
                 return ResourceManager.GetString("ExceptionUriInvalid", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to The object name in the request is not a valid JavaScript identifier, so the configured name &apos;{0}&apos; is used instead..
+        /// </summary>
+        internal static string WarningObjectNameInvalid {
+            get {
+                return ResourceManager.GetString("WarningObjectNameInvalid", resourceCulture);
             }
         }
     }

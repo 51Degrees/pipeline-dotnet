@@ -43,6 +43,7 @@ using FiftyOne.Pipeline.Engines.Data;
 using FiftyOne.Pipeline.Engines;
 using Newtonsoft.Json;
 using System.Globalization;
+using System.Text.RegularExpressions;
 
 namespace FiftyOne.Pipeline.JavaScriptBuilder.FlowElement
 {
@@ -120,6 +121,58 @@ namespace FiftyOne.Pipeline.JavaScriptBuilder.FlowElement
             Engines.FiftyOne.Constants.EVIDENCE_SEQUENCE,
             Engines.FiftyOne.Constants.EVIDENCE_SESSIONID,
         };
+
+        /// <summary>
+        /// The shape of a JavaScript identifier that the object name must
+        /// have. \z rather than $ so that a trailing new line is refused.
+        /// </summary>
+        private static readonly Regex _objectNamePattern = new Regex(
+            @"\A[A-Za-z_$][A-Za-z0-9_$]*\z",
+            RegexOptions.CultureInvariant);
+
+        /// <summary>
+        /// Words that match the identifier pattern but cannot be the name
+        /// of the object. These are the reserved words of the language,
+        /// including those reserved only in strict mode, and the three
+        /// global values a top level var cannot replace (undefined, NaN and
+        /// Infinity), where the object would never be created. The last
+        /// entry is the constructor the script defines and calls to create
+        /// the object, so that name would clash with it. The other language
+        /// builders use the same list.
+        /// </summary>
+        private static readonly HashSet<string> _objectNameReserved =
+            new HashSet<string>(StringComparer.Ordinal)
+        {
+            "await", "break", "case", "catch", "class", "const",
+            "continue", "debugger", "default", "delete", "do", "else",
+            "enum", "export", "extends", "false", "finally", "for",
+            "function", "if", "implements", "import", "in", "instanceof",
+            "interface", "let", "new", "null", "package", "private",
+            "protected", "public", "return", "static", "super", "switch",
+            "this", "throw", "true", "try", "typeof", "var", "void",
+            "while", "with", "yield", "Infinity", "NaN", "undefined",
+            "fiftyoneDegreesManager",
+        };
+
+        /// <summary>
+        /// True if <paramref name="name"/> can be used as the name of the
+        /// object the client script creates, meaning it is a JavaScript
+        /// identifier made of ASCII letters, digits, underscores and
+        /// dollar signs, does not start with a digit, and is not a
+        /// reserved word.
+        /// </summary>
+        /// <param name="name">
+        /// The name to check.
+        /// </param>
+        /// <returns>
+        /// True if the name is valid, otherwise false.
+        /// </returns>
+        public static bool IsValidObjectName(string name)
+        {
+            return name != null &&
+                _objectNamePattern.IsMatch(name) &&
+                _objectNameReserved.Contains(name) == false;
+        }
 
         /// <summary>
         /// The default element data key that will be used for this element. 
@@ -206,7 +259,9 @@ namespace FiftyOne.Pipeline.JavaScriptBuilder.FlowElement
         /// </param>
         /// <param name="objectName">
         /// The default name of the object instantiated by the client 
-        /// JavaScript.
+        /// JavaScript. Null means the default name, fod. Anything else
+        /// must be a valid JavaScript identifier, see
+        /// <see cref="IsValidObjectName(string)"/>.
         /// </param>
         /// <param name="enableCookies">
         /// Set whether the client JavaScript stored results of client side
@@ -224,6 +279,10 @@ namespace FiftyOne.Pipeline.JavaScriptBuilder.FlowElement
         /// querying for updates.
         /// If null or blank then the protocol from the request will be used
         /// </param>
+        /// <exception cref="PipelineConfigurationException">
+        /// Thrown if <paramref name="objectName"/> is not null and is not
+        /// a valid JavaScript identifier.
+        /// </exception>
 		public JavaScriptBuilderElement(
             ILogger<JavaScriptBuilderElement> logger,
             Func<IPipeline,
@@ -254,6 +313,22 @@ namespace FiftyOne.Pipeline.JavaScriptBuilder.FlowElement
                         typeof(string),
                         true)
                 };
+
+            // Null keeps the default, so that callers which build the
+            // element directly without a name still get a working script.
+            // Any other name has to be a valid identifier, because it is
+            // written into the script as it is.
+            if (objectName == null)
+            {
+                objectName = Constants.BUILDER_DEFAULT_OBJECT_NAME;
+            }
+            else if (IsValidObjectName(objectName) == false)
+            {
+                throw new PipelineConfigurationException(
+                    string.Format(CultureInfo.InvariantCulture,
+                        Messages.ExceptionObjectNameInvalid,
+                        objectName));
+            }
 
             Host = host;
             Endpoint = endpoint;
@@ -793,11 +868,27 @@ namespace FiftyOne.Pipeline.JavaScriptBuilder.FlowElement
             IJavaScriptBuilderElementData elementData = javascriptBuilderElementDataProvider();
 
             string objectName = ObjName;
-            // Try and get the requested object name from evidence.
-            if (data.TryGetEvidence(Constants.EVIDENCE_OBJECT_NAME, 
-                out object objObjectName))
+            // Try and get the requested object name from evidence. The name
+            // is written into the script as it is, so a name that is not a
+            // valid identifier is ignored in favour of the configured one.
+            // The requested text is not logged because it comes from the
+            // request.
+            if (data.TryGetEvidence(Constants.EVIDENCE_OBJECT_NAME,
+                out object objObjectName) &&
+                objObjectName != null)
             {
-                objectName = objObjectName?.ToString() ?? ObjName;
+                var requested = objObjectName.ToString();
+                if (IsValidObjectName(requested))
+                {
+                    objectName = requested;
+                }
+                else
+                {
+                    Logger.LogWarning(string.Format(
+                        CultureInfo.InvariantCulture,
+                        Messages.WarningObjectNameInvalid,
+                        ObjName));
+                }
             }
 
             bool enableCookies = EnableCookies;
