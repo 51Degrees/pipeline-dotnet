@@ -194,6 +194,81 @@ namespace FiftyOne.Pipeline.CloudRequestEngine.Tests
         }
 
         /// <summary>
+        /// The cloud service treats a request whose own HTTP User-Agent
+        /// header names a browser as a browser page, and gives such a
+        /// request no 51Did until the page has sent back the results of
+        /// every snippet it was given. A server calling the cloud must
+        /// therefore pass the end user's User-Agent as the 'user-agent'
+        /// form parameter and never in its own User-Agent header, so that
+        /// the 51Did is created on the first call. This test pins both
+        /// halves for 'header.user-agent' and 'query.user-agent' evidence.
+        /// </summary>
+        [TestMethod]
+        [DataRow("header.user-agent")]
+        [DataRow("query.user-agent")]
+        public void Process_EndUserAgent_NotSentInUserAgentHeader(
+            string evidenceKey)
+        {
+            const string browserUserAgent =
+                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) " +
+                "AppleWebKit/537.36 (KHTML, like Gecko) " +
+                "Chrome/139.0.0.0 Safari/537.36";
+            HttpRequestMessage jsonRequest = null;
+            string jsonContent = null;
+            ConfigureMockedClient(r =>
+            {
+                if (r.RequestUri.AbsolutePath.ToLower().EndsWith("json"))
+                {
+                    jsonRequest = r;
+                    jsonContent = r.Content.ReadAsStringAsync(
+                        TestContext.CancellationToken).Result;
+                }
+                return true;
+            });
+
+            var engine = new CloudRequestEngineBuilder(
+                _loggerFactory,
+                _httpClient)
+                .SetResourceKey("resource_key")
+                .Build();
+
+            using (var pipeline = new PipelineBuilder(_loggerFactory)
+                .AddFlowElement(engine)
+                .Build())
+            {
+                var data = pipeline.CreateFlowData();
+                data.AddEvidence(evidenceKey, browserUserAgent);
+                data.AddEvidence("query.id.usage", "non-marketing");
+                data.Process();
+            }
+
+            Assert.IsNotNull(jsonRequest,
+                "the engine must have sent a request to the json endpoint");
+            var sentUserAgent = jsonRequest.Headers.TryGetValues(
+                "User-Agent", out var values)
+                ? string.Join(" ", values)
+                : string.Empty;
+            Assert.DoesNotContain(
+                "Mozilla",
+                sentUserAgent,
+                "the end user's User-Agent must not be sent in the HTTP " +
+                "User-Agent header, because the cloud then treats the " +
+                "server as a browser page and creates no 51Did on the " +
+                $"first call. The header sent was '{sentUserAgent}'.");
+            var sentParameter = jsonContent
+                .Split('&')
+                .Select(p => p.Split('='))
+                .Where(p => p[0] == "user-agent")
+                .Select(p => WebUtility.UrlDecode(p[1]))
+                .SingleOrDefault();
+            Assert.AreEqual(
+                browserUserAgent,
+                sentParameter,
+                "the end user's User-Agent must be sent as the " +
+                "'user-agent' form parameter");
+        }
+
+        /// <summary>
         /// Test cloud request engine adds correct information to post request
         /// following the order of precedence when processing evidence and 
         /// returns the response in the ElementData. Evidence parameters 
