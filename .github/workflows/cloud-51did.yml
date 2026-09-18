@@ -1,11 +1,15 @@
 name: Cloud 51Did Tests
 
-# Runs the live cloud 51Did tests once for every resource key the central
-# common-ci script exports from the _51DEGREES_RESOURCE_KEY* secrets (free,
-# paid and any added later). Each run sets two names to that key, being
+# Runs the live cloud 51Did tests once for every _51DEGREES_RESOURCE_KEY*
+# secret passed in below. Each run sets two names to that key, being
 # 51DEGREES_RESOURCE_KEY, which DidCloudEngineLiveEntitlementTests reads, and
-# _51DEGREES_RESOURCE_KEY, which CloudFodIdTests reads. New resource keys are
-# added once at the organisation level and this workflow needs no change.
+# _51DEGREES_RESOURCE_KEY, which CloudFodIdTests reads.
+#
+# The secrets are named one by one rather than passed as toJSON(secrets).
+# GitHub marks a workflow that hands every secret to a step as possibly
+# malicious and holds each run for manual approval, so the nightly never ran.
+# A new resource key therefore needs a line here as well as the organisation
+# secret.
 #
 # Two projects run. Tests/FiftyOne.Did.Tests, CloudFodIdTests, obtains a real
 # 51Did and parses it. Tests/FiftyOne.Did.Cloud.Tests,
@@ -45,23 +49,16 @@ jobs:
         with:
           # FiftyOne.Did compiles the owid-dotnet submodule source directly.
           submodules: recursive
-      - name: Checkout common-ci
-        uses: actions/checkout@v4
-        with:
-          # Provides steps/set-resource-keys.ps1, the central script that
-          # exports the _51DEGREES_RESOURCE_KEY* secrets as environment
-          # variables.
-          repository: 51Degrees/common-ci
-          path: common-ci
       - uses: actions/setup-dotnet@v4
         with:
           dotnet-version: 8.0.x
       - name: Cloud 51Did test for each resource key secret
         shell: pwsh
         env:
-          SECRETS: ${{ toJSON(secrets) }}
+          _51DEGREES_RESOURCE_KEY_FREE: ${{ secrets._51DEGREES_RESOURCE_KEY_FREE }}
+          _51DEGREES_RESOURCE_KEY_PAID: ${{ secrets._51DEGREES_RESOURCE_KEY_PAID }}
+          _51DEGREES_RESOURCE_KEY_BESPOKE: ${{ secrets._51DEGREES_RESOURCE_KEY_BESPOKE }}
         run: |
-          ./common-ci/steps/set-resource-keys.ps1 -Keys (ConvertFrom-Json -AsHashtable $env:SECRETS)
           $runs = @(
             @{ Project = 'Tests/FiftyOne.Did.Tests/FiftyOne.Did.Tests.csproj'
                Filter  = 'FullyQualifiedName~CloudFodIdTests' },
