@@ -22,6 +22,7 @@
 
 using System;
 using System.Collections.Generic;
+using System.Text.RegularExpressions;
 
 namespace FiftyOne.Pipeline.JavaScriptBuilder.TemplateData
 {
@@ -57,6 +58,51 @@ namespace FiftyOne.Pipeline.JavaScriptBuilder.TemplateData
         public bool UserPrompt { get; set; }
 
         /// <summary>
+        /// The shape a session id must have to be written into the script.
+        /// The template writes it inside double quotes as it is, so only
+        /// characters that cannot end or change the string are allowed.
+        /// \z rather than $ so that a trailing new line is refused.
+        /// </summary>
+        private static readonly Regex _sessionIdPattern = new Regex(
+            @"\A[A-Za-z0-9-]{1,64}\z",
+            RegexOptions.CultureInvariant);
+
+        /// <summary>
+        /// True if <paramref name="sessionId"/> can be written into the
+        /// script, meaning it is 1 to 64 ASCII letters, digits and
+        /// hyphens. Any other session id is written as an empty string.
+        /// </summary>
+        /// <param name="sessionId">
+        /// The session id to check.
+        /// </param>
+        /// <returns>
+        /// True if the session id is valid, otherwise false.
+        /// </returns>
+        public static bool IsValidSessionId(string sessionId)
+        {
+            return sessionId != null && _sessionIdPattern.IsMatch(sessionId);
+        }
+
+        /// <summary>
+        /// The session id to write into the script, being
+        /// <paramref name="sessionId"/> when it is valid and an empty
+        /// string otherwise.
+        /// </summary>
+        private static string SafeSessionId(string sessionId)
+        {
+            return IsValidSessionId(sessionId) ? sessionId : string.Empty;
+        }
+
+        /// <summary>
+        /// The sequence to write into the script, being
+        /// <paramref name="sequence"/> when it is positive and 1 otherwise.
+        /// </summary>
+        private static int SafeSequence(int sequence)
+        {
+            return sequence > 0 ? sequence : 1;
+        }
+
+        /// <summary>
         /// Constructor
         /// </summary>
         /// <remarks>
@@ -74,10 +120,13 @@ namespace FiftyOne.Pipeline.JavaScriptBuilder.TemplateData
         /// The JSON data payload to be inserted into the template.
         /// </param>
         /// <param name="sessionId">
-        /// The session Id to use in the JavaScript response.
+        /// The session Id to use in the JavaScript response. A session id
+        /// that fails <see cref="IsValidSessionId(string)"/> is written as
+        /// an empty string.
         /// </param>
         /// <param name="sequence">
-        /// The sequence value to use in the JavaScript response.
+        /// The sequence value to use in the JavaScript response. A value
+        /// less than 1 is written as 1.
         /// </param>
         /// <param name="supportsPromises">
         /// If true, the template will produce JavaScript that makes 
@@ -128,8 +177,8 @@ namespace FiftyOne.Pipeline.JavaScriptBuilder.TemplateData
             _objName = objName;
             _jsonObject = string.IsNullOrWhiteSpace(jsonObject) == false
                 ? jsonObject : "{\"errors\":[\"Json data missing.\"]}";
-            _sessionId = sessionId;
-            _sequence = sequence;
+            _sessionId = SafeSessionId(sessionId);
+            _sequence = SafeSequence(sequence);
             _supportsPromises = supportsPromises;
             _supportsFetch = supportsFetch;
             _url = new Uri(url);
@@ -157,10 +206,13 @@ namespace FiftyOne.Pipeline.JavaScriptBuilder.TemplateData
         /// The JSON data payload to be inserted into the template.
         /// </param>
         /// <param name="sessionId">
-        /// The session Id to use in the JavaScript response.
+        /// The session Id to use in the JavaScript response. A session id
+        /// that fails <see cref="IsValidSessionId(string)"/> is written as
+        /// an empty string.
         /// </param>
         /// <param name="sequence">
-        /// The sequence value to use in the JavaScript response.
+        /// The sequence value to use in the JavaScript response. A value
+        /// less than 1 is written as 1.
         /// </param>
         /// <param name="supportsPromises">
         /// If true, the template will produce JavaScript that makes 
@@ -211,8 +263,8 @@ namespace FiftyOne.Pipeline.JavaScriptBuilder.TemplateData
             _objName = objName;
             _jsonObject = string.IsNullOrWhiteSpace(jsonObject) == false
                 ? jsonObject : "{\"errors\":[\"Json data missing.\"]}";
-            _sessionId = sessionId;
-            _sequence = sequence;
+            _sessionId = SafeSessionId(sessionId);
+            _sequence = SafeSequence(sequence);
             _supportsPromises = supportsPromises;
             _supportsFetch = supportsFetch;
             _url = url;
