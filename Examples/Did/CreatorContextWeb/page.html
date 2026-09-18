@@ -138,6 +138,18 @@
     stolen identifier is caught the moment it is presented, with nothing
     stored server side.</p>
   </div>
+
+  <hr>
+  <h3 class="c-eg-page__heading">Find out more</h3>
+  <ul>
+    <li><a href="https://51degrees.com/documentation/_identifiers__index.html?utm_source=code&amp;utm_medium=example&amp;utm_campaign=pipeline-dotnet&amp;utm_content=examples-did-creatorcontextweb-page.html&amp;utm_term=find-out-more">What a 51Did is, and what the creator context binds it to</a></li>
+    <li><a href="https://51degrees.com/contact-us?utm_source=code&amp;utm_medium=example&amp;utm_campaign=pipeline-dotnet&amp;utm_content=examples-did-creatorcontextweb-page.html&amp;utm_term=find-out-more">Talk to 51Degrees about using 51Did</a></li>
+  </ul>
+  <p class="c-eg-page__lead">The source of this demo and of the code it runs on.</p>
+  <ul>
+    <li><a href="https://github.com/51Degrees/pipeline-dotnet">https://github.com/51Degrees/pipeline-dotnet</a></li>
+    <li><a href="https://github.com/51Degrees/specifications">https://github.com/51Degrees/specifications</a></li>
+  </ul>
 </div>
 
 <script>
@@ -280,26 +292,93 @@
     tr.appendChild(result);
   }
 
+  // The name the client script gives its object on the page. It can be
+  // set per resource key, and every key used with this demo leaves it at
+  // the default.
+  var OBJECT_NAME = "fod";
+
+  // The 51Did is created by the 51Degrees client script, never by a
+  // request of our own. The service creates one only once the page has
+  // run the snippets it asks for and sent what they collected, so a page
+  // that asks for an identifier before then is told the page has not
+  // finished and is given nothing at all. The script runs those snippets,
+  // sends them with its own request, and calls back through its complete
+  // function with the answer, which carries the six identifiers because
+  // the resource key is entitled to them. The usage and the email address
+  // travel on the script's own address, and the service puts both into
+  // the request the script makes.
+  function created() {
+    return new Promise(function (resolve, reject) {
+      var script = document.createElement("script");
+      script.async = true;
+      script.src = API + RESOURCE + ".js?id.usage=non-marketing"
+        + "&id.email=" + encodeURIComponent("demo@51did.example");
+      script.onerror = function () {
+        reject(new Error("the 51Degrees client script at " + script.src
+          + " did not load"));
+      };
+      script.onload = function () {
+        var object = window[OBJECT_NAME];
+        if (!object || typeof object.complete !== "function") {
+          reject(new Error("the 51Degrees client script loaded but left "
+            + "no '" + OBJECT_NAME + "' object with a complete function "
+            + "on the page, so nothing can be created here"));
+          return;
+        }
+        object.complete(function (data) { resolve(data || {}); });
+      };
+      document.head.appendChild(script);
+    });
+  }
+
+  // What the snippets collected, taken from the cookies the client
+  // script writes on this page and sent with the verification call. The
+  // service compares this browser's device and browser against the
+  // creator's from these values, and where a browser needs them and they
+  // are absent it answers that the page has not sent them yet rather
+  // than giving a verdict. Every name the script writes begins 51D_, so
+  // forwarding all of them needs no list here that could fall behind the
+  // script.
+  function snippetQuery() {
+    var query = "";
+    (document.cookie || "").split(";").forEach(function (pair) {
+      var text = pair.trim();
+      var split = text.indexOf("=");
+      if (split > 0 && text.slice(0, 4) === "51D_") {
+        query += "&" + encodeURIComponent(text.slice(0, split))
+          + "=" + encodeURIComponent(text.slice(split + 1));
+      }
+    });
+    return query;
+  }
+
   var given = new URLSearchParams(location.search).get("51did");
+
+  // The client script runs whichever path the page is on, because the
+  // service compares this browser against the creator using the values
+  // the snippets collect, and it only has them once the script has run.
+  var ready = created();
 
   // 1. The identifier: created for THIS browser's connection, or
   // taken from the link when demonstrating the transplant.
   var owidPromise = given
-    ? Promise.resolve(given).then(function (owid) {
+    ? ready.then(function () { return given; }).then(function (owid) {
         // The row shows the identifier itself, truncated as the table
         // below truncates every identifier, so the reader sees which
         // 51Did the link carried rather than a description of it.
         show("s-create", owid.slice(0, 30) + "…", NONE);
         return owid;
       })
-    : fetch(API + "json?resource=" + RESOURCE
-        + "&id.usage=non-marketing"
-        + "&id.email=" + encodeURIComponent("demo@51did.example")
-        + "&values=FODiD.IdProbGlobal&values=FODiD.IdProbLic"
-        + "&values=FODiD.IdHemGlobal&values=FODiD.IdHemLic"
-        + "&values=FODiD.IdRandGlobal&values=FODiD.IdRandLic")
-      .then(asJson)
+    : ready
       .then(function (json) {
+        if (!json.fodid) {
+          // Said here rather than where the script is loaded, because a
+          // page checking an identifier from another browser still wants
+          // the script for its snippet values and does not need one of
+          // its own.
+          throw new Error("the client script completed with no 51Did "
+            + "section, so this resource key is not entitled to one");
+        }
         var families = [
           ["Probabilistic", "Global", "idprobglobal"],
           ["Probabilistic", "Licensed", "idproblic"],
@@ -351,7 +430,7 @@
     // 2. Verify from THIS browser, so the cloud observes this live
     // connection. The verdict returns only as an encrypted result.
     return fetch(API + "id/verify-full/" + RESOURCE + "/"
-        + owid + "?challenge=" + CHALLENGE)
+        + owid + "?challenge=" + CHALLENGE + snippetQuery())
       .then(asJson)
       .then(function (verified) {
         if (!verified.result) {
