@@ -44,15 +44,16 @@ namespace FiftyOne.Did.Model
     /// <c>non-marketing</c>, <c>standard</c> and <c>personalized</c>, and
     /// are the same in every 51Did package.
     /// </para>
+    /// <para>
+    /// There are exactly three values. A payload with all three usage
+    /// bits clear is not an identifier the cloud issues, so it is refused
+    /// at parse with <see cref="FodIdParseStatus.NoUsage"/> rather than
+    /// offered as a fourth value every caller would have to remember to
+    /// handle.
+    /// </para>
     /// </summary>
     public enum Usage : byte
     {
-        /// <summary>
-        /// No usage bit is set. The cloud never issues such an identifier,
-        /// so this is an identifier from somewhere else or a damaged one,
-        /// and it should be treated as though it may not be passed on.
-        /// </summary>
-        None = 0,
         /// <summary>
         /// Created for use that is not marketing. Must not be passed to a
         /// demand source.

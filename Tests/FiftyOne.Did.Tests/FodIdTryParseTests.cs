@@ -377,7 +377,7 @@ namespace FiftyOne.Did.Tests
         [TestMethod]
         public void ParseStatus_CarriesEveryOwidStatusByNameAndValue()
         {
-            // The 51Did vocabulary is the OWID one plus three. A rename
+            // The 51Did vocabulary is the OWID one plus four. A rename
             // or a renumbering on either side would let a status be
             // reported as a different one, which this catches.
             foreach (var owid in Enum.GetValues<OwidParseStatus>())
@@ -396,6 +396,7 @@ namespace FiftyOne.Did.Tests
                 new[]
                 {
                     "InvalidTypePayloadLength",
+                    "NoUsage",
                     "PayloadTooShort",
                     "UnsupportedPayloadVersion",
                 },

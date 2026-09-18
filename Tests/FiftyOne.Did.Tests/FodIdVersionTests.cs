@@ -143,7 +143,6 @@ namespace FiftyOne.Did.Tests
         /// A reader masking the wrong bits would refuse some of these.
         /// </summary>
         [TestMethod]
-        [DataRow((byte)0b0000_0000, IdType.Probabilistic, Usage.None)]
         [DataRow((byte)0b0000_0001, IdType.Probabilistic, Usage.NonMarketing)]
         [DataRow((byte)0b0000_1011, IdType.Probabilistic, Usage.Standard)]
         [DataRow((byte)0b0100_0111, IdType.Random, Usage.Personalized)]

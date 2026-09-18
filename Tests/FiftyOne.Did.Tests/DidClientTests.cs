@@ -498,7 +498,7 @@ namespace FiftyOne.Did.Tests
             // The reader accepts a Reserved type down to the five header
             // bytes, and the base for anything but Random is 37.
             var payload = new byte[FodId.HeaderLength + 10];
-            payload[FodId.FlagsOffset] = 0b1100_0000;
+            payload[FodId.FlagsOffset] = 0b1100_0001;
             var fodId = SignedAt(T0.AddDays(1), payload);
 
             Assert.IsFalse(await client.VerifySignatureAsync(fodId));
@@ -680,8 +680,30 @@ namespace FiftyOne.Did.Tests
             + "\"factors\":{\"transport\":\"misconfigured\","
             + "\"device\":\"verified\",\"browserip\":\"verified\","
             + "\"connectionip\":\"verified\",\"asn\":\"misconfigured\","
-            + "\"browser\":\"verified\"},"
+            + "\"platformname\":\"verified\","
+            + "\"platformversion\":\"verified\","
+            + "\"browsername\":\"verified\","
+            + "\"browserversion\":\"verified\"},"
             + "\"verifiedAt\":\"2026-09-03T09:15:32Z\",\"secondsSinceVerified\":1}";
+
+        private const string RedeemedFourBrowserFactors =
+            "{\"signature\":\"verified\",\"context\":\"mismatch\","
+            + "\"factors\":{\"transport\":\"verified\","
+            + "\"device\":\"verified\",\"browserip\":\"verified\","
+            + "\"connectionip\":\"verified\",\"asn\":\"verified\","
+            + "\"platformname\":\"verified\","
+            + "\"platformversion\":\"mismatch\","
+            + "\"browsername\":\"mismatch\","
+            + "\"browserversion\":\"misconfigured\"},"
+            + "\"verifiedAt\":\"2026-09-16T09:15:32Z\","
+            + "\"secondsSinceVerified\":2}";
+
+        private const string RedeemedOldBrowserFactorOnly =
+            "{\"signature\":\"verified\",\"context\":\"mismatch\","
+            + "\"factors\":{\"transport\":\"verified\","
+            + "\"browser\":\"mismatch\"},"
+            + "\"verifiedAt\":\"2026-09-16T09:15:32Z\","
+            + "\"secondsSinceVerified\":2}";
 
         private const string RedeemedInvalidDate =
             "{\"signature\":\"invalid\",\"context\":\"invaliddate\","
@@ -705,7 +727,7 @@ namespace FiftyOne.Did.Tests
             Assert.AreEqual(ContextOutcome.Misconfigured, result.Context);
             Assert.AreEqual("misconfigured", result.ContextValue);
             Assert.IsNotNull(result.Factors);
-            Assert.AreEqual(6, result.Factors!.Count);
+            Assert.AreEqual(9, result.Factors!.Count);
             Assert.AreEqual(
                 FactorOutcome.Misconfigured, result.Factors["transport"]);
             Assert.AreEqual(FactorOutcome.Misconfigured, result.Factors["asn"]);
@@ -713,13 +735,103 @@ namespace FiftyOne.Did.Tests
             Assert.AreEqual(FactorOutcome.Verified, result.Factors["browserip"]);
             Assert.AreEqual(
                 FactorOutcome.Verified, result.Factors["connectionip"]);
-            Assert.AreEqual(FactorOutcome.Verified, result.Factors["browser"]);
+            Assert.AreEqual(
+                FactorOutcome.Verified, result.Factors["platformname"]);
+            Assert.AreEqual(
+                FactorOutcome.Verified, result.Factors["platformversion"]);
+            Assert.AreEqual(
+                FactorOutcome.Verified, result.Factors["browsername"]);
+            Assert.AreEqual(
+                FactorOutcome.Verified, result.Factors["browserversion"]);
             Assert.AreEqual(
                 0,
                 System.Linq.Enumerable.Count(
                     result.Factors,
                     f => f.Value == FactorOutcome.Mismatch),
                 "no factor should read as a mismatch");
+        }
+
+        /// <summary>
+        /// The four factors that replaced the single browser factor in
+        /// cloud release 4.4.38 are read by the names in
+        /// <see cref="FactorName"/>, each with its own outcome, and a
+        /// misconfigured one is not read as a mismatch.
+        /// </summary>
+        [TestMethod]
+        public async Task Redeem_FourBrowserFactors_AreReadByName()
+        {
+            _handler.Enqueue(HttpStatusCode.OK, RedeemedFourBrowserFactors);
+            using var client = NewClient();
+
+            var result = await client.RedeemAsync(
+                SignedAt(T0.AddDays(1)), "sealed", "abc123");
+
+            Assert.AreEqual(ContextOutcome.Mismatch, result.Context);
+            Assert.IsNotNull(result.Factors);
+            CollectionAssert.AreEquivalent(
+                FactorName.All.ToArray(),
+                result.Factors!.Keys.ToArray(),
+                "every factor the cloud sent is read");
+            Assert.AreEqual(
+                FactorOutcome.Verified,
+                result.Factors[FactorName.PlatformName]);
+            Assert.AreEqual(
+                FactorOutcome.Mismatch,
+                result.Factors[FactorName.PlatformVersion]);
+            Assert.AreEqual(
+                FactorOutcome.Mismatch,
+                result.Factors[FactorName.BrowserName]);
+            Assert.AreEqual(
+                FactorOutcome.Misconfigured,
+                result.Factors[FactorName.BrowserVersion]);
+            Assert.IsFalse(result.Factors.ContainsKey("browser"));
+        }
+
+        /// <summary>
+        /// An answer carrying only the old browser factor, as a cloud older
+        /// than release 4.4.38 sends, populates none of the four new
+        /// factors, so an old verdict is never read as though the operating
+        /// system and browser had each been checked.
+        /// </summary>
+        [TestMethod]
+        public async Task Redeem_OldBrowserFactorOnly_PopulatesNoNewFactor()
+        {
+            _handler.Enqueue(HttpStatusCode.OK, RedeemedOldBrowserFactorOnly);
+            using var client = NewClient();
+
+            var result = await client.RedeemAsync(
+                SignedAt(T0.AddDays(1)), "sealed", "abc123");
+
+            Assert.IsNotNull(result.Factors);
+            foreach (var name in new[]
+            {
+                FactorName.PlatformName,
+                FactorName.PlatformVersion,
+                FactorName.BrowserName,
+                FactorName.BrowserVersion,
+            })
+            {
+                Assert.IsFalse(
+                    result.Factors!.ContainsKey(name),
+                    $"{name} should not be read from the old browser key");
+            }
+        }
+
+        /// <summary>
+        /// The factor names are the words the cloud writes, in the order
+        /// the cloud lists them, and the old browser factor is not one.
+        /// </summary>
+        [TestMethod]
+        public void FactorName_All_IsTheNineCloudNamesInOrder()
+        {
+            CollectionAssert.AreEqual(
+                new[]
+                {
+                    "transport", "device", "browserip", "connectionip",
+                    "asn", "platformname", "platformversion",
+                    "browsername", "browserversion",
+                },
+                FactorName.All.ToArray());
         }
 
         /// <summary>
@@ -746,7 +858,10 @@ namespace FiftyOne.Did.Tests
             "{\"signature\":\"verified\",\"context\":\"mismatch\","
             + "\"factors\":{\"transport\":\"verified\",\"device\":\"mismatch\","
             + "\"browserip\":\"verified\",\"connectionip\":\"mismatch\","
-            + "\"asn\":\"verified\",\"browser\":\"verified\"},"
+            + "\"asn\":\"verified\",\"platformname\":\"verified\","
+            + "\"platformversion\":\"verified\","
+            + "\"browsername\":\"verified\","
+            + "\"browserversion\":\"verified\"},"
             + "\"verifiedAt\":\"2026-08-07T09:15:32Z\",\"secondsSinceVerified\":2}";
 
         [TestMethod]
@@ -762,7 +877,7 @@ namespace FiftyOne.Did.Tests
             Assert.AreEqual("mismatch", result.ContextValue);
             Assert.AreEqual(SignatureOutcome.Verified, result.Signature);
             Assert.IsNotNull(result.Factors);
-            Assert.AreEqual(6, result.Factors!.Count);
+            Assert.AreEqual(9, result.Factors!.Count);
             Assert.AreEqual(FactorOutcome.Verified, result.Factors["transport"]);
             Assert.AreEqual(FactorOutcome.Mismatch, result.Factors["device"]);
             Assert.AreEqual(FactorOutcome.Mismatch, result.Factors["connectionip"]);

@@ -98,9 +98,13 @@ namespace FiftyOne.Did.Client
         /// <summary>
         /// The outcome of each creator context factor by name
         /// (<c>transport</c>, <c>device</c>, <c>browserip</c>,
-        /// <c>connectionip</c>, <c>asn</c>, <c>browser</c>), present only
-        /// when the cloud sent <c>factors</c>, which it does for a
-        /// <see cref="ContextOutcome.Mismatch"/>.
+        /// <c>connectionip</c>, <c>asn</c>, <c>platformname</c>,
+        /// <c>platformversion</c>, <c>browsername</c>,
+        /// <c>browserversion</c>, see <see cref="FactorName"/>), present
+        /// only when the cloud sent <c>factors</c>, which it does where
+        /// there is something to diagnose, such as a
+        /// <see cref="ContextOutcome.Mismatch"/>. Every name the cloud sent
+        /// is kept, so a name this package does not list still appears.
         /// </summary>
         public IReadOnlyDictionary<string, FactorOutcome>? Factors { get; }
 

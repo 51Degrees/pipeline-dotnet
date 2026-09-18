@@ -328,7 +328,7 @@ namespace FiftyOne.Did.Tests
         public void Terms_ReservedType_HasNoAddress()
         {
             var payload = new byte[FodId.MatchKeyOffset + 50];
-            payload[FodId.FlagsOffset] = 0b1100_0000;
+            payload[FodId.FlagsOffset] = 0b1100_0001;
             payload[payload.Length - 1] = 1;
 
             var fodId = new FodId(_factory.SignedOwidBase64(payload));

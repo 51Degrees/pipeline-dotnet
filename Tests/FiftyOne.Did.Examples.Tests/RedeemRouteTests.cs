@@ -188,6 +188,43 @@ namespace FiftyOne.Did.Examples.Tests
             Assert.AreEqual("mismatch", factors.GetProperty("device").GetString());
         }
 
+        /// <summary>
+        /// The four factors cloud release 4.4.38 reports in place of the
+        /// single browser factor pass through the demo route by name, and a
+        /// misconfigured factor stays misconfigured rather than being shown
+        /// as a mismatch.
+        /// </summary>
+        [TestMethod]
+        public async Task Redeem_FourBrowserFactorsAndMisconfiguredPassThrough()
+        {
+            QueueKeys(_publicPem);
+            _handler.Enqueue(HttpStatusCode.OK,
+                "{\"signature\":\"verified\",\"context\":\"mismatch\","
+                + "\"factors\":{\"transport\":\"misconfigured\","
+                + "\"platformname\":\"verified\","
+                + "\"platformversion\":\"mismatch\","
+                + "\"browsername\":\"verified\","
+                + "\"browserversion\":\"mismatch\"},"
+                + "\"verifiedAt\":\"2026-09-16T09:15:32Z\","
+                + "\"secondsSinceVerified\":3}");
+
+            var answer = await RedeemRoute.HandleAsync(
+                _client, Signed().AsBase64Url(), "sealed", "abc");
+
+            var factors = Parse(answer).GetProperty("factors");
+            Assert.AreEqual(
+                "misconfigured", factors.GetProperty("transport").GetString());
+            Assert.AreEqual(
+                "verified", factors.GetProperty("platformname").GetString());
+            Assert.AreEqual(
+                "mismatch", factors.GetProperty("platformversion").GetString());
+            Assert.AreEqual(
+                "verified", factors.GetProperty("browsername").GetString());
+            Assert.AreEqual(
+                "mismatch", factors.GetProperty("browserversion").GetString());
+            Assert.IsFalse(factors.TryGetProperty("browser", out _));
+        }
+
         [TestMethod]
         public async Task Redeem_WrongKey_ServerSignatureInvalid()
         {
