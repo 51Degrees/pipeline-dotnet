@@ -54,6 +54,10 @@ on:
         description: "Build, sign and verify, but do not push"
         type: boolean
         default: true
+      allow-version-bump:
+        description: "Push even though the version moves the major or minor place"
+        type: boolean
+        default: false
 
 jobs:
   Republish:
@@ -66,6 +70,9 @@ jobs:
         with:
           ref: ${{ inputs.ref }}
           submodules: recursive
+          # The version check reads the tags to see what has been released,
+          # and a shallow checkout has none of them.
+          fetch-depth: 0
 
       - name: Confirm what was checked out
         shell: pwsh
@@ -74,6 +81,29 @@ jobs:
           if (-not (Test-Path "${{ inputs.project }}")) {
             throw "no project at '${{ inputs.project }}' in ${{ inputs.ref }}"
           }
+
+      # The same check the normal publish runs, taken from common-ci rather
+      # than copied here, so there is one rule and not two that drift apart.
+      - name: Checkout common-ci
+        uses: actions/checkout@v4
+        with:
+          repository: 51Degrees/common-ci
+          path: common-ci
+
+      # This workflow takes the version as typed, which is what makes it
+      # useful, and also what makes it a way to push a version nobody agreed
+      # to. Republishing a version that already has a tag is not a bump and
+      # passes, which is the case this workflow exists for. A version above
+      # everything released is refused unless whoever dispatched the run
+      # asked for it.
+      - name: Refuse a major or minor bump nobody approved
+        shell: pwsh
+        env:
+          ALLOW_VERSION_BUMP: ${{ inputs.allow-version-bump }}
+        run: >-
+          ./common-ci/steps/check-version-bump.ps1
+          -Version '${{ inputs.version }}'
+          -RepoName '.'
 
       # Directory.Build.props sets AssemblyOriginatorKeyFile to
       # 51Degrees.snk at the repository root when BuiltOnCI is true, so the
