@@ -13,7 +13,7 @@ $Solutions = @("FiftyOne.CloudRequestEngine.sln", "FiftyOne.Pipeline.Elements.sl
 
 foreach($Solution in $Solutions){
 
-    ./dotnet/outdated.ps1 -RepoName:$RepoName -ExtraArgs $Solution
+    ./dotnet/outdated.ps1 -RepoName:$RepoName -Target $Solution
 
 }
 
