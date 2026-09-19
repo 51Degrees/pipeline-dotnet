@@ -295,7 +295,7 @@ namespace FiftyOne.Pipeline.Core.Tests.FlowElements
             };
 
             // Pass the configuration to the builder to create the pipeline.
-            var pipeline = _builder.BuildFromConfiguration(options);
+            using var pipeline = _builder.BuildFromConfiguration(options);
             // Get the elements
             var splitterElement = pipeline.GetElement<ListSplitterElement>();
             var multiplyByElement = pipeline.GetElement<MultiplyByElement>();
@@ -533,7 +533,7 @@ namespace FiftyOne.Pipeline.Core.Tests.FlowElements
                 element
             ];
 
-            var pipeline = _builder.BuildFromConfiguration(opts);
+            using var pipeline = _builder.BuildFromConfiguration(opts);
             var retreivedElement = pipeline.GetElement<EnumPerfProfileElement>();
 
             Assert.AreEqual(expected, retreivedElement.PerfProfile);
@@ -581,7 +581,7 @@ namespace FiftyOne.Pipeline.Core.Tests.FlowElements
             };
 
             // Pass the configuration to the builder to create the pipeline.
-            var pipeline = _builder.BuildFromConfiguration(options);
+            using var pipeline = _builder.BuildFromConfiguration(options);
 
             // Check the flow elements are in the correct order 
             for(int i = 0; i < pipeline.FlowElements.Count; i++)
@@ -620,23 +620,24 @@ namespace FiftyOne.Pipeline.Core.Tests.FlowElements
                 .Returns(new MultiplyByElementBuilder());
 
             // Pass the configuration to the builder to create the pipeline.
-            var pipeline = new PipelineBuilder(_loggerFactory, services.Object)
-                .BuildFromConfiguration(opts);
-
-            // Get the element
-            var multiplyByElement = pipeline.GetElement<MultiplyByElement>();
-
-            // Create, populate and process flow data.
-            using (var flowData = pipeline.CreateFlowData())
+            using (var pipeline = new PipelineBuilder(_loggerFactory, services.Object)
+                .BuildFromConfiguration(opts))
             {
-                flowData
-                    .AddEvidence(multiplyByElement.EvidenceKeys[0], 25)
-                    .Process();
+                // Get the element
+                var multiplyByElement = pipeline.GetElement<MultiplyByElement>();
 
-                // Get the results and verify them.
-                var multiplyByData = flowData.GetFromElement(multiplyByElement);
+                // Create, populate and process flow data.
+                using (var flowData = pipeline.CreateFlowData())
+                {
+                    flowData
+                        .AddEvidence(multiplyByElement.EvidenceKeys[0], 25)
+                        .Process();
 
-                Assert.AreEqual(75, multiplyByData.Result);
+                    // Get the results and verify them.
+                    var multiplyByData = flowData.GetFromElement(multiplyByElement);
+
+                    Assert.AreEqual(75, multiplyByData.Result);
+                }
             }
         }
 
@@ -689,7 +690,7 @@ namespace FiftyOne.Pipeline.Core.Tests.FlowElements
                 element
             };
 
-            var pipeline = _builder.BuildFromConfiguration(opts);
+            using var pipeline = _builder.BuildFromConfiguration(opts);
             var builtElement = pipeline.GetElement<CompositeConfigElement>();
             Assert.AreEqual(42, builtElement.Number);
             Assert.AreEqual("dummy", builtElement.Text);
@@ -710,7 +711,7 @@ namespace FiftyOne.Pipeline.Core.Tests.FlowElements
                 element
             };
 
-            var pipeline = _builder.BuildFromConfiguration(opts);
+            using var pipeline = _builder.BuildFromConfiguration(opts);
             var builtElement = pipeline.GetElement<CompositeConfigElement>();
             Assert.AreEqual(0, builtElement.Number);
             Assert.IsNull(builtElement.Text);
@@ -892,7 +893,7 @@ namespace FiftyOne.Pipeline.Core.Tests.FlowElements
             };
 
             // Pass the configuration to the builder to create the pipeline.
-            var pipeline = new PipelineBuilder(_loggerFactory, new FiftyOneServiceProvider())
+            using var pipeline = new PipelineBuilder(_loggerFactory, new FiftyOneServiceProvider())
                 .BuildFromConfiguration(opts);
 
             Assert.IsNotNull(pipeline.GetElement<RequiredServiceElement>().LoggerFactory);
@@ -929,7 +930,7 @@ namespace FiftyOne.Pipeline.Core.Tests.FlowElements
             services.AddService(service);
 
             // Pass the configuration to the builder to create the pipeline.
-            var pipeline = new PipelineBuilder(_loggerFactory, services)
+            using var pipeline = new PipelineBuilder(_loggerFactory, services)
                 .BuildFromConfiguration(opts);
 
             Assert.IsNotNull(pipeline.GetElement<RequiredServiceElement>().LoggerFactory);
@@ -971,7 +972,7 @@ namespace FiftyOne.Pipeline.Core.Tests.FlowElements
             services.AddService(updateService);
 
             // Pass the configuration to the builder to create the pipeline.
-            var pipeline = new PipelineBuilder(_loggerFactory, services)
+            using var pipeline = new PipelineBuilder(_loggerFactory, services)
                 .BuildFromConfiguration(opts);
 
             Assert.IsNotNull(pipeline.GetElement<RequiredServiceElement>().LoggerFactory);
@@ -988,7 +989,7 @@ namespace FiftyOne.Pipeline.Core.Tests.FlowElements
             SplitOption splitOn)
         {
             // Pass the configuration to the builder to create the pipeline.
-            var pipeline = _builder.BuildFromConfiguration(options);
+            using var pipeline = _builder.BuildFromConfiguration(options);
 
             var element = pipeline.GetElement<ListSplitterElement>();
             // Check we've got the expected number of evidence keys.
@@ -1040,7 +1041,7 @@ namespace FiftyOne.Pipeline.Core.Tests.FlowElements
         private void VerifyMultiplyByElementPipeline(PipelineOptions options)
         {
             // Pass the configuration to the builder to create the pipeline.
-            var pipeline = _builder.BuildFromConfiguration(options);
+            using var pipeline = _builder.BuildFromConfiguration(options);
             var element = pipeline.GetElement<MultiplyByElement>();
 
             // Check we've got the expected number of evidence keys.
