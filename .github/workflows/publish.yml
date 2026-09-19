@@ -6,6 +6,9 @@ on:
       dryrun:
         type: boolean
         default: false
+      common-ci-ref:
+        type: string
+        default: ''
 
 jobs:
   Publish:
@@ -16,6 +19,7 @@ jobs:
       org-name: ${{ github.event.repository.owner.login }}
       dryrun: ${{ inputs.dryrun || false }}
       build-platform: windows-latest
+      common-ci-ref: ${{ inputs.common-ci-ref || '' }}
     secrets:
       token: ${{ secrets.ACCESS_TOKEN }}
       ApiKey: ${{ secrets.NUGET_API_KEY }}
