@@ -431,10 +431,11 @@ against the cloud. Use `DidClient` instead. The `Verify(ECDsa)`,
 you already hold, still work, and `Verify(ECDsa)` is the check
 `DidClient` makes underneath with the key it picked.
 
-## Moving to 4.6.0
+## Breaking change in 4.5.110
 
-This release takes two public members away with no alias and no
-forwarder, so it is published as `4.6.0` rather than as the next patch.
+**This release takes two public members away with no alias and no
+forwarder, and it ships in the patch place.** The version number does not
+warn you, so this section does.
 
 - `FodId.UsageFromConsent` is now `FodId.UsageIsIndirect`, because bit 3
   says whether the issuer worked the usage out rather than where it
@@ -442,10 +443,21 @@ forwarder, so it is published as `4.6.0` rather than as the next patch.
 - `Usage.None` is gone, because a payload whose usage bits are all clear
   is refused while it is being read and so can never reach a `Usage`.
 
-Code compiled against 4.5.x that reads either member fails to compile
-against 4.6.0 with `CS1061` for the first and `CS0117` for the second.
-Both are a rename at the call site. Nothing else in the surface moved,
-and a 51Did created by an earlier release still reads.
+Code compiled against an earlier 4.5 that reads either member fails to
+compile with `CS1061` for the first and `CS0117` for the second. Both are a
+rename at the call site. Nothing else in the surface moved, and a 51Did
+created by an earlier release still reads.
+
+### Why the patch place
+
+By the usual rule this is a minor version. It was published as 4.6.0 on
+18 September 2026 and withdrawn the next day, because the 51Degrees
+documentation is versioned and a minor bump would have meant moving it.
+4.6.0 and 4.6.1 are unlisted on NuGet and should not be used.
+
+So the number no longer tells you the surface changed. If you pin a range
+such as `[4.5.0,4.6.0)` you will receive this release, and it may not
+compile. Read this section before taking it.
 
 ## Migrating from the OWID constructors
 
