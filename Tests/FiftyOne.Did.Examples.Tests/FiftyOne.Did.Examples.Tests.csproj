@@ -13,7 +13,7 @@
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="18.5.1" />
     <PackageReference Include="MSTest.TestAdapter" Version="4.2.3" />
     <PackageReference Include="MSTest.TestFramework" Version="4.2.3" />
-    <PackageReference Include="coverlet.collector" Version="10.0.0">
+    <PackageReference Include="coverlet.collector" Version="10.0.1">
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
       <PrivateAssets>all</PrivateAssets>
     </PackageReference>
@@ -26,8 +26,7 @@
   <ItemGroup>
     <!-- Run beside the test assembly, which is also where page.html
          arrives from the example project. -->
-    <None Include="CreatorContextPageHarness.js"
-          CopyToOutputDirectory="PreserveNewest" />
+    <None Include="CreatorContextPageHarness.js" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
 </Project>

@@ -8,8 +8,8 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="coverlet.collector" Version="6.0.0" />
-    <PackageReference Include="FiftyOne.Common.TestHelpers" Version="5.1.7" />
+    <PackageReference Include="coverlet.collector" Version="6.0.4" />
+    <PackageReference Include="FiftyOne.Common.TestHelpers" Version="5.1.8" />
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.8.0" />
     <!-- MSTest 4.0.2, not the 3.1.1 the Translation test project uses,
          because FiftyOne.Common.TestHelpers 5.1.7 asks for MSTest.TestFramework
