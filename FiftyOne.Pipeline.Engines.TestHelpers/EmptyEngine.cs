@@ -91,7 +91,12 @@ namespace FiftyOne.Pipeline.Engines.TestHelpers
                 Logger.LogDebug($"Will notify of incoming delay...");
                 OnWillDelayProcessEngine?.Invoke();
                 Logger.LogDebug($"Will wait for {_processCost.Value}...");
-                Thread.Sleep(_processCost.Value);
+                // Thread.Sleep(0) still gives the CPU away, which the
+                // overhead tests with a zero cost would pay on every call.
+                if (_processCost.Value > TimeSpan.Zero)
+                {
+                    Thread.Sleep(_processCost.Value);
+                }
                 Logger.LogDebug($"Did wait for {_processCost.Value}...");
             }
             aspectData.ValueTwo = 2;
