@@ -27,7 +27,7 @@ using FiftyOne.Pipeline.Engines.FlowElements;
 using Microsoft.Extensions.Logging;
 using System;
 using System.Collections.Generic;
-using System.Threading.Tasks;
+using System.Threading;
 
 namespace FiftyOne.Pipeline.Engines.TestHelpers
 {
@@ -91,7 +91,7 @@ namespace FiftyOne.Pipeline.Engines.TestHelpers
                 Logger.LogDebug($"Will notify of incoming delay...");
                 OnWillDelayProcessEngine?.Invoke();
                 Logger.LogDebug($"Will wait for {_processCost.Value}...");
-                Task.Delay(_processCost.Value).Wait();
+                Thread.Sleep(_processCost.Value);
                 Logger.LogDebug($"Did wait for {_processCost.Value}...");
             }
             aspectData.ValueTwo = 2;
