@@ -36,6 +36,8 @@ using System.Threading.Tasks;
 namespace FiftyOne.Pipeline.Engines.Tests.FlowElements
 {
     [TestClass]
+    // These tests depend on timing, so run them on their own.
+    [DoNotParallelize]
     public class AspectEngineLazyLoadTests
     {
         private EmptyEngine _engine;
