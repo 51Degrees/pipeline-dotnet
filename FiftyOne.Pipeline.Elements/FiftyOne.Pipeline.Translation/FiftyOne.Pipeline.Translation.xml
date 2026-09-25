@@ -158,7 +158,7 @@
         </member>
         <member name="T:FiftyOne.Pipeline.Translation.Data.TranslationProperty">
             <summary>
-            Defines a translation from one property to another. 
+            Defines a translation from one property to another.
             </summary>
         </member>
         <member name="M:FiftyOne.Pipeline.Translation.Data.TranslationProperty.#ctor(System.String,System.String)">
@@ -168,6 +168,29 @@
             <param name="source"></param>
             <param name="destination"></param>
         </member>
+        <member name="M:FiftyOne.Pipeline.Translation.Data.TranslationProperty.Create``1(System.String,System.String)">
+            <summary>
+            Creates a translation whose no-value placeholder is typed for
+            the readers of the destination property.
+            </summary>
+            <typeparam name="TDestination">
+            The value type readers of the destination property expect,
+            i.e. the T of the
+            <see cref="T:FiftyOne.Pipeline.Engines.Data.IAspectPropertyValue`1"/> they read it as. When the
+            source property has no value, the placeholder stored against
+            the destination is created with this type so typed reads of the
+            destination do not fail with an invalid cast.
+            </typeparam>
+            <param name="source">
+            Source property name on the source element data.
+            </param>
+            <param name="destination">
+            Destination property name on translation engine data.
+            </param>
+            <returns>
+            A new <see cref="T:FiftyOne.Pipeline.Translation.Data.TranslationProperty"/>.
+            </returns>
+        </member>
         <member name="P:FiftyOne.Pipeline.Translation.Data.TranslationProperty.SourceProperty">
             <summary>
             Source property name on the source element data.
@@ -176,6 +199,13 @@
         <member name="P:FiftyOne.Pipeline.Translation.Data.TranslationProperty.DestinationProperty">
             <summary>
             Destination property name on translation engine data.
+            </summary>
+        </member>
+        <member name="P:FiftyOne.Pipeline.Translation.Data.TranslationProperty.CreateNoValuePlaceholder">
+            <summary>
+            Creates the no-value placeholder stored against the destination
+            property when the source property has no value. The supplied
+            string is the placeholder's no-value message.
             </summary>
         </member>
         <member name="T:FiftyOne.Pipeline.Translation.Data.Translator">
@@ -468,7 +498,14 @@
         </member>
         <member name="M:FiftyOne.Pipeline.Translation.FlowElements.TranslationEngineBase`1.TryGetSourceValue(FiftyOne.Pipeline.Core.Data.IElementData,System.String,System.Object@)">
             <summary>
-            Gets the source value from the sourceData
+            Gets the source value from the sourceData.
+            The value is read through <see cref="M:FiftyOne.Pipeline.Core.Data.IData.AsDictionary"/>
+            rather than the indexer because a missing property must report
+            false, not throw: aspect data (for example a cloud engine's
+            data when the resource key does not include the property, or
+            when the cloud request failed) throws from its indexer for a
+            missing property, while its AsDictionary waits for any lazy
+            loading and then supports a non-throwing lookup.
             </summary>
             <param name="sourceData"></param>
             <param name="sourceProperty"></param>
@@ -591,6 +628,27 @@
             Add translated property. This defines a translation from one property
             to another.
             </summary>
+            <param name="source">
+            The key for the source property to translate.
+            </param>
+            <param name="destination">
+            The key to store the translated value under on the translation engine data.
+            </param>
+            <returns>
+            This builder.
+            </returns>
+        </member>
+        <member name="M:FiftyOne.Pipeline.Translation.FlowElements.TranslationEngineBuilder.AddTranslation``1(System.String,System.String)">
+            <summary>
+            Add translated property. This defines a translation from one property
+            to another.
+            </summary>
+            <typeparam name="TDestination">
+            The value type readers of the destination property expect. When
+            the source property has no value, the no-value placeholder stored
+            against the destination is created with this type so typed reads
+            of the destination do not fail with an invalid cast.
+            </typeparam>
             <param name="source">
             The key for the source property to translate.
             </param>
