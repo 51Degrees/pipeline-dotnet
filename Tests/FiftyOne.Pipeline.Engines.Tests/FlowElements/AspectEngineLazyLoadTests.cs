@@ -172,6 +172,54 @@ namespace FiftyOne.Pipeline.Engines.Tests.FlowElements
         }
 
         /// <summary>
+        /// Check that a lazy loaded property that takes longer than the
+        /// timeout raises a TimeoutException when the lazy loading
+        /// configuration has no cancellation token.
+        /// </summary>
+        [TestMethod]
+        public void AspectEngineLazyLoad_PropertyTimeoutWithoutToken()
+        {
+            // Arrange
+            // An engine whose lazy loading has a timeout but no
+            // cancellation token, with the process time set to double the
+            // timeout.
+            var engine = new EmptyEngineBuilder(_loggerFactory)
+                .SetLazyLoading(new LazyLoadingConfiguration(_timeoutMS))
+                .Build();
+            engine.SetProcessCost(TimeSpan.TicksPerMillisecond * (_timeoutMS * 2));
+
+            // Act
+            var evidence = new Dictionary<string, object>()
+            {
+                { "user-agent", "1234" }
+            };
+            // Use the mock flow data to populate this variable with the
+            // engine data from the call to process.
+            var mockData = MockFlowData.CreateFromEvidence(evidence, false);
+            EmptyEngineData engineData = null;
+            mockData.Setup(d => d.GetOrAdd(It.IsAny<ITypedKey<EmptyEngineData>>(),
+                It.IsAny<Func<IPipeline, EmptyEngineData>>()))
+                .Callback((ITypedKey<EmptyEngineData> k, Func<IPipeline, EmptyEngineData> f) =>
+                {
+                    engineData = f(mockData.Object.Pipeline);
+                })
+                .Returns((ITypedKey<EmptyEngineData> k, Func<IPipeline, EmptyEngineData> f) =>
+                {
+                    return engineData;
+                });
+            var data = mockData.Object;
+
+            // Process the data
+            engine.Process(data);
+            // Attempt to get the value. This should cause the timeout to be
+            // triggered, and not fail on the absent cancellation token.
+            Assert.ThrowsExactly<TimeoutException>(() =>
+            {
+                var result = engineData.ValueTwo;
+            });
+        }
+
+        /// <summary>
         /// Check that activating the cancellation token while
         /// waiting for processing for a lazy loaded property to
         /// complete will function as expected.
