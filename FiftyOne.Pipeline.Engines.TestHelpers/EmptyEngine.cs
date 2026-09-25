@@ -27,7 +27,7 @@ using FiftyOne.Pipeline.Engines.FlowElements;
 using Microsoft.Extensions.Logging;
 using System;
 using System.Collections.Generic;
-using System.Threading;
+using System.Threading.Tasks;
 
 namespace FiftyOne.Pipeline.Engines.TestHelpers
 {
@@ -91,12 +91,7 @@ namespace FiftyOne.Pipeline.Engines.TestHelpers
                 Logger.LogDebug($"Will notify of incoming delay...");
                 OnWillDelayProcessEngine?.Invoke();
                 Logger.LogDebug($"Will wait for {_processCost.Value}...");
-                // Thread.Sleep(0) still gives the CPU away, which the
-                // overhead tests with a zero cost would pay on every call.
-                if (_processCost.Value > TimeSpan.Zero)
-                {
-                    Thread.Sleep(_processCost.Value);
-                }
+                Task.Delay(_processCost.Value).Wait();
                 Logger.LogDebug($"Did wait for {_processCost.Value}...");
             }
             aspectData.ValueTwo = 2;
