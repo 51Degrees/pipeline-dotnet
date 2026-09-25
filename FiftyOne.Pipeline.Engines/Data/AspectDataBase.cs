@@ -572,7 +572,7 @@ namespace FiftyOne.Pipeline.Engines.Data
 
                     if (taskCompleted == false)
                     {
-                        if (token.Value.IsCancellationRequested)
+                        if (token.HasValue && token.Value.IsCancellationRequested)
                         {
                             // The property is being lazy loaded but 
                             // been canceled, so pass the exception up.
