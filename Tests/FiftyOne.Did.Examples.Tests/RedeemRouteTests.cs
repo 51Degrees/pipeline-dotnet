@@ -225,6 +225,35 @@ namespace FiftyOne.Did.Examples.Tests
             Assert.IsFalse(factors.TryGetProperty("browser", out _));
         }
 
+        /// <summary>
+        /// A factor the creating service recorded no value for passes
+        /// through the demo route as notrecorded, so the page is never shown
+        /// a mismatch for something the identifier never claimed.
+        /// </summary>
+        [TestMethod]
+        public async Task Redeem_NotRecordedFactorPassesThrough()
+        {
+            QueueKeys(_publicPem);
+            _handler.Enqueue(HttpStatusCode.OK,
+                "{\"signature\":\"verified\",\"context\":\"mismatch\","
+                + "\"factors\":{\"transport\":\"notrecorded\","
+                + "\"device\":\"mismatch\","
+                + "\"asn\":\"misconfigured\"},"
+                + "\"verifiedAt\":\"2026-09-26T09:15:32Z\","
+                + "\"secondsSinceVerified\":3}");
+
+            var answer = await RedeemRoute.HandleAsync(
+                _client, Signed().AsBase64Url(), "sealed", "abc");
+
+            var factors = Parse(answer).GetProperty("factors");
+            Assert.AreEqual(
+                "notrecorded", factors.GetProperty("transport").GetString());
+            Assert.AreEqual(
+                "mismatch", factors.GetProperty("device").GetString());
+            Assert.AreEqual(
+                "misconfigured", factors.GetProperty("asn").GetString());
+        }
+
         [TestMethod]
         public async Task Redeem_WrongKey_ServerSignatureInvalid()
         {

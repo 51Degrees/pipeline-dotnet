@@ -546,6 +546,15 @@
             sends can produce it.
             </summary>
         </member>
+        <member name="F:FiftyOne.Did.Client.FactorOutcome.NotRecorded">
+            <summary>
+            The service that created the identifier recorded no value for
+            this factor, so the identifier says nothing about it and there
+            was nothing to compare. This is neither a mismatch nor
+            <see cref="F:FiftyOne.Did.Client.FactorOutcome.Misconfigured"/>, which says the checking service
+            could not determine the factor.
+            </summary>
+        </member>
         <member name="T:FiftyOne.Did.Client.RedeemResult">
             <summary>
             The typed answer from the cloud's redeem endpoint, built by

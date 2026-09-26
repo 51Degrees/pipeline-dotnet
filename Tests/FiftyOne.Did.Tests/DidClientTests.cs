@@ -705,6 +705,24 @@ namespace FiftyOne.Did.Tests
             + "\"verifiedAt\":\"2026-09-16T09:15:32Z\","
             + "\"secondsSinceVerified\":2}";
 
+        private const string RedeemedNotRecorded =
+            "{\"signature\":\"verified\",\"context\":\"mismatch\","
+            + "\"factors\":{\"transport\":\"notrecorded\","
+            + "\"device\":\"verified\",\"browserip\":\"mismatch\","
+            + "\"connectionip\":\"verified\",\"asn\":\"misconfigured\","
+            + "\"platformname\":\"verified\","
+            + "\"platformversion\":\"notrecorded\","
+            + "\"browsername\":\"verified\","
+            + "\"browserversion\":\"verified\"},"
+            + "\"verifiedAt\":\"2026-09-26T09:15:32Z\","
+            + "\"secondsSinceVerified\":2}";
+
+        private const string RedeemedUnknownFactorValue =
+            "{\"signature\":\"verified\",\"context\":\"mismatch\","
+            + "\"factors\":{\"transport\":\"somethingnewer\"},"
+            + "\"verifiedAt\":\"2026-09-26T09:15:32Z\","
+            + "\"secondsSinceVerified\":2}";
+
         private const string RedeemedInvalidDate =
             "{\"signature\":\"invalid\",\"context\":\"invaliddate\","
             + "\"verifiedAt\":\"2026-09-03T09:15:32Z\",\"secondsSinceVerified\":1}";
@@ -815,6 +833,63 @@ namespace FiftyOne.Did.Tests
                     result.Factors!.ContainsKey(name),
                     $"{name} should not be read from the old browser key");
             }
+        }
+
+        /// <summary>
+        /// A factor the creating service recorded no value for is read as
+        /// notrecorded, which is its own outcome and neither a mismatch nor
+        /// misconfigured, so the three sit side by side in one answer
+        /// without being confused for each other.
+        /// </summary>
+        [TestMethod]
+        public async Task Redeem_NotRecordedFactors_AreTheirOwnOutcome()
+        {
+            _handler.Enqueue(HttpStatusCode.OK, RedeemedNotRecorded);
+            using var client = NewClient();
+
+            var result = await client.RedeemAsync(
+                SignedAt(T0.AddDays(1)), "sealed", "abc123");
+
+            Assert.AreEqual(ContextOutcome.Mismatch, result.Context);
+            Assert.IsNotNull(result.Factors);
+            Assert.AreEqual(9, result.Factors!.Count);
+            Assert.AreEqual(
+                FactorOutcome.NotRecorded, result.Factors[FactorName.Transport]);
+            Assert.AreEqual(
+                FactorOutcome.NotRecorded,
+                result.Factors[FactorName.PlatformVersion]);
+            Assert.AreEqual(
+                FactorOutcome.Mismatch, result.Factors[FactorName.BrowserIp]);
+            Assert.AreEqual(
+                FactorOutcome.Misconfigured, result.Factors[FactorName.Asn]);
+            Assert.AreEqual(
+                FactorOutcome.Verified, result.Factors[FactorName.Device]);
+            Assert.AreNotEqual(
+                FactorOutcome.Mismatch, result.Factors[FactorName.Transport],
+                "a factor with no recorded value is not a mismatch");
+            Assert.AreNotEqual(
+                FactorOutcome.Misconfigured,
+                result.Factors[FactorName.Transport],
+                "a factor with no recorded value is not misconfigured");
+        }
+
+        /// <summary>
+        /// A factor value this client does not know still reads as a
+        /// mismatch, so adding notrecorded has not turned an unexpected word
+        /// into a pass or into an outcome that says nothing was checked.
+        /// </summary>
+        [TestMethod]
+        public async Task Redeem_UnknownFactorValue_IsStillAMismatch()
+        {
+            _handler.Enqueue(HttpStatusCode.OK, RedeemedUnknownFactorValue);
+            using var client = NewClient();
+
+            var result = await client.RedeemAsync(
+                SignedAt(T0.AddDays(1)), "sealed", "abc123");
+
+            Assert.IsNotNull(result.Factors);
+            Assert.AreEqual(
+                FactorOutcome.Mismatch, result.Factors![FactorName.Transport]);
         }
 
         /// <summary>

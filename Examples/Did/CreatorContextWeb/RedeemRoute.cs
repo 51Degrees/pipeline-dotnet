@@ -140,13 +140,14 @@ public static class RedeemRoute
             var factors = new Dictionary<string, string>();
             foreach (var factor in redeemed.Factors)
             {
-                // Misconfigured is kept as its own word, because it says
-                // the checking service could not determine the factor and
-                // must never be shown as a mismatch.
+                // Misconfigured and notrecorded keep their own words,
+                // because neither is a mismatch and showing either as one
+                // would report a difference the identifier never claimed.
                 factors[factor.Key] = factor.Value switch
                 {
                     FactorOutcome.Verified => "verified",
                     FactorOutcome.Misconfigured => "misconfigured",
+                    FactorOutcome.NotRecorded => "notrecorded",
                     _ => "mismatch",
                 };
             }
