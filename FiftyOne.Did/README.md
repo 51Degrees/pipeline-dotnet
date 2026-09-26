@@ -399,15 +399,19 @@ The four steps, in the order a server takes them.
    failure is reported as the one word `Unreadable` by design, so the
    client does not try to tell them apart either.
 
-   `Factors` maps each creator context factor to `Verified`, `Mismatch`
-   or `Misconfigured`, and is present only where there is something to
-   diagnose. The names are in `FactorName`, in the order `transport`,
-   `device`, `browserip`, `connectionip`, `asn`, `platformname`,
-   `platformversion`, `browsername` and `browserversion`. Cloud release
-   4.4.38 replaced the single `browser` factor with the last four, which
-   the cloud no longer sends. `Misconfigured` is never a mismatch. A
-   version mismatch beside a verified name means an upgrade, whilst a
-   mismatched name means a different operating system or browser.
+   `Factors` maps each creator context factor to `Verified`, `Mismatch`,
+   `Misconfigured` or `NotRecorded`, and is present only where there is
+   something to diagnose. The names are in `FactorName`, in the order
+   `transport`, `device`, `browserip`, `connectionip`, `asn`,
+   `platformname`, `platformversion`, `browsername` and
+   `browserversion`. Cloud release 4.4.38 replaced the single `browser`
+   factor with the last four, which the cloud no longer sends. Neither
+   `Misconfigured` nor `NotRecorded` is a mismatch, and they say
+   different things, because `Misconfigured` means the checking service
+   could not determine the factor whilst `NotRecorded` means the
+   creating service recorded no value for it. A version mismatch beside
+   a verified name means an upgrade, whilst a mismatched name means a
+   different operating system or browser.
 
 The string overloads of `VerifyAsync` and `RedeemAsync` also refuse a
 value longer than 4096 characters before parsing it. That figure is
