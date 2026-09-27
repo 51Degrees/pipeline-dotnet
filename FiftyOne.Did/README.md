@@ -341,13 +341,18 @@ The four steps, in the order a server takes them.
 
 2. **Verify the signature offline.** The client fetches the signing
    public keys, keeps them, and picks the key in force when the
-   identifier was created from the identifier's own date. The fetch is
-   one use, and it is repeated only when the list is more than a day
-   old or an identifier's date falls outside the keys held, so checking
-   an identifier costs nothing in the normal case. A signature that
-   does not match is `Invalid`. A key that could not be fetched is an
-   `HttpRequestException` and a date no key covers is `NoKeyForDate`,
-   because neither says anything about the signature.
+   identifier was created from the identifier's own date. The list held
+   covers identifiers dated up to the newest key's scheduled end, or its
+   start where the service gives no end. The fetch is one use, and it is
+   repeated only when the list is more than a day old, when an
+   identifier is dated near or after the end of the keys held, or when
+   a signature fails against every key held, because a key may be
+   replaced before its scheduled end. The last two happen at most once
+   a minute, so checking an identifier costs nothing in the normal
+   case. A signature that does not match is `Invalid`. A key that could
+   not be fetched is an `HttpRequestException` and a date no key covers
+   is `NoKeyForDate`, because neither says anything about the
+   signature.
 
    ```csharp
    bool genuine = await client.VerifySignatureAsync(fodId);

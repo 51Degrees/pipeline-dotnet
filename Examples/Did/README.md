@@ -73,7 +73,7 @@ route binds it with `[FromQuery(Name = "51did")] string did`), and
 `resource` and `licence` are the account's resource key and licence
 key. The client reads the cloud base from `FOD_CLOUD_API_URL` itself.
 `VerifySignatureAsync` checks the signature offline against the
-published signing keys, which the client fetches once and caches, and
+published signing keys, which the client fetches and caches, and
 `RedeemAsync` returns a typed `RedeemResult` with `Signature`,
 `Context`, `Factors` when the context did not verify, `VerifiedAt` and
 `SecondsSinceVerified`. The route answers the page with the cloud's
@@ -116,8 +116,11 @@ browser makes two, verify-full from the page and redeem from the
 server, so a browser-based context check is two uses every time.
 Checking only the signature with `verify` is one use. The server's
 offline signature check costs nothing per identifier, because the
-signing keys it uses are fetched once, one use, and then cached and
-refreshed at most daily.
+signing keys it uses are fetched once, one use, and then cached. The
+list is fetched again, one use each time, when it is a day old, when an
+identifier comes from a key period the list does not cover yet, and
+when a signature fails against every key held, the last two at most
+once a minute.
 
 ## The web demo, and the copy-and-paste proof
 

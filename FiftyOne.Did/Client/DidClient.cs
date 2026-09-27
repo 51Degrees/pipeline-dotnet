@@ -57,6 +57,18 @@ namespace FiftyOne.Did.Client
     /// a POST form body, because a query string is written to access logs.
     /// </para>
     /// <para>
+    /// The key list is kept, and each later answer is merged into it
+    /// without dropping anything, because an old identifier verifies
+    /// against an old key. The whole list is fetched again when it is
+    /// older than <see cref="KeyCacheLifetime"/>. Newer keys are fetched
+    /// when an identifier is dated near or after the end of the keys held,
+    /// and the keys from the one in force at an identifier's date are
+    /// fetched when its signature fails against every key held, because a
+    /// key may be replaced before its scheduled end. Those two fetches are
+    /// made at most once a minute between them, so a forged date or
+    /// signature cannot make the client call the cloud on every lookup.
+    /// </para>
+    /// <para>
     /// The key cache is per instance and safe to share across threads, so
     /// create one client for the process and reuse it.
     /// </para>
@@ -79,9 +91,11 @@ namespace FiftyOne.Did.Client
         public const string EndpointEnvironmentVariable = "FOD_CLOUD_API_URL";
 
         /// <summary>
-        /// How old the cached key list may be before a lookup fetches it
-        /// again. Keys are published up to three months ahead of their
-        /// start, so a day is far inside that margin.
+        /// How old the whole key list may be before a lookup fetches all of
+        /// it again. A key may be replaced before its scheduled end, and the
+        /// client picks up the replacement on the first signature that fails
+        /// against the keys held or, at the latest, when it fetches the whole
+        /// list at this age.
         /// </summary>
         public static readonly TimeSpan KeyCacheLifetime = TimeSpan.FromDays(1);
 
@@ -93,6 +107,13 @@ namespace FiftyOne.Did.Client
 
         private static readonly TimeSpan BoundaryTolerance =
             TimeSpan.FromMinutes(15);
+
+        // The shortest time between two fetches prompted by an identifier's
+        // date or by a failed signature, so that a date not published yet,
+        // or a forged date or signature, cannot make the client call the
+        // cloud on every lookup.
+        private static readonly TimeSpan RefetchInterval =
+            TimeSpan.FromMinutes(1);
 
         // A guard against obviously malformed input, so the client does no
         // work and makes no call for a value that cannot be an identifier.
@@ -107,7 +128,10 @@ namespace FiftyOne.Did.Client
         private readonly SemaphoreSlim _keyLock = new SemaphoreSlim(1, 1);
         private readonly string? _licenceKey;
         private IReadOnlyList<DidPublicKey>? _keys;
+        // When the whole list was last fetched, which sets its age.
         private DateTimeOffset _keysFetchedAt;
+        // When a fetch for a date or a failed signature last started.
+        private DateTimeOffset? _refetchedAt;
         private bool _disposed;
 
         /// <summary>
@@ -176,8 +200,8 @@ namespace FiftyOne.Did.Client
         public bool HasLicenceKey => _licenceKey is not null;
 
         /// <summary>
-        /// The signing public keys the cloud publishes, fetched on first use
-        /// and then answered from the cache. Use
+        /// The signing public keys held, fetched on first use and then
+        /// answered from the cache, which later fetches add to. Use
         /// <see cref="PublicKeyForAsync"/> to pick the key for one
         /// identifier, which also refreshes the cache when it is stale.
         /// </summary>
@@ -195,7 +219,7 @@ namespace FiftyOne.Did.Client
             {
                 if (_keys is null)
                 {
-                    await RefreshKeysLockedAsync(cancellationToken)
+                    await FetchKeysLockedAsync(null, cancellationToken)
                         .ConfigureAwait(false);
                 }
                 return _keys!;
@@ -208,16 +232,17 @@ namespace FiftyOne.Did.Client
 
         /// <summary>
         /// The key in force when the identifier was created, being the
-        /// entry whose start is latest on or before the identifier's date.
-        /// The cache is fetched again, once, before answering when it holds
-        /// no entry on or before the date, when the date is later than the
-        /// newest start held, or when the cache is older than
-        /// <see cref="KeyCacheLifetime"/>.
+        /// entry whose start is latest on or before the identifier's date,
+        /// unless that entry had ended by then. The whole list is fetched
+        /// again before answering when it is older than
+        /// <see cref="KeyCacheLifetime"/>, and the keys from the newest held
+        /// on are fetched, at most once a minute, when the date is near or
+        /// after the end of the keys held.
         /// </summary>
         /// <param name="fodId">The identifier.</param>
         /// <param name="cancellationToken">Cancels a fetch.</param>
         /// <returns>
-        /// The key, or null when the date precedes the whole schedule.
+        /// The key, or null when no key held is in force at the date.
         /// </returns>
         /// <exception cref="ArgumentNullException">
         /// Thrown when <paramref name="fodId"/> is null.
@@ -232,14 +257,15 @@ namespace FiftyOne.Did.Client
         {
             ArgumentNullException.ThrowIfNull(fodId);
             var date = AsUtc(fodId.Date);
-            var keys = await KeysCoveringAsync(date, cancellationToken)
+            var (keys, _) = await KeysCoveringAsync(date, cancellationToken)
                 .ConfigureAwait(false);
             return InForceAt(keys, date);
         }
 
         /// <summary>
         /// Verifies the identifier's signature offline against the
-        /// published keys, without a cloud call once the keys are cached.
+        /// published keys, which are fetched only as
+        /// <see cref="DidClient"/> describes.
         /// </summary>
         /// <param name="fodId">The identifier.</param>
         /// <param name="cancellationToken">Cancels a key fetch.</param>
@@ -267,7 +293,11 @@ namespace FiftyOne.Did.Client
         /// section and is accepted, because the signature covers the whole
         /// payload. The keys tried are the one in force at the identifier's
         /// date and, near a boundary in the schedule, the neighbouring key
-        /// where the two differ, best first.
+        /// where the two differ, best first. When every key tried fails and
+        /// the keys were not fetched for this check, the keys from the one
+        /// in force at the identifier's date are fetched, at most once a
+        /// minute, and the check is made once more, because a key may have
+        /// been replaced before its scheduled end.
         /// </summary>
         /// <param name="fodId">The identifier.</param>
         /// <param name="cancellationToken">Cancels a key fetch.</param>
@@ -296,8 +326,26 @@ namespace FiftyOne.Did.Client
                 return SignatureCheck.InvalidLength;
             }
             var date = AsUtc(fodId.Date);
-            var keys = await KeysCoveringAsync(date, cancellationToken)
+            var (keys, fetched) = await KeysCoveringAsync(
+                date, cancellationToken).ConfigureAwait(false);
+            var check = CheckSignature(fodId, keys, date);
+            // A list fetched for this very check cannot get any better.
+            if (check != SignatureCheck.Invalid || fetched)
+            {
+                return check;
+            }
+            var fresher = await KeysAfterFailureAsync(date, cancellationToken)
                 .ConfigureAwait(false);
+            return ReferenceEquals(fresher, keys)
+                ? check
+                : CheckSignature(fodId, fresher, date);
+        }
+
+        private static SignatureCheck CheckSignature(
+            FodId fodId,
+            IReadOnlyList<DidPublicKey> keys,
+            DateTime date)
+        {
             var candidates = CandidatesForDate(keys, date);
             if (candidates.Count == 0)
             {
@@ -543,7 +591,7 @@ namespace FiftyOne.Did.Client
         /// <summary>
         /// The entry in force at the moment, being the one whose start is
         /// latest on or before it, or null when the moment precedes every
-        /// entry.
+        /// entry or that entry had ended by then.
         /// </summary>
         /// <param name="keys">The schedule, in any order.</param>
         /// <param name="at">The moment.</param>
@@ -565,6 +613,10 @@ namespace FiftyOne.Did.Client
                     best = key;
                 }
             }
+            if (best?.EndsAt is DateTime end && end <= at)
+            {
+                return null;
+            }
             return best;
         }
 
@@ -572,7 +624,7 @@ namespace FiftyOne.Did.Client
         /// The keys that may have signed something created at the moment,
         /// best first, being the entry in force and, near a boundary in the
         /// schedule, the neighbouring entries where those differ. Empty
-        /// when the moment precedes the whole schedule.
+        /// when no entry is in force at or near the moment.
         /// </summary>
         /// <param name="keys">The schedule, in any order.</param>
         /// <param name="at">The creation moment.</param>
@@ -592,13 +644,14 @@ namespace FiftyOne.Did.Client
         /// <summary>
         /// Reads the key endpoint's answer, a JSON array of objects each
         /// carrying <c>startsAt</c> (or <c>created</c> on a service that
-        /// predates <c>startsAt</c>) and <c>publicKey</c>. Other fields are
-        /// ignored.
+        /// predates <c>startsAt</c>), <c>publicKey</c> and, where the
+        /// service gives it, <c>endsAt</c>. Other fields are ignored.
         /// </summary>
         /// <param name="json">The response body.</param>
         /// <returns>The keys in start order.</returns>
         /// <exception cref="FormatException">
-        /// Thrown when the body is not an array of such objects.
+        /// Thrown when the body is not an array of such objects, or an
+        /// entry does not end after it starts.
         /// </exception>
         /// <exception cref="JsonException">
         /// Thrown when the body is not JSON.
@@ -625,25 +678,77 @@ namespace FiftyOne.Did.Client
                             "A 51Did key entry lacks its start or public "
                             + "key: " + Truncate(element.GetRawText()));
                     }
-                    keys.Add(new DidPublicKey(ParseUtc(start), pem));
+                    var starts = ParseUtc(start);
+                    var end = ReadString(element, "endsAt");
+                    var ends = end is null ? (DateTime?)null : ParseUtc(end);
+                    if (ends <= starts)
+                    {
+                        throw new FormatException(
+                            "A 51Did key entry does not end after it starts: "
+                            + Truncate(element.GetRawText()));
+                    }
+                    keys.Add(new DidPublicKey(starts, pem, ends));
                 }
                 keys.Sort((a, b) => a.StartsAt.CompareTo(b.StartsAt));
                 return keys.AsReadOnly();
             }
         }
 
-        private async Task<IReadOnlyList<DidPublicKey>> KeysCoveringAsync(
+        /// <summary>
+        /// The keys to answer a question about the date from, and whether
+        /// this call fetched them. The whole list is fetched when nothing is
+        /// held or it is older than <see cref="KeyCacheLifetime"/>, and the
+        /// keys from the newest held on are fetched, within the refetch
+        /// limit, when the date is near or after the end of the keys held,
+        /// where the key in force or its neighbour may be one not held yet.
+        /// </summary>
+        private async Task<(IReadOnlyList<DidPublicKey> Keys, bool Fetched)>
+            KeysCoveringAsync(
+                DateTime date,
+                CancellationToken cancellationToken)
+        {
+            await _keyLock.WaitAsync(cancellationToken).ConfigureAwait(false);
+            try
+            {
+                if (_keys is null
+                    || _time.GetUtcNow() - _keysFetchedAt > KeyCacheLifetime)
+                {
+                    await FetchKeysLockedAsync(null, cancellationToken)
+                        .ConfigureAwait(false);
+                    return (_keys!, true);
+                }
+                var end = CoverageEnd(_keys);
+                var fetched =
+                    (end is null || Shift(date, BoundaryTolerance) >= end)
+                    && await RefetchLockedAsync(
+                        NewestStart(_keys), cancellationToken)
+                        .ConfigureAwait(false);
+                return (_keys, fetched);
+            }
+            finally
+            {
+                _keyLock.Release();
+            }
+        }
+
+        /// <summary>
+        /// The keys to check a failed signature against once more. The keys
+        /// from the one in force at the date on are fetched, within the
+        /// refetch limit, so that the answer carries that key's end, moved
+        /// earlier if the key was replaced, and any replacement starting in
+        /// its period. Where the limit stops the fetch, the list held now is
+        /// returned, which another caller may have fetched since.
+        /// </summary>
+        private async Task<IReadOnlyList<DidPublicKey>> KeysAfterFailureAsync(
             DateTime date,
             CancellationToken cancellationToken)
         {
             await _keyLock.WaitAsync(cancellationToken).ConfigureAwait(false);
             try
             {
-                if (_keys is null || NeedsRefreshLocked(_keys, date))
-                {
-                    await RefreshKeysLockedAsync(cancellationToken)
-                        .ConfigureAwait(false);
-                }
+                await RefetchLockedAsync(
+                    StartOfKeyAt(_keys!, date), cancellationToken)
+                    .ConfigureAwait(false);
                 return _keys!;
             }
             finally
@@ -652,44 +757,125 @@ namespace FiftyOne.Did.Client
             }
         }
 
-        private bool NeedsRefreshLocked(
-            IReadOnlyList<DidPublicKey> keys,
-            DateTime date)
-        {
-            if (_time.GetUtcNow() - _keysFetchedAt > KeyCacheLifetime)
-            {
-                return true;
-            }
-            var inForce = InForceAt(keys, date);
-            if (inForce is null)
-            {
-                return true;
-            }
-            var newest = DateTime.MinValue;
-            foreach (var key in keys)
-            {
-                if (key.StartsAt > newest)
-                {
-                    newest = key.StartsAt;
-                }
-            }
-            return date > newest;
-        }
-
-        private async Task RefreshKeysLockedAsync(
+        /// <summary>
+        /// Fetches the keys starting at or after the moment, or the whole
+        /// list where it is null, unless a fetch for a date or a failed
+        /// signature started less than <see cref="RefetchInterval"/> ago. A
+        /// clock set back does not hold the fetch back. The start is noted
+        /// before sending, so that a cloud which cannot be reached is not
+        /// asked again on every lookup either.
+        /// </summary>
+        /// <returns>Whether a fetch was made.</returns>
+        private async Task<bool> RefetchLockedAsync(
+            DateTime? since,
             CancellationToken cancellationToken)
         {
-            var request = NewRequest(
-                HttpMethod.Get,
-                "id/key/" + Uri.EscapeDataString(ResourceKey));
+            var now = _time.GetUtcNow();
+            if (_refetchedAt is DateTimeOffset last
+                && now >= last
+                && now - last < RefetchInterval)
+            {
+                return false;
+            }
+            _refetchedAt = now;
+            await FetchKeysLockedAsync(since, cancellationToken)
+                .ConfigureAwait(false);
+            return true;
+        }
+
+        /// <summary>
+        /// Fetches the keys starting at or after the moment, or the whole
+        /// list where it is null, and merges the answer into the keys held.
+        /// Only a fetch of the whole list resets the list's age, because
+        /// only that fetch is sure to see a change to any key held.
+        /// </summary>
+        private async Task FetchKeysLockedAsync(
+            DateTime? since,
+            CancellationToken cancellationToken)
+        {
+            var path = "id/key/" + Uri.EscapeDataString(ResourceKey);
+            if (since is DateTime from)
+            {
+                path += "?datetime=" + Uri.EscapeDataString(
+                    from.ToString("o", CultureInfo.InvariantCulture));
+            }
+            var request = NewRequest(HttpMethod.Get, path);
             var (status, body) = await SendAsync(request, cancellationToken)
                 .ConfigureAwait(false);
             if (status != HttpStatusCode.OK)
             {
                 throw Unexpected("key", status, body);
             }
-            _keys = ParseKeys(body);
-            _keysFetchedAt = _time.GetUtcNow();
+            _keys = Merge(_keys, ParseKeys(body));
+            if (since is null)
+            {
+                _keysFetchedAt = _time.GetUtcNow();
+            }
+        }
+
+        /// <summary>
+        /// The moment the keys held stop covering, being the newest
+        /// entry's end, or its start where no end is known. Null when none
+        /// are held.
+        /// </summary>
+        private static DateTime? CoverageEnd(IReadOnlyList<DidPublicKey> keys)
+        {
+            if (keys.Count == 0)
+            {
+                return null;
+            }
+            var newest = keys[keys.Count - 1];
+            return newest.EndsAt ?? newest.StartsAt;
+        }
+
+        /// <summary>
+        /// The newest start held, or null when none are held.
+        /// </summary>
+        private static DateTime? NewestStart(IReadOnlyList<DidPublicKey> keys)
+            => keys.Count == 0 ? null : keys[keys.Count - 1].StartsAt;
+
+        /// <summary>
+        /// The start of the newest key held that starts at or before the
+        /// moment, or of the first key held where none does, or null when
+        /// none are held.
+        /// </summary>
+        private static DateTime? StartOfKeyAt(
+            IReadOnlyList<DidPublicKey> keys,
+            DateTime at)
+        {
+            DateTime? start = null;
+            foreach (var key in keys)
+            {
+                if (start is not null && key.StartsAt > at)
+                {
+                    break;
+                }
+                start = key.StartsAt;
+            }
+            return start;
+        }
+
+        /// <summary>
+        /// The keys held with an answer merged in by start. The answer's
+        /// copy of an entry replaces the one held, as it may carry an end
+        /// the held one lacks or one moved earlier by a replacement, and no
+        /// entry held is dropped, because old identifiers verify against
+        /// old keys.
+        /// </summary>
+        private static IReadOnlyList<DidPublicKey> Merge(
+            IReadOnlyList<DidPublicKey>? held,
+            IReadOnlyList<DidPublicKey> answer)
+        {
+            var byStart = new SortedDictionary<DateTime, DidPublicKey>();
+            foreach (var key in held ?? Array.Empty<DidPublicKey>())
+            {
+                byStart[key.StartsAt] = key;
+            }
+            foreach (var key in answer)
+            {
+                byStart[key.StartsAt] = key;
+            }
+            return new List<DidPublicKey>(byStart.Values).AsReadOnly();
         }
 
         private HttpRequestMessage NewRequest(HttpMethod method, string path)

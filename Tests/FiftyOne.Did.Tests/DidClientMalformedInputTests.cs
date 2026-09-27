@@ -177,8 +177,11 @@ namespace FiftyOne.Did.Tests
         [TestMethod]
         public async Task VerifySignature_AlteredSignature_IsInvalidNotAnError()
         {
-            _handler.Enqueue(
-                HttpStatusCode.OK, KeysJson((T0, _factory.PublicPem), (T1, "pem1")));
+            var keys = KeysJson((T0, _factory.PublicPem), (T1, "pem1"));
+            _handler.Enqueue(HttpStatusCode.OK, keys);
+            // Answers the fetch made when the second check fails with the
+            // keys held, in case the key was replaced.
+            _handler.Enqueue(HttpStatusCode.OK, keys);
             using var client = NewClient();
             var bytes = _factory.SignedBytes(CanonicalPayload(), T0.AddDays(1));
             bytes[bytes.Length - 1] ^= 0xFF;
@@ -188,6 +191,7 @@ namespace FiftyOne.Did.Tests
                 SignatureCheck.Invalid,
                 await client.VerifySignatureDetailedAsync(fodId));
             Assert.IsFalse(await client.VerifySignatureAsync(fodId));
+            Assert.AreEqual(2, _handler.Requests.Count);
         }
 
         [TestMethod]
@@ -213,7 +217,6 @@ namespace FiftyOne.Did.Tests
             // covers it. The answer says so rather than calling the
             // signature bad.
             var keys = KeysJson((T1, _factory.PublicPem), (T1.AddDays(7), "pem2"));
-            _handler.Enqueue(HttpStatusCode.OK, keys);
             _handler.Enqueue(HttpStatusCode.OK, keys);
             using var client = NewClient();
             var fodId = new FodId(

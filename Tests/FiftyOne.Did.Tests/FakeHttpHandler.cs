@@ -48,8 +48,8 @@ namespace FiftyOne.Did.Tests
             public string? UserAgent { get; init; }
         }
 
-        private readonly Queue<Func<Recorded, HttpResponseMessage>> _responses =
-            new Queue<Func<Recorded, HttpResponseMessage>>();
+        private readonly Queue<Func<Recorded, Task<HttpResponseMessage>>>
+            _responses = new Queue<Func<Recorded, Task<HttpResponseMessage>>>();
 
         /// <summary>Every request, in the order received.</summary>
         public List<Recorded> Requests { get; } = new List<Recorded>();
@@ -63,16 +63,30 @@ namespace FiftyOne.Did.Tests
             string body,
             string contentType = "application/json")
         {
-            _responses.Enqueue(_ => new HttpResponseMessage(status)
-            {
-                Content = new StringContent(body, Encoding.UTF8, contentType),
-            });
+            _responses.Enqueue(_ => Task.FromResult(
+                new HttpResponseMessage(status)
+                {
+                    Content = new StringContent(body, Encoding.UTF8, contentType),
+                }));
         }
 
         /// <summary>Queue a transport failure.</summary>
         public void EnqueueFailure(Exception exception)
         {
             _responses.Enqueue(_ => throw exception);
+        }
+
+        /// <summary>
+        /// Queue a response that stays pending until the test completes the
+        /// source returned, so that one request is held in flight while
+        /// another call is made.
+        /// </summary>
+        public TaskCompletionSource<HttpResponseMessage> EnqueueHeld()
+        {
+            var held = new TaskCompletionSource<HttpResponseMessage>(
+                TaskCreationOptions.RunContinuationsAsynchronously);
+            _responses.Enqueue(_ => held.Task);
+            return held;
         }
 
         protected override async Task<HttpResponseMessage> SendAsync(
@@ -97,7 +111,7 @@ namespace FiftyOne.Did.Tests
                 throw new InvalidOperationException(
                     "No response was queued for " + request.RequestUri);
             }
-            return _responses.Dequeue()(recorded);
+            return await _responses.Dequeue()(recorded);
         }
     }
 }
