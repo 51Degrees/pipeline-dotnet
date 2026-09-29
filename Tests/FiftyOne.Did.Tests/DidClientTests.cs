@@ -81,6 +81,21 @@ namespace FiftyOne.Did.Tests
                     ["publicKey"] = key.Pem,
                 }).ToArray());
 
+        // The shape of an answer that gives each key's scheduled end.
+        private static string EndedKeysJson(
+            params (DateTime Start, DateTime End, string Pem)[] keys)
+            => JsonSerializer.Serialize(keys.Select(key =>
+                new Dictionary<string, string>
+                {
+                    ["startsAt"] = key.Start.ToString("o"),
+                    ["endsAt"] = key.End.ToString("o"),
+                    ["publicKey"] = key.Pem,
+                }).ToArray());
+
+        // The start a key request asked from, or null where it gave none.
+        private static string? AskedFrom(FakeHttpHandler.Recorded request)
+            => HttpUtility.ParseQueryString(request.Uri.Query)["datetime"];
+
         private FodId SignedAt(
             DateTime date,
             byte[]? payload = null,
@@ -90,6 +105,9 @@ namespace FiftyOne.Did.Tests
                 date,
                 OwidVersion.Version3,
                 domain));
+
+        private static FodId SignedBy(FodIdTestFactory signer, DateTime date)
+            => new FodId(signer.SignedOwid(CanonicalPayload(), date));
 
         // A payload with a creator context section after the value. The
         // section's length belongs to the cloud, so this is simply longer
@@ -269,11 +287,64 @@ namespace FiftyOne.Did.Tests
         }
 
         [TestMethod]
-        public async Task PublicKeyFor_AnswersFromCacheOtherwise()
+        public void ParseKeys_ReadsEndsAtWhereGiven()
         {
-            // The newest start is in the future, as it is on the cloud,
-            // which publishes ahead, so nothing prompts a fetch.
-            _handler.Enqueue(HttpStatusCode.OK, KeysJson((T0, "pem0"), (T1, "pem1")));
+            var keys = DidClient.ParseKeys(
+                "[{\"startsAt\":\"2026-08-10T00:00:00Z\","
+                + "\"endsAt\":\"2026-08-17T00:00:00Z\",\"publicKey\":\"pem1\"},"
+                + "{\"startsAt\":\"2026-08-03T00:00:00Z\",\"endsAt\":null,"
+                + "\"publicKey\":\"pem0\"},"
+                + "{\"startsAt\":\"2026-07-27T00:00:00Z\",\"publicKey\":\"pem9\"}]");
+
+            Assert.IsNull(keys[0].EndsAt);
+            Assert.AreEqual(T0, keys[1].StartsAt);
+            Assert.IsNull(keys[1].EndsAt);
+            Assert.AreEqual(T1, keys[2].StartsAt);
+            Assert.AreEqual(T1.AddDays(7), keys[2].EndsAt);
+            Assert.AreEqual(DateTimeKind.Utc, keys[2].EndsAt!.Value.Kind);
+        }
+
+        [TestMethod]
+        public void ParseKeys_EndNotAfterStart_IsUnreadable()
+        {
+            Assert.ThrowsExactly<FormatException>(() => DidClient.ParseKeys(
+                "[{\"startsAt\":\"2026-08-03T00:00:00Z\","
+                + "\"endsAt\":\"2026-08-03T00:00:00Z\",\"publicKey\":\"pem0\"}]"));
+            Assert.ThrowsExactly<FormatException>(() => DidClient.ParseKeys(
+                "[{\"startsAt\":\"2026-08-10T00:00:00Z\","
+                + "\"endsAt\":\"2026-08-03T00:00:00Z\",\"publicKey\":\"pem0\"}]"));
+            Assert.ThrowsExactly<ArgumentException>(
+                () => new DidPublicKey(T1, "pem0", T0));
+        }
+
+        [TestMethod]
+        public async Task PublicKeyFor_AnswerWithAnEndNotAfterItsStart_MergesNothing()
+        {
+            // One such entry makes the whole answer unreadable, so none of
+            // it is merged, the good entry included.
+            _handler.Enqueue(HttpStatusCode.OK, EndedKeysJson((T0, T1, "pem0")));
+            _handler.Enqueue(HttpStatusCode.OK, EndedKeysJson(
+                (T1, T1.AddDays(7), "pem1"),
+                (T1.AddDays(7), T1.AddDays(7), "pem2")));
+            using var client = NewClient();
+            await client.PublicKeysAsync();
+
+            await Assert.ThrowsExactlyAsync<FormatException>(
+                () => client.PublicKeyForAsync(SignedAt(T1.AddHours(1))));
+
+            var keys = await client.PublicKeysAsync();
+            Assert.AreEqual(1, keys.Count);
+            Assert.AreEqual(T1, keys[0].EndsAt);
+        }
+
+        [TestMethod]
+        public async Task PublicKeyFor_KeysWithoutEnds_AnswersFromCache()
+        {
+            // An answer that gives no ends and includes keys not started
+            // yet covers up to its newest start, so an identifier from the
+            // current period prompts no fetch.
+            _handler.Enqueue(HttpStatusCode.OK, KeysJson(
+                (T0, "pem0"), (T1, "pem1"), (T1.AddDays(7), "pem2")));
             using var client = NewClient();
             var fodId = SignedAt(T0.AddDays(1));
 
@@ -310,6 +381,8 @@ namespace FiftyOne.Did.Tests
         [TestMethod]
         public async Task PublicKeyFor_RefetchesWhenDateIsLaterThanNewestStart()
         {
+            // Without ends the keys held cover up to the newest start, and
+            // the fetch asks only from that start.
             _handler.Enqueue(HttpStatusCode.OK, KeysJson((T0, "pem0")));
             _handler.Enqueue(HttpStatusCode.OK, KeysJson((T0, "pem0"), (T1, "pem1")));
             using var client = NewClient();
@@ -319,12 +392,16 @@ namespace FiftyOne.Did.Tests
 
             Assert.AreEqual("pem1", key!.PublicKeyPem);
             Assert.AreEqual(2, _handler.Requests.Count);
+            Assert.IsNull(AskedFrom(_handler.Requests[0]));
+            Assert.AreEqual(T0.ToString("o"), AskedFrom(_handler.Requests[1]));
         }
 
         [TestMethod]
-        public async Task PublicKeyFor_RefetchesOnceWhenNoEntryOnOrBeforeDate()
+        public async Task PublicKeyFor_DateBeforeEveryKey_MakesNoFetch()
         {
-            _handler.Enqueue(HttpStatusCode.OK, KeysJson((T0, "pem0")));
+            // The first answer held every key the service publishes, and a
+            // later fetch asks only from the newest start held, so a date
+            // before every key held prompts no fetch.
             _handler.Enqueue(HttpStatusCode.OK, KeysJson((T0, "pem0")));
             using var client = NewClient();
             await client.PublicKeysAsync();
@@ -332,7 +409,33 @@ namespace FiftyOne.Did.Tests
             var key = await client.PublicKeyForAsync(SignedAt(T0.AddDays(-1)));
 
             Assert.IsNull(key);
+            Assert.AreEqual(1, _handler.Requests.Count);
+        }
+
+        [TestMethod]
+        public async Task PublicKeyFor_EmptyAnswer_FetchesAgainAtMostOnceAMinute()
+        {
+            // An answer with no keys covers nothing, so the next lookup asks
+            // again for every key, and the one after within the minute makes
+            // no request.
+            _handler.Enqueue(HttpStatusCode.OK, "[]");
+            _handler.Enqueue(HttpStatusCode.OK, "[]");
+            _handler.Enqueue(HttpStatusCode.OK, KeysJson((T0, "pem0")));
+            using var client = NewClient();
+            var fodId = SignedAt(T0.AddDays(1));
+
+            Assert.IsNull(await client.PublicKeyForAsync(fodId));
+            Assert.IsNull(await client.PublicKeyForAsync(fodId));
+            Assert.IsNull(await client.PublicKeyForAsync(fodId));
             Assert.AreEqual(2, _handler.Requests.Count);
+
+            _time.Now = _time.Now.AddMinutes(1);
+            var key = await client.PublicKeyForAsync(fodId);
+
+            Assert.AreEqual("pem0", key!.PublicKeyPem);
+            Assert.AreEqual(3, _handler.Requests.Count);
+            Assert.IsNull(AskedFrom(_handler.Requests[1]));
+            Assert.IsNull(AskedFrom(_handler.Requests[2]));
         }
 
         [TestMethod]
@@ -353,6 +456,66 @@ namespace FiftyOne.Did.Tests
             Assert.AreEqual(2, _handler.Requests.Count, "over a day old");
         }
 
+        [TestMethod]
+        public async Task PublicKeyFor_DayOldList_FetchesTheWholeList()
+        {
+            // Only a fetch of the whole list resets its age, because only
+            // that fetch sees a change to a key older than the newest held,
+            // and the one minute limit neither counts it nor holds it back.
+            var keys = KeysJson((T0, "pem0"), (T1, "pem1"));
+            _handler.Enqueue(HttpStatusCode.OK, KeysJson((T0, "pem0")));
+            _handler.Enqueue(HttpStatusCode.OK, keys);
+            _handler.Enqueue(HttpStatusCode.OK, keys);
+            using var client = NewClient();
+            await client.PublicKeysAsync();
+
+            // A date past the newest start fetches from it, just before the
+            // list is a day old.
+            _time.Now = _time.Now.AddDays(1).AddSeconds(-30);
+            await client.PublicKeyForAsync(SignedAt(T1.AddDays(1)));
+            // Moments later the list is over a day old all the same.
+            _time.Now = _time.Now.AddSeconds(40);
+            await client.PublicKeyForAsync(SignedAt(T0.AddDays(1)));
+
+            Assert.AreEqual(3, _handler.Requests.Count);
+            Assert.IsNull(AskedFrom(_handler.Requests[0]));
+            Assert.AreEqual(T0.ToString("o"), AskedFrom(_handler.Requests[1]));
+            Assert.IsNull(AskedFrom(_handler.Requests[2]));
+        }
+
+        [TestMethod]
+        public async Task PublicKeys_LaterAnswerWithEnd_ReplacesTheEntryHeld()
+        {
+            // The first answer gives no ends, so the keys held cover up to
+            // the newest start. A date past it fetches from that start, and
+            // the answer's copy of the entry replaces the one held, bringing
+            // its end, whilst the older entry the answer leaves out is kept.
+            _handler.Enqueue(
+                HttpStatusCode.OK, KeysJson((T0, "pem0"), (T1, "pem1")));
+            _handler.Enqueue(HttpStatusCode.OK, EndedKeysJson(
+                (T1, T1.AddDays(7), "pem1")));
+            using var client = NewClient();
+            Assert.IsNull((await client.PublicKeysAsync())[1].EndsAt);
+
+            var key = await client.PublicKeyForAsync(SignedAt(T1.AddDays(1)));
+            var keys = await client.PublicKeysAsync();
+
+            Assert.AreEqual("pem1", key!.PublicKeyPem);
+            Assert.AreEqual(2, _handler.Requests.Count);
+            Assert.AreEqual(T1.ToString("o"), AskedFrom(_handler.Requests[1]));
+            Assert.AreEqual(2, keys.Count);
+            Assert.AreEqual(T0, keys[0].StartsAt);
+            Assert.IsNull(keys[0].EndsAt);
+            Assert.AreEqual(T1, keys[1].StartsAt);
+            Assert.AreEqual(T1.AddDays(7), keys[1].EndsAt);
+
+            // The keys held now end later, so a later date in the same
+            // period needs no request, even once the minute has passed.
+            _time.Now = _time.Now.AddMinutes(2);
+            await client.PublicKeyForAsync(SignedAt(T1.AddDays(3)));
+            Assert.AreEqual(2, _handler.Requests.Count);
+        }
+
         // ----------------------------------------------------------------
         // Key selection
         // ----------------------------------------------------------------
@@ -367,6 +530,25 @@ namespace FiftyOne.Did.Tests
             Assert.AreEqual("pem1", DidClient.InForceAt(keys, T1)!.PublicKeyPem);
             Assert.AreEqual("pem1", DidClient.InForceAt(keys, T1.AddDays(300))!.PublicKeyPem);
             Assert.IsNull(DidClient.InForceAt(keys, T0.AddMinutes(-1)));
+        }
+
+        [TestMethod]
+        public void InForceAt_NotAtOrAfterItsEnd()
+        {
+            var keys = new[] { new DidPublicKey(T0, "pem0", T1) };
+
+            Assert.AreEqual(
+                "pem0",
+                DidClient.InForceAt(keys, T1.AddTicks(-1))!.PublicKeyPem);
+            Assert.IsNull(DidClient.InForceAt(keys, T1));
+            // Just after its end the key is still tried as the neighbour,
+            // and beyond the boundary tolerance nothing is.
+            CollectionAssert.AreEqual(
+                new[] { "pem0" },
+                DidClient.CandidatesForDate(keys, T1.AddMinutes(1))
+                    .Select(c => c.PublicKeyPem).ToArray());
+            Assert.AreEqual(
+                0, DidClient.CandidatesForDate(keys, T1.AddHours(1)).Count);
         }
 
         [TestMethod]
@@ -451,14 +633,22 @@ namespace FiftyOne.Did.Tests
         public async Task VerifySignature_FalseWithTheWrongKey()
         {
             var other = new FodIdTestFactory();
-            _handler.Enqueue(HttpStatusCode.OK, KeysJson((T0, other.PublicPem), (T1, "pem1")));
+            var keys = KeysJson((T0, other.PublicPem), (T1, "pem1"));
+            _handler.Enqueue(HttpStatusCode.OK, keys);
+            // The second check fails with the keys held, so it fetches once
+            // more before answering, in case the key was replaced.
+            _handler.Enqueue(HttpStatusCode.OK, keys);
             using var client = NewClient();
             var fodId = SignedAt(T0.AddDays(1));
 
+            // The first check fetched the keys it failed with, which cannot
+            // get any better, so it makes no second request.
             Assert.IsFalse(await client.VerifySignatureAsync(fodId));
+            Assert.AreEqual(1, _handler.Requests.Count);
             Assert.AreEqual(
                 SignatureCheck.Invalid,
                 await client.VerifySignatureDetailedAsync(fodId));
+            Assert.AreEqual(2, _handler.Requests.Count);
         }
 
         [TestMethod]
@@ -466,14 +656,19 @@ namespace FiftyOne.Did.Tests
         {
             // Signed under the first key a moment into the second period,
             // as a creator stamping its date just after rollover.
-            _handler.Enqueue(HttpStatusCode.OK, KeysJson(
+            var keys = KeysJson(
                 (T0, _factory.PublicPem),
                 (T1, new FodIdTestFactory().PublicPem),
-                (T1.AddDays(7), "pem2")));
+                (T1.AddDays(7), "pem2"));
+            _handler.Enqueue(HttpStatusCode.OK, keys);
+            // Answers the fetch made when the second fails with the keys
+            // held.
+            _handler.Enqueue(HttpStatusCode.OK, keys);
             using var client = NewClient();
 
             Assert.IsTrue(await client.VerifySignatureAsync(SignedAt(T1.AddMinutes(1))));
             Assert.IsFalse(await client.VerifySignatureAsync(SignedAt(T1.AddHours(1))));
+            Assert.AreEqual(2, _handler.Requests.Count);
         }
 
         [TestMethod]
@@ -536,18 +731,309 @@ namespace FiftyOne.Did.Tests
         [TestMethod]
         public async Task VerifySignature_NoKeyCoversTheDate()
         {
-            // The date precedes the schedule, which prompts one refetch, and
-            // the refetched schedule still does not reach it.
-            _handler.Enqueue(HttpStatusCode.OK, KeysJson((T0, _factory.PublicPem)));
+            // The date precedes every key held, which no fetch could
+            // change, so no key is tried and no further request is made.
             _handler.Enqueue(HttpStatusCode.OK, KeysJson((T0, _factory.PublicPem)));
             using var client = NewClient();
             var fodId = SignedAt(T0.AddDays(-2));
 
             Assert.IsFalse(await client.VerifySignatureAsync(fodId));
-            _handler.Enqueue(HttpStatusCode.OK, KeysJson((T0, _factory.PublicPem)));
             Assert.AreEqual(
                 SignatureCheck.NoKeyForDate,
                 await client.VerifySignatureDetailedAsync(fodId));
+            Assert.AreEqual(1, _handler.Requests.Count);
+        }
+
+        [TestMethod]
+        public async Task VerifySignature_KeysWithEnds_VerifyOfflineUntilTheNewestEnd()
+        {
+            // Only started keys are published, each with its scheduled end,
+            // so the newest key's end is the start of one not published
+            // yet. Identifiers dated before that end, by more than the
+            // boundary tolerance, verify with no request.
+            var earlier = new FodIdTestFactory();
+            _time.Now = T1.AddMinutes(-16);
+            _handler.Enqueue(HttpStatusCode.OK, EndedKeysJson(
+                (T0.AddDays(-7), T0, earlier.PublicPem),
+                (T0, T1, _factory.PublicPem)));
+            using var client = NewClient();
+
+            foreach (var date in new[]
+            {
+                T0,
+                T0.AddDays(1),
+                T0.AddDays(3),
+                T0.AddDays(6),
+                T1.AddMinutes(-16),
+            })
+            {
+                Assert.AreEqual(
+                    SignatureCheck.Verified,
+                    await client.VerifySignatureDetailedAsync(SignedAt(date)),
+                    date.ToString("o"));
+            }
+
+            Assert.AreEqual(1, _handler.Requests.Count);
+        }
+
+        [TestMethod]
+        public async Task VerifySignature_AtTheNewestEndLessTolerance_FetchesOnce()
+        {
+            // From the newest end less the boundary tolerance, the key in
+            // force or its neighbour may be one not held yet, so the list is
+            // fetched once more, asking from the newest start held, and the
+            // answer is merged in.
+            var earlier = new FodIdTestFactory();
+            var next = new FodIdTestFactory();
+            _time.Now = T1.AddMinutes(-20);
+            _handler.Enqueue(HttpStatusCode.OK, EndedKeysJson(
+                (T0.AddDays(-7), T0, earlier.PublicPem),
+                (T0, T1, _factory.PublicPem)));
+            using var client = NewClient();
+            await client.PublicKeysAsync();
+            _time.Now = T1.AddMinutes(-10);
+            _handler.Enqueue(HttpStatusCode.OK, EndedKeysJson(
+                (T0, T1, _factory.PublicPem),
+                (T1, T1.AddDays(7), next.PublicPem)));
+
+            // Signed under the key held, which would verify it, but dated
+            // exactly the tolerance before the newest end, so the list is
+            // fetched first.
+            Assert.AreEqual(
+                SignatureCheck.Verified,
+                await client.VerifySignatureDetailedAsync(
+                    SignedAt(T1.AddMinutes(-15))));
+            Assert.AreEqual(2, _handler.Requests.Count);
+            // Signed under the next key with the same date, so only the
+            // newly published neighbour verifies it, and one from the next
+            // period verifies from the merged list, neither with a request.
+            Assert.AreEqual(
+                SignatureCheck.Verified,
+                await client.VerifySignatureDetailedAsync(
+                    SignedBy(next, T1.AddMinutes(-15))));
+            _time.Now = T1.AddHours(2);
+            Assert.AreEqual(
+                SignatureCheck.Verified,
+                await client.VerifySignatureDetailedAsync(
+                    SignedBy(next, T1.AddHours(1))));
+
+            Assert.AreEqual(2, _handler.Requests.Count);
+            var request = _handler.Requests[1];
+            Assert.AreEqual(
+                Endpoint + "id/key/" + Resource,
+                request.Uri.GetLeftPart(UriPartial.Path));
+            Assert.AreEqual(T0.ToString("o"), AskedFrom(request));
+            // The older key the answer left out is kept.
+            CollectionAssert.AreEqual(
+                new[] { T0.AddDays(-7), T0, T1 },
+                (await client.PublicKeysAsync())
+                    .Select(key => key.StartsAt).ToArray());
+        }
+
+        [TestMethod]
+        public async Task VerifySignature_AfterTheNewestEnd_FetchesAtMostOnceAMinute()
+        {
+            // A date in a period whose key is not published, as a forged
+            // date may be, fetches at most once a minute, the first fetch of
+            // the whole list not counting, and is answered as a date no key
+            // held covers, never as a bad signature.
+            var keys = EndedKeysJson((T0, T1, _factory.PublicPem));
+            _handler.Enqueue(HttpStatusCode.OK, keys);
+            _handler.Enqueue(HttpStatusCode.OK, keys);
+            using var client = NewClient();
+            await client.PublicKeysAsync();
+
+            Assert.AreEqual(
+                SignatureCheck.NoKeyForDate,
+                await client.VerifySignatureDetailedAsync(
+                    SignedAt(T1.AddHours(1))));
+            Assert.AreEqual(
+                SignatureCheck.NoKeyForDate,
+                await client.VerifySignatureDetailedAsync(
+                    SignedAt(T1.AddHours(2))));
+            Assert.AreEqual(2, _handler.Requests.Count, "one in the minute");
+
+            _time.Now = _time.Now.AddMinutes(1);
+            _handler.Enqueue(HttpStatusCode.OK, keys);
+            Assert.AreEqual(
+                SignatureCheck.NoKeyForDate,
+                await client.VerifySignatureDetailedAsync(
+                    SignedAt(T1.AddHours(3))));
+            Assert.AreEqual(3, _handler.Requests.Count, "one a minute later");
+        }
+
+        [TestMethod]
+        public async Task VerifySignature_FetchThatFails_CountsTowardTheMinute()
+        {
+            // A request for keys that fails is counted too, so a cloud that
+            // cannot be reached is not asked on every lookup, and lookups
+            // within the minute are answered from the keys held.
+            _handler.Enqueue(HttpStatusCode.OK, EndedKeysJson(
+                (T0, T1, _factory.PublicPem)));
+            using var client = NewClient();
+            await client.PublicKeysAsync();
+            _handler.EnqueueFailure(
+                new HttpRequestException("no route to host"));
+
+            await Assert.ThrowsExactlyAsync<HttpRequestException>(
+                () => client.VerifySignatureDetailedAsync(
+                    SignedAt(T1.AddHours(1))));
+            Assert.AreEqual(
+                SignatureCheck.NoKeyForDate,
+                await client.VerifySignatureDetailedAsync(
+                    SignedAt(T1.AddHours(2))));
+            Assert.AreEqual(
+                SignatureCheck.Verified,
+                await client.VerifySignatureDetailedAsync(
+                    SignedAt(T0.AddDays(1))));
+
+            Assert.AreEqual(2, _handler.Requests.Count);
+        }
+
+        [TestMethod]
+        public async Task VerifySignature_KeyReplacedMidPeriod_FetchesOnceThenVerifies()
+        {
+            // A key may be replaced before its scheduled end. The service
+            // then ends the old entry at the replacement's start and
+            // publishes the replacement from there.
+            var replacement = new FodIdTestFactory();
+            var replacedAt = T0.AddDays(1).AddHours(2);
+            _handler.Enqueue(HttpStatusCode.OK, EndedKeysJson(
+                (T0, T1, _factory.PublicPem)));
+            using var client = NewClient();
+            await client.PublicKeysAsync();
+            _time.Now = replacedAt.AddHours(1);
+            _handler.Enqueue(HttpStatusCode.OK, EndedKeysJson(
+                (T0, replacedAt, _factory.PublicPem),
+                (replacedAt, T1, replacement.PublicPem)));
+
+            // Genuine and signed under the replacement, so it fails with the
+            // key held and verifies after one fetch.
+            Assert.AreEqual(
+                SignatureCheck.Verified,
+                await client.VerifySignatureDetailedAsync(
+                    SignedBy(replacement, replacedAt.AddMinutes(30))));
+            Assert.AreEqual(2, _handler.Requests.Count);
+            Assert.AreEqual(T0.ToString("o"), AskedFrom(_handler.Requests[1]));
+
+            // Signed under the old key after the replacement, so refused.
+            Assert.AreEqual(
+                SignatureCheck.Invalid,
+                await client.VerifySignatureDetailedAsync(
+                    SignedAt(replacedAt.AddMinutes(45))));
+            // Made under the old key before the replacement, so still good.
+            Assert.AreEqual(
+                SignatureCheck.Verified,
+                await client.VerifySignatureDetailedAsync(
+                    SignedAt(replacedAt.AddHours(-1))));
+            Assert.AreEqual(2, _handler.Requests.Count);
+        }
+
+        [TestMethod]
+        public async Task VerifySignature_OlderKeyReplaced_FetchesFromTheKeyInForce()
+        {
+            // The next key is already held when the key in force is replaced
+            // in the last minutes of its period. The fetch after the failure
+            // asks from the start of the key in force at the identifier's
+            // date, which brings the replacement, and not from the newest
+            // start held, which would not.
+            var replacement = new FodIdTestFactory();
+            var next = new FodIdTestFactory();
+            var replacedAt = T1.AddMinutes(-5);
+            _time.Now = T1.AddMinutes(-10);
+            _handler.Enqueue(HttpStatusCode.OK, EndedKeysJson(
+                (T0, T1, _factory.PublicPem),
+                (T1, T1.AddDays(7), next.PublicPem)));
+            _handler.Enqueue(HttpStatusCode.OK, EndedKeysJson(
+                (T0, replacedAt, _factory.PublicPem),
+                (replacedAt, T1, replacement.PublicPem),
+                (T1, T1.AddDays(7), next.PublicPem)));
+            using var client = NewClient();
+            await client.PublicKeysAsync();
+            _time.Now = T1.AddMinutes(-2);
+
+            Assert.AreEqual(
+                SignatureCheck.Verified,
+                await client.VerifySignatureDetailedAsync(
+                    SignedBy(replacement, T1.AddMinutes(-3))));
+
+            Assert.AreEqual(2, _handler.Requests.Count);
+            Assert.AreEqual(T0.ToString("o"), AskedFrom(_handler.Requests[1]));
+        }
+
+        [TestMethod]
+        public async Task VerifySignature_CallersAtTheEnd_ShareOneFetch()
+        {
+            // A second caller waits for the fetch the first started, rather
+            // than making its own or answering from the list that lacks the
+            // key.
+            var next = new FodIdTestFactory();
+            _handler.Enqueue(HttpStatusCode.OK, EndedKeysJson(
+                (T0, T1, _factory.PublicPem)));
+            using var client = NewClient();
+            await client.PublicKeysAsync();
+            var held = _handler.EnqueueHeld();
+            var fodId = SignedBy(next, T1.AddHours(1));
+
+            var first = client.VerifySignatureDetailedAsync(fodId);
+            var second = client.VerifySignatureDetailedAsync(fodId);
+
+            Assert.AreEqual(2, _handler.Requests.Count);
+            Assert.IsFalse(first.IsCompleted);
+            Assert.IsFalse(second.IsCompleted);
+            held.SetResult(new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = new StringContent(EndedKeysJson(
+                    (T0, T1, _factory.PublicPem),
+                    (T1, T1.AddDays(7), next.PublicPem))),
+            });
+            Assert.AreEqual(SignatureCheck.Verified, await first);
+            Assert.AreEqual(SignatureCheck.Verified, await second);
+            Assert.AreEqual(2, _handler.Requests.Count);
+        }
+
+        [TestMethod]
+        public async Task PublicKeyFor_ClockSetBack_DoesNotHoldAFetchBack()
+        {
+            // The minute is measured forward, so a clock set back behind the
+            // last fetch does not stop the next one.
+            var keys = EndedKeysJson((T0, T1, _factory.PublicPem));
+            _handler.Enqueue(HttpStatusCode.OK, keys);
+            _handler.Enqueue(HttpStatusCode.OK, keys);
+            _handler.Enqueue(HttpStatusCode.OK, keys);
+            using var client = NewClient();
+            await client.PublicKeysAsync();
+
+            await client.PublicKeyForAsync(SignedAt(T1.AddHours(1)));
+            _time.Now = _time.Now.AddHours(-1);
+            await client.PublicKeyForAsync(SignedAt(T1.AddHours(2)));
+
+            Assert.AreEqual(3, _handler.Requests.Count);
+        }
+
+        [TestMethod]
+        public async Task VerifySignature_FailsWithEveryKeyHeld_FetchesAtMostOnceAMinute()
+        {
+            // A forged signature fails with every key held and prompts one
+            // more fetch in case the key was replaced, but no other within
+            // the minute, so forgeries cannot make a request each lookup.
+            var forger = new FodIdTestFactory();
+            var keys = EndedKeysJson((T0, T1, _factory.PublicPem));
+            _handler.Enqueue(HttpStatusCode.OK, keys);
+            _handler.Enqueue(HttpStatusCode.OK, keys);
+            using var client = NewClient();
+            await client.PublicKeysAsync();
+
+            Assert.AreEqual(
+                SignatureCheck.Invalid,
+                await client.VerifySignatureDetailedAsync(
+                    SignedBy(forger, T0.AddDays(1))));
+            Assert.AreEqual(
+                SignatureCheck.Invalid,
+                await client.VerifySignatureDetailedAsync(
+                    SignedBy(forger, T0.AddDays(1).AddMinutes(1))));
+
+            Assert.AreEqual(2, _handler.Requests.Count);
         }
 
         // ----------------------------------------------------------------
@@ -705,6 +1191,24 @@ namespace FiftyOne.Did.Tests
             + "\"verifiedAt\":\"2026-09-16T09:15:32Z\","
             + "\"secondsSinceVerified\":2}";
 
+        private const string RedeemedNotRecorded =
+            "{\"signature\":\"verified\",\"context\":\"mismatch\","
+            + "\"factors\":{\"transport\":\"notrecorded\","
+            + "\"device\":\"verified\",\"browserip\":\"mismatch\","
+            + "\"connectionip\":\"verified\",\"asn\":\"misconfigured\","
+            + "\"platformname\":\"verified\","
+            + "\"platformversion\":\"notrecorded\","
+            + "\"browsername\":\"verified\","
+            + "\"browserversion\":\"verified\"},"
+            + "\"verifiedAt\":\"2026-09-26T09:15:32Z\","
+            + "\"secondsSinceVerified\":2}";
+
+        private const string RedeemedUnknownFactorValue =
+            "{\"signature\":\"verified\",\"context\":\"mismatch\","
+            + "\"factors\":{\"transport\":\"somethingnewer\"},"
+            + "\"verifiedAt\":\"2026-09-26T09:15:32Z\","
+            + "\"secondsSinceVerified\":2}";
+
         private const string RedeemedInvalidDate =
             "{\"signature\":\"invalid\",\"context\":\"invaliddate\","
             + "\"verifiedAt\":\"2026-09-03T09:15:32Z\",\"secondsSinceVerified\":1}";
@@ -815,6 +1319,63 @@ namespace FiftyOne.Did.Tests
                     result.Factors!.ContainsKey(name),
                     $"{name} should not be read from the old browser key");
             }
+        }
+
+        /// <summary>
+        /// A factor the creating service recorded no value for is read as
+        /// notrecorded, which is its own outcome and neither a mismatch nor
+        /// misconfigured, so the three sit side by side in one answer
+        /// without being confused for each other.
+        /// </summary>
+        [TestMethod]
+        public async Task Redeem_NotRecordedFactors_AreTheirOwnOutcome()
+        {
+            _handler.Enqueue(HttpStatusCode.OK, RedeemedNotRecorded);
+            using var client = NewClient();
+
+            var result = await client.RedeemAsync(
+                SignedAt(T0.AddDays(1)), "sealed", "abc123");
+
+            Assert.AreEqual(ContextOutcome.Mismatch, result.Context);
+            Assert.IsNotNull(result.Factors);
+            Assert.AreEqual(9, result.Factors!.Count);
+            Assert.AreEqual(
+                FactorOutcome.NotRecorded, result.Factors[FactorName.Transport]);
+            Assert.AreEqual(
+                FactorOutcome.NotRecorded,
+                result.Factors[FactorName.PlatformVersion]);
+            Assert.AreEqual(
+                FactorOutcome.Mismatch, result.Factors[FactorName.BrowserIp]);
+            Assert.AreEqual(
+                FactorOutcome.Misconfigured, result.Factors[FactorName.Asn]);
+            Assert.AreEqual(
+                FactorOutcome.Verified, result.Factors[FactorName.Device]);
+            Assert.AreNotEqual(
+                FactorOutcome.Mismatch, result.Factors[FactorName.Transport],
+                "a factor with no recorded value is not a mismatch");
+            Assert.AreNotEqual(
+                FactorOutcome.Misconfigured,
+                result.Factors[FactorName.Transport],
+                "a factor with no recorded value is not misconfigured");
+        }
+
+        /// <summary>
+        /// A factor value this client does not know still reads as a
+        /// mismatch, so adding notrecorded has not turned an unexpected word
+        /// into a pass or into an outcome that says nothing was checked.
+        /// </summary>
+        [TestMethod]
+        public async Task Redeem_UnknownFactorValue_IsStillAMismatch()
+        {
+            _handler.Enqueue(HttpStatusCode.OK, RedeemedUnknownFactorValue);
+            using var client = NewClient();
+
+            var result = await client.RedeemAsync(
+                SignedAt(T0.AddDays(1)), "sealed", "abc123");
+
+            Assert.IsNotNull(result.Factors);
+            Assert.AreEqual(
+                FactorOutcome.Mismatch, result.Factors![FactorName.Transport]);
         }
 
         /// <summary>

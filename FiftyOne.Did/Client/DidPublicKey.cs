@@ -27,13 +27,15 @@ namespace FiftyOne.Did.Client
     /// <summary>
     /// One entry of the 51Did signing key schedule as the cloud publishes
     /// it. A key is in force from <see cref="StartsAt"/> until the next
-    /// entry starts, so the entry whose start is latest on or before an
-    /// identifier's creation time is the one that signed it.
+    /// entry starts, which is <see cref="EndsAt"/> where the service gives
+    /// it, so the entry whose start is latest on or before an identifier's
+    /// creation time is the one that signed it, unless it had ended by
+    /// then.
     /// </summary>
     public sealed class DidPublicKey
     {
         /// <summary>
-        /// Creates an entry.
+        /// Creates an entry whose end is not known.
         /// </summary>
         /// <param name="startsAt">When the key comes into force, UTC.</param>
         /// <param name="publicKeyPem">The public key as SPKI PEM.</param>
@@ -41,18 +43,56 @@ namespace FiftyOne.Did.Client
         /// Thrown when <paramref name="publicKeyPem"/> is null.
         /// </exception>
         public DidPublicKey(DateTime startsAt, string publicKeyPem)
+            : this(startsAt, publicKeyPem, null)
         {
-            StartsAt = startsAt;
-            PublicKeyPem = publicKeyPem
-                ?? throw new ArgumentNullException(nameof(publicKeyPem));
         }
 
         /// <summary>
-        /// When the key comes into force, UTC. Keys are published up to
-        /// three months ahead of their start, so an entry may be in the
-        /// future.
+        /// Creates an entry.
+        /// </summary>
+        /// <param name="startsAt">When the key comes into force, UTC.</param>
+        /// <param name="publicKeyPem">The public key as SPKI PEM.</param>
+        /// <param name="endsAt">
+        /// When the key is scheduled to stop being in force, UTC, or null
+        /// where that is not known.
+        /// </param>
+        /// <exception cref="ArgumentNullException">
+        /// Thrown when <paramref name="publicKeyPem"/> is null.
+        /// </exception>
+        /// <exception cref="ArgumentException">
+        /// Thrown when <paramref name="endsAt"/> is not after
+        /// <paramref name="startsAt"/>.
+        /// </exception>
+        public DidPublicKey(
+            DateTime startsAt,
+            string publicKeyPem,
+            DateTime? endsAt)
+        {
+            if (endsAt <= startsAt)
+            {
+                throw new ArgumentException(
+                    "A key must end after it starts.", nameof(endsAt));
+            }
+            StartsAt = startsAt;
+            PublicKeyPem = publicKeyPem
+                ?? throw new ArgumentNullException(nameof(publicKeyPem));
+            EndsAt = endsAt;
+        }
+
+        /// <summary>
+        /// When the key comes into force, UTC. An entry may start in the
+        /// future, because a key can be published before its start.
         /// </summary>
         public DateTime StartsAt { get; }
+
+        /// <summary>
+        /// When the key is scheduled to stop being in force, UTC, being the
+        /// next key's start, or null where the service does not say. The
+        /// newest entry carries it although the next key is not published
+        /// yet. A key may be replaced before this moment, and the service
+        /// then moves it earlier to the replacement's start.
+        /// </summary>
+        public DateTime? EndsAt { get; }
 
         /// <summary>
         /// The public key in SPKI PEM form, as accepted by

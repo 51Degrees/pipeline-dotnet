@@ -43,8 +43,9 @@ namespace FiftyOne.Did.Client
         Invalid,
 
         /// <summary>
-        /// No published signing key covers the identifier's creation time,
-        /// which happens when the date precedes the whole schedule.
+        /// No signing key held covers the identifier's creation time, which
+        /// happens when the date precedes the whole schedule or follows the
+        /// end of every key published so far.
         /// </summary>
         NoKeyForDate,
 

@@ -121,6 +121,18 @@
             a POST form body, because a query string is written to access logs.
             </para>
             <para>
+            The key list is kept, and each later answer is merged into it
+            without dropping anything, because an old identifier verifies
+            against an old key. The whole list is fetched again when it is
+            older than <see cref="F:FiftyOne.Did.Client.DidClient.KeyCacheLifetime"/>. Newer keys are fetched
+            when an identifier is dated near or after the end of the keys held,
+            and the keys from the one in force at an identifier's date are
+            fetched when its signature fails against every key held, because a
+            key may be replaced before its scheduled end. Those two fetches are
+            made at most once a minute between them, so a forged date or
+            signature cannot make the client call the cloud on every lookup.
+            </para>
+            <para>
             The key cache is per instance and safe to share across threads, so
             create one client for the process and reuse it.
             </para>
@@ -142,9 +154,11 @@
         </member>
         <member name="F:FiftyOne.Did.Client.DidClient.KeyCacheLifetime">
             <summary>
-            How old the cached key list may be before a lookup fetches it
-            again. Keys are published up to three months ahead of their
-            start, so a day is far inside that margin.
+            How old the whole key list may be before a lookup fetches all of
+            it again. A key may be replaced before its scheduled end, and the
+            client picks up the replacement on the first signature that fails
+            against the keys held or, at the latest, when it fetches the whole
+            list at this age.
             </summary>
         </member>
         <member name="P:FiftyOne.Did.Client.DidClient.UserAgent">
@@ -200,8 +214,8 @@
         </member>
         <member name="M:FiftyOne.Did.Client.DidClient.PublicKeysAsync(System.Threading.CancellationToken)">
             <summary>
-            The signing public keys the cloud publishes, fetched on first use
-            and then answered from the cache. Use
+            The signing public keys held, fetched on first use and then
+            answered from the cache, which later fetches add to. Use
             <see cref="M:FiftyOne.Did.Client.DidClient.PublicKeyForAsync(FiftyOne.Did.Model.FodId,System.Threading.CancellationToken)"/> to pick the key for one
             identifier, which also refreshes the cache when it is stale.
             </summary>
@@ -215,16 +229,17 @@
         <member name="M:FiftyOne.Did.Client.DidClient.PublicKeyForAsync(FiftyOne.Did.Model.FodId,System.Threading.CancellationToken)">
             <summary>
             The key in force when the identifier was created, being the
-            entry whose start is latest on or before the identifier's date.
-            The cache is fetched again, once, before answering when it holds
-            no entry on or before the date, when the date is later than the
-            newest start held, or when the cache is older than
-            <see cref="F:FiftyOne.Did.Client.DidClient.KeyCacheLifetime"/>.
+            entry whose start is latest on or before the identifier's date,
+            unless that entry had ended by then. The whole list is fetched
+            again before answering when it is older than
+            <see cref="F:FiftyOne.Did.Client.DidClient.KeyCacheLifetime"/>, and the keys from the newest held
+            on are fetched, at most once a minute, when the date is near or
+            after the end of the keys held.
             </summary>
             <param name="fodId">The identifier.</param>
             <param name="cancellationToken">Cancels a fetch.</param>
             <returns>
-            The key, or null when the date precedes the whole schedule.
+            The key, or null when no key held is in force at the date.
             </returns>
             <exception cref="T:System.ArgumentNullException">
             Thrown when <paramref name="fodId"/> is null.
@@ -237,7 +252,8 @@
         <member name="M:FiftyOne.Did.Client.DidClient.VerifySignatureAsync(FiftyOne.Did.Model.FodId,System.Threading.CancellationToken)">
             <summary>
             Verifies the identifier's signature offline against the
-            published keys, without a cloud call once the keys are cached.
+            published keys, which are fetched only as
+            <see cref="T:FiftyOne.Did.Client.DidClient"/> describes.
             </summary>
             <param name="fodId">The identifier.</param>
             <param name="cancellationToken">Cancels a key fetch.</param>
@@ -258,7 +274,11 @@
             section and is accepted, because the signature covers the whole
             payload. The keys tried are the one in force at the identifier's
             date and, near a boundary in the schedule, the neighbouring key
-            where the two differ, best first.
+            where the two differ, best first. When every key tried fails and
+            the keys were not fetched for this check, the keys from the one
+            in force at the identifier's date are fetched, at most once a
+            minute, and the check is made once more, because a key may have
+            been replaced before its scheduled end.
             </summary>
             <param name="fodId">The identifier.</param>
             <param name="cancellationToken">Cancels a key fetch.</param>
@@ -378,7 +398,7 @@
             <summary>
             The entry in force at the moment, being the one whose start is
             latest on or before it, or null when the moment precedes every
-            entry.
+            entry or that entry had ended by then.
             </summary>
             <param name="keys">The schedule, in any order.</param>
             <param name="at">The moment.</param>
@@ -389,7 +409,7 @@
             The keys that may have signed something created at the moment,
             best first, being the entry in force and, near a boundary in the
             schedule, the neighbouring entries where those differ. Empty
-            when the moment precedes the whole schedule.
+            when no entry is in force at or near the moment.
             </summary>
             <param name="keys">The schedule, in any order.</param>
             <param name="at">The creation moment.</param>
@@ -399,17 +419,85 @@
             <summary>
             Reads the key endpoint's answer, a JSON array of objects each
             carrying <c>startsAt</c> (or <c>created</c> on a service that
-            predates <c>startsAt</c>) and <c>publicKey</c>. Other fields are
-            ignored.
+            predates <c>startsAt</c>), <c>publicKey</c> and, where the
+            service gives it, <c>endsAt</c>. Other fields are ignored.
             </summary>
             <param name="json">The response body.</param>
             <returns>The keys in start order.</returns>
             <exception cref="T:System.FormatException">
-            Thrown when the body is not an array of such objects.
+            Thrown when the body is not an array of such objects, or an
+            entry does not end after it starts.
             </exception>
             <exception cref="T:System.Text.Json.JsonException">
             Thrown when the body is not JSON.
             </exception>
+        </member>
+        <member name="M:FiftyOne.Did.Client.DidClient.KeysCoveringAsync(System.DateTime,System.Threading.CancellationToken)">
+            <summary>
+            The keys to answer a question about the date from, and whether
+            this call fetched them. The whole list is fetched when nothing is
+            held or it is older than <see cref="F:FiftyOne.Did.Client.DidClient.KeyCacheLifetime"/>, and the
+            keys from the newest held on are fetched, within the refetch
+            limit, when the date is near or after the end of the keys held,
+            where the key in force or its neighbour may be one not held yet.
+            </summary>
+        </member>
+        <member name="M:FiftyOne.Did.Client.DidClient.KeysAfterFailureAsync(System.DateTime,System.Threading.CancellationToken)">
+            <summary>
+            The keys to check a failed signature against once more. The keys
+            from the one in force at the date on are fetched, within the
+            refetch limit, so that the answer carries that key's end, moved
+            earlier if the key was replaced, and any replacement starting in
+            its period. Where the limit stops the fetch, the list held now is
+            returned, which another caller may have fetched since.
+            </summary>
+        </member>
+        <member name="M:FiftyOne.Did.Client.DidClient.RefetchLockedAsync(System.Nullable{System.DateTime},System.Threading.CancellationToken)">
+            <summary>
+            Fetches the keys starting at or after the moment, or the whole
+            list where it is null, unless a fetch for a date or a failed
+            signature started less than <see cref="F:FiftyOne.Did.Client.DidClient.RefetchInterval"/> ago. A
+            clock set back does not hold the fetch back. The start is noted
+            before sending, so that a cloud which cannot be reached is not
+            asked again on every lookup either.
+            </summary>
+            <returns>Whether a fetch was made.</returns>
+        </member>
+        <member name="M:FiftyOne.Did.Client.DidClient.FetchKeysLockedAsync(System.Nullable{System.DateTime},System.Threading.CancellationToken)">
+            <summary>
+            Fetches the keys starting at or after the moment, or the whole
+            list where it is null, and merges the answer into the keys held.
+            Only a fetch of the whole list resets the list's age, because
+            only that fetch is sure to see a change to any key held.
+            </summary>
+        </member>
+        <member name="M:FiftyOne.Did.Client.DidClient.CoverageEnd(System.Collections.Generic.IReadOnlyList{FiftyOne.Did.Client.DidPublicKey})">
+            <summary>
+            The moment the keys held stop covering, being the newest
+            entry's end, or its start where no end is known. Null when none
+            are held.
+            </summary>
+        </member>
+        <member name="M:FiftyOne.Did.Client.DidClient.NewestStart(System.Collections.Generic.IReadOnlyList{FiftyOne.Did.Client.DidPublicKey})">
+            <summary>
+            The newest start held, or null when none are held.
+            </summary>
+        </member>
+        <member name="M:FiftyOne.Did.Client.DidClient.StartOfKeyAt(System.Collections.Generic.IReadOnlyList{FiftyOne.Did.Client.DidPublicKey},System.DateTime)">
+            <summary>
+            The start of the newest key held that starts at or before the
+            moment, or of the first key held where none does, or null when
+            none are held.
+            </summary>
+        </member>
+        <member name="M:FiftyOne.Did.Client.DidClient.Merge(System.Collections.Generic.IReadOnlyList{FiftyOne.Did.Client.DidPublicKey},System.Collections.Generic.IReadOnlyList{FiftyOne.Did.Client.DidPublicKey})">
+            <summary>
+            The keys held with an answer merged in by start. The answer's
+            copy of an entry replaces the one held, as it may carry an end
+            the held one lacks or one moved earlier by a replacement, and no
+            entry held is dropped, because old identifiers verify against
+            old keys.
+            </summary>
         </member>
         <member name="M:FiftyOne.Did.Client.DidClient.ValidateEncodedValue(System.String,System.String)">
             <summary>
@@ -432,13 +520,15 @@
             <summary>
             One entry of the 51Did signing key schedule as the cloud publishes
             it. A key is in force from <see cref="P:FiftyOne.Did.Client.DidPublicKey.StartsAt"/> until the next
-            entry starts, so the entry whose start is latest on or before an
-            identifier's creation time is the one that signed it.
+            entry starts, which is <see cref="P:FiftyOne.Did.Client.DidPublicKey.EndsAt"/> where the service gives
+            it, so the entry whose start is latest on or before an identifier's
+            creation time is the one that signed it, unless it had ended by
+            then.
             </summary>
         </member>
         <member name="M:FiftyOne.Did.Client.DidPublicKey.#ctor(System.DateTime,System.String)">
             <summary>
-            Creates an entry.
+            Creates an entry whose end is not known.
             </summary>
             <param name="startsAt">When the key comes into force, UTC.</param>
             <param name="publicKeyPem">The public key as SPKI PEM.</param>
@@ -446,11 +536,37 @@
             Thrown when <paramref name="publicKeyPem"/> is null.
             </exception>
         </member>
+        <member name="M:FiftyOne.Did.Client.DidPublicKey.#ctor(System.DateTime,System.String,System.Nullable{System.DateTime})">
+            <summary>
+            Creates an entry.
+            </summary>
+            <param name="startsAt">When the key comes into force, UTC.</param>
+            <param name="publicKeyPem">The public key as SPKI PEM.</param>
+            <param name="endsAt">
+            When the key is scheduled to stop being in force, UTC, or null
+            where that is not known.
+            </param>
+            <exception cref="T:System.ArgumentNullException">
+            Thrown when <paramref name="publicKeyPem"/> is null.
+            </exception>
+            <exception cref="T:System.ArgumentException">
+            Thrown when <paramref name="endsAt"/> is not after
+            <paramref name="startsAt"/>.
+            </exception>
+        </member>
         <member name="P:FiftyOne.Did.Client.DidPublicKey.StartsAt">
             <summary>
-            When the key comes into force, UTC. Keys are published up to
-            three months ahead of their start, so an entry may be in the
-            future.
+            When the key comes into force, UTC. An entry may start in the
+            future, because a key can be published before its start.
+            </summary>
+        </member>
+        <member name="P:FiftyOne.Did.Client.DidPublicKey.EndsAt">
+            <summary>
+            When the key is scheduled to stop being in force, UTC, being the
+            next key's start, or null where the service does not say. The
+            newest entry carries it although the next key is not published
+            yet. A key may be replaced before this moment, and the service
+            then moves it earlier to the replacement's start.
             </summary>
         </member>
         <member name="P:FiftyOne.Did.Client.DidPublicKey.PublicKeyPem">
@@ -544,6 +660,15 @@
             request. This is not a mismatch and must not be read as one, since
             the identifier says nothing about it either way. Nothing a caller
             sends can produce it.
+            </summary>
+        </member>
+        <member name="F:FiftyOne.Did.Client.FactorOutcome.NotRecorded">
+            <summary>
+            The service that created the identifier recorded no value for
+            this factor, so the identifier says nothing about it and there
+            was nothing to compare. This is neither a mismatch nor
+            <see cref="F:FiftyOne.Did.Client.FactorOutcome.Misconfigured"/>, which says the checking service
+            could not determine the factor.
             </summary>
         </member>
         <member name="T:FiftyOne.Did.Client.RedeemResult">
@@ -690,8 +815,9 @@
         </member>
         <member name="F:FiftyOne.Did.Client.SignatureCheck.NoKeyForDate">
             <summary>
-            No published signing key covers the identifier's creation time,
-            which happens when the date precedes the whole schedule.
+            No signing key held covers the identifier's creation time, which
+            happens when the date precedes the whole schedule or follows the
+            end of every key published so far.
             </summary>
         </member>
         <member name="F:FiftyOne.Did.Client.SignatureCheck.UnsupportedVersion">
