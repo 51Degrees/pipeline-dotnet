@@ -59,7 +59,10 @@
 // makes two calls, verify-full from the page and redeem from this server,
 // so two uses every time, plus one use for the creation call. The
 // signing keys the offline check uses are fetched once, one use, and
-// then cached and refreshed at most daily.
+// then cached. The list is fetched again, one use each time, when it is
+// a day old, when an identifier comes from a key period the list does
+// not cover yet, and when a signature fails against every key held, the
+// last two at most once a minute.
 //
 // Environment variables:
 //   _51DEGREES_RESOURCE_KEY  the resource key, required (the legacy
