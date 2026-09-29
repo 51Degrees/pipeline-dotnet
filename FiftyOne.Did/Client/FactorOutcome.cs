@@ -23,9 +23,12 @@
 namespace FiftyOne.Did.Client
 {
     /// <summary>
-    /// The outcome of one creator context factor, reported when the context
-    /// is <see cref="ContextOutcome.Mismatch"/> or
-    /// <see cref="ContextOutcome.Misconfigured"/>.
+    /// The outcome of one creator context factor. The factors are reported
+    /// when the context is <see cref="ContextOutcome.Mismatch"/>, when it is
+    /// <see cref="ContextOutcome.Misconfigured"/> with the transport compared,
+    /// and whenever any factor is <see cref="NotRecorded"/>, whatever the
+    /// overall outcome, so a verified result shows how many factors it rests
+    /// on.
     /// </summary>
     public enum FactorOutcome
     {
