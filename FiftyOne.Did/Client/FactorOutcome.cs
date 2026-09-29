@@ -43,5 +43,14 @@ namespace FiftyOne.Did.Client
         /// sends can produce it.
         /// </summary>
         Misconfigured,
+
+        /// <summary>
+        /// The service that created the identifier recorded no value for
+        /// this factor, so the identifier says nothing about it and there
+        /// was nothing to compare. This is neither a mismatch nor
+        /// <see cref="Misconfigured"/>, which says the checking service
+        /// could not determine the factor.
+        /// </summary>
+        NotRecorded,
     }
 }

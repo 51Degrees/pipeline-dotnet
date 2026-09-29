@@ -259,27 +259,27 @@ namespace FiftyOne.Did.Client
                 StringComparer.Ordinal);
             foreach (var factor in element.EnumerateObject())
             {
-                // Misconfigured is read on its own, because it is the one
-                // value that must NOT fall through to mismatch. It says the
-                // checking service could not determine that factor, so
-                // reading it as a mismatch would report a replay indicator
-                // for something the identifier says nothing about. Everything
-                // else that is not the one word verified is a mismatch, so an
-                // unexpected value never reads as a pass.
                 var value = factor.Value.ValueKind == JsonValueKind.String
                     ? factor.Value.GetString()
                     : null;
-                factors[factor.Name] =
-                    string.Equals(
-                        value, "verified", StringComparison.OrdinalIgnoreCase)
-                        ? FactorOutcome.Verified
-                    : string.Equals(
-                        value, "misconfigured",
-                        StringComparison.OrdinalIgnoreCase)
-                        ? FactorOutcome.Misconfigured
-                    : FactorOutcome.Mismatch;
+                factors[factor.Name] = ParseFactor(value);
             }
             return factors;
+        }
+
+        // Verified, misconfigured and notrecorded are each read on their
+        // own, because none of them is a mismatch. Anything else, including
+        // a word this client does not know, is a mismatch, so an unexpected
+        // value never reads as a pass.
+        private static FactorOutcome ParseFactor(string? value)
+        {
+            switch (value?.ToLowerInvariant())
+            {
+                case "verified": return FactorOutcome.Verified;
+                case "misconfigured": return FactorOutcome.Misconfigured;
+                case "notrecorded": return FactorOutcome.NotRecorded;
+                default: return FactorOutcome.Mismatch;
+            }
         }
 
         private static DateTime? ReadVerifiedAt(JsonElement root)
