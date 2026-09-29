@@ -34,8 +34,8 @@ the example is a web demo rather than a console program.
 
 Step 2 runs in the visitor's browser (the page relays the encrypted
 result to your server) and step 3 runs on your server, which is the
-party holding the licence key. A verdict of mismatch or notcheckable
-is expected mechanics rather than an error. So is `nocontext`, because
+party holding the licence key. A verdict of mismatch is expected
+mechanics rather than an error. So is `nocontext`, because
 a self-hosted service can be configured not to emit the creator
 context, and an identifier it issued then redeems as `nocontext`,
 which the page shows the way it shows any verdict. A 404 from
@@ -75,7 +75,7 @@ key. The client reads the cloud base from `FOD_CLOUD_API_URL` itself.
 `VerifySignatureAsync` checks the signature offline against the
 published signing keys, which the client fetches and caches, and
 `RedeemAsync` returns a typed `RedeemResult` with `Signature`,
-`Context`, `Factors` when the context did not verify, `VerifiedAt` and
+`Context`, `Factors` when the cloud sends them, `VerifiedAt` and
 `SecondsSinceVerified`. The route answers the page with the cloud's
 status and a JSON body in the cloud's own shape built from that result,
 plus one extra field, `serverSignature`, carrying the offline outcome,

@@ -341,17 +341,21 @@ The four steps, in the order a server takes them.
 
 2. **Verify the signature offline.** The client fetches the signing
    public keys, keeps them, and picks the key in force when the
-   identifier was created from the identifier's own date. The list held
-   covers identifiers dated up to the newest key's scheduled end, or its
-   start where the service gives no end. The fetch is one use, and it is
-   repeated only when the list is more than a day old, when an
-   identifier is dated near or after the end of the keys held, or when
-   a signature fails against every key held, because a key may be
-   replaced before its scheduled end. The last two happen at most once
-   a minute, so checking an identifier costs nothing in the normal
-   case. A signature that does not match is `Invalid`. A key that could
-   not be fetched is an `HttpRequestException` and a date no key covers
-   is `NoKeyForDate`, because neither says anything about the
+   identifier was created from the identifier's own date. The cloud
+   publishes only keys whose period has started, plus the next key from
+   fifteen minutes before its start, and every entry carries `startsAt`
+   and `endsAt`, its scheduled end, which is the next key's start, the
+   newest entry included although the next key is not yet published.
+   The list held therefore covers identifiers dated up to the newest
+   key's `endsAt`, or its start where a service gives no end. The fetch
+   is one use, and it is repeated only when the list is more than a day
+   old, when an identifier is dated near or after the end of the keys
+   held, or when a signature fails against every key held, because a
+   key may be replaced before its scheduled end. The last two happen at
+   most once a minute, so checking an identifier costs nothing in the
+   normal case. A signature that does not match is `Invalid`. A key that
+   could not be fetched is an `HttpRequestException` and a date no key
+   covers is `NoKeyForDate`, because neither says anything about the
    signature.
 
    ```csharp
@@ -405,8 +409,10 @@ The four steps, in the order a server takes them.
    client does not try to tell them apart either.
 
    `Factors` maps each creator context factor to `Verified`, `Mismatch`,
-   `Misconfigured` or `NotRecorded`, and is present only where there is
-   something to diagnose. The names are in `FactorName`, in the order
+   `Misconfigured` or `NotRecorded`, and is present on a mismatch, on a
+   misconfigured result where the transport was compared, and whenever
+   any factor is `NotRecorded`, whatever the overall result. The names
+   are in `FactorName`, in the order
    `transport`, `device`, `browserip`, `connectionip`, `asn`,
    `platformname`, `platformversion`, `browsername` and
    `browserversion`. Cloud release 4.4.38 replaced the single `browser`
@@ -414,9 +420,12 @@ The four steps, in the order a server takes them.
    `Misconfigured` nor `NotRecorded` is a mismatch, and they say
    different things, because `Misconfigured` means the checking service
    could not determine the factor whilst `NotRecorded` means the
-   creating service recorded no value for it. A version mismatch beside
-   a verified name means an upgrade, whilst a mismatched name means a
-   different operating system or browser.
+   creating service recorded no value for it. A `NotRecorded` factor is
+   left out of the overall result, so `Verified` can arrive beside
+   factors that are `NotRecorded`, and `Factors` then says how many the
+   verdict rests on. A version mismatch beside a verified name means an
+   upgrade, whilst a mismatched name means a different operating system
+   or browser.
 
 The string overloads of `VerifyAsync` and `RedeemAsync` also refuse a
 value longer than 4096 characters before parsing it. That figure is
