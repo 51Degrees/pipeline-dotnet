@@ -22,3 +22,5 @@ if ($BuildMethod -ne "dotnet") {
 # 152 against Chrome 154 on macOS). Skipping PATH makes Selenium Manager fetch
 # a matching driver for the JavaScriptBuilderElement browser tests.
 $env:SE_SKIP_DRIVER_IN_PATH = "true"
+# Lock the version by Selemiun Manager
+$env:SE_BROWSER_VERSION = "stable"
