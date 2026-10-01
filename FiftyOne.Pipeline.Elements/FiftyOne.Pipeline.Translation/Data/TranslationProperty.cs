@@ -1,4 +1,4 @@
-﻿/* *********************************************************************
+/* *********************************************************************
  * This Original Work is copyright of 51 Degrees Mobile Experts Limited.
  * Copyright 2026 51 Degrees Mobile Experts Limited, Davidson House,
  * Forbury Square, Reading, Berkshire, United Kingdom RG1 3EU.
@@ -20,10 +20,13 @@
  * such notice(s) shall fulfill the requirements of that article.
  * ********************************************************************* */
 
+using FiftyOne.Pipeline.Engines.Data;
+using System;
+
 namespace FiftyOne.Pipeline.Translation.Data
 {
     /// <summary>
-    /// Defines a translation from one property to another. 
+    /// Defines a translation from one property to another.
     /// </summary>
     public class TranslationProperty
     {
@@ -33,9 +36,58 @@ namespace FiftyOne.Pipeline.Translation.Data
         /// <param name="source"></param>
         /// <param name="destination"></param>
         public TranslationProperty(string source, string destination)
+            : this(
+                  source,
+                  destination,
+                  message => new AspectPropertyValue<string>()
+                  {
+                      NoValueMessage = message,
+                  })
+        {
+        }
+
+        private TranslationProperty(
+            string source,
+            string destination,
+            Func<string, IAspectPropertyValue> createNoValuePlaceholder)
         {
             SourceProperty = source;
             DestinationProperty = destination;
+            CreateNoValuePlaceholder = createNoValuePlaceholder;
+        }
+
+        /// <summary>
+        /// Creates a translation whose no-value placeholder is typed for
+        /// the readers of the destination property.
+        /// </summary>
+        /// <typeparam name="TDestination">
+        /// The value type readers of the destination property expect,
+        /// i.e. the T of the
+        /// <see cref="IAspectPropertyValue{T}"/> they read it as. When the
+        /// source property has no value, the placeholder stored against
+        /// the destination is created with this type so typed reads of the
+        /// destination do not fail with an invalid cast.
+        /// </typeparam>
+        /// <param name="source">
+        /// Source property name on the source element data.
+        /// </param>
+        /// <param name="destination">
+        /// Destination property name on translation engine data.
+        /// </param>
+        /// <returns>
+        /// A new <see cref="TranslationProperty"/>.
+        /// </returns>
+        public static TranslationProperty Create<TDestination>(
+            string source,
+            string destination)
+        {
+            return new TranslationProperty(
+                source,
+                destination,
+                message => new AspectPropertyValue<TDestination>()
+                {
+                    NoValueMessage = message,
+                });
         }
 
         /// <summary>
@@ -47,5 +99,13 @@ namespace FiftyOne.Pipeline.Translation.Data
         /// Destination property name on translation engine data.
         /// </summary>
         public string DestinationProperty { get; set; }
+
+        /// <summary>
+        /// Creates the no-value placeholder stored against the destination
+        /// property when the source property has no value. The supplied
+        /// string is the placeholder's no-value message.
+        /// </summary>
+        public Func<string, IAspectPropertyValue> CreateNoValuePlaceholder
+        { get; }
     }
 }
