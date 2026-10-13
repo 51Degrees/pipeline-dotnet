@@ -24,6 +24,8 @@ using FiftyOne.Pipeline.Core.Data;
 using FiftyOne.Pipeline.Core.FlowElements;
 using FiftyOne.Pipeline.Engines;
 using FiftyOne.Pipeline.Engines.Data;
+using FiftyOne.Pipeline.Engines.FlowElements;
+using FiftyOne.Pipeline.Engines.Services;
 using FiftyOne.Pipeline.Translation.Data;
 using FiftyOne.Pipeline.Translation.FlowElements;
 using Microsoft.Extensions.Logging;
@@ -44,31 +46,128 @@ namespace FiftyOne.Pipeline.Translation.Tests;
 [TestClass]
 public class MissingSourcePropertyTests
 {
-    private ILoggerFactory _loggerFactory = LoggerFactory.Create(b => { });
+    /// <summary>
+    /// The kinds of source data the translation engine reads from.
+    /// </summary>
+    private enum SourceKind
+    {
+        /// <summary>
+        /// Plain element data whose indexer throws
+        /// PropertyMissingException for every property.
+        /// </summary>
+        ThrowingIndexer,
+
+        /// <summary>
+        /// Plain element data whose indexer returns null for every
+        /// property.
+        /// </summary>
+        NullIndexer,
+
+        /// <summary>
+        /// Plain element data whose indexer computes the value on read and
+        /// never stores it, as on-premise aspect data does.
+        /// </summary>
+        ComputedIndexer,
+
+        /// <summary>
+        /// Real <see cref="AspectDataBase"/> without the property, so the
+        /// read goes through the aspect data's own missing property path.
+        /// </summary>
+        AspectDataMissing,
+
+        /// <summary>
+        /// Real <see cref="AspectDataBase"/> holding the property.
+        /// </summary>
+        AspectDataPresent
+    }
+
+    private const string SourceKey = "testsource";
+
+    private readonly ILoggerFactory _loggerFactory =
+        LoggerFactory.Create(loggingBuilder => { });
+
+    // Each test writes its translation file to a directory of its own and
+    // removes it afterwards. The file name has to stay
+    // 'animals.fr_FR.yml' because the locale is read from it, and
+    // TranslationEngineTests uses the same name in the shared temp
+    // directory, so a fixed path would leak between the two classes.
+    private DirectoryInfo _tempDirectory;
+    private IPipeline _pipeline;
+    private IFlowData _flowData;
+
+    [TestCleanup]
+    public void Cleanup()
+    {
+        _flowData?.Dispose();
+        _pipeline?.Dispose();
+        if (_tempDirectory != null && _tempDirectory.Exists == true)
+        {
+            _tempDirectory.Delete(recursive: true);
+        }
+    }
 
     /// <summary>
     /// A source whose indexer throws PropertyMissingException for a missing
-    /// property (as aspect data does) must not make the engine throw. The
-    /// destination gets a no-value placeholder. The pipeline is built
-    /// WITHOUT suppressed process exceptions so any escaping exception
-    /// fails the test.
+    /// property must not make the engine throw. The destination gets a
+    /// no-value placeholder. The pipeline is built WITHOUT suppressed
+    /// process exceptions so any escaping exception fails the test.
     /// </summary>
     [TestMethod]
     public void SourceThrowsPropertyMissing_ProducesNoValuePlaceholder()
     {
-        using var flowData = Setup();
+        var aspectValue = ProcessAndGet<IAspectPropertyValue<string>>(
+            SourceKind.ThrowingIndexer);
 
-        flowData.AddEvidence("header.accept-language", "fr_FR");
-        flowData.Process();
-
-        var result = flowData.Get<ITranslationData>();
-        var translation = result["AnimalTranslated"];
-
-        Assert.IsNotNull(translation);
-        Assert.IsInstanceOfType(translation, typeof(IAspectPropertyValue<string>));
-        var aspectValue = translation as IAspectPropertyValue<string>;
         Assert.IsFalse(aspectValue.HasValue);
         StringAssert.Contains(aspectValue.NoValueMessage, "could not be found");
+    }
+
+    /// <summary>
+    /// The same as <see cref="SourceThrowsPropertyMissing_ProducesNoValuePlaceholder"/>
+    /// but through real aspect data, which is what a cloud engine
+    /// produces. Its indexer asks the missing property service for the
+    /// reason and throws, here with the reason a failed cloud request
+    /// gives.
+    /// </summary>
+    [TestMethod]
+    public void AspectDataMissing_ProducesNoValuePlaceholder()
+    {
+        var aspectValue = ProcessAndGet<IAspectPropertyValue<string>>(
+            SourceKind.AspectDataMissing);
+
+        Assert.IsFalse(aspectValue.HasValue);
+        StringAssert.Contains(aspectValue.NoValueMessage, "could not be found");
+    }
+
+    /// <summary>
+    /// Real aspect data that does hold the source property is still
+    /// translated, so catching the missing property exception has not
+    /// changed the path a present value takes.
+    /// </summary>
+    [TestMethod]
+    public void AspectDataPresent_IsTranslated()
+    {
+        var aspectValue = ProcessAndGet<IAspectPropertyValue<string>>(
+            SourceKind.AspectDataPresent);
+
+        Assert.IsTrue(aspectValue.HasValue);
+        Assert.AreEqual("chat", aspectValue.Value);
+    }
+
+    /// <summary>
+    /// A source that computes its values on read, with nothing in its
+    /// backing dictionary, is still translated. On-premise aspect data
+    /// works this way, so a read through AsDictionary or TryGet, which
+    /// only see the backing dictionary, would report every value missing.
+    /// </summary>
+    [TestMethod]
+    public void ComputedIndexer_IsTranslated()
+    {
+        var aspectValue = ProcessAndGet<IAspectPropertyValue<string>>(
+            SourceKind.ComputedIndexer);
+
+        Assert.IsTrue(aspectValue.HasValue);
+        Assert.AreEqual("chat", aspectValue.Value);
     }
 
     /// <summary>
@@ -79,20 +178,26 @@ public class MissingSourcePropertyTests
     [TestMethod]
     public void SourceThrowsPropertyMissing_TypedPlaceholder()
     {
-        using var flowData = Setup(typedDestination: true);
+        var aspectValue = ProcessAndGet<
+            IAspectPropertyValue<IReadOnlyList<IWeightedValue<string>>>>(
+            SourceKind.ThrowingIndexer,
+            typedDestination: true);
 
-        flowData.AddEvidence("header.accept-language", "fr_FR");
-        flowData.Process();
+        Assert.IsFalse(aspectValue.HasValue);
+        StringAssert.Contains(aspectValue.NoValueMessage, "could not be found");
+    }
 
-        var result = flowData.Get<ITranslationData>();
-        var translation = result["AnimalTranslated"];
+    /// <summary>
+    /// The typed placeholder is also produced through real aspect data.
+    /// </summary>
+    [TestMethod]
+    public void AspectDataMissing_TypedPlaceholder()
+    {
+        var aspectValue = ProcessAndGet<
+            IAspectPropertyValue<IReadOnlyList<IWeightedValue<string>>>>(
+            SourceKind.AspectDataMissing,
+            typedDestination: true);
 
-        Assert.IsNotNull(translation);
-        Assert.IsInstanceOfType(
-            translation,
-            typeof(IAspectPropertyValue<IReadOnlyList<IWeightedValue<string>>>));
-        var aspectValue = translation
-            as IAspectPropertyValue<IReadOnlyList<IWeightedValue<string>>>;
         Assert.IsFalse(aspectValue.HasValue);
         StringAssert.Contains(aspectValue.NoValueMessage, "could not be found");
     }
@@ -104,46 +209,41 @@ public class MissingSourcePropertyTests
     [TestMethod]
     public void SourceAbsent_TypedPlaceholder()
     {
-        using var flowData = Setup(
-            typedDestination: true,
-            sourceThrows: false);
+        var aspectValue = ProcessAndGet<
+            IAspectPropertyValue<IReadOnlyList<IWeightedValue<string>>>>(
+            SourceKind.NullIndexer,
+            typedDestination: true);
 
-        flowData.AddEvidence("header.accept-language", "fr_FR");
-        flowData.Process();
-
-        var result = flowData.Get<ITranslationData>();
-        var translation = result["AnimalTranslated"];
-
-        Assert.IsNotNull(translation);
-        Assert.IsInstanceOfType(
-            translation,
-            typeof(IAspectPropertyValue<IReadOnlyList<IWeightedValue<string>>>));
-        var aspectValue = translation
-            as IAspectPropertyValue<IReadOnlyList<IWeightedValue<string>>>;
         Assert.IsFalse(aspectValue.HasValue);
         StringAssert.Contains(aspectValue.NoValueMessage, "could not be found");
     }
 
     /// <summary>
-    /// Build a pipeline of a source element (throwing or returning null for
-    /// every property read) followed by a translation engine, and return a
-    /// flow data ready to process. Process exceptions are NOT suppressed.
+    /// Build a pipeline of a source element followed by a translation
+    /// engine, process a French request through it with process
+    /// exceptions NOT suppressed, and return the translated value as the
+    /// expected type.
     /// </summary>
-    private IFlowData Setup(
-        bool typedDestination = false,
-        bool sourceThrows = true)
+    private TValue ProcessAndGet<TValue>(
+        SourceKind sourceKind,
+        bool typedDestination = false)
+        where TValue : class
     {
-        var translations = new Dictionary<string, string>()
-        {
-            { "cat", "chat" },
-            { "dog", "chien" }
-        };
-        var file = CreateFile("animals.fr_FR.yml", translations);
+        _tempDirectory = Directory.CreateDirectory(Path.Combine(
+            Path.GetTempPath(),
+            Guid.NewGuid().ToString()));
+        var file = WriteTranslations(
+            Path.Combine(_tempDirectory.FullName, "animals.fr_FR.yml"),
+            new Dictionary<string, string>()
+            {
+                { "cat", "chat" },
+                { "dog", "chien" }
+            });
 
         var builder = new TranslationEngineBuilder(_loggerFactory)
-            .SetSourceElementDataKey("throwingsource")
-            .AddSource(file.File.FullName);
-        if (typedDestination)
+            .SetSourceElementDataKey(SourceKey)
+            .AddSource(file.FullName);
+        if (typedDestination == true)
         {
             builder.AddTranslation<IReadOnlyList<IWeightedValue<string>>>(
                 "Animal", "AnimalTranslated");
@@ -152,23 +252,28 @@ public class MissingSourcePropertyTests
         {
             builder.AddTranslation("Animal", "AnimalTranslated");
         }
-        var engine = builder.Build();
 
-        var pipeline = new PipelineBuilder(_loggerFactory)
-            .AddFlowElement(new ThrowingSourceElement(
-                _loggerFactory.CreateLogger<ThrowingSourceElement>(),
-                sourceThrows))
-            .AddFlowElement(engine)
+        _pipeline = new PipelineBuilder(_loggerFactory)
+            .AddFlowElement(new SourceElement(
+                _loggerFactory.CreateLogger<SourceElement>(),
+                _loggerFactory.CreateLogger<AspectDataBase>(),
+                sourceKind))
+            .AddFlowElement(builder.Build())
+            .SetSuppressProcessExceptions(false)
             .Build();
+        _flowData = _pipeline.CreateFlowData();
+        _flowData.AddEvidence("header.accept-language", "fr_FR");
+        _flowData.Process();
 
-        return pipeline.CreateFlowData();
+        var translation = _flowData.Get<ITranslationData>()["AnimalTranslated"];
+        Assert.IsInstanceOfType<TValue>(translation);
+        return (TValue)translation;
     }
 
-    private TempFile CreateFile(
-        string name,
+    private static FileInfo WriteTranslations(
+        string path,
         IReadOnlyDictionary<string, string> translations)
     {
-        var path = Path.Combine(Path.GetTempPath(), name);
         using (var writer = new StreamWriter(path))
         {
             foreach (var translation in translations)
@@ -176,48 +281,37 @@ public class MissingSourcePropertyTests
                 writer.WriteLine($"{translation.Key}: {translation.Value}");
             }
         }
-        return new TempFile(new FileInfo(path));
-    }
-
-    private class TempFile : IDisposable
-    {
-        public TempFile(FileInfo file)
-        {
-            File = file;
-        }
-
-        public FileInfo File { get; }
-
-        public void Dispose()
-        {
-            File.Delete();
-        }
+        return new FileInfo(path);
     }
 
     /// <summary>
-    /// Element data whose indexer throws PropertyMissingException for every
-    /// read, mirroring an aspect data whose property is not available.
-    /// When configured not to throw it returns null instead.
+    /// Element data whose indexer answers every read the same way without
+    /// storing anything: by throwing PropertyMissingException, by
+    /// returning null, or by returning a computed value.
     /// </summary>
-    private class ThrowingSourceData : ElementDataBase
+    private class IndexerSourceData : ElementDataBase
     {
-        private readonly bool _throws;
+        private readonly SourceKind _sourceKind;
 
-        public ThrowingSourceData(IPipeline pipeline, bool throws)
+        public IndexerSourceData(IPipeline pipeline, SourceKind sourceKind)
             : base(null, pipeline)
         {
-            _throws = throws;
+            _sourceKind = sourceKind;
         }
 
         public override object this[string key]
         {
             get
             {
-                if (_throws)
+                if (_sourceKind == SourceKind.ThrowingIndexer)
                 {
                     throw new PropertyMissingException(
                         $"Property '{key}' not found in data for element " +
-                        $"'throwingsource'.");
+                        $"'{SourceKey}'.");
+                }
+                if (_sourceKind == SourceKind.ComputedIndexer)
+                {
+                    return new AspectPropertyValue<string>("cat");
                 }
                 return null;
             }
@@ -226,22 +320,65 @@ public class MissingSourcePropertyTests
     }
 
     /// <summary>
-    /// Element whose data throws (or returns null) for every property read.
+    /// Aspect data with no engine behind it, so it does not lazy load, and
+    /// the missing property service a failed cloud request would leave.
     /// </summary>
-    private class ThrowingSourceElement
-        : FlowElementBase<ThrowingSourceData, ElementPropertyMetaData>
+    private class AspectSourceData : AspectDataBase
     {
-        private readonly bool _throws;
+        public AspectSourceData(
+            ILogger<AspectDataBase> logger,
+            IPipeline pipeline)
+            : base(logger, pipeline, null, new CloudFailedMissingPropertyService())
+        {
+        }
+    }
 
-        public ThrowingSourceElement(
-            ILogger<FlowElementBase<ThrowingSourceData, ElementPropertyMetaData>> logger,
-            bool throws)
+    /// <summary>
+    /// Reports every missing property as missing because the cloud
+    /// request failed, which is the reason the website saw.
+    /// </summary>
+    private class CloudFailedMissingPropertyService : IMissingPropertyService
+    {
+        private static readonly MissingPropertyResult _result =
+            new MissingPropertyResult()
+            {
+                Reason = MissingPropertyReason.CloudRequestFailed,
+                Description = "The cloud request failed."
+            };
+
+        public MissingPropertyResult GetMissingPropertyReason(
+            string propertyName,
+            IAspectEngine engine) => _result;
+
+        public MissingPropertyResult GetMissingPropertyReason(
+            string propertyName,
+            IReadOnlyList<IAspectEngine> engines) => _result;
+
+        public MissingPropertyResult GetMissingPropertyReason(
+            string propertyName,
+            IReadOnlyList<IAspectEngine> engines,
+            IAspectData aspectData) => _result;
+    }
+
+    /// <summary>
+    /// Element that adds source data of the configured kind.
+    /// </summary>
+    private class SourceElement : FlowElementBase<IElementData, ElementPropertyMetaData>
+    {
+        private readonly ILogger<AspectDataBase> _aspectDataLogger;
+        private readonly SourceKind _sourceKind;
+
+        public SourceElement(
+            ILogger<FlowElementBase<IElementData, ElementPropertyMetaData>> logger,
+            ILogger<AspectDataBase> aspectDataLogger,
+            SourceKind sourceKind)
             : base(logger)
         {
-            _throws = throws;
+            _aspectDataLogger = aspectDataLogger;
+            _sourceKind = sourceKind;
         }
 
-        public override string ElementDataKey => "throwingsource";
+        public override string ElementDataKey => SourceKey;
 
         public override IEvidenceKeyFilter EvidenceKeyFilter =>
             new EvidenceKeyFilterWhitelist(new List<string>());
@@ -251,9 +388,27 @@ public class MissingSourcePropertyTests
 
         protected override void ProcessInternal(IFlowData data)
         {
-            data.GetOrAdd(
-                ElementDataKey,
-                p => new ThrowingSourceData(p, _throws));
+            data.GetOrAdd(ElementDataKey, CreateData);
+        }
+
+        private IElementData CreateData(IPipeline pipeline)
+        {
+            switch (_sourceKind)
+            {
+                case SourceKind.ThrowingIndexer:
+                case SourceKind.NullIndexer:
+                case SourceKind.ComputedIndexer:
+                    return new IndexerSourceData(pipeline, _sourceKind);
+                case SourceKind.AspectDataPresent:
+                    var aspectData = new AspectSourceData(
+                        _aspectDataLogger,
+                        pipeline);
+                    aspectData["Animal"] =
+                        new AspectPropertyValue<string>("cat");
+                    return aspectData;
+                default:
+                    return new AspectSourceData(_aspectDataLogger, pipeline);
+            }
         }
 
         protected override void ManagedResourcesCleanup() { }

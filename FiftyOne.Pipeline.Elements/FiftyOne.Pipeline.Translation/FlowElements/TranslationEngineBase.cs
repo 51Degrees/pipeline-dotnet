@@ -23,6 +23,7 @@
 using FiftyOne.Pipeline.Core.Data;
 using FiftyOne.Pipeline.Core.FlowElements;
 using FiftyOne.Pipeline.Core.TypedMap;
+using FiftyOne.Pipeline.Engines;
 using FiftyOne.Pipeline.Engines.Data;
 using FiftyOne.Pipeline.Translation.Data;
 using Microsoft.Extensions.Logging;
@@ -376,13 +377,18 @@ namespace FiftyOne.Pipeline.Translation.FlowElements
 
         /// <summary>
         /// Gets the source value from the sourceData.
-        /// The value is read through <see cref="IData.AsDictionary"/>
-        /// rather than the indexer because a missing property must report
-        /// false, not throw: aspect data (for example a cloud engine's
-        /// data when the resource key does not include the property, or
-        /// when the cloud request failed) throws from its indexer for a
-        /// missing property, while its AsDictionary waits for any lazy
-        /// loading and then supports a non-throwing lookup.
+        /// The value is read through the indexer because, on aspect data,
+        /// that is the one read that waits for lazy loading only when the
+        /// value is not already present and then asks the missing property
+        /// service why it is absent. A missing property on aspect data (for
+        /// example a cloud engine's data when the cloud request failed, or
+        /// when the resource key does not include the property) therefore
+        /// throws <see cref="PropertyMissingException"/>. That used to
+        /// escape as a per-request error, so it is caught here and reported
+        /// as no value, the same as plain element data returning null.
+        /// AsDictionary is not used instead because on-premise aspect data
+        /// builds every property to answer it, and TryGet is not used
+        /// because it does not wait for lazy loading.
         /// </summary>
         /// <param name="sourceData"></param>
         /// <param name="sourceProperty"></param>
@@ -401,9 +407,15 @@ namespace FiftyOne.Pipeline.Translation.FlowElements
                 return false;
             }
 
-            return sourceData.AsDictionary()
-                    .TryGetValue(sourceProperty, out sourceValue) &&
-                sourceValue != null;
+            try
+            {
+                sourceValue = sourceData[sourceProperty];
+            }
+            catch (PropertyMissingException)
+            {
+                return false;
+            }
+            return sourceValue != null;
         }
 
         /// <summary>
