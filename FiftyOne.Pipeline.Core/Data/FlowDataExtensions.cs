@@ -130,11 +130,10 @@ namespace FiftyOne.Pipeline.Core.Data
         /// <remarks>
         /// This is the channel to use instead of
         /// <see cref="IFlowData.AddError(Exception, IFlowElement)"/> for a
-        /// problem that should not fail the request. A non-empty errors
-        /// collection makes the pipeline throw at the end of processing
-        /// unless the host has set SuppressProcessExceptions, whatever the
-        /// shouldThrow flag on the individual error says, which leaves such
-        /// a host returning no payload at all.
+        /// problem that should not fail the request. An error is still
+        /// reported to the caller as an error, even one added with
+        /// shouldThrow false: a builder such as the JSON builder writes it
+        /// into the response's errors.
         /// </remarks>
         /// <param name="data">The flow data to record the message on.</param>
         /// <param name="message">The message for the caller.</param>

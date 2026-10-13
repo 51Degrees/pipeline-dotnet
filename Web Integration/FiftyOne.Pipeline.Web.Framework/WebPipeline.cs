@@ -225,8 +225,8 @@ namespace FiftyOne.Pipeline.Web.Framework
         /// Thrown if a required parameter is null.
         /// </exception>
         /// <exception cref="AggregateException">
-        /// Thrown if an error occurred during processing, 
-        /// unless inderlying <see ref="IPipeline.SuppressProcessExceptions"/> is true.
+        /// Thrown if an error that should throw occurred during processing,
+        /// unless underlying <see ref="IPipeline.SuppressProcessExceptions"/> is true.
         /// </exception>
         public static IFlowData Process(HttpRequest request)
         {

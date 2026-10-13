@@ -181,6 +181,9 @@ namespace FiftyOne.Pipeline.Core.FlowElements
         /// Control field that indicates if the Pipeline will throw an
         /// aggregate exception during processing or suppress it and ignore the
         /// exceptions added to <see cref="IFlowData.Errors"/>.
+        /// Only errors with <see cref="IFlowError.ShouldThrow"/> true are
+        /// ever thrown; the rest stay in <see cref="IFlowData.Errors"/>
+        /// either way.
         /// When true, exceptions thrown by flow elements are also not logged
         /// at error level. They are logged at debug level instead and remain
         /// available through <see cref="IFlowData.Errors"/>.
@@ -387,8 +390,10 @@ namespace FiftyOne.Pipeline.Core.FlowElements
         /// Thrown if a required parameter is null.
         /// </exception>
         /// <exception cref="AggregateException">
-        /// Thrown if an error occurred during processing, 
-        /// unless <see ref="SuppressProcessExceptions"/> is true.
+        /// Thrown if an error that should throw occurred during processing,
+        /// unless <see ref="SuppressProcessExceptions"/> is true. Errors
+        /// recorded with <see cref="IFlowError.ShouldThrow"/> false never
+        /// cause this exception and are not included in it.
         /// </exception>
         /// <remarks>
         /// If <see ref="SuppressProcessExceptions"/> is true then exceptions
@@ -455,18 +460,23 @@ namespace FiftyOne.Pipeline.Core.FlowElements
                 }
             }
 
-            // If any throwing errors have occurred and exceptions are not
-            // suppressed, then throw an aggregate exception. Errors recorded
-            // with ShouldThrow false (e.g. a cloud engine noting that it did
-            // not process because the cloud request failed) are diagnostic
-            // only and must not surface as an exception of their own.
-            if (data.Errors != null &&
-                SuppressProcessExceptions == false &&
-                data.Errors.Any(e => e.ShouldThrow))
+            // Errors recorded with ShouldThrow false (e.g. a cloud engine
+            // noting that it did not process because the cloud request
+            // failed) are diagnostic only. The pipeline used to throw
+            // whenever any error was present but aggregate only the throwing
+            // ones, so a request whose errors were all non-throwing failed
+            // with an AggregateException holding no inner exceptions and
+            // nothing to diagnose. The same list now decides whether to throw
+            // and what to throw, so the two can never disagree again.
+            var throwingErrors = data.Errors?
+                .Where(error => error.ShouldThrow == true)
+                .Select(error => error.ExceptionData)
+                .ToList();
+            if (SuppressProcessExceptions == false &&
+                throwingErrors != null &&
+                throwingErrors.Count > 0)
             {
-                throw new AggregateException(data.Errors
-                    .Where(e => e.ShouldThrow == true)
-                    .Select(e => e.ExceptionData));
+                throw new AggregateException(throwingErrors);
             }
 
             if (log)

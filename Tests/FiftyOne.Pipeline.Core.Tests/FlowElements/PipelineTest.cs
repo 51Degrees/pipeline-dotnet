@@ -387,8 +387,45 @@ namespace FiftyOne.Pipeline.Core.Tests.FlowElements
 
         [TestMethod]
         /// <summary>
+        /// End to end check, through a real pipeline and flow data, that an
+        /// element recording its own error with shouldThrow false does not
+        /// make Process throw when process exceptions are not suppressed,
+        /// and that the error is still available in FlowData.Errors. The
+        /// pipeline used to throw an AggregateException with no inner
+        /// exceptions here, because it threw whenever any error was present
+        /// but aggregated only the throwing ones.
+        /// </summary>
+        public void Pipeline_NonThrowingErrorFromAddError_NotSuppressed_DoesNotThrow()
+        {
+            var element = GetMockFlowElement();
+            element.Setup(e => e.Process(It.IsAny<IFlowData>()))
+                .Callback((IFlowData flowData) => flowData.AddError(
+                    new Exception("QUIET"),
+                    element.Object,
+                    shouldThrow: false,
+                    shouldLog: false));
+
+            using (var pipeline = new PipelineBuilder(new TestLoggerFactory())
+                .AddFlowElement(element.Object)
+                .SetSuppressProcessExceptions(false)
+                .Build())
+            using (var data = pipeline.CreateFlowData())
+            {
+                data.Process();
+
+                Assert.HasCount(1, data.Errors,
+                    "The error should still be recorded in FlowData.Errors.");
+                Assert.IsFalse(data.Errors[0].ShouldThrow);
+            }
+        }
+
+        [TestMethod]
+        /// <summary>
         /// Check that when throwing and non-throwing errors are mixed, only
-        /// the throwing errors appear in the aggregate exception.
+        /// the throwing errors appear in the aggregate exception. This held
+        /// before non-throwing errors stopped causing the throw, so it does
+        /// not demonstrate that fix. It guards the single list of throwing
+        /// errors that now both decides whether to throw and is thrown.
         /// </summary>
         public void Pipeline_MixedErrorsThrowOnlyThrowing()
         {
@@ -412,25 +449,12 @@ namespace FiftyOne.Pipeline.Core.Tests.FlowElements
                 element1.Object);
 
             // Start processing.
-            Exception exception = null;
-            try
-            {
-                pipeline.Process(data.Object);
-            }
-            catch (Exception e)
-            {
-                exception = e;
-            }
+            var exception = Assert.ThrowsExactly<AggregateException>(
+                () => pipeline.Process(data.Object));
 
             // Check that only the throwing error is in the aggregate.
-            Assert.IsNotNull(exception);
-            Assert.IsInstanceOfType(exception, typeof(AggregateException));
-            Assert.HasCount(
-                1,
-                ((AggregateException)exception).InnerExceptions);
-            Assert.AreEqual(
-                "LOUD",
-                ((AggregateException)exception).InnerExceptions[0].Message);
+            Assert.HasCount(1, exception.InnerExceptions);
+            Assert.AreEqual("LOUD", exception.InnerExceptions[0].Message);
         }
 
         [TestMethod]
