@@ -193,7 +193,8 @@ namespace FiftyOne.Pipeline.Core.FlowElements
         /// <summary>
         /// Configure the Pipeline to either suppress exceptions added to
         /// <see cref="IFlowData.Errors"/> during processing or to throw them
-        /// as an aggregate exception once processing is complete.
+        /// as an aggregate exception once processing is complete. Errors
+        /// with <see cref="IFlowError.ShouldThrow"/> false are never thrown.
         /// </summary>
         /// <param name="suppressExceptions">
         /// If true then Pipeline will suppress exceptions added to
@@ -214,7 +215,8 @@ namespace FiftyOne.Pipeline.Core.FlowElements
         /// <summary>
         /// Configure the Pipeline to either suppress exceptions added to
         /// <see cref="IFlowData.Errors"/> during processing or to throw them
-        /// as an aggregate exception once processing is complete.
+        /// as an aggregate exception once processing is complete. Errors
+        /// with <see cref="IFlowError.ShouldThrow"/> false are never thrown.
         /// </summary>
         /// <param name="suppressExceptions">
         /// If true then Pipeline will suppress exceptions added to
