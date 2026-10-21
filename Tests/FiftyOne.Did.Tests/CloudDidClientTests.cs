@@ -46,10 +46,10 @@ namespace FiftyOne.Did.Tests
     /// <c>fodid.*</c>. With no key set the tests are inconclusive.
     /// <c>_51DEGREES_LICENSE_KEY_51DID</c>, then
     /// <c>_51DEGREES_LICENSE_KEY</c> (or <c>LICENSE_KEY</c>), is read for
-    /// the license key and is optional. Only a key under the first name
-    /// is known to carry the 51Did product, so only then must a sealed
-    /// result read back as a verdict. <c>FOD_CLOUD_API_URL</c> points
-    /// every call at another host.
+    /// the license key and is optional. When one is set it must belong to
+    /// the resource key's account and carry the 51Did product, because a
+    /// sealed result must then read back as a verdict.
+    /// <c>FOD_CLOUD_API_URL</c> points every call at another host.
     /// </para>
     /// <para>
     /// These are integration tests that use the live cloud service, so
@@ -78,10 +78,11 @@ namespace FiftyOne.Did.Tests
         private static string? ResourceKey() =>
             FirstSet("_51DEGREES_RESOURCE_KEY", "SUPER_RESOURCE_KEY");
 
-        private const string DidLicenseKeyName = "_51DEGREES_LICENSE_KEY_51DID";
-
         private static string? LicenceKey() =>
-            FirstSet(DidLicenseKeyName, "_51DEGREES_LICENSE_KEY", "LICENSE_KEY");
+            FirstSet(
+                "_51DEGREES_LICENSE_KEY_51DID",
+                "_51DEGREES_LICENSE_KEY",
+                "LICENSE_KEY");
 
         private static string? FirstSet(params string[] names)
         {
@@ -271,22 +272,9 @@ namespace FiftyOne.Did.Tests
                 return;
             }
 
-            // A license without the 51Did product gets the same refusal, and
-            // nothing here can tell which products a license under the
-            // general names carries.
-            if (result.Context == ContextOutcome.Unreadable &&
-                string.IsNullOrWhiteSpace(
-                    Environment.GetEnvironmentVariable(DidLicenseKeyName)))
-            {
-                Assert.Inconclusive(
-                    "The license key could not read the sealed result, so it " +
-                    "carries no 51Did product. Set " + DidLicenseKeyName +
-                    " to one that does.");
-                return;
-            }
-
             Assert.AreNotEqual(ContextOutcome.Unreadable, result.Context,
-                "the license key reads the sealed result: " + result.Raw);
+                "the license key reads the sealed result, so it belongs to " +
+                "the resource key's account and carries 51Did: " + result.Raw);
             Assert.AreEqual(SignatureOutcome.Verified, result.Signature, result.Raw);
             // The 51Did was created with a User-Agent and client IP that are
             // not this machine's, so factors are expected to differ. What
