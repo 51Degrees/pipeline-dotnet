@@ -333,6 +333,49 @@ public class DerivedScriptValidatorTests
         AssertFault(faults, "Checks.NotCrawler", "unknown operator 'Equals'");
     }
 
+    /// <summary>
+    /// An element key may carry single hyphens, and the key and property
+    /// name are split at the dot.
+    /// </summary>
+    [TestMethod]
+    public void Validate_AnElementKeyWithHyphens_IsASourceProperty()
+    {
+        var result = DerivedScriptValidator.Validate(
+            Replace(
+                "{ Property: device.IsCrawler, Eq: false }",
+                "{ Property: 'agent-signature.AgentSignature', " +
+                "Eq: Verified }"),
+            "Example",
+            "test");
+
+        AssertNoFaults(result);
+        var property = result.Script.Properties.Single();
+        Assert.AreEqual("agent-signature", property.ElementDataKey);
+        Assert.AreEqual("AgentSignature", property.PropertyName);
+    }
+
+    /// <summary>
+    /// A leading, trailing or doubled hyphen, a hyphen in the property name
+    /// and a key with no property name are each a fault.
+    /// </summary>
+    [TestMethod]
+    [DataRow("-agent.Signature")]
+    [DataRow("agent-.Signature")]
+    [DataRow("agent--signature.Signature")]
+    [DataRow("agent.Sig-nature")]
+    [DataRow("agent-signature")]
+    public void Fault_AMalformedSourceProperty(string property)
+    {
+        var faults = FaultsOf(Replace(
+            "{ Property: device.IsCrawler, Eq: false }",
+            "{ Property: '" + property + "', Eq: false }"));
+
+        AssertFault(
+            faults,
+            "Checks.NotCrawler.Property",
+            "is not a source property");
+    }
+
     /// <summary>More than one operator in one condition.</summary>
     [TestMethod]
     public void Fault_MoreThanOneOperatorInACondition()

@@ -77,8 +77,9 @@ namespace FiftyOne.Pipeline.DerivedProperty.Data
             "^[A-Za-z][A-Za-z0-9]*$",
             RegexOptions.CultureInvariant | RegexOptions.Compiled);
 
+        // An element key may carry single hyphens, as agent-signature does.
         private static readonly Regex _sourceProperty = new Regex(
-            "^[A-Za-z][A-Za-z0-9]*\\.[A-Za-z][A-Za-z0-9]*$",
+            "^[A-Za-z][A-Za-z0-9]*(?:-[A-Za-z0-9]+)*\\.[A-Za-z][A-Za-z0-9]*$",
             RegexOptions.CultureInvariant | RegexOptions.Compiled);
 
         private static readonly Regex _semanticVersion = new Regex(
