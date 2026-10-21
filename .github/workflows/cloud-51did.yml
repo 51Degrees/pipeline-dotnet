@@ -3,7 +3,10 @@ name: Cloud 51Did Tests
 # Runs the live cloud 51Did tests once for every _51DEGREES_RESOURCE_KEY*
 # key passed in below. Each run sets two names to that key, being
 # 51DEGREES_RESOURCE_KEY, which DidCloudEngineLiveEntitlementTests reads, and
-# _51DEGREES_RESOURCE_KEY, which CloudFodIdTests reads.
+# _51DEGREES_RESOURCE_KEY, which CloudFodIdTests and CloudDidClientTests read.
+# _51DEGREES_LICENSE_KEY_51DID carries the 51Did product, so with it
+# CloudDidClientTests must read a sealed creator context result back as a
+# verdict rather than the refusal a caller with no license key gets.
 #
 # The secrets are named one by one rather than passed as toJSON(secrets).
 # GitHub marks a workflow that hands every secret to a step as possibly
@@ -12,7 +15,8 @@ name: Cloud 51Did Tests
 # secret.
 #
 # Two projects run. Tests/FiftyOne.Did.Tests, CloudFodIdTests, obtains a real
-# 51Did and parses it. Tests/FiftyOne.Did.Cloud.Tests,
+# 51Did and parses it, and CloudDidClientTests verifies it and redeems a sealed
+# result with the license key. Tests/FiftyOne.Did.Cloud.Tests,
 # DidCloudEngineLiveEntitlementTests, builds a customer style pipeline against
 # the live cloud and checks that the outcome matches what the key is actually
 # entitled to, which is a build that reports what the cloud lists for an
@@ -57,10 +61,11 @@ jobs:
         env:
           _51DEGREES_RESOURCE_KEY_BASIC: ${{ vars._51DEGREES_RESOURCE_KEY_BASIC }}
           _51DEGREES_RESOURCE_KEY_BESPOKE: ${{ secrets._51DEGREES_RESOURCE_KEY_BESPOKE }}
+          _51DEGREES_LICENSE_KEY_51DID: ${{ secrets._51DEGREES_LICENSE_KEY_51DID }}
         run: |
           $runs = @(
             @{ Project = 'Tests/FiftyOne.Did.Tests/FiftyOne.Did.Tests.csproj'
-               Filter  = 'FullyQualifiedName~CloudFodIdTests' },
+               Filter  = 'FullyQualifiedName~CloudFodIdTests|FullyQualifiedName~CloudDidClientTests' },
             @{ Project = 'Tests/FiftyOne.Did.Cloud.Tests/FiftyOne.Did.Cloud.Tests.csproj'
                Filter  = 'FullyQualifiedName~DidCloudEngineLiveEntitlementTests' }
           )
