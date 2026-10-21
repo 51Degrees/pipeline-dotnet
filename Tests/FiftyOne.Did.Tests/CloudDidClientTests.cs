@@ -24,6 +24,7 @@ using FiftyOne.Did.Client;
 using FiftyOne.Did.Model;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using System;
+using System.Linq;
 using System.Net.Http;
 using System.Text.Json;
 using System.Threading.Tasks;
@@ -35,16 +36,20 @@ namespace FiftyOne.Did.Tests
     /// create a 51Did through the cloud <c>json</c> endpoint with the
     /// resource key from the environment, exactly as
     /// <see cref="CloudFodIdTests"/> does, then verify it offline and
-    /// through the cloud, and redeem a garbage result.
+    /// through the cloud, and redeem both a garbage result and one the
+    /// cloud sealed.
     /// </summary>
     /// <remarks>
     /// <para>
     /// Set <c>_51DEGREES_RESOURCE_KEY</c> (or the legacy
     /// <c>SUPER_RESOURCE_KEY</c>) to a key whose properties include
     /// <c>fodid.*</c>. With no key set the tests are inconclusive.
-    /// <c>_51DEGREES_LICENSE_KEY</c> (or <c>LICENSE_KEY</c>) is read for
-    /// the licence key and is optional. <c>FOD_CLOUD_API_URL</c> points
-    /// every call at another host.
+    /// <c>_51DEGREES_LICENSE_KEY_51DID</c>, then
+    /// <c>_51DEGREES_LICENSE_KEY</c> (or <c>LICENSE_KEY</c>), is read for
+    /// the license key and is optional. When one is set it must belong to
+    /// the resource key's account and carry the 51Did product, because a
+    /// sealed result must then read back as a verdict.
+    /// <c>FOD_CLOUD_API_URL</c> points every call at another host.
     /// </para>
     /// <para>
     /// These are integration tests that use the live cloud service, so
@@ -74,7 +79,10 @@ namespace FiftyOne.Did.Tests
             FirstSet("_51DEGREES_RESOURCE_KEY", "SUPER_RESOURCE_KEY");
 
         private static string? LicenceKey() =>
-            FirstSet("_51DEGREES_LICENSE_KEY", "LICENSE_KEY");
+            FirstSet(
+                "_51DEGREES_LICENSE_KEY_51DID",
+                "_51DEGREES_LICENSE_KEY",
+                "LICENSE_KEY");
 
         private static string? FirstSet(params string[] names)
         {
@@ -115,6 +123,16 @@ namespace FiftyOne.Did.Tests
         /// </summary>
         private static async Task<FodId?> CreateAsync(DidClient client)
         {
+            var encoded = await CreateEncodedAsync(client);
+            return encoded == null ? null : FodId.FromBase64(encoded);
+        }
+
+        /// <summary>
+        /// The 51Did exactly as the cloud json endpoint returned it, or null
+        /// with the test marked inconclusive when the key returns none.
+        /// </summary>
+        private static async Task<string?> CreateEncodedAsync(DidClient client)
+        {
             var url =
                 $"{client.Endpoint}json?resource={Uri.EscapeDataString(client.ResourceKey)}" +
                 $"&user-agent={Uri.EscapeDataString(UserAgent)}" +
@@ -137,7 +155,31 @@ namespace FiftyOne.Did.Tests
                     "include fodid.*. Response: " + body);
                 return null;
             }
-            return FodId.FromBase64(id.GetString()!);
+            return id.GetString()!;
+        }
+
+        /// <summary>
+        /// Seals a creator context result for the 51Did, standing in for
+        /// the browser call the client does not carry, or null when the
+        /// host returns none.
+        /// </summary>
+        private static async Task<string?> SealAsync(
+            DidClient client, string encoded, string challenge)
+        {
+            var url =
+                $"{client.Endpoint}id/verify-context/{Uri.EscapeDataString(client.ResourceKey)}" +
+                $"?51did={Uri.EscapeDataString(encoded)}" +
+                $"&challenge={Uri.EscapeDataString(challenge)}";
+            using var response = await Http.GetAsync(url);
+            var body = await response.Content.ReadAsStringAsync();
+            Assert.IsTrue(response.IsSuccessStatusCode,
+                $"verify-context request failed " +
+                $"({(int)response.StatusCode} {response.StatusCode}): {body}");
+            using var document = JsonDocument.Parse(body);
+            return document.RootElement.TryGetProperty("result", out var result)
+                && result.ValueKind == JsonValueKind.String
+                ? result.GetString()
+                : null;
         }
 
         [TestMethod]
@@ -190,6 +232,60 @@ namespace FiftyOne.Did.Tests
             Assert.AreEqual(200, result.StatusCode, result.Raw);
             Assert.AreEqual(ContextOutcome.Unreadable, result.Context, result.Raw);
             Assert.AreEqual(SignatureOutcome.Unknown, result.Signature);
+        }
+
+        [TestMethod]
+        public async Task Redeem_SealedResult_ReadsVerdictWithLicenseKey()
+        {
+            using var client = ClientOrInconclusive();
+            if (client == null) { return; }
+            var encoded = await CreateEncodedAsync(client);
+            if (encoded == null) { return; }
+
+            var challenge = Guid.NewGuid().ToString("N");
+            var sealedResult = await SealAsync(client, encoded, challenge);
+            if (sealedResult == null)
+            {
+                Assert.Inconclusive(
+                    "verify-context returned no sealed result, so the host " +
+                    "holds no creator context secret.");
+                return;
+            }
+
+            RedeemResult result;
+            try
+            {
+                result = await client.RedeemAsync(encoded, sealedResult, challenge);
+            }
+            catch (NotSupportedException e)
+            {
+                Assert.Inconclusive(
+                    "The host does not offer the creator context: " + e.Message);
+                return;
+            }
+
+            if (LicenceKey() == null)
+            {
+                Assert.AreEqual(ContextOutcome.Unreadable, result.Context,
+                    "without a license key the sealed result cannot be read: " +
+                    result.Raw);
+                return;
+            }
+
+            Assert.AreNotEqual(ContextOutcome.Unreadable, result.Context,
+                "the license key reads the sealed result, so it belongs to " +
+                "the resource key's account and carries 51Did: " + result.Raw);
+            Assert.AreEqual(SignatureOutcome.Verified, result.Signature, result.Raw);
+            // The 51Did was created with a User-Agent and client IP that are
+            // not this machine's, so factors are expected to differ. What
+            // matters is that each one is reported.
+            Assert.IsNotNull(result.Factors, result.Raw);
+            CollectionAssert.AreEquivalent(
+                FactorName.All.ToList(), result.Factors!.Keys.ToList(), result.Raw);
+
+            Console.WriteLine(
+                $"redeemed: context={result.ContextValue} " +
+                $"signature={result.Signature} factors={result.Factors.Count}");
         }
     }
 }

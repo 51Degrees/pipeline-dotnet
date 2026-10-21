@@ -3,7 +3,12 @@ name: Cloud 51Did Tests
 # Runs the live cloud 51Did tests once for every _51DEGREES_RESOURCE_KEY*
 # key passed in below. Each run sets two names to that key, being
 # 51DEGREES_RESOURCE_KEY, which DidCloudEngineLiveEntitlementTests reads, and
-# _51DEGREES_RESOURCE_KEY, which CloudFodIdTests reads.
+# _51DEGREES_RESOURCE_KEY, which CloudFodIdTests and CloudDidClientTests read.
+# A license key only reads a sealed creator context result made with a
+# resource key of its own account, so each _51DEGREES_LICENSE_KEY<suffix> is
+# set only on the pass for _51DEGREES_RESOURCE_KEY<suffix>. With it,
+# CloudDidClientTests must read the result back as a verdict, and without it
+# must see the refusal a caller with no license key gets.
 #
 # The secrets are named one by one rather than passed as toJSON(secrets).
 # GitHub marks a workflow that hands every secret to a step as possibly
@@ -12,7 +17,8 @@ name: Cloud 51Did Tests
 # secret.
 #
 # Two projects run. Tests/FiftyOne.Did.Tests, CloudFodIdTests, obtains a real
-# 51Did and parses it. Tests/FiftyOne.Did.Cloud.Tests,
+# 51Did and parses it, and CloudDidClientTests verifies it and redeems a sealed
+# result with the license key. Tests/FiftyOne.Did.Cloud.Tests,
 # DidCloudEngineLiveEntitlementTests, builds a customer style pipeline against
 # the live cloud and checks that the outcome matches what the key is actually
 # entitled to, which is a build that reports what the cloud lists for an
@@ -57,10 +63,12 @@ jobs:
         env:
           _51DEGREES_RESOURCE_KEY_BASIC: ${{ vars._51DEGREES_RESOURCE_KEY_BASIC }}
           _51DEGREES_RESOURCE_KEY_BESPOKE: ${{ secrets._51DEGREES_RESOURCE_KEY_BESPOKE }}
+          _51DEGREES_RESOURCE_KEY_51DID: ${{ vars._51DEGREES_RESOURCE_KEY_51DID }}
+          _51DEGREES_LICENSE_KEY_51DID: ${{ secrets._51DEGREES_LICENSE_KEY_51DID }}
         run: |
           $runs = @(
             @{ Project = 'Tests/FiftyOne.Did.Tests/FiftyOne.Did.Tests.csproj'
-               Filter  = 'FullyQualifiedName~CloudFodIdTests' },
+               Filter  = 'FullyQualifiedName~CloudFodIdTests|FullyQualifiedName~CloudDidClientTests' },
             @{ Project = 'Tests/FiftyOne.Did.Cloud.Tests/FiftyOne.Did.Cloud.Tests.csproj'
                Filter  = 'FullyQualifiedName~DidCloudEngineLiveEntitlementTests' }
           )
@@ -74,10 +82,24 @@ jobs:
             dotnet build $run.Project -c Release --nologo
             if ($LASTEXITCODE -ne 0) { exit 1 }
           }
+          $licenses = @{}
+          Get-ChildItem env: |
+            Where-Object { $_.Name -like '_51DEGREES_LICENSE_KEY*' } |
+            ForEach-Object {
+              if ($_.Value) { $licenses[$_.Name] = $_.Value }
+              Remove-Item "env:$($_.Name)"
+            }
           $failed = $false
           foreach ($k in $keys) {
             $env:_51DEGREES_RESOURCE_KEY = $k.Value
             ${env:51DEGREES_RESOURCE_KEY} = $k.Value
+            $licenseName = $k.Name -replace '^_51DEGREES_RESOURCE_KEY', '_51DEGREES_LICENSE_KEY'
+            if ($licenses.ContainsKey($licenseName)) {
+              Set-Item "env:$licenseName" $licenses[$licenseName]
+              Write-Host "License key for $($k.Name): $licenseName"
+            } else {
+              Write-Host "License key for $($k.Name): none"
+            }
             foreach ($run in $runs) {
               $name = Split-Path $run.Project -Leaf
               Write-Host "::group::$name with $($k.Name)"
@@ -86,6 +108,9 @@ jobs:
                 --logger 'console;verbosity=normal'
               if ($LASTEXITCODE -ne 0) { $failed = $true }
               Write-Host '::endgroup::'
+            }
+            if ($licenses.ContainsKey($licenseName)) {
+              Remove-Item "env:$licenseName"
             }
           }
           if ($failed) { exit 1 }
