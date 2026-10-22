@@ -27,6 +27,7 @@ using Microsoft.Extensions.Logging;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using Moq;
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
@@ -55,49 +56,31 @@ namespace FiftyOne.Pipeline.Core.Tests.FlowElements
         /// <summary>
         /// Test ParallelElements does actually execute it's children
         /// in parallel.
-        /// Each of the three elements will record the start time, 
-        /// wait for 1 second and then record the end time.
-        /// If the elements are being run in parallel then all the start times
-        /// should be before all the end times and the time between start
-        /// and end for each element should be approx 1 second.
+        /// Each of the three elements signals a barrier and waits for the
+        /// other two to reach it. The barrier can only be passed if all three
+        /// elements are running at the same time, so this proves parallel
+        /// execution without depending on timings. On a busy machine the
+        /// thread pool may need to add threads before all three can start,
+        /// which only delays the test. If the elements were run one after
+        /// another, the first would never be joined by the others and the
+        /// wait would time out.
         /// </summary>
         [TestMethod]
         public void ParallelElements_ThreeElements_ValidateParallel()
         {
-            if (Environment.ProcessorCount < 4)
-            {
-                Assert.Inconclusive("This test cannot be run on a machine with less that 4 processing cores");
-            }
-
             // Arrange
+            var timeout = TimeSpan.FromSeconds(10);
+            using var allStarted = new Barrier(3);
+            var passedBarrier = new ConcurrentBag<bool>();
+            Action<IFlowData> process = d =>
+                passedBarrier.Add(allStarted.SignalAndWait(timeout));
+
             var element1 = new Mock<IFlowElement>();
             var element2 = new Mock<IFlowElement>();
             var element3 = new Mock<IFlowElement>();
-
-            element1.Setup(e => e.Process(It.IsAny<IFlowData>())).Callback((IFlowData d) =>
-            {
-                var tempdata = d.GetOrAdd("element1", (p) => new TestElementData(p));
-                tempdata["start"] = DateTime.UtcNow;
-                DateTime end = DateTime.UtcNow.AddSeconds(1);
-                SpinWait.SpinUntil(() => DateTime.UtcNow >= end);
-                tempdata["end"] = DateTime.UtcNow;
-            });
-            element2.Setup(e => e.Process(It.IsAny<IFlowData>())).Callback((IFlowData d) =>
-            {
-                var tempdata = d.GetOrAdd("element2", (p) => new TestElementData(p));
-                tempdata["start"] = DateTime.UtcNow;
-                DateTime end = DateTime.UtcNow.AddSeconds(1);
-                SpinWait.SpinUntil(() => DateTime.UtcNow >= end);
-                tempdata["end"] = DateTime.UtcNow;
-            });
-            element3.Setup(e => e.Process(It.IsAny<IFlowData>())).Callback((IFlowData d) =>
-            {
-                var tempdata = d.GetOrAdd("element3", (p) => new TestElementData(p));
-                tempdata["start"] = DateTime.UtcNow;
-                DateTime end = DateTime.UtcNow.AddSeconds(1);
-                SpinWait.SpinUntil(() => DateTime.UtcNow >= end);
-                tempdata["end"] = DateTime.UtcNow;
-            });
+            element1.Setup(e => e.Process(It.IsAny<IFlowData>())).Callback(process);
+            element2.Setup(e => e.Process(It.IsAny<IFlowData>())).Callback(process);
+            element3.Setup(e => e.Process(It.IsAny<IFlowData>())).Callback(process);
 
             _parallelElements = new ParallelElements(_logger.Object,
                 element1.Object,
@@ -110,45 +93,12 @@ namespace FiftyOne.Pipeline.Core.Tests.FlowElements
             // Act
             _parallelElements.Process(data);
 
-            List<DateTime> startTimes = new List<DateTime>();
-            startTimes.Add((DateTime)data.Get("element1")["start"]);
-            startTimes.Add((DateTime)data.Get("element2")["start"]);
-            startTimes.Add((DateTime)data.Get("element3")["start"]);
-            List<DateTime> endTimes = new List<DateTime>();
-            endTimes.Add((DateTime)data.Get("element1")["end"]);
-            endTimes.Add((DateTime)data.Get("element2")["end"]);
-            endTimes.Add((DateTime)data.Get("element3")["end"]);
-
             // Assert
             Assert.IsTrue(data.Errors == null || data.Errors.Count == 0, "Expected no errors");
-            // Requiring all three intervals to overlap at a single instant is
-            // too strict for a loaded CI runner: staggered scheduling can leave
-            // one element starting just after another finished. Parallel
-            // execution is still proven if at least one pair of elements
-            // overlaps in time, so only require a single overlapping pair.
-            int overlappingPairs = 0;
-            for (int i = 0; i < startTimes.Count; i++)
-            {
-                for (int j = i + 1; j < startTimes.Count; j++)
-                {
-                    // Two intervals overlap when each starts before the other ends.
-                    if (startTimes[i] < endTimes[j] && startTimes[j] < endTimes[i])
-                    {
-                        overlappingPairs++;
-                    }
-                }
-            }
-            Assert.IsTrue(overlappingPairs >= 1,
-                $"Expected at least two elements to overlap in time. " +
-                $"Start times [{string.Join(",", startTimes.Select(t => t.ToString("HH:mm:ss.ffffff")))}] " +
-                $"end times [" +
-                $"{string.Join(",", endTimes.Select(t => t.ToString("HH:mm:ss.ffffff")))}]");
-            for (int i = 0; i < 3; i++)
-            {
-                double ms = endTimes[i].Subtract(startTimes[i]).TotalMilliseconds;
-                Assert.IsTrue(ms < 1100 && ms > 1000, $"Element {i} total time taken was {ms}ms, " +
-                    $"which is outside the expected range of 1000-1100");
-            }
+            Assert.AreEqual(3, passedBarrier.Count, "Expected all three elements to run");
+            Assert.IsTrue(passedBarrier.All(p => p),
+                $"Expected all three elements to be running at the same " +
+                $"time, but they did not all start within {timeout}");
         }
 
         [TestMethod]
