@@ -30,8 +30,8 @@
     <!-- If these package references are updated or modified then don't forget to also 
 	     update the dependencies in the nuspec file in the parent directory. -->
     <FrameworkReference Include="Microsoft.AspNetCore.App" />
-    <PackageReference Include="Microsoft.AspNetCore.Mvc.Razor.RuntimeCompilation" Version="8.0.32" />
-    <PackageReference Include="Microsoft.Extensions.FileProviders.Embedded" Version="8.0.32" />
+    <PackageReference Include="Microsoft.AspNetCore.Mvc.Razor.RuntimeCompilation" Version="8.0.33" />
+    <PackageReference Include="Microsoft.Extensions.FileProviders.Embedded" Version="8.0.33" />
   </ItemGroup>
   <ItemGroup>
     <None Include="..\..\README.md">
@@ -44,6 +44,8 @@
     <ProjectReference Include="..\..\FiftyOne.Pipeline.Engines.FiftyOne\FiftyOne.Pipeline.Engines.FiftyOne.csproj" />
     <ProjectReference Include="..\..\FiftyOne.Pipeline.Web.Shared\FiftyOne.Pipeline.Web.Shared.csproj" />
   </ItemGroup>
+  <ItemGroup />
+  <ItemGroup />
   <ItemGroup />
   <ItemGroup />
   <ItemGroup />
