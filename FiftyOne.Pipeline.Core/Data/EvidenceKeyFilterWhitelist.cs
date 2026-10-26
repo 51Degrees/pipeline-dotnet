@@ -31,6 +31,14 @@ namespace FiftyOne.Pipeline.Core.Data
     /// This evidence filter will only include keys that are in a list
     /// that is specified at construction time.
     /// </summary>
+    /// <remarks>
+    /// Keys that the filter's comparer finds equal, such as 'header.Host'
+    /// and 'header.host' under the default case-insensitive comparer, are
+    /// one key. The list given at construction may hold such keys more
+    /// than once. The first spelling seen is the one that
+    /// <see cref="Whitelist"/> reports, and the lowest order among them
+    /// (the highest precedence) is the one kept.
+    /// </remarks>
     public class EvidenceKeyFilterWhitelist : IEvidenceKeyFilter
     {
 #pragma warning disable CA1051 // Do not declare visible instance fields
@@ -136,12 +144,38 @@ namespace FiftyOne.Pipeline.Core.Data
 
         private void PopulateFromList(List<string> inclusionList)
         {
-            _inclusionList = inclusionList.ToDictionary(w => w, w => 0, _comparer);
+            PopulateFromEntries(inclusionList.Select(key =>
+                new KeyValuePair<string, int>(key, 0)));
         }
 
         private void PopulateFromDictionary(Dictionary<string, int> inclusionList)
         {
-            _inclusionList = inclusionList.ToDictionary(w => w.Key, w => w.Value, _comparer);
+            PopulateFromEntries(inclusionList);
+        }
+
+        /// <summary>
+        /// Build the inclusion list, treating keys that the comparer finds
+        /// equal as one key. The first spelling seen names the key and the
+        /// lowest order (the highest precedence) among them is kept.
+        /// </summary>
+        /// <remarks>
+        /// Keys are grouped rather than added directly because two
+        /// capitalisations of one key are not an error. Elements in
+        /// different packages have spelled a shared key differently, and
+        /// anything that combined their whitelists with an ordinal
+        /// comparison passed both spellings here, where a straight add
+        /// threw <see cref="ArgumentException"/> naming a key the caller
+        /// had written only once. See pipeline-dotnet#393.
+        /// </remarks>
+        private void PopulateFromEntries(
+            IEnumerable<KeyValuePair<string, int>> entries)
+        {
+            _inclusionList = entries
+                .GroupBy(entry => entry.Key, _comparer)
+                .ToDictionary(
+                    group => group.First().Key,
+                    group => group.Min(entry => entry.Value),
+                    _comparer);
         }
 
         /// <summary>

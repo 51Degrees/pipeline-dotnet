@@ -38,10 +38,14 @@ namespace FiftyOne.Pipeline.JavaScriptBuilder
         /// The complete key to be used when the 'Host' HTTP header is
         /// passed as evidence
         /// </summary>
-        public const string EVIDENCE_HOST_KEY = 
-            Core.Constants.EVIDENCE_HTTPHEADER_PREFIX + 
-            Core.Constants.EVIDENCE_SEPERATOR + 
-            "Host";
+        /// <remarks>
+        /// Taken from <see cref="Core.Constants.EVIDENCE_HOST_KEY"/> rather
+        /// than spelled here, because this copy once read 'header.Host'
+        /// where other elements read 'header.host', and the two spellings
+        /// stopped a combined whitelist being built.
+        /// </remarks>
+        public const string EVIDENCE_HOST_KEY =
+            Core.Constants.EVIDENCE_HOST_KEY;
 
         /// <summary>
         /// The suffix used when the <see cref="JavaScriptBuilderElement"/> 

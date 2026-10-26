@@ -1553,14 +1553,18 @@ namespace FiftyOne.Pipeline.AgentSignature.FlowElement
                     Constants.EVIDENCE_SIGNATURE_NAME,
                     Constants.EVIDENCE_SIGNATURE_INPUT_NAME,
                     Constants.EVIDENCE_SIGNATURE_AGENT_NAME,
-                    "host",
-                    "protocol",
                 };
                 var keys = new List<string>();
                 foreach (var name in names)
                 {
                     keys.Add(_headerPrefix + name);
                 }
+                // The host and protocol keys are shared with other
+                // elements, so they are taken whole from the shared
+                // constants rather than spelled here. A separate spelling
+                // is how the host key once came to be capitalised two ways.
+                keys.Add(Core.Constants.EVIDENCE_HOST_KEY);
+                keys.Add(Core.Constants.EVIDENCE_PROTOCOL);
                 foreach (var key in RequestLineKeys)
                 {
                     keys.Add(key);
