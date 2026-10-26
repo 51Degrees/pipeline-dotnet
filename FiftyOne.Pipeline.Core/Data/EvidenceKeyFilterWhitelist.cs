@@ -34,10 +34,12 @@ namespace FiftyOne.Pipeline.Core.Data
     /// <remarks>
     /// Keys that the filter's comparer finds equal, such as 'header.Host'
     /// and 'header.host' under the default case-insensitive comparer, are
-    /// one key. The list given at construction may hold such keys more
-    /// than once. The first spelling seen is the one that
-    /// <see cref="Whitelist"/> reports, and the lowest order among them
-    /// (the highest precedence) is the one kept.
+    /// one key. The keys given at construction may hold such a key more
+    /// than once. The lowest order among them (the highest precedence)
+    /// is the one kept. The spelling that <see cref="Whitelist"/> reports
+    /// is the first one met: for a list, the first in the list; for a
+    /// dictionary, the first the dictionary yields when enumerated, which
+    /// .NET does not promise to be the order the keys were added in.
     /// </remarks>
     public class EvidenceKeyFilterWhitelist : IEvidenceKeyFilter
     {
@@ -155,8 +157,9 @@ namespace FiftyOne.Pipeline.Core.Data
 
         /// <summary>
         /// Build the inclusion list, treating keys that the comparer finds
-        /// equal as one key. The first spelling seen names the key and the
-        /// lowest order (the highest precedence) among them is kept.
+        /// equal as one key. The first spelling met in the entries names
+        /// the key and the lowest order (the highest precedence) among them
+        /// is kept.
         /// </summary>
         /// <remarks>
         /// Keys are grouped rather than added directly because two

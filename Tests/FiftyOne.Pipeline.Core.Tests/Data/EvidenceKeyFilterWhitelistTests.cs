@@ -131,10 +131,15 @@ namespace FiftyOne.Pipeline.Core.Tests.Data
         /// <summary>
         /// When two capitalisations of one key carry different orders of
         /// precedence, the higher precedence (the lower value) is kept,
-        /// whichever spelling it came with, and the first spelling seen
-        /// names the key.
+        /// whichever spelling it came with.
         /// </summary>
-        [DataTestMethod]
+        /// <remarks>
+        /// Which spelling names the key is not checked here, because for a
+        /// dictionary it is the first the dictionary yields, and .NET does
+        /// not promise that is the order the keys were added in. The list
+        /// test above checks the first spelling is kept.
+        /// </remarks>
+        [TestMethod]
         [DataRow(5, 1)]
         [DataRow(1, 5)]
         public void EvidenceKeyFilterWhitelist_Dictionary_KeysDifferingInCase(
@@ -151,10 +156,7 @@ namespace FiftyOne.Pipeline.Core.Tests.Data
             _filter = new EvidenceKeyFilterWhitelist(inclusionList);
 
             Assert.HasCount(1, _filter.Whitelist);
-            Assert.IsTrue(
-                _filter.Whitelist.Keys.Contains(
-                    "header.host", StringComparer.Ordinal),
-                "The first spelling seen is the one kept.");
+            Assert.AreEqual(1, _filter.Order("header.host"));
             Assert.AreEqual(1, _filter.Order("header.Host"));
         }
 
