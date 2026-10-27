@@ -48,6 +48,11 @@ namespace FiftyOne.Pipeline.Core.Data
         /// <summary>
         /// Add a child filter to this aggregator.
         /// </summary>
+        /// <remarks>
+        /// A key already held keeps the earlier filter's order, unlike
+        /// <see cref="EvidenceKeyFilterWhitelist"/>, which keeps the lowest.
+        /// Left so to avoid changing precedence in existing pipelines.
+        /// </remarks>
         /// <param name="filter">
         /// The filter to add.
         /// </param>

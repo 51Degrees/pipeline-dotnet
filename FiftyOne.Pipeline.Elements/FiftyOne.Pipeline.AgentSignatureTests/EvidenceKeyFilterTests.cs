@@ -21,8 +21,11 @@
  * ********************************************************************* */
 
 using FiftyOne.Pipeline.AgentSignature.Tests.Helpers;
+using FiftyOne.Pipeline.Core.Data;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
+using System;
 using System.Collections.Generic;
+using System.Linq;
 
 namespace FiftyOne.Pipeline.AgentSignature.Tests
 {
@@ -133,6 +136,29 @@ namespace FiftyOne.Pipeline.AgentSignature.Tests
                     (expected ? "be given an order, because the element " +
                         "asks for it" : "be given no order, because the " +
                         "element does not ask for it") + ".");
+            }
+        }
+
+        /// <summary>
+        /// The published whitelist names the host header spelled exactly as
+        /// the shared key is, so that combining it with another element's
+        /// whitelist by ordinal comparison yields one key, not two.
+        /// </summary>
+        [TestMethod]
+        public void HostKeyIsPublishedInTheSharedSpelling()
+        {
+            using (var harness = ElementHarness.Create())
+            {
+                var whitelist = ((EvidenceKeyFilterWhitelist)harness.Element
+                    .EvidenceKeyFilter).Whitelist;
+
+                Assert.IsTrue(
+                    whitelist.Keys.Contains(
+                        Core.Constants.EVIDENCE_HOST_KEY,
+                        StringComparer.Ordinal),
+                    "Expected '" + Core.Constants.EVIDENCE_HOST_KEY + "' " +
+                    "but the whitelist holds '" +
+                    string.Join("', '", whitelist.Keys) + "'.");
             }
         }
 

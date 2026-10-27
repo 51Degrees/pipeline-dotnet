@@ -1553,14 +1553,15 @@ namespace FiftyOne.Pipeline.AgentSignature.FlowElement
                     Constants.EVIDENCE_SIGNATURE_NAME,
                     Constants.EVIDENCE_SIGNATURE_INPUT_NAME,
                     Constants.EVIDENCE_SIGNATURE_AGENT_NAME,
-                    "host",
-                    "protocol",
                 };
                 var keys = new List<string>();
                 foreach (var name in names)
                 {
                     keys.Add(_headerPrefix + name);
                 }
+                // Shared with other elements: use the Core keys, never re-spell them.
+                keys.Add(Core.Constants.EVIDENCE_HOST_KEY);
+                keys.Add(Core.Constants.EVIDENCE_PROTOCOL);
                 foreach (var key in RequestLineKeys)
                 {
                     keys.Add(key);

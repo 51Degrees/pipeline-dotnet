@@ -21,9 +21,11 @@
  * ********************************************************************* */
 
 using FiftyOne.Common.TestHelpers;
+using FiftyOne.Pipeline.Core.Data;
 using FiftyOne.Pipeline.Core.Exceptions;
 using FiftyOne.Pipeline.JavaScriptBuilder.FlowElement;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
+using System;
 using System.Linq;
 
 namespace FiftyOne.Pipeline.JavaScript.Tests
@@ -124,6 +126,29 @@ namespace FiftyOne.Pipeline.JavaScript.Tests
             var loggers = loggerFactory.Loggers.Where(x => x.WarningEntries.Count() > 0);
 
             Assert.AreEqual(loggers.Count(), 0);
+        }
+
+        /// <summary>
+        /// The element asks for the host header spelled exactly as the
+        /// shared key is, so that combining its whitelist with another
+        /// element's by ordinal comparison yields one key, not two.
+        /// </summary>
+        [TestMethod]
+        public void JavaScriptBuilderElement_EvidenceKeyFilter_HostKeySpelling()
+        {
+            var element = new JavaScriptBuilderElementBuilder(_loggerFactory)
+                .Build();
+
+            var whitelist = ((EvidenceKeyFilterWhitelist)element
+                .EvidenceKeyFilter).Whitelist;
+
+            Assert.IsTrue(
+                whitelist.Keys.Contains(
+                    Core.Constants.EVIDENCE_HOST_KEY,
+                    StringComparer.Ordinal),
+                "Expected '" + Core.Constants.EVIDENCE_HOST_KEY + "' " +
+                "but the whitelist holds '" +
+                string.Join("', '", whitelist.Keys) + "'.");
         }
     }
 }

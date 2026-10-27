@@ -88,9 +88,7 @@ namespace FiftyOne.Pipeline.AgentSignature
         /// evidence. The '@authority' derived component is built from it.
         /// </summary>
         public const string EVIDENCE_HOST_KEY =
-            Core.Constants.EVIDENCE_HTTPHEADER_PREFIX +
-            Core.Constants.EVIDENCE_SEPERATOR +
-            "host";
+            Core.Constants.EVIDENCE_HOST_KEY;
 
         #endregion
 

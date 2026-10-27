@@ -92,5 +92,77 @@ namespace FiftyOne.Pipeline.Core.Tests.Data
             Assert.IsFalse(_filter.Include("Key1"));
             Assert.IsFalse(_filter.Include("KEY1"));
         }
+
+        /// <summary>
+        /// Two capitalisations of one key are one key to a case-insensitive
+        /// filter, so building one from both must not throw.
+        /// </summary>
+        /// <remarks>Regression test for pipeline-dotnet#393.</remarks>
+        [TestMethod]
+        public void EvidenceKeyFilterWhitelist_List_KeysDifferingInCase()
+        {
+            var combined = new List<string>() { "header.Host" }
+                .Concat(new List<string>() { "header.host" })
+                .Distinct(StringComparer.Ordinal)
+                .ToList();
+
+            _filter = new EvidenceKeyFilterWhitelist(combined);
+
+            Assert.HasCount(1, _filter.Whitelist);
+            Assert.IsTrue(
+                _filter.Whitelist.Keys.Contains(
+                    "header.Host", StringComparer.Ordinal),
+                "The first spelling seen is the one kept.");
+            Assert.IsTrue(_filter.Include("header.host"));
+            Assert.IsTrue(_filter.Include("header.Host"));
+            Assert.AreEqual(0, _filter.Order("header.host"));
+        }
+
+        /// <summary>
+        /// When two capitalisations of one key carry different orders of
+        /// precedence, the higher precedence (the lower value) is kept,
+        /// whichever spelling it came with.
+        /// </summary>
+        /// <remarks>
+        /// The spelling kept is not checked: dictionary enumeration order is
+        /// not guaranteed.
+        /// </remarks>
+        [TestMethod]
+        [DataRow(5, 1)]
+        [DataRow(1, 5)]
+        public void EvidenceKeyFilterWhitelist_Dictionary_KeysDifferingInCase(
+            int firstOrder,
+            int secondOrder)
+        {
+            var inclusionList = new Dictionary<string, int>(
+                StringComparer.Ordinal)
+            {
+                { "header.host", firstOrder },
+                { "header.Host", secondOrder },
+            };
+
+            _filter = new EvidenceKeyFilterWhitelist(inclusionList);
+
+            Assert.HasCount(1, _filter.Whitelist);
+            Assert.AreEqual(1, _filter.Order("header.host"));
+            Assert.AreEqual(1, _filter.Order("header.Host"));
+        }
+
+        /// <summary>
+        /// A case-sensitive filter still treats two capitalisations as two
+        /// keys, because to its comparer they are.
+        /// </summary>
+        [TestMethod]
+        public void EvidenceKeyFilterWhitelist_CaseSensitive_KeysDifferingInCase()
+        {
+            _filter = new EvidenceKeyFilterWhitelist(
+                new List<string>() { "header.Host", "header.host" },
+                StringComparer.Ordinal);
+
+            Assert.HasCount(2, _filter.Whitelist);
+            Assert.IsTrue(_filter.Include("header.Host"));
+            Assert.IsTrue(_filter.Include("header.host"));
+            Assert.IsFalse(_filter.Include("HEADER.HOST"));
+        }
     }
 }

@@ -31,6 +31,12 @@ namespace FiftyOne.Pipeline.Core.Data
     /// This evidence filter will only include keys that are in a list
     /// that is specified at construction time.
     /// </summary>
+    /// <remarks>
+    /// Keys the comparer finds equal are one key. The lowest order among
+    /// them is kept, and <see cref="Whitelist"/> reports the first spelling
+    /// met. For a dictionary that is its enumeration order, which .NET does
+    /// not guarantee.
+    /// </remarks>
     public class EvidenceKeyFilterWhitelist : IEvidenceKeyFilter
     {
 #pragma warning disable CA1051 // Do not declare visible instance fields
@@ -136,12 +142,27 @@ namespace FiftyOne.Pipeline.Core.Data
 
         private void PopulateFromList(List<string> inclusionList)
         {
-            _inclusionList = inclusionList.ToDictionary(w => w, w => 0, _comparer);
+            PopulateFromEntries(inclusionList.Select(key =>
+                new KeyValuePair<string, int>(key, 0)));
         }
 
         private void PopulateFromDictionary(Dictionary<string, int> inclusionList)
         {
-            _inclusionList = inclusionList.ToDictionary(w => w.Key, w => w.Value, _comparer);
+            PopulateFromEntries(inclusionList);
+        }
+
+        /// <summary>
+        /// Groups keys the comparer finds equal; see the class remarks.
+        /// </summary>
+        private void PopulateFromEntries(
+            IEnumerable<KeyValuePair<string, int>> entries)
+        {
+            _inclusionList = entries
+                .GroupBy(entry => entry.Key, _comparer)
+                .ToDictionary(
+                    group => group.First().Key,
+                    group => group.Min(entry => entry.Value),
+                    _comparer);
         }
 
         /// <summary>

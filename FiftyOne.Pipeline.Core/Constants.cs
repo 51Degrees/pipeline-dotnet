@@ -100,6 +100,18 @@ namespace FiftyOne.Pipeline.Core
         public const string EVIDENCE_PROTOCOL = EVIDENCE_HTTPHEADER_PREFIX + EVIDENCE_SEPERATOR + "protocol";
 
         /// <summary>
+        /// The complete key to be used when the 'Host' HTTP header is
+        /// passed as evidence.
+        /// </summary>
+        /// <remarks>
+        /// The one definition of this key; element constants alias it.
+        /// Elements once spelled it 'header.Host' and 'header.host', and a
+        /// whitelist built from their combined lists threw. See
+        /// pipeline-dotnet#393.
+        /// </remarks>
+        public const string EVIDENCE_HOST_KEY = EVIDENCE_HTTPHEADER_PREFIX + EVIDENCE_SEPERATOR + "host";
+
+        /// <summary>
         /// The complete key to be used when the HTTP method of the request
         /// is passed as evidence.
         /// </summary>
