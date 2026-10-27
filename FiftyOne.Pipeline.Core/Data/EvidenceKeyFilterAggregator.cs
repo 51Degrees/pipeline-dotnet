@@ -49,12 +49,9 @@ namespace FiftyOne.Pipeline.Core.Data
         /// Add a child filter to this aggregator.
         /// </summary>
         /// <remarks>
-        /// When a key is already held, from a filter added earlier, the
-        /// earlier filter's order of precedence is kept. This differs from
-        /// <see cref="EvidenceKeyFilterWhitelist"/>, which keeps the lowest
-        /// order when its own list names a key more than once. It is left
-        /// this way on purpose, because taking the lowest order here would
-        /// change which element's precedence wins in existing pipelines.
+        /// A key already held keeps the earlier filter's order, unlike
+        /// <see cref="EvidenceKeyFilterWhitelist"/>, which keeps the lowest.
+        /// Left so to avoid changing precedence in existing pipelines.
         /// </remarks>
         /// <param name="filter">
         /// The filter to add.

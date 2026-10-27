@@ -32,14 +32,10 @@ namespace FiftyOne.Pipeline.Core.Data
     /// that is specified at construction time.
     /// </summary>
     /// <remarks>
-    /// Keys that the filter's comparer finds equal, such as 'header.Host'
-    /// and 'header.host' under the default case-insensitive comparer, are
-    /// one key. The keys given at construction may hold such a key more
-    /// than once. The lowest order among them (the highest precedence)
-    /// is the one kept. The spelling that <see cref="Whitelist"/> reports
-    /// is the first one met: for a list, the first in the list; for a
-    /// dictionary, the first the dictionary yields when enumerated, which
-    /// .NET does not promise to be the order the keys were added in.
+    /// Keys the comparer finds equal are one key. The lowest order among
+    /// them is kept, and <see cref="Whitelist"/> reports the first spelling
+    /// met. For a dictionary that is its enumeration order, which .NET does
+    /// not guarantee.
     /// </remarks>
     public class EvidenceKeyFilterWhitelist : IEvidenceKeyFilter
     {
@@ -156,20 +152,8 @@ namespace FiftyOne.Pipeline.Core.Data
         }
 
         /// <summary>
-        /// Build the inclusion list, treating keys that the comparer finds
-        /// equal as one key. The first spelling met in the entries names
-        /// the key and the lowest order (the highest precedence) among them
-        /// is kept.
+        /// Groups keys the comparer finds equal; see the class remarks.
         /// </summary>
-        /// <remarks>
-        /// Keys are grouped rather than added directly because two
-        /// capitalisations of one key are not an error. Elements in
-        /// different packages have spelled a shared key differently, and
-        /// anything that combined their whitelists with an ordinal
-        /// comparison passed both spellings here, where a straight add
-        /// threw <see cref="ArgumentException"/> naming a key the caller
-        /// had written only once. See pipeline-dotnet#393.
-        /// </remarks>
         private void PopulateFromEntries(
             IEnumerable<KeyValuePair<string, int>> entries)
         {

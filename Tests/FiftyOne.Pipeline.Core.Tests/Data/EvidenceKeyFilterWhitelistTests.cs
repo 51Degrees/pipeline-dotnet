@@ -97,17 +97,7 @@ namespace FiftyOne.Pipeline.Core.Tests.Data
         /// Two capitalisations of one key are one key to a case-insensitive
         /// filter, so building one from both must not throw.
         /// </summary>
-        /// <remarks>
-        /// This is the failure reported in pipeline-dotnet#393. The
-        /// JavaScript builder named the host header 'header.Host' and the
-        /// agent signature element 'header.host'. Anything that combined
-        /// the whitelists of several elements, removed duplicates with an
-        /// ordinal comparison and built a filter from the result, as the
-        /// cloud request engine does with the list the cloud publishes,
-        /// passed both spellings through and then threw
-        /// <see cref="ArgumentException"/> naming a key that appeared only
-        /// once as it was written.
-        /// </remarks>
+        /// <remarks>Regression test for pipeline-dotnet#393.</remarks>
         [TestMethod]
         public void EvidenceKeyFilterWhitelist_List_KeysDifferingInCase()
         {
@@ -134,10 +124,8 @@ namespace FiftyOne.Pipeline.Core.Tests.Data
         /// whichever spelling it came with.
         /// </summary>
         /// <remarks>
-        /// Which spelling names the key is not checked here, because for a
-        /// dictionary it is the first the dictionary yields, and .NET does
-        /// not promise that is the order the keys were added in. The list
-        /// test above checks the first spelling is kept.
+        /// The spelling kept is not checked: dictionary enumeration order is
+        /// not guaranteed.
         /// </remarks>
         [TestMethod]
         [DataRow(5, 1)]

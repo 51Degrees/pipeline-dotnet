@@ -144,14 +144,6 @@ namespace FiftyOne.Pipeline.AgentSignature.Tests
         /// the shared key is, so that combining it with another element's
         /// whitelist by ordinal comparison yields one key, not two.
         /// </summary>
-        /// <remarks>
-        /// The JavaScript builder once asked for 'header.Host' while this
-        /// element asked for 'header.host'. The cloud published both, and
-        /// every caller's cloud request engine then failed to build its
-        /// whitelist from the list. See pipeline-dotnet#393. The
-        /// whitelist's own lookup is case-insensitive, so the check is
-        /// made ordinally on its keys.
-        /// </remarks>
         [TestMethod]
         public void HostKeyIsPublishedInTheSharedSpelling()
         {

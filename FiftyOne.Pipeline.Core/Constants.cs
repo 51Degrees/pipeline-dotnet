@@ -104,12 +104,10 @@ namespace FiftyOne.Pipeline.Core
         /// passed as evidence.
         /// </summary>
         /// <remarks>
-        /// Defined once here, and lower-cased like the other keys, because
-        /// elements that each defined their own copy disagreed on its
-        /// capitalisation. Evidence keys are matched case-insensitively,
-        /// but anything that combined the whitelists of several elements
-        /// with an ordinal comparison saw two keys, and a case-insensitive
-        /// whitelist built from both then refused to start.
+        /// The one definition of this key; element constants alias it.
+        /// Elements once spelled it 'header.Host' and 'header.host', and a
+        /// whitelist built from their combined lists threw. See
+        /// pipeline-dotnet#393.
         /// </remarks>
         public const string EVIDENCE_HOST_KEY = EVIDENCE_HTTPHEADER_PREFIX + EVIDENCE_SEPERATOR + "host";
 

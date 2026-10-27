@@ -133,14 +133,6 @@ namespace FiftyOne.Pipeline.JavaScript.Tests
         /// shared key is, so that combining its whitelist with another
         /// element's by ordinal comparison yields one key, not two.
         /// </summary>
-        /// <remarks>
-        /// The element once asked for 'header.Host' while the agent
-        /// signature element asked for 'header.host'. The cloud published
-        /// both, and every caller's cloud request engine then failed to
-        /// build its whitelist from the list. See pipeline-dotnet#393.
-        /// The whitelist's own lookup is case-insensitive, so the check
-        /// is made ordinally on its keys.
-        /// </remarks>
         [TestMethod]
         public void JavaScriptBuilderElement_EvidenceKeyFilter_HostKeySpelling()
         {

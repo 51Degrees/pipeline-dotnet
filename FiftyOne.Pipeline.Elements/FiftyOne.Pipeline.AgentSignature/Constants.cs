@@ -87,10 +87,6 @@ namespace FiftyOne.Pipeline.AgentSignature
         /// The complete key used when the 'Host' HTTP header is passed as
         /// evidence. The '@authority' derived component is built from it.
         /// </summary>
-        /// <remarks>
-        /// Taken from <see cref="Core.Constants.EVIDENCE_HOST_KEY"/> so that
-        /// every element names the key with the same capitalisation.
-        /// </remarks>
         public const string EVIDENCE_HOST_KEY =
             Core.Constants.EVIDENCE_HOST_KEY;
 
