@@ -468,6 +468,9 @@ namespace FiftyOne.Pipeline.Engines.Services
 		/// This handler deals with the extra events by using synchronisation 
 		/// with a double-check lock to ensure that the update will only be 
 		/// done once.
+		/// The watcher raises this event on a thread it owns. An exception
+		/// that escaped would end the process on Windows and macOS, and stop
+		/// the watcher on Linux, so every exception is logged here instead.
 		/// </remarks>
 		/// <param name="sender">
 		/// The <see cref="FileSystemWatcher"/> sender of the event.
@@ -486,24 +489,30 @@ namespace FiftyOne.Pipeline.Engines.Services
                 // nop -- ignore all errors
             }
 
-			// Get the associated update configuration
 			AspectEngineDataFile dataFile = null;
 			try
 			{
-				dataFile = _configurations
-					.Where(c => c.FileWatcher != null &&
-						c.FileWatcher == sender)
-					.SingleOrDefault();
-			}
-			catch (InvalidOperationException)
-			{
-				dataFile = null;
-			}
+				// Get the associated update configuration
+				try
+				{
+					dataFile = _configurations
+						.Where(c => c.FileWatcher != null &&
+							c.FileWatcher == sender)
+						.SingleOrDefault();
+				}
+				catch (InvalidOperationException)
+				{
+					dataFile = null;
+				}
 
-			try
-			{
 				DataFileUpdatedInternal(sender, e, dataFile);
             }
+#pragma warning disable CA1031 // Do not catch general exception types
+			catch (Exception ex)
+#pragma warning restore CA1031 // Do not catch general exception types
+			{
+				LogUpdateException(ex, dataFile);
+			}
 			finally
 			{
                 try
@@ -516,6 +525,16 @@ namespace FiftyOne.Pipeline.Engines.Services
                 }
             }
 		}
+
+        /// <summary>
+        /// Refreshes the engine from the file the watcher reported, then
+        /// raises <see cref="CheckForUpdateComplete"/> with the result.
+        /// </summary>
+        /// <remarks>
+        /// A failed update is logged before the event is raised, as on the
+        /// timer route. The file's write time is recorded first, so the same
+        /// file is not tried again and a file written later is.
+        /// </remarks>
         private void DataFileUpdatedInternal(object sender, FileSystemEventArgs e, AspectEngineDataFile dataFile)
         {
             AutoUpdateStatus status = AutoUpdateStatus.AUTO_UPDATE_IN_PROGRESS;
@@ -527,53 +546,67 @@ namespace FiftyOne.Pipeline.Engines.Services
 
 			if (dataFile != null)
 			{
-				// Get the last modified time of the new data file
-				DateTime dataTime = _fileSystem.File.GetLastWriteTimeUtc(e.FullPath);
-				// Use a lock with a double check on file time to make
-				// sure we only run the update once even if multiple
-				// events fire for a single file.
-				if (dataFile.LastUpdateFileModifiedTime < dataTime)
+				try
 				{
-					lock (dataFile.UpdateSyncLock)
+					// Get the last modified time of the new data file
+					DateTime dataTime = _fileSystem.File.GetLastWriteTimeUtc(e.FullPath);
+					// Use a lock with a double check on file time to make
+					// sure we only run the update once even if multiple
+					// events fire for a single file.
+					if (dataFile.LastUpdateFileModifiedTime < dataTime)
 					{
-						if (dataFile.LastUpdateFileModifiedTime < dataTime)
+						lock (dataFile.UpdateSyncLock)
 						{
-							dataFile.LastUpdateFileModifiedTime = dataTime;
-
-							// Make sure we can actually open the file for reading
-							// before notifying the engine, otherwise the copy 
-							// may still be in progress.
-							bool fileLockable = false;
-							DateTime timeout = DateTime.UtcNow.AddMinutes(10);
-
-							while (fileLockable == false &&
-								timeout > DateTime.UtcNow)
+							if (dataFile.LastUpdateFileModifiedTime < dataTime)
 							{
-								try
+								dataFile.LastUpdateFileModifiedTime = dataTime;
+
+								// Make sure we can actually open the file for reading
+								// before notifying the engine, otherwise the copy
+								// may still be in progress.
+								bool fileLockable = false;
+								DateTime timeout = DateTime.UtcNow.AddMinutes(10);
+
+								while (fileLockable == false &&
+									timeout > DateTime.UtcNow)
 								{
-									using (_fileSystem.File.OpenRead(e.FullPath)) { }
-									fileLockable = true;
-								}
-								catch (IOException)
-								{
-									// Wait for half a second before trying again.
-									Task.Delay(500).Wait();
+									try
+									{
+										using (_fileSystem.File.OpenRead(e.FullPath)) { }
+										fileLockable = true;
+									}
+									catch (IOException)
+									{
+										// Wait for half a second before trying again.
+										Task.Delay(500).Wait();
+									}
 								}
 
-								// Complete the update
-								status = UpdatedDataAvailable(dataFile);
-							}
-
-							if(fileLockable == false)
-							{
-								status = AutoUpdateStatus.AUTO_UPDATE_TIMEOUT;
+								if (fileLockable)
+								{
+									// Complete the update
+									status = UpdatedDataAvailable(dataFile);
+								}
+								else
+								{
+									status = AutoUpdateStatus.AUTO_UPDATE_TIMEOUT;
+								}
 							}
 						}
 					}
+					else
+					{
+						status = AutoUpdateStatus.AUTO_UPDATE_NOT_NEEDED;
+					}
 				}
-				else
+#pragma warning disable CA1031 // Do not catch general exception types
+				catch (Exception ex)
+#pragma warning restore CA1031 // Do not catch general exception types
 				{
-					status = AutoUpdateStatus.AUTO_UPDATE_NOT_NEEDED;
+					status = ex is DataUpdateException dataUpdateException ?
+						dataUpdateException.Status :
+						AutoUpdateStatus.AUTO_UPDATE_UNKNOWN_ERROR;
+					LogUpdateException(ex, dataFile);
 				}
 			}
 
@@ -614,6 +647,39 @@ namespace FiftyOne.Pipeline.Engines.Services
 		}
 
 		/// <summary>
+		/// Logs an exception from an automatic update with the exception
+		/// attached, so the log says why the update failed.
+		/// </summary>
+		/// <remarks>
+		/// Runs on the threads of the timer and the file system watcher,
+		/// where an exception that escapes ends the process, so a logger
+		/// that throws is ignored.
+		/// </remarks>
+		private void LogUpdateException(
+			Exception exception,
+			AspectEngineDataFile dataFile)
+		{
+			try
+			{
+				if (exception is DataUpdateException)
+				{
+					_logger.LogError(exception, Messages.ExceptionAutoUpdate);
+				}
+				else
+				{
+					_logger.LogError(exception, string.Format(
+						CultureInfo.InvariantCulture,
+						Messages.MessageAutoUpdateUnhandledError,
+						dataFile?.EngineType?.Name ?? "Unknown"));
+				}
+			}
+			catch
+			{
+				// nop -- a logger that throws must not end the process
+			}
+		}
+
+		/// <summary>
 		/// Private method called by update timers when an update is believed
 		/// to be available.
 		/// </summary>
@@ -631,21 +697,13 @@ namespace FiftyOne.Pipeline.Engines.Services
 				// nop --- ignore all errors
 			}
 
+			var dataFile = state as AspectEngineDataFile;
 			try
 			{
 				// This method is called from a background thread so
 				// we need to make sure any exceptions that occur
 				// are handled here.
 				var onUpdateCompleteReports = new List<DataUpdateCompleteArgs>();
-				Action<Exception> reportUnknownException = x =>
-				{
-					AspectEngineDataFile dataFile = state == null ? null :
-						state as AspectEngineDataFile;
-					string msg = string.Format(CultureInfo.InvariantCulture,
-						Messages.MessageAutoUpdateUnhandledError,
-						dataFile?.EngineType?.Name ?? "Unknown");
-					_logger.LogError(msg, x);
-				};
 				try
 				{
 					if (state == null)
@@ -659,17 +717,17 @@ namespace FiftyOne.Pipeline.Engines.Services
 				{
 					LogDebugMessage(() => $"Exception of type '{ex.GetType().Name}' received into {nameof(DataUpdateException)} clause.", null);
 					DebugDescribeException(ex);
-					_logger.LogError(Messages.ExceptionAutoUpdate, ex);
+					LogUpdateException(ex, dataFile);
 				}
 #pragma warning disable CA1031 // Do not catch general exception types
-				// We want to catch any possible exception here so that 
+				// We want to catch any possible exception here so that
 				// the relevant details can be logged.
 				catch (Exception ex)
 #pragma warning restore CA1031 // Do not catch general exception types
 				{
 					LogDebugMessage(() => $"Exception of type '{ex.GetType().Name}' received into {nameof(Exception)} clause.", null);
 					DebugDescribeException(ex);
-					reportUnknownException(ex);
+					LogUpdateException(ex, dataFile);
 				}
 
 				LogDebugMessage(() => $"At midpoint of {nameof(CheckForUpdate)} -- will call {nameof(OnUpdateComplete)} with {onUpdateCompleteReports.Count} reports", null);
@@ -683,10 +741,18 @@ namespace FiftyOne.Pipeline.Engines.Services
 				}
 				catch (Exception ex)
 				{
-					reportUnknownException(ex);
+					LogUpdateException(ex, dataFile);
 				}
 
 				LogDebugMessage(() => $"Exiting timer-bound {nameof(CheckForUpdate)}", null);
+			}
+#pragma warning disable CA1031 // Do not catch general exception types
+			// An exception from the debug logging above, which must not end
+			// the process either.
+			catch (Exception ex)
+#pragma warning restore CA1031 // Do not catch general exception types
+			{
+				LogUpdateException(ex, dataFile);
 			}
 			finally
 			{
@@ -816,13 +882,14 @@ namespace FiftyOne.Pipeline.Engines.Services
 			finally
 			{
 				LogDebugMessage(() => $"Entering {nameof(CheckForUpdate)}-finally with {nameof(newDataAvailable)} = {newDataAvailable}, {nameof(result)} = {result}", dataFile);
-				if (newDataAvailable == false)
+				if (result != AutoUpdateStatus.AUTO_UPDATE_SUCCESS)
 				{
-					// No update available.
+					// No update was applied, because none was available or
+					// because applying it failed.
 					// If this was a manual call to update then do nothing.
 					// If it was triggered by the timer expiring then modify
 					// the timer to check again after the configured interval.
-					// This will repeat until the update is acquired.
+					// This will repeat until an update is applied.
 					if (manualUpdate == false &&
 						dataFile != null &&
 						dataFile.Timer != null)
@@ -1130,7 +1197,7 @@ namespace FiftyOne.Pipeline.Engines.Services
 					tries++;
 				}
 
-				if (tries == 10)
+				if (result != AutoUpdateStatus.AUTO_UPDATE_SUCCESS)
 				{
                     throw new DataUpdateException($"An error occurred when applying a " +
 							$"data update to engine '{dataFile.Engine.GetType().Name}' " +
